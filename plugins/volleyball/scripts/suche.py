@@ -31,7 +31,9 @@ from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from tpdaten import LEVEL, finde_wurzel, hole_index  # noqa: E402
+from tpdaten import (  # noqa: E402
+    LEVEL, finde_wurzel, hole_index, konsole_vorbereiten,
+)
 
 
 def gruppen(hi, anwesend):
@@ -154,6 +156,12 @@ def zeige(e, lang: bool, anwesend=None):
         print(f"    Belastung    {e.get('belastungshinweis') or 'Erwachsenenbelastung, Hinweis fehlt'}")
     if e.get("variante_von"):
         print(f"    Variante von {e['variante_von']}")
+    if e.get("schaubild"):
+        print(f"    Schaubild    schaubilder/{e['schaubild']}")
+    if e.get("quelle"):
+        print(f"    Quelle       {e['quelle']}")
+    if e.get("quelldatei"):
+        print(f"    Quelldatei   quellen/{e['quelldatei']}")
     d = tage_her(e.get("zuletzt"))
     hist = f"{e.get('zuletzt')} ({d} Tage her)" if d is not None else (e.get("zuletzt") or "noch nie")
     print(f"    Zuletzt      {hist} · insgesamt {e.get('anzahl_einsaetze', 0)}x")
@@ -162,6 +170,7 @@ def zeige(e, lang: bool, anwesend=None):
 
 
 def main() -> int:
+    konsole_vorbereiten()
     ap = argparse.ArgumentParser(description="Übungen in der Bibliothek suchen")
     ap.add_argument("--wurzel", type=Path, default=None)
     ap.add_argument("--id")

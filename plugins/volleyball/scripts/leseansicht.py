@@ -7,6 +7,12 @@ Erzeugt die .html neben der .md. Die Ablauftabelle wird dabei bewusst NICHT
 als Tabelle gerendert: sechs Spalten sind auf einem Handy in der Halle
 unlesbar. Jede Zeile wird ein Block, den man mit dem Daumen abhaken kann.
 
+Hat eine Uebung im Ablauf ein Schaubild auf ihrer Karte, landet es mit im
+Block. Standardmaessig als Data-URI eingebettet, damit die Datei allein
+lauffaehig ist und auch dann noch Bilder zeigt, wenn man sie sich aufs Handy
+schickt. Das macht sie gross. Wer sie klein braucht, nimmt --bilder verweis,
+dann steht ein relativer Pfad nach schaubilder/ drin.
+
 Der Trainingsplan bleibt die Quelle. Die Leseansicht traegt oben das Datum
 ihrer Erzeugung, damit man sieht, ob sie zur aktuellen Fassung passt. Wer in
 die HTML tippt, verliert es beim naechsten Erzeugen.
@@ -15,14 +21,19 @@ die HTML tippt, verliert es beim naechsten Erzeugen.
 from __future__ import annotations
 
 import argparse
+import base64
 import html
+import mimetypes
+import os
 import re
 import sys
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from tpdaten import finde_wurzel, lies_frontmatter  # noqa: E402
+from tpdaten import (  # noqa: E402
+    finde_wurzel, konsole_vorbereiten, lies_frontmatter, lies_uebungen,
+)
 
 CSS = """
 :root{--bg:#fbfaf8;--fg:#1c1a17;--muted:#6b6560;--line:#e2ddd6;--akzent:#8a5a2b;
@@ -49,6 +60,9 @@ padding:14px 16px;margin:10px 0}
 .zeile b{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 letter-spacing:.05em;display:block}
 .warum{color:var(--muted);font-size:.88rem;font-style:italic}
+.bild{margin-top:10px}
+.bild img{display:block;width:100%;height:auto;border:1px solid var(--line);
+border-radius:8px;background:#fff}
 ul,ol{padding-left:22px}
 li{margin:4px 0}
 table{width:100%;border-collapse:collapse;font-size:.9rem;margin:12px 0;display:block;
@@ -64,6 +78,42 @@ color:var(--muted);font-size:.8rem}
 """
 
 
+def kein_bild(_uid: str) -> str:
+    return ""
+
+
+def baue_bildaufloeser(wurzel, ziel: Path, modus: str):
+    """Gibt eine Funktion uid -> HTML-Schnipsel fuer das Schaubild zurueck.
+
+    Faellt auf "kein Bild" zurueck, wenn die Karte keins traegt oder die Datei
+    unter schaubilder/ fehlt. Eine Leseansicht ohne Bild ist brauchbar, eine
+    mit totem Bildverweis nicht.
+    """
+    if modus == "aus" or wurzel is None:
+        return kein_bild
+
+    nach_id = {k["id"]: k for k in lies_uebungen(wurzel) if k.get("id")}
+
+    def aufloesen(uid: str) -> str:
+        karte = nach_id.get(uid)
+        if not karte or not karte.get("schaubild"):
+            return ""
+        datei = wurzel / "schaubilder" / str(karte["schaubild"])
+        if not datei.is_file():
+            return ""
+        if modus == "einbetten":
+            typ = mimetypes.guess_type(datei.name)[0] or "image/png"
+            roh = base64.b64encode(datei.read_bytes()).decode("ascii")
+            quelle = f"data:{typ};base64,{roh}"
+        else:
+            quelle = Path(os.path.relpath(datei, ziel.parent)).as_posix()
+        beschriftung = html.escape(f"Schaubild: {karte.get('titel') or uid}")
+        return (f'<div class="bild"><img src="{quelle}" alt="{beschriftung}" '
+                f'loading="lazy"></div>')
+
+    return aufloesen
+
+
 def inline(t: str) -> str:
     t = html.escape(t)
     t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
@@ -73,7 +123,7 @@ def inline(t: str) -> str:
     return t.replace("&lt;br&gt;", "<br>")
 
 
-def ablauf_bloecke(zeilen: list[str]) -> str:
+def ablauf_bloecke(zeilen: list[str], bild=kein_bild) -> str:
     """Rendert die Ablauftabelle als Bloecke statt als breite Tabelle."""
     reihen = []
     for z in zeilen:
@@ -113,11 +163,15 @@ def ablauf_bloecke(zeilen: list[str]) -> str:
             raus.append(f'<div class="zeile"><b>Heute</b>{inline(anp)}</div>')
         if g(i_warum).strip():
             raus.append(f'<div class="zeile warum">{inline(g(i_warum))}</div>')
+        if uid and uid != "—":
+            schnipsel = bild(uid)
+            if schnipsel:
+                raus.append(schnipsel)
         raus.append("</div>")
     return "\n".join(raus)
 
 
-def nach_html(rumpf: str) -> str:
+def nach_html(rumpf: str, bild=kein_bild) -> str:
     zeilen = rumpf.splitlines()
     raus, i = [], 0
     liste = None
@@ -155,7 +209,7 @@ def nach_html(rumpf: str) -> str:
                 i += 1
             liste_zu()
             if in_ablauf:
-                raus.append(ablauf_bloecke(block))
+                raus.append(ablauf_bloecke(block, bild))
                 in_ablauf = False
             else:
                 raus.append("<table>")
@@ -215,14 +269,29 @@ def nach_html(rumpf: str) -> str:
 
 
 def main() -> int:
+    konsole_vorbereiten()
     ap = argparse.ArgumentParser(description="Leseansicht eines Trainingsplans erzeugen")
     ap.add_argument("plan", type=Path, help="Pfad zur Trainings-.md")
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--bilder", choices=["einbetten", "verweis", "aus"],
+                    default="einbetten",
+                    help="Schaubilder der Uebungen einbetten (Standard, die HTML "
+                         "laeuft dann allein), als relativen Verweis setzen, oder "
+                         "weglassen")
     a = ap.parse_args()
 
     plan = a.plan.resolve()
     if not plan.is_file():
         raise SystemExit(f"Nicht gefunden: {plan}")
+
+    ziel = a.out or plan.with_suffix(".html")
+    try:
+        wurzel = finde_wurzel(plan.parent)
+    except SystemExit:
+        # Leseansicht soll auch fuer eine .md ausserhalb der Bibliothek laufen,
+        # dann eben ohne Schaubilder.
+        wurzel = None
+    bild = baue_bildaufloeser(wurzel, ziel, a.bilder)
 
     fm, rumpf = lies_frontmatter(plan)
     titel = next((z[2:].strip() for z in rumpf.splitlines() if z.startswith("# ")), plan.stem)
@@ -240,12 +309,11 @@ def main() -> int:
 <title>{html.escape(titel)}</title><style>{CSS}</style></head><body>
 <h1>{html.escape(titel)}</h1>
 <div class="meta">{html.escape(" · ".join(meta))}</div>
-{nach_html(rumpf)}
+{nach_html(rumpf, bild)}
 <div class="fuss">Leseansicht, erzeugt am {erzeugt} aus <code>{html.escape(plan.name)}</code>.<br>
 Änderungen gehören in die Markdown-Datei, hier gehen sie beim nächsten Erzeugen verloren.</div>
 </body></html>"""
 
-    ziel = a.out or plan.with_suffix(".html")
     ziel.write_text(doc, encoding="utf-8")
     print(f"Leseansicht: {ziel}")
     return 0

@@ -27,6 +27,27 @@ TYPEN = {"uebung", "folge"}
 
 
 # --------------------------------------------------------------------------
+# Konsole
+# --------------------------------------------------------------------------
+
+def konsole_vorbereiten() -> None:
+    """Sorgt dafuer, dass die Ausgabe auch auf Windows-Konsolen durchkommt.
+
+    Die Skripte schreiben Umlaute, Halbgeviertstriche und das Warnzeichen fuer
+    Uebungen mit Erwachsenenbelastung. Unter Windows steht stdout haeufig auf
+    cp1252, und das Warnzeichen laesst sich dort nicht kodieren: jeder Aufruf,
+    der eine solche Uebung anzeigt, stirbt sonst mit UnicodeEncodeError.
+    Deshalb hier auf UTF-8 umstellen, mit errors="replace" als Netz fuer
+    Konsolen, die auch damit nicht klarkommen.
+    """
+    for strom in (sys.stdout, sys.stderr):
+        try:
+            strom.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
+# --------------------------------------------------------------------------
 # Wurzel finden
 # --------------------------------------------------------------------------
 
@@ -144,7 +165,7 @@ SCHLANK = [
     "level_min", "level_max", "spieler_min", "spieler_max",
     "dauer_min", "dauer_max", "hallenteile", "netz",
     "erwachsenenbelastung", "belastungshinweis", "material",
-    "variante_von", "autor", "datei",
+    "variante_von", "schaubild", "quelle", "quelldatei", "autor", "datei",
 ]
 
 

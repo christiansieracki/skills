@@ -23,7 +23,9 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from tpdaten import cache_pfad, finde_wurzel, hole_index  # noqa: E402
+from tpdaten import (  # noqa: E402
+    cache_pfad, finde_wurzel, hole_index, konsole_vorbereiten,
+)
 
 ELEMENT_TITEL = {
     "annahme": "Annahme", "zuspiel": "Zuspiel", "angriff": "Angriff",
@@ -89,6 +91,7 @@ def schreibe_md(wurzel: Path, daten: dict) -> Path:
 
 
 def main() -> int:
+    konsole_vorbereiten()
     ap = argparse.ArgumentParser(description="Übungsindex neu bauen")
     ap.add_argument("--wurzel", type=Path, default=None)
     ap.add_argument("--md", action="store_true", help="index.md in der Wurzel neu schreiben")

@@ -3,12 +3,13 @@
 Exportiert die Markdown-Dokumente der Volleyball-Trainingsplanung als PDF.
 
 Nutzung:
-    python3 export_pdf.py                      # alles unter volleyball-coaching/
+    python3 export_pdf.py                      # alles in der Trainingsplanung
     python3 export_pdf.py <pfad>               # einzelne Datei oder Ordner
     python3 export_pdf.py <pfad> -o <ausgabe>  # eigener Ausgabeordner
 
-Die PDFs landen standardmaessig in volleyball-coaching/pdf/ und spiegeln
-die Ordnerstruktur. Bestehende PDFs werden ueberschrieben.
+Ohne Pfad wird die Wurzel ueber trainingsplanung-root.yml gesucht, genau wie
+bei den anderen Skripten. Die PDFs landen in <wurzel>/pdf/ und spiegeln die
+Ordnerstruktur. Bestehende PDFs werden ueberschrieben.
 
 Benoetigt pandoc ODER wkhtmltopdf. Fehlt beides, gibt das Skript einen
 Hinweis mit Installationsbefehl aus.
@@ -20,6 +21,9 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from tpdaten import finde_wurzel, konsole_vorbereiten  # noqa: E402
 
 CSS = """
 @page { size: A4; margin: 16mm 14mm; }
@@ -86,9 +90,10 @@ def md_to_pdf(src: Path, dest: Path, tool: str) -> bool:
 
 
 def main():
+    konsole_vorbereiten()
     parser = argparse.ArgumentParser(description="Markdown-Trainingsdokumente als PDF exportieren")
-    parser.add_argument("pfad", nargs="?", default="volleyball-coaching",
-                        help="Datei oder Ordner (Standard: volleyball-coaching)")
+    parser.add_argument("pfad", nargs="?", default=None,
+                        help="Datei oder Ordner (Standard: die Wurzel der Trainingsplanung)")
     parser.add_argument("-o", "--ausgabe", default=None, help="Ausgabeordner")
     args = parser.parse_args()
 
@@ -99,7 +104,7 @@ def main():
         print("                 oder:  brew install pandoc wkhtmltopdf")
         sys.exit(1)
 
-    quelle = Path(args.pfad)
+    quelle = Path(args.pfad) if args.pfad else finde_wurzel()
     if not quelle.exists():
         print(f"Pfad nicht gefunden: {quelle}")
         sys.exit(1)

@@ -52,7 +52,7 @@ netz: true
 erwachsenenbelastung: false
 belastungshinweis: ""            # Klartext, wenn erwachsenenbelastung true ist
 material: [zielmatte, baelle]    # kleingeschrieben, ohne Umlaute
-schaubild: null                  # Dateiname in schaubilder/
+schaubild: null                  # Dateiname in schaubilder/, landet in der Leseansicht
 quelle: "..."                    # nie leer
 quelldatei: null                 # Datei in quellen/, wenn die Karte daher kommt
 variante_von: null               # id, wenn abgeleitet
@@ -167,7 +167,7 @@ aus der Standardbibliothek.
 |---|---|
 | `index.py` | Index neu bauen, Bibliothek prüfen, mit `--md` die Lesebrille schreiben |
 | `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek |
-| `leseansicht.py` | aus einem Trainingsplan die HTML-Fassung fürs Handy erzeugen |
+| `leseansicht.py` | aus einem Trainingsplan die HTML-Fassung fürs Handy erzeugen, samt den Schaubildern der verwendeten Übungen |
 | `export_pdf.py` | PDF zum Ausdrucken |
 
 `index.py` ohne Argumente ist auch der Linter: doppelte IDs, unbekannte

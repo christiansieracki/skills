@@ -118,6 +118,13 @@ Die HTML ist fürs Handy in der Halle, das PDF zum Ausdrucken. Beide werden aus
 der Markdown-Datei erzeugt und tragen das Datum ihrer Erzeugung. Änderungen
 gehören in die Markdown-Datei.
 
+Hat eine Übung im Ablauf ein `schaubild:` auf ihrer Karte, steckt das Bild mit
+in der HTML. Eingebettet, damit die Datei allein läuft, wenn man sie sich aufs
+Handy schickt. Das macht sie groß. Bei vielen Schaubildern in einer Einheit
+stattdessen `--bilder verweis` anbieten, dann steht nur ein Pfad nach
+`schaubilder/` drin und die Datei bleibt klein, funktioniert aber nur im
+Ordner.
+
 ## Nachbereitung
 
 Nach der Einheit fragen: Was lief gut? Wie war die Belastung? Auffälligkeiten?
