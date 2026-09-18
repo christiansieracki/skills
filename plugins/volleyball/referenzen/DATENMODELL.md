@@ -82,7 +82,8 @@ einmal vergessen.
 - `form`: erwaermung, technik, komplex, spielform, station, abschluss
 - `level_min` / `level_max`: einsteiger, fortgeschritten, ambitioniert
 - `schwerpunkt`: nur Kennungen aus `schwerpunkte.md` der Wurzel. Fehlt eine,
-  erst dort eintragen lassen, dann verwenden. Nie einfach eine neue erfinden.
+  vorschlagen, nach dem Ja des Nutzers dort eintragen, dann verwenden. Nie
+  einfach eine neue erfinden.
   Jede Kennung führt dort eine Disziplin, siehe unten.
 
 ### Disziplin

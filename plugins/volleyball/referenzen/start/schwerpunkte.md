@@ -10,8 +10,9 @@ wird von hier aus für euren Verein erweitert.
 ## Wie die Liste wächst
 
 Ein neuer Schwerpunkt wird hier eingetragen, bevor er in einem Plan oder auf
-einer Karte auftaucht. Ein Skill darf einen vorschlagen, eintragen tut ihn ein
-Mensch. Dazu gehört die Disziplin in der dritten Spalte. Umbenennen bitte nie
+einer Karte auftaucht. Ein Skill schlägt ihn vor, sagt was er abdeckt, und
+trägt ihn nach eurem ausdrücklichen Ja selbst ein. Ohne dieses Ja bleibt es
+beim Vorschlag. Dazu gehört die Disziplin in der dritten Spalte. Umbenennen bitte nie
 ohne Suchen und Ersetzen über alle Dateien, sonst zeigen alte Karten ins Leere.
 
 ## Inhaltliche Schwerpunkte
@@ -29,7 +30,7 @@ Wer eine Zeile von Hand ergänzt, füllt die Spalte mit aus. Bleibt sie leer,
 gilt die Kennung für beide Disziplinen und schränkt keine Karte ein.
 
 Beachspezifische Kennungen stehen hier noch keine. Sie entstehen aus echtem
-Material beim Import, wo der Skill sie vorschlägt und ihr sie eintragt.
+Material beim Import, wo der Skill sie vorschlägt und nach eurem Ja einträgt.
 
 | Kennung | Klartext | Disziplin |
 |---|---|---|
@@ -62,8 +63,8 @@ das nicht.
 Den Einerblock und die Absprache am Netz gibt es am Strand genauso, dort mit
 Handzeichen vor dem Aufschlag.
 
-Was im Sand an die Stelle der drei Hallenkennungen tritt, tragt ihr ein, wenn
-ihr die erste Beachübung importiert.
+Was im Sand an die Stelle der drei Hallenkennungen tritt, entsteht beim ersten
+Beachimport.
 
 ## Steuerungsschwerpunkte
 

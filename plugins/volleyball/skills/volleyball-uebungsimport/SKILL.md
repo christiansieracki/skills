@@ -116,9 +116,10 @@ freigeben.
 
 Passt zu einem Kandidaten keine Kennung aus der `schwerpunkte.md` der Wurzel,
 steht der Vorschlag für eine neue in derselben Liste, mit `halle`, `beach`
-oder `beide` für die dritte Spalte jener Datei. Eintragen tut sie ein Mensch,
-so schreibt die Datei es vor. Die Karte nimmt die Kennung, sobald sie dort
-steht. Bis dahin bleibt der Vorschlag im Abschlussbericht stehen.
+oder `beide` für die dritte Spalte jener Datei. Sag dazu, was die Kennung
+abdeckt und warum keine vorhandene reicht. Nach einem ausdrücklichen Ja trägst
+du sie dort ein, danach nimmt die Karte sie. Ohne dieses Ja bleibt es beim
+Vorschlag.
 
 Fertig ist dieser Schritt, wenn zu jedem Kandidaten eine Entscheidung des
 Nutzers vorliegt und jede Zeile eine Disziplin trägt. Ein `?` heißt, es fehlt
@@ -149,9 +150,9 @@ Raten:
 - `erwachsenenbelastung`: nur setzen, wenn die Quelle Sprungvolumen,
   Zusatzlast oder Maximalkraft beschreibt. Dazu `belastungshinweis` in
   Klartext, damit ein Jugendtrainer weiß, was er anpassen muss.
-- `schwerpunkt`: nur Kennungen, die in der `schwerpunkte.md` der Wurzel schon
-  stehen, und jede muss zu mindestens einer Disziplin der Karte passen. Sonst
-  meldet der Linter sie.
+- `schwerpunkt`: nur Kennungen aus der `schwerpunkte.md` der Wurzel, und jede
+  muss zu mindestens einer Disziplin der Karte passen. Sonst meldet der Linter
+  sie. Eine neue Kennung steht dort, bevor eine Karte sie trägt.
 
 Inhalte in eigenen Worten wiedergeben, mit Kurzquelle in `quelle:`. Kein
 Volltext aus der Vorlage.
@@ -174,6 +175,6 @@ Danach anbieten, `index.py --md` laufen zu lassen, damit die Lesebrille
 Wie viele Karten dazugekommen sind, welche IDs, und welche Disziplin jede von
 ihnen trägt. Dazu die bestehenden Karten, die eine Disziplin dazubekommen
 haben, und was du beim Zerlegen entschieden hast, wo es nicht eindeutig war.
-Schwerpunkt-Kennungen, die du vorgeschlagen hast und die noch niemand
-eingetragen hat, stehen am Ende. Fragen, die du unterwegs gestellt und selbst
+Neue Schwerpunkt-Kennungen, die du nach Freigabe eingetragen hast, stehen mit
+dabei, und ebenso die, für die es kein Ja gab. Fragen, die du unterwegs gestellt und selbst
 beantwortet hast, gehören ebenfalls hinein, damit er sie kippen kann.

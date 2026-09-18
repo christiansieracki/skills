@@ -19,7 +19,7 @@ If a file doesn't exist, **proceed silently**. Don't flag its absence.
 
 When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as the glossary defines it. Don't drift to synonyms it explicitly avoids — the "Nicht verwenden" table is binding, and so is the Block-Regel.
 
-If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap. A new Kennung or term is **proposed** by a skill and **entered by a human** — never invented in passing.
+If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap. A skill **proposes** a new Kennung or term, says what it covers, and enters it only once the user has said yes — never invented in passing.
 
 ## Flag ADR conflicts
 

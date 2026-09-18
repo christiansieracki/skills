@@ -48,7 +48,7 @@ Plugins, damit hier keine Sprache erfunden wird, die es im Verein nicht gibt.
 
 Eine Ausnahme ist `nur-beach`. Eine rein beachspezifische Kennung gibt es in
 der echten Liste noch nicht, weil die erst aus echtem Importmaterial entsteht
-und ein Mensch sie eintraegt. Fuer die Mismatch-Pruefung braucht es sie aber,
+und nach Freigabe eingetragen wird. Fuer die Mismatch-Pruefung braucht es sie,
 und der Name sagt, dass sie dem Fixture gehoert, genau wie die IDs.
 
 Die Steuerungsschwerpunkte tragen keine Disziplinspalte, so wie in der echten
