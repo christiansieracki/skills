@@ -12,7 +12,11 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from tpdaten import konsole_vorbereiten  # noqa: E402
 
 START = Path(__file__).resolve().parent.parent / "referenzen" / "start"
 
@@ -132,6 +136,7 @@ def schreibe(pfad: Path, inhalt: str, angelegt: list, uebersprungen: list):
 
 
 def main() -> int:
+    konsole_vorbereiten()
     ap = argparse.ArgumentParser(description="Trainingsplanungs-Ordner anlegen")
     ap.add_argument("ordner", type=Path)
     ap.add_argument("--verein", default="TODO Vereinsnamen eintragen")
