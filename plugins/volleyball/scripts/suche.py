@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Sucht Übungen in der Bibliothek.
 
-    python3 suche.py --element annahme --spieler 14 --hallenteile 2
-    python3 suche.py --schwerpunkt sideout-sicherheit --level fortgeschritten
-    python3 suche.py --form spielform --dauer 20 --lang
-    python3 suche.py --id ue-0042
-    python3 suche.py --nie-benutzt
-    python3 suche.py --seit 180          # seit über 180 Tagen nicht eingesetzt
+    <python> suche.py --element annahme --spieler 14 --hallenteile 2
+    <python> suche.py --schwerpunkt sideout-sicherheit --level fortgeschritten
+    <python> suche.py --form spielform --dauer 20 --lang
+    <python> suche.py --id ue-0042
+    <python> suche.py --nie-benutzt
+    <python> suche.py --seit 180          # seit über 180 Tagen nicht eingesetzt
 
 Der Index wird vor jeder Suche neu gebaut, die Treffer sind also immer aktuell.
 `--spieler 14` heißt "heute sind 14 da", nicht "nimm genau 14". Eine Übung
@@ -32,7 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    LEVEL, finde_wurzel, hole_index, konsole_vorbereiten,
+    LEVEL, finde_wurzel, hole_index, interpreter, konsole_vorbereiten,
 )
 
 
@@ -222,7 +222,7 @@ def main() -> int:
 
     if daten["warnungen"]:
         print(f"Hinweis: {len(daten['warnungen'])} Auffälligkeiten in der Bibliothek, "
-              f"'python3 index.py' zeigt sie.")
+              f"'{interpreter()} index.py' zeigt sie.")
     return 0
 
 

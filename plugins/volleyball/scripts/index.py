@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Baut den Uebungsindex neu und meldet, was in der Bibliothek nicht stimmt.
 
-    python3 index.py                 # Index bauen, Warnungen zeigen
-    python3 index.py --md            # zusaetzlich index.md in der Wurzel schreiben
-    python3 index.py --wurzel PFAD   # Wurzel vorgeben statt suchen
-    python3 index.py --still         # nur der Pfad zur index.json
+    <python> index.py                 # Index bauen, Warnungen zeigen
+    <python> index.py --md            # zusaetzlich index.md in der Wurzel schreiben
+    <python> index.py --wurzel PFAD   # Wurzel vorgeben statt suchen
+    <python> index.py --still         # nur der Pfad zur index.json
 
 Der Index wird bei jedem Aufruf komplett neu aus den Karten gebaut, deshalb
 kann er nicht veralten. Die index.json landet im Cache des Rechners, nicht in

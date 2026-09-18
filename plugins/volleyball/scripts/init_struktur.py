@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Legt einen neuen Trainingsplanungs-Ordner an.
 
-    python3 init_struktur.py ~/Nextcloud/Training/trainingsplanung
-    python3 init_struktur.py <ordner> --gruppe h1-h2 --teams herren-1 herren-2
+    <python> init_struktur.py ~/Nextcloud/Training/trainingsplanung
+    <python> init_struktur.py <ordner> --gruppe h1-h2 --teams herren-1 herren-2
 
 Vorhandene Dateien werden nie überschrieben. Das Skript kann also gefahrlos ein
 zweites Mal laufen, wenn nachträglich etwas fehlt.

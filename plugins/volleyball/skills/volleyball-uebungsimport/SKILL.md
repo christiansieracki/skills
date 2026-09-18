@@ -10,7 +10,10 @@ bevor geschrieben wird.
 
 ## Zuerst
 
-1. Wurzel finden: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/index.py`. Das gibt
+`<python>` heißt `python3`, unter Windows `python`. Schlägt der eine fehl,
+nimm den anderen.
+
+1. Wurzel finden: `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py`. Das gibt
    den Ordner, die Anzahl der Karten und alles, was in der Bibliothek gerade
    nicht stimmt. Findet es keine `trainingsplanung-root.yml`, fragen wo der
    Ordner liegt, statt einen Pfad zu raten.
@@ -55,7 +58,7 @@ Typ. Er streicht, was keine eigene Übung ist. Für eine Quelle, der er traut,
 kann er pauschal alles freigeben.
 
 Dazu die Duplikatprüfung, **vor** dem Vorlegen: für jeden Kandidaten
-`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --element <element> --json`
+`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --element <element> --json`
 und die Titel vergleichen. Sieht etwas nach derselben Übung aus, den Kandidaten
 zeigen und fragen: zusammenführen, als Variante anlegen, oder neu?
 
@@ -69,7 +72,7 @@ Nutzers vorliegt.
 
 Pro freigegebener Übung eine Datei `uebungen/ue-####-slug.md` nach dem Schema
 in `DATENMODELL.md`. Die nächste freie Nummer ergibt
-`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --json`, höchste ID plus eins.
+`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --json`, höchste ID plus eins.
 
 Für jedes Feld gilt: was in der Quelle steht, kommt rein. Was nicht drinsteht,
 wird gefragt oder bleibt leer. Besonders diese vier verleiten zum Raten:
@@ -89,7 +92,7 @@ Volltext aus der Vorlage.
 
 ## Prüfen
 
-`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/index.py` laufen lassen. Der Import ist
+`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py` laufen lassen. Der Import ist
 fertig, wenn es null Auffälligkeiten meldet und jede neue Karte
 `suche.py --id ue-####` findet.
 

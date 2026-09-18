@@ -47,6 +47,18 @@ def konsole_vorbereiten() -> None:
             pass
 
 
+def interpreter() -> str:
+    """Nennt den Aufruf, mit dem dieses Skript gerade laeuft.
+
+    Unter Windows kommt `python` heraus, sonst `python3` oder die genaue
+    Fassung wie `python3.12`. Hinweise in der Ausgabe nehmen diesen Namen,
+    damit der Leser ihn kopieren kann: `python3` zeigt unter Windows auf den
+    Platzhalter aus dem Microsoft Store und bricht ab, bevor ein Skript
+    startet.
+    """
+    return Path(sys.executable).stem or "python3"
+
+
 # --------------------------------------------------------------------------
 # Wurzel finden
 # --------------------------------------------------------------------------

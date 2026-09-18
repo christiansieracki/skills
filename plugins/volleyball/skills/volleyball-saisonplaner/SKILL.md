@@ -11,9 +11,12 @@ später Übungen dazu findet.
 
 ## Zuerst
 
-1. `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/index.py`. Das gibt die Wurzel.
+`<python>` heißt `python3`, unter Windows `python`. Schlägt der eine fehl,
+nimm den anderen.
+
+1. `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py`. Das gibt die Wurzel.
    Findet es keine `trainingsplanung-root.yml`, fragen wo der Ordner liegt.
-   Gibt es noch keinen, `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/init_struktur.py <ordner>`.
+   Gibt es noch keinen, `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/init_struktur.py <ordner>`.
 2. `trainingsplanung-root.yml` lesen: welche Teams, welche Gruppen, welches
    Team führt bei gemeinsamem Training.
 3. `${CLAUDE_PLUGIN_ROOT}/referenzen/SPRACHE.md` und die `glossary.md` der
@@ -93,7 +96,7 @@ des Teams lückenlos und überschneidungsfrei aneinander liegen.
 Nach dem Speichern anbieten:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/export_pdf.py teams/<team>/saisonplan.md
+<python> ${CLAUDE_PLUGIN_ROOT}/scripts/export_pdf.py teams/<team>/saisonplan.md
 ```
 
 ## Erklärstil

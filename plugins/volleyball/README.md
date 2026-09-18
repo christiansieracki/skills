@@ -18,7 +18,8 @@ geöffneten Ordner nach oben, deshalb darf der Ordner heißen und liegen, wo er
 will, solange die Markerdatei mitwandert.
 
 Existiert noch keiner: `python3 scripts/init_struktur.py <zielordner>` legt ihn
-mit Startfassungen von `schwerpunkte.md` und `glossary.md` an.
+mit Startfassungen von `schwerpunkte.md` und `glossary.md` an. Unter Windows
+heißt der Aufruf `python`.
 
 ## Aufbau
 
@@ -38,3 +39,8 @@ werden nicht mit einem Plugin-Update überschrieben.
 Python 3 für die Skripte, nur Standardbibliothek. Für den PDF-Export zusätzlich
 pandoc oder wkhtmltopdf. Und eine Claude-Umgebung, die Dateien lesen und
 schreiben darf.
+
+Aufgerufen wird Python auf macOS und Linux mit `python3`, unter Windows mit
+`python`. Dort zeigt `python3` auf den Platzhalter aus dem Microsoft Store und
+bricht mit einer Meldung ab, bevor das Skript startet. In den Skills und in
+den Skripten steht dafür `<python>`.

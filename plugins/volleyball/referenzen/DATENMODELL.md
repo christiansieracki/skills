@@ -110,8 +110,8 @@ schlechter als gar keine. Im Zweifel nachfragen.
 auf die Datei auf. **Eine vergebene ID wird nie wieder geändert**, auch nicht
 beim Umbenennen der Datei. Sonst brechen alle Pläne, die auf sie zeigen.
 
-Nächste freie ID: `python3 scripts/suche.py --json` und die höchste Nummer plus
-eins. Format immer vierstellig mit führenden Nullen.
+Nächste freie ID: `python3 scripts/suche.py --json` (Windows: `python`) und die
+höchste Nummer plus eins. Format immer vierstellig mit führenden Nullen.
 
 Der Dateiname beginnt mit der ID, darf aber sonst geändert werden.
 

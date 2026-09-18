@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Macht aus einem Trainingsplan die Leseansicht fuers Handy.
 
-    python3 leseansicht.py trainings/h1-h2/2026-09-15.md
+    <python> leseansicht.py trainings/h1-h2/2026-09-15.md
 
 Erzeugt die .html neben der .md. Die Ablauftabelle wird dabei bewusst NICHT
 als Tabelle gerendert: sechs Spalten sind auf einem Handy in der Halle

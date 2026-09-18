@@ -3,9 +3,9 @@
 Exportiert die Markdown-Dokumente der Volleyball-Trainingsplanung als PDF.
 
 Nutzung:
-    python3 export_pdf.py                      # alles in der Trainingsplanung
-    python3 export_pdf.py <pfad>               # einzelne Datei oder Ordner
-    python3 export_pdf.py <pfad> -o <ausgabe>  # eigener Ausgabeordner
+    <python> export_pdf.py                      # alles in der Trainingsplanung
+    <python> export_pdf.py <pfad>               # einzelne Datei oder Ordner
+    <python> export_pdf.py <pfad> -o <ausgabe>  # eigener Ausgabeordner
 
 Ohne Pfad wird die Wurzel ueber trainingsplanung-root.yml gesucht, genau wie
 bei den anderen Skripten. Die PDFs landen in <wurzel>/pdf/ und spiegeln die

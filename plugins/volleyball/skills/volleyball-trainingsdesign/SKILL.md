@@ -10,7 +10,10 @@ zahlt erkennbar auf den aktiven Trainingsblock ein.
 
 ## Zuerst
 
-1. `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/index.py`. Das gibt die Wurzel, die
+`<python>` heißt `python3`, unter Windows `python`. Schlägt der eine fehl,
+nimm den anderen.
+
+1. `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py`. Das gibt die Wurzel, die
    Anzahl der Karten und was in der Bibliothek gerade nicht stimmt. Findet es
    keine `trainingsplanung-root.yml`, fragen wo der Ordner liegt.
 2. `trainingsplanung-root.yml` lesen: welche Gruppe, welche Teams, welches Team
@@ -54,7 +57,7 @@ Trainingsblock. Das steht fest, bevor die erste Übung ausgewählt wird.
 Bibliothek zuerst:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py \
+<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py \
   --schwerpunkt <kennung> --spieler <anzahl> --hallenteile <1|2> --dauer <min>
 ```
 
@@ -103,15 +106,15 @@ findet `index.py` später, wann welche Übung gelaufen ist.
 
 Fertig ist der Plan, wenn jede Zeile mit Übung auch eine ID trägt oder im Text
 steht, warum nicht (etwa weil die Karte noch fehlt), und
-`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/index.py` keine unbekannten IDs meldet.
+`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py` keine unbekannten IDs meldet.
 
 ## Leseansicht
 
 Wenn die Einheit steht, anbieten:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/leseansicht.py trainings/<gruppe>/JJJJ-MM-TT.md
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/export_pdf.py  trainings/<gruppe>/JJJJ-MM-TT.md
+<python> ${CLAUDE_PLUGIN_ROOT}/scripts/leseansicht.py trainings/<gruppe>/JJJJ-MM-TT.md
+<python> ${CLAUDE_PLUGIN_ROOT}/scripts/export_pdf.py  trainings/<gruppe>/JJJJ-MM-TT.md
 ```
 
 Die HTML ist fürs Handy in der Halle, das PDF zum Ausdrucken. Beide werden aus
