@@ -298,7 +298,7 @@ def main() -> int:
 
     meta = []
     for schl, beschriftung in (("gruppe", ""), ("teilnehmer", "Teilnehmer"),
-                               ("dauer", "Minuten"), ("hallenteile", "Hallenteile")):
+                               ("dauer", "Minuten"), ("spielflaechen", "Spielflächen")):
         if fm.get(schl) is not None:
             meta.append(f"{fm[schl]} {beschriftung}".strip())
     erzeugt = datetime.now().strftime("%d.%m.%Y %H:%M")

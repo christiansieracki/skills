@@ -5,7 +5,7 @@ leitteam: <team>
 mesozyklus: teams/<team>/mesozyklen/<datei>.md
 teilnehmer:
 dauer: 120
-hallenteile:          # 1 oder 2
+spielflaechen:        # 1 oder 2
 trainer: <name>
 status: entwurf       # entwurf | geplant | absolviert
 ---

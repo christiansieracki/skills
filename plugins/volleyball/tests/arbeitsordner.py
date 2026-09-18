@@ -87,7 +87,7 @@ KARTE = {
     "spieler_max": None,
     "dauer_min": 10,
     "dauer_max": 15,
-    "hallenteile": 1,
+    "spielflaechen": 1,
     "netz": False,
     "erwachsenenbelastung": False,
     "belastungshinweis": "",
@@ -101,7 +101,7 @@ KARTE = {
 }
 
 STANDARDKARTEN = [
-    # Braucht wenige Spieler und ein Hallenteil.
+    # Braucht wenige Spieler und eine Spielflaeche.
     {
         "id": "ue-0001",
         "titel": "Annahme im Halbfeld",
@@ -125,10 +125,10 @@ STANDARDKARTEN = [
         "dauer_min": 8,
         "dauer_max": 8,
     },
-    # Die einzige Karte, die zwei Hallenteile braucht.
+    # Die einzige Karte, die zwei Spielflaechen braucht.
     {
         "id": "ue-0003",
-        "titel": "Sideout-Serie über zwei Hallenteile",
+        "titel": "Sideout-Serie über zwei Spielflächen",
         "element": ["annahme", "angriff"],
         "spielphase": "sideout",
         "form": "spielform",
@@ -137,7 +137,7 @@ STANDARDKARTEN = [
         "spieler_max": 16,
         "dauer_min": 20,
         "dauer_max": 25,
-        "hallenteile": 2,
+        "spielflaechen": 2,
         "netz": True,
     },
 ]

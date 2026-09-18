@@ -47,7 +47,7 @@ spieler_min: 5
 spieler_max: 8                   # null heißt: nach oben offen
 dauer_min: 15
 dauer_max: 25
-hallenteile: 1                   # wie viele die Übung braucht
+spielflaechen: 1                 # wie viele die Übung braucht
 netz: true
 erwachsenenbelastung: false
 belastungshinweis: ""            # Klartext, wenn erwachsenenbelastung true ist
@@ -118,7 +118,7 @@ Der Dateiname beginnt mit der ID, darf aber sonst geändert werden.
 ## Der Trainingsplan
 
 `trainings/<gruppe>/JJJJ-MM-TT.md`, Frontmatter mit `datum`, `gruppe`,
-`leitteam`, `mesozyklus`, `teilnehmer`, `dauer`, `hallenteile`, `trainer`,
+`leitteam`, `mesozyklus`, `teilnehmer`, `dauer`, `spielflaechen`, `trainer`,
 `status`.
 
 Die Ablauftabelle hat die Spalten Zeit, Teil, Übung, ID, Anpassung, Warum hier.

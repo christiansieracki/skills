@@ -6,7 +6,7 @@ Gesucht wird ueber die Kommandozeile und mit `--json`, so wie ein Skill es
 tut, der die Treffer weiterverarbeitet. Die Zusagen, die hier festgehalten
 werden, sind die beiden, die sich am leichtesten unbemerkt verlieren: dass
 `--spieler` die Anwesenden meint und keine Obergrenze, und dass zu wenige
-Hallenteile eine Uebung wirklich herausfallen lassen.
+Spielflaechen eine Uebung wirklich herausfallen lassen.
 """
 
 from __future__ import annotations
@@ -40,14 +40,14 @@ class SucheTest(unittest.TestCase):
     def test_jeder_treffer_traegt_die_felder_seiner_karte(self) -> None:
         (gefunden,) = self.treffer("--id", "ue-0003")
 
-        self.assertEqual(gefunden["titel"], "Sideout-Serie über zwei Hallenteile")
+        self.assertEqual(gefunden["titel"], "Sideout-Serie über zwei Spielflächen")
         self.assertEqual(gefunden["element"], ["annahme", "angriff"])
-        self.assertEqual(gefunden["hallenteile"], 2)
+        self.assertEqual(gefunden["spielflaechen"], 2)
         self.assertEqual(gefunden["spieler_max"], 16)
         self.assertIs(gefunden["netz"], True)
 
-    def test_zu_wenige_hallenteile_lassen_die_uebung_herausfallen(self) -> None:
-        gefunden = [e["id"] for e in self.treffer("--hallenteile", "1")]
+    def test_zu_wenige_spielflaechen_lassen_die_uebung_herausfallen(self) -> None:
+        gefunden = [e["id"] for e in self.treffer("--spielflaechen", "1")]
 
         self.assertNotIn("ue-0003", gefunden)  # braucht zwei
         self.assertIn("ue-0002", gefunden)     # kommt mit einem aus
@@ -59,15 +59,15 @@ class SucheTest(unittest.TestCase):
 
         self.assertIn("ue-0002", gefunden)
 
-    def test_die_trefferzeile_nennt_hallenteile_und_gruppen(self) -> None:
-        # Die lesbare Ausgabe zeigt zwei Dinge, die in der JSON-Fassung nicht
-        # stehen: das Feld, das bei der Umbenennung angefasst wird, und die
-        # Zahl der Gruppen, in denen die Uebung bei so vielen Anwesenden laeuft.
+    def test_die_trefferzeile_nennt_spielflaechen_und_gruppen(self) -> None:
+        # Die lesbare Ausgabe zeigt zwei Dinge, die die JSON-Fassung nicht
+        # hergibt: die Beschriftung des Spielflaechenfeldes und die Zahl der
+        # Gruppen, in denen die Uebung bei so vielen Anwesenden laeuft.
         fertig = self.ordner.starte("suche.py", "--id", "ue-0002", "--spieler", "12", "--lang")
 
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
         self.assertIn("[3 Gruppen parallel]", fertig.stdout)
-        self.assertIn("Hallenteile 1", fertig.stdout)
+        self.assertIn("Spielflächen 1", fertig.stdout)
 
     def test_mit_genau_zaehlt_die_obergrenze_dann_doch(self) -> None:
         gefunden = [e["id"] for e in self.treffer("--spieler", "12", "--genau")]

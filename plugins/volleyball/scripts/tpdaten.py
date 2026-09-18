@@ -175,7 +175,7 @@ def lies_trainings(wurzel: Path) -> list[dict]:
 SCHLANK = [
     "id", "titel", "typ", "element", "spielphase", "form", "schwerpunkt",
     "level_min", "level_max", "spieler_min", "spieler_max",
-    "dauer_min", "dauer_max", "hallenteile", "netz",
+    "dauer_min", "dauer_max", "spielflaechen", "netz",
     "erwachsenenbelastung", "belastungshinweis", "material",
     "variante_von", "schaubild", "quelle", "quelldatei", "autor", "datei",
 ]

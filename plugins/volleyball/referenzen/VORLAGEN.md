@@ -133,7 +133,7 @@ mesozyklus: teams/<team>/mesozyklen/<datei>.md
 meso_woche: <n>
 teilnehmer: <n>
 dauer: <minuten>
-hallenteile: 1 | 2
+spielflaechen: 1 | 2
 trainer: <name>
 status: entwurf | geplant | absolviert
 ---

@@ -58,7 +58,7 @@ Bibliothek zuerst:
 
 ```
 <python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py \
-  --schwerpunkt <kennung> --spieler <anzahl> --hallenteile <1|2> --dauer <min>
+  --schwerpunkt <kennung> --spieler <anzahl> --spielflaechen <1|2> --dauer <min>
 ```
 
 `--spieler 14` heißt „heute sind 14 da". Eine Übung für 8 läuft dann in zwei

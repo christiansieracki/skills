@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sucht Übungen in der Bibliothek.
 
-    <python> suche.py --element annahme --spieler 14 --hallenteile 2
+    <python> suche.py --element annahme --spieler 14 --spielflaechen 2
     <python> suche.py --schwerpunkt sideout-sicherheit --level fortgeschritten
     <python> suche.py --form spielform --dauer 20 --lang
     <python> suche.py --id ue-0042
@@ -103,7 +103,7 @@ def filtere(eintraege, a):
             continue
         if a.netz is not None and bool(e.get("netz")) != a.netz:
             continue
-        if a.hallenteile is not None and (e.get("hallenteile") or 1) > a.hallenteile:
+        if a.spielflaechen is not None and (e.get("spielflaechen") or 1) > a.spielflaechen:
             continue
         if not passt_spieler(e, a.spieler, a.genau):
             continue
@@ -148,7 +148,7 @@ def zeige(e, lang: bool, anwesend=None):
     print(f"    Level        {s(e.get('level_min'), e.get('level_max'))}")
     print(f"    Spieler      {s(e.get('spieler_min'), e.get('spieler_max'))}"
           f" · Dauer {s(e.get('dauer_min'), e.get('dauer_max'), ' min')}"
-          f" · Hallenteile {e.get('hallenteile') or '?'}"
+          f" · Spielflächen {e.get('spielflaechen') or '?'}"
           f" · Netz {'ja' if e.get('netz') else 'nein'}")
     if e.get("material"):
         print(f"    Material     {', '.join(e['material'])}")
@@ -185,7 +185,7 @@ def main() -> int:
     ap.add_argument("--dauer", type=int, help="so viele Minuten hat der Teil")
     ap.add_argument("--genau", action="store_true",
                     help="Spieler und Dauer exakt treffen statt Gruppen bilden zu dürfen")
-    ap.add_argument("--hallenteile", type=int, help="so viele stehen zur Verfügung")
+    ap.add_argument("--spielflaechen", type=int, help="so viele stehen zur Verfügung")
     ap.add_argument("--netz", dest="netz", action="store_true", default=None)
     ap.add_argument("--ohne-netz", dest="netz", action="store_false")
     ap.add_argument("--nie-benutzt", action="store_true")
