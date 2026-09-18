@@ -51,22 +51,78 @@ Jedes Stück Material ist eins von dreien. `DATENMODELL.md` hat die Prüffrage:
 Ein DVV-Athletikplan ist eine Folge. In zwölf Karten zerlegt wäre seine
 Dosierung weg.
 
+## Disziplin vorschlagen
+
+Jede Karte trägt `disziplin`, eine Liste aus `halle` und `beach`. Der
+Vorschlag kommt aus der Quelle:
+
+| Was in der Quelle steht | Vorschlag |
+|---|---|
+| Zu zweit über das ganze Feld, Handzeichen vor dem Aufschlag, Seitenwechsel wegen Wind und Sonne | `[beach]` |
+| Libero, Riegel, 5-1, 6-2, Sechserbesetzung, Hallenteile | `[halle]` |
+| Ein Ablauf, dem der Untergrund egal ist: Technik, Athletik, Koordination | `[halle, beach]` |
+
+Sagt die Quelle dazu nichts, kommt in die Spalte ein `?` mit der Frage, was
+gemeint ist. Der Nutzer beantwortet sie in derselben Liste. Eine Karte, die
+als Halle durchgeht, weil niemand widersprochen hat, findet beim
+Beachtraining nie wieder jemand.
+
+Sand im Titel ist noch kein `beach`. Zonenbaggern im Sand läuft in der Halle
+genauso und trägt beide Werte. Erst wenn die Quelle die Aufstellung, die
+Spielerzahl oder das Ziel an den Sand bindet, ist es `beach` allein.
+
+## Duplikate prüfen
+
+Für jeden Kandidaten, bevor die Liste steht:
+
+`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --element <element> --json`
+
+Ohne `--disziplin`, damit die Suche über die Disziplingrenze hinwegschaut. Das
+Duplikat einer Beachübung liegt in der Bibliothek unter `halle`, mit Filter
+bekommst du es nie zu sehen. Dann Titel, Ziel und Ablauf vergleichen.
+
+Sieht etwas nach derselben Übung aus, entscheidet diese Tabelle:
+
+| Was sich unterscheidet | Was passiert |
+|---|---|
+| Nur der Untergrund | Die Disziplin kommt auf der **bestehenden** Karte dazu, die Sandbesonderheiten unter `## Variationen`. Keine zweite Karte. |
+| Aufstellung, Spielerzahl oder Ziel | Eigene Karte mit `variante_von: ue-####` und eigener Disziplin |
+| Es ist eine andere Übung | Neue Karte |
+
+Zonenbaggern zu zweit im Sand ist dieselbe Übung: `beach` kommt zu `[halle]`
+dazu, der weiche Stand in die Variationen. Zwei-gegen-Zwei über das ganze Feld
+statt Sechs-gegen-Sechs ist eine andere Übung und bekommt eine eigene Karte
+mit `variante_von`.
+
+Eine bestehende Karte wird ergänzt, nie überschrieben. `id`, Ziel und Ablauf
+bleiben stehen, damit jeder Trainingsplan, der auf sie zeigt, weiter dieselbe
+Übung meint.
+
+Was hier herauskommt, steht in der Vorlege-Liste und wird dort bestätigt.
+
 ## Vorlegen, bevor geschrieben wird
 
-Dem Nutzer eine Liste zeigen: erkannter Titel, ein Satz Inhalt, vorgeschlagener
-Typ. Er streicht, was keine eigene Übung ist. Für eine Quelle, der er traut,
-kann er pauschal alles freigeben.
+Eine Zeile je Kandidat:
 
-Dazu die Duplikatprüfung, **vor** dem Vorlegen: für jeden Kandidaten
-`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --element <element> --json`
-und die Titel vergleichen. Sieht etwas nach derselben Übung aus, den Kandidaten
-zeigen und fragen: zusammenführen, als Variante anlegen, oder neu?
+| Titel | Inhalt in einem Satz | Typ | Disziplin | Duplikat |
+|---|---|---|---|---|
+| Zonenbaggern im Sand | Bagger in Zonen, zu zweit, ohne Netz | uebung | `[halle, beach]` | ergänzt ue-0002 |
+| Sideout-Serie zu zweit | Aufschlag, Annahme, Angriff im Sand, auf Punkte | uebung | `[beach]` | — |
+| Aufschlagserie mit Zielfeldern | Zehn Aufschläge auf wechselnde Zonen | uebung | `?` sagt die Quelle nicht | — |
 
-Eine bestehende Karte wird nur ergänzt, nie überschrieben. Beim Zusammenführen
-kommt das Neue in den Abschnitt `## Variationen`.
+Der Nutzer streicht, was keine eigene Übung ist, und korrigiert die Disziplin
+direkt in der Spalte. Für eine Quelle, der er traut, kann er pauschal alles
+freigeben.
+
+Passt zu einem Kandidaten keine Kennung aus der `schwerpunkte.md` der Wurzel,
+steht der Vorschlag für eine neue in derselben Liste, mit `halle`, `beach`
+oder `beide` für die dritte Spalte jener Datei. Eintragen tut sie ein Mensch,
+so schreibt die Datei es vor. Die Karte nimmt die Kennung, sobald sie dort
+steht. Bis dahin bleibt der Vorschlag im Abschlussbericht stehen.
 
 Fertig ist dieser Schritt, wenn zu jedem Kandidaten eine Entscheidung des
-Nutzers vorliegt.
+Nutzers vorliegt und jede Zeile eine Disziplin trägt. Ein `?` heißt, es fehlt
+noch eine Antwort.
 
 ## Karten schreiben
 
@@ -74,8 +130,18 @@ Pro freigegebener Übung eine Datei `uebungen/ue-####-slug.md` nach dem Schema
 in `DATENMODELL.md`. Die nächste freie Nummer ergibt
 `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --json`, höchste ID plus eins.
 
-Für jedes Feld gilt: was in der Quelle steht, kommt rein. Was nicht drinsteht,
-wird gefragt oder bleibt leer. Besonders diese vier verleiten zum Raten:
+Ein Kandidat, der laut Liste eine bestehende Karte ergänzt, bekommt keine neue
+Datei. Dort kommt die Disziplin ins Frontmatter, alles Weitere unter
+`## Variationen`, mit der Kurzquelle im selben Absatz. `quelle:` und
+`quelldatei:` bleiben stehen, die gehören der ursprünglichen Übung. Die neue
+Quelldatei gehört trotzdem nach `quellen/`.
+
+`disziplin` kommt aus der Vorlege-Liste, in eckigen Klammern und mit
+mindestens einem Wert. Fehlt sie, meldet `index.py` die Karte.
+
+Für die übrigen Felder gilt: was in der Quelle steht, kommt rein. Was nicht
+drinsteht, wird gefragt oder bleibt leer. Besonders diese vier verleiten zum
+Raten:
 
 - `spieler_min` / `spieler_max`: aus dem Ablauf ableiten, wenn er die Rollen
   nennt. Sonst fragen.
@@ -83,9 +149,9 @@ wird gefragt oder bleibt leer. Besonders diese vier verleiten zum Raten:
 - `erwachsenenbelastung`: nur setzen, wenn die Quelle Sprungvolumen,
   Zusatzlast oder Maximalkraft beschreibt. Dazu `belastungshinweis` in
   Klartext, damit ein Jugendtrainer weiß, was er anpassen muss.
-- `schwerpunkt`: nur Kennungen aus der `schwerpunkte.md` der Wurzel. Passt
-  keine, dem Nutzer eine neue vorschlagen und erst nach seinem Ja dort
-  eintragen, mit `halle`, `beach` oder `beide` in der dritten Spalte.
+- `schwerpunkt`: nur Kennungen, die in der `schwerpunkte.md` der Wurzel schon
+  stehen, und jede muss zu mindestens einer Disziplin der Karte passen. Sonst
+  meldet der Linter sie.
 
 Inhalte in eigenen Worten wiedergeben, mit Kurzquelle in `quelle:`. Kein
 Volltext aus der Vorlage.
@@ -96,12 +162,18 @@ Volltext aus der Vorlage.
 fertig, wenn es null Auffälligkeiten meldet und jede neue Karte
 `suche.py --id ue-####` findet.
 
+Eine ergänzte Karte gehört mit geprüft:
+`suche.py --id ue-#### --disziplin <die dazugekommene Disziplin>` muss sie
+jetzt zeigen.
+
 Danach anbieten, `index.py --md` laufen zu lassen, damit die Lesebrille
 `index.md` die neuen Übungen kennt.
 
 ## Was der Nutzer am Ende hört
 
-Wie viele Karten dazugekommen sind, welche IDs, und was du beim Zerlegen
-entschieden hast, wo es nicht eindeutig war. Fragen, die du unterwegs gestellt
-und selbst beantwortet hast, gehören in diese Zusammenfassung, damit er sie
-kippen kann.
+Wie viele Karten dazugekommen sind, welche IDs, und welche Disziplin jede von
+ihnen trägt. Dazu die bestehenden Karten, die eine Disziplin dazubekommen
+haben, und was du beim Zerlegen entschieden hast, wo es nicht eindeutig war.
+Schwerpunkt-Kennungen, die du vorgeschlagen hast und die noch niemand
+eingetragen hat, stehen am Ende. Fragen, die du unterwegs gestellt und selbst
+beantwortet hast, gehören ebenfalls hinein, damit er sie kippen kann.
