@@ -83,6 +83,7 @@ einmal vergessen.
 - `level_min` / `level_max`: einsteiger, fortgeschritten, ambitioniert
 - `schwerpunkt`: nur Kennungen aus `schwerpunkte.md` der Wurzel. Fehlt eine,
   erst dort eintragen lassen, dann verwenden. Nie einfach eine neue erfinden.
+  Jede Kennung führt dort eine Disziplin, siehe unten.
 
 ### Disziplin
 
@@ -97,6 +98,28 @@ vergessen wurde, und legte die Beachübung wortlos unter Halle ab.
 
 Das Team führt die Disziplin als einzelnen Wert in seinem Profil, weil ein Team
 immer eine von beiden spielt. Die Trainingsgruppe erbt sie von ihrem Leitteam.
+
+### Schwerpunkt und Disziplin
+
+In `schwerpunkte.md` trägt jede inhaltliche Kennung eine dritte Spalte mit
+`halle`, `beach` oder `beide`. `index.py` meldet eine Karte, deren Schwerpunkt
+in keiner ihrer Disziplinen gilt. Eine Hallenkarte mit einem reinen
+Beachschwerpunkt fällt damit auf, bevor beim Planen jemand danach sucht.
+
+Eine Übereinstimmung reicht. Eine Karte für Halle und Beach darf einen
+Schwerpunkt tragen, den es nur in einer der beiden gibt.
+
+Kennungen mit leerer dritter Spalte gelten für beide Disziplinen. Das sind die
+Steuerungsschwerpunkte, die die Spalte gar nicht führen, und Zeilen, bei denen
+sie beim Eintragen vergessen wurde. Ein Wert, den es nicht gibt, ist etwas
+anderes und wird gemeldet. Sonst schaltete ein Tippfehler in der von Hand
+gepflegten Datei still die Prüfung ab, für die die Spalte da ist.
+
+Die Spalte trägt einen einzelnen Wert mit `beide`, während `disziplin` auf der
+Karte eine Liste ist. ADR-0001 verwirft den Einzelwert für die Karte, weil er
+jeden Filter für immer zu „beach oder beide" zwingt. Hier filtert niemand: die
+Zelle wird beim Einlesen zur Menge aufgelöst und danach wie eine Liste
+geschnitten. Eine Liste in einer Tabellenzelle wäre nur schlechter zu lesen.
 
 ### Übung oder Folge
 

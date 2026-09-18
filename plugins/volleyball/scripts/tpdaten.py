@@ -21,6 +21,15 @@ ELEMENTE = {
     "ballkontrolle", "athletik", "koordination",
 }
 DISZIPLINEN = {"halle", "beach"}
+
+# Was in der Disziplinspalte von schwerpunkte.md stehen darf, und wofuer es
+# steht. `beide` gibt es nur hier: auf der Karte ist die Disziplin eine Liste,
+# in einer Tabellenzelle waere eine Liste unlesbar.
+DISZIPLIN_SPALTE = {
+    "halle": {"halle"},
+    "beach": {"beach"},
+    "beide": set(DISZIPLINEN),
+}
 SPIELPHASEN = {"sideout", "break", "keine"}
 FORMEN = {"erwaermung", "technik", "komplex", "spielform", "station", "abschluss"}
 LEVEL = ["einsteiger", "fortgeschritten", "ambitioniert"]
@@ -129,12 +138,47 @@ def lies_frontmatter(pfad: Path) -> tuple[dict, str]:
 # Einlesen
 # --------------------------------------------------------------------------
 
-def lies_schwerpunkte(wurzel: Path) -> set[str]:
-    """Zieht die erlaubten Kennungen aus den Tabellen in schwerpunkte.md."""
+_KENNUNG = re.compile(r"`([a-z0-9-]+)`")
+
+
+def lies_schwerpunkte(wurzel: Path) -> tuple[dict[str, set[str]], list[str]]:
+    """Zieht aus schwerpunkte.md, welche Kennung fuer welche Disziplin gilt.
+
+    Zurueck kommt die Zuordnung und nicht mehr nur die Menge der Kennungen:
+    die Pruefung auf eine Hallenkarte mit einem Beachschwerpunkt braucht zu
+    jeder Kennung die Disziplinen, fuer die sie gedacht ist. Dazu die
+    Auffaelligkeiten der Datei selbst.
+
+    Eine leere dritte Spalte gilt fuer beide Disziplinen, schraenkt also keine
+    Karte ein. Das trifft die Steuerungsschwerpunkte, die die Spalte nicht
+    fuehren, und eine von Hand nachgetragene Zeile, die sie vergessen hat.
+    Beide sollen erlaubt bleiben, statt als unbekannte Kennung zu gelten.
+
+    Ein Wert, den es nicht gibt, ist etwas anderes und wird gemeldet. Sonst
+    schaltete ein Tippfehler in der von Hand gepflegten Datei still genau die
+    Pruefung ab, fuer die die Spalte da ist.
+    """
     datei = wurzel / "schwerpunkte.md"
     if not datei.is_file():
-        return set()
-    return set(re.findall(r"^\|\s*`([a-z0-9-]+)`\s*\|", datei.read_text(encoding="utf-8"), re.M))
+        return {}, []
+    gefunden: dict[str, set[str]] = {}
+    warnungen: list[str] = []
+    for zeile in datei.read_text(encoding="utf-8").splitlines():
+        if not zeile.strip().startswith("|"):
+            continue
+        spalten = [s.strip() for s in zeile.strip().strip("|").split("|")]
+        m = _KENNUNG.fullmatch(spalten[0])
+        if not m:
+            continue
+        kennung = m.group(1)
+        disziplin_angabe = spalten[2] if len(spalten) > 2 else ""
+        if disziplin_angabe and disziplin_angabe not in DISZIPLIN_SPALTE:
+            warnungen.append(
+                f"schwerpunkte.md: {kennung} traegt die Disziplin "
+                f"{disziplin_angabe!r}, die es nicht gibt"
+            )
+        gefunden[kennung] = DISZIPLIN_SPALTE.get(disziplin_angabe, set(DISZIPLINEN))
+    return gefunden, warnungen
 
 
 def lies_uebungen(wurzel: Path) -> list[dict]:
@@ -185,7 +229,7 @@ SCHLANK = [
 def baue_index(wurzel: Path) -> dict:
     karten = lies_uebungen(wurzel)
     trainings = lies_trainings(wurzel)
-    erlaubt = lies_schwerpunkte(wurzel)
+    schwerpunkte, schwerpunkt_warnungen = lies_schwerpunkte(wurzel)
 
     # Einsatzhistorie aus den Trainingsplaenen, statt sie auf den Karten zu pflegen
     einsaetze: dict[str, list[str]] = {}
@@ -208,11 +252,11 @@ def baue_index(wurzel: Path) -> dict:
         "wurzel": str(wurzel),
         "anzahl": len(eintraege),
         "uebungen": eintraege,
-        "warnungen": pruefe(karten, trainings, erlaubt, bekannt),
+        "warnungen": schwerpunkt_warnungen + pruefe(karten, trainings, schwerpunkte, bekannt),
     }
 
 
-def pruefe(karten, trainings, erlaubt, bekannt) -> list[str]:
+def pruefe(karten, trainings, schwerpunkte, bekannt) -> list[str]:
     w: list[str] = []
     gesehen: dict[str, str] = {}
 
@@ -233,6 +277,7 @@ def pruefe(karten, trainings, erlaubt, bekannt) -> list[str]:
         # Ein Default legte eine beim Import vergessene Beachuebung wortlos
         # unter Halle ab, und dort findet sie nie wieder jemand.
         disziplin = k.get("disziplin")
+        gueltige_disziplinen: set[str] = set()
         if not disziplin:
             w.append(f"{datei}: disziplin fehlt oder ist leer")
         elif not isinstance(disziplin, list):
@@ -241,6 +286,8 @@ def pruefe(karten, trainings, erlaubt, bekannt) -> list[str]:
             for d in disziplin:
                 if d not in DISZIPLINEN:
                     w.append(f"{datei}: disziplin {d!r} steht nicht in der Liste")
+                else:
+                    gueltige_disziplinen.add(d)
 
         for el in k.get("element") or []:
             if el not in ELEMENTE:
@@ -250,10 +297,21 @@ def pruefe(karten, trainings, erlaubt, bekannt) -> list[str]:
         if k.get("form") not in FORMEN:
             w.append(f"{datei}: form {k.get('form')!r} ist unbekannt")
 
-        if erlaubt:
+        if schwerpunkte:
             for s in k.get("schwerpunkt") or []:
-                if s not in erlaubt:
+                if s not in schwerpunkte:
                     w.append(f"{datei}: schwerpunkt {s!r} steht nicht in schwerpunkte.md")
+                    continue
+                # Eine Disziplin der Karte reicht: eine Karte fuer beides darf
+                # einen Schwerpunkt tragen, den es nur in einer Disziplin gibt.
+                # Traegt die Karte gar keine gueltige Disziplin, steht das
+                # schon oben, und zweimal dasselbe zu melden hilft niemandem.
+                if gueltige_disziplinen and not (schwerpunkte[s] & gueltige_disziplinen):
+                    w.append(
+                        f"{datei}: schwerpunkt {s!r} gilt nur fuer "
+                        f"{', '.join(sorted(schwerpunkte[s]))}, die Karte fuer "
+                        f"{', '.join(sorted(gueltige_disziplinen))}"
+                    )
 
         for feld in ("level_min", "level_max"):
             v = k.get(feld)

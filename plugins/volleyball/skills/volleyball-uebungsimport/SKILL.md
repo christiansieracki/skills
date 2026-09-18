@@ -85,7 +85,7 @@ wird gefragt oder bleibt leer. Besonders diese vier verleiten zum Raten:
   Klartext, damit ein Jugendtrainer weiß, was er anpassen muss.
 - `schwerpunkt`: nur Kennungen aus der `schwerpunkte.md` der Wurzel. Passt
   keine, dem Nutzer eine neue vorschlagen und erst nach seinem Ja dort
-  eintragen.
+  eintragen, mit `halle`, `beach` oder `beide` in der dritten Spalte.
 
 Inhalte in eigenen Worten wiedergeben, mit Kurzquelle in `quelle:`. Kein
 Volltext aus der Vorlage.

@@ -46,13 +46,29 @@ SCHWERPUNKTE_MD = """\
 Kurzfassung fuer die Tests. Die Kennungen stammen aus der Startfassung des
 Plugins, damit hier keine Sprache erfunden wird, die es im Verein nicht gibt.
 
+Eine Ausnahme ist `nur-beach`. Eine rein beachspezifische Kennung gibt es in
+der echten Liste noch nicht, weil die erst aus echtem Importmaterial entsteht
+und ein Mensch sie eintraegt. Fuer die Mismatch-Pruefung braucht es sie aber,
+und der Name sagt, dass sie dem Fixture gehoert, genau wie die IDs.
+
+Die Steuerungsschwerpunkte tragen keine Disziplinspalte, so wie in der echten
+Datei. Der Parser darf sie deshalb nicht verlieren.
+
 ## Inhaltliche Schwerpunkte
+
+| Kennung | Klartext | Disziplin |
+|---|---|---|
+| `ballkontrolle` | Sauberer Kontakt in Bagger und Pritschen, ohne Spielsituation | beide |
+| `annahme` | Annahme als Technikelement | beide |
+| `sideout-sicherheit` | Den eigenen Aufschlagball sicher zurueckgewinnen | beide |
+| `laufwege-rotation` | Positionen, Rotation, Wechsel zwischen 5-1, 6-2 und situativ | halle |
+| `nur-beach` | Nur im Sand, es gibt sie allein fuer diesen Fixture | beach |
+
+## Steuerungsschwerpunkte
 
 | Kennung | Klartext |
 |---|---|
-| `ballkontrolle` | Sauberer Kontakt in Bagger und Pritschen, ohne Spielsituation |
-| `annahme` | Annahme als Technikelement |
-| `sideout-sicherheit` | Den eigenen Aufschlagball sicher zurueckgewinnen |
+| `standortbestimmung` | Technik-Checks und Tests, um den Ausgangspunkt zu kennen |
 """
 
 RUMPF = """\
@@ -227,6 +243,22 @@ class Arbeitsordner:
         (self.pfad / "uebungen").mkdir()
         for felder in STANDARDKARTEN:
             self.lege_karte_an(**felder)
+
+    def ergaenze_schwerpunkt(self, kennung: str, disziplin: str) -> None:
+        """Haengt eine Zeile an die Tabelle der inhaltlichen Schwerpunkte.
+
+        Fuer Zeilen, die der Fixture nicht dauerhaft tragen soll, etwa eine mit
+        einem vertippten Disziplinwert. `disziplin` geht so in die Zelle, wie
+        es hier steht, auch leer.
+        """
+        datei = self.pfad / "schwerpunkte.md"
+        zeile = f"| `{kennung}` | Zeile aus einem Test | {disziplin} |"
+        datei.write_text(
+            datei.read_text(encoding="utf-8").replace(
+                "\n\n## Steuerungsschwerpunkte", f"\n{zeile}\n\n## Steuerungsschwerpunkte"
+            ),
+            encoding="utf-8",
+        )
 
     def lege_karte_an(self, **felder) -> None:
         """Legt eine Uebungskarte an.

@@ -63,7 +63,7 @@ an der wirklich etwas Neues entwickelt werden kann.
 Entwurf vorlegen, Rückfragen einholen, dann `teams/<team>/saisonplan.md`
 schreiben. In der Mesozyklus-Tabelle stehen Kennungen aus `schwerpunkte.md`.
 Fehlt eine passende, dem Nutzer eine neue vorschlagen und erst nach seinem Ja
-dort eintragen.
+dort eintragen, mit `halle`, `beach` oder `beide` in der dritten Spalte.
 
 ## Interview vor jedem Mesozyklus
 
