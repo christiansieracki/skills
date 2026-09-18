@@ -36,9 +36,10 @@ werden nicht mit einem Plugin-Update überschrieben.
 
 ## Voraussetzungen
 
-Python 3 für die Skripte, nur Standardbibliothek. Für den PDF-Export zusätzlich
-pandoc oder wkhtmltopdf. Und eine Claude-Umgebung, die Dateien lesen und
-schreiben darf.
+Python 3 für die Skripte, nur Standardbibliothek. Für den PDF-Export pandoc,
+dazu eine PDF-Maschine wie wkhtmltopdf oder weasyprint. Fehlt die Maschine,
+druckt Edge oder Chrome die HTML-Fassung, dafür ist keine Installation nötig.
+Und eine Claude-Umgebung, die Dateien lesen und schreiben darf.
 
 Aufgerufen wird Python auf macOS und Linux mit `python3`, unter Windows mit
 `python`. Dort zeigt `python3` auf den Platzhalter aus dem Microsoft Store und
