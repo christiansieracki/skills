@@ -4,9 +4,11 @@
 
 Gesucht wird ueber die Kommandozeile und mit `--json`, so wie ein Skill es
 tut, der die Treffer weiterverarbeitet. Die Zusagen, die hier festgehalten
-werden, sind die beiden, die sich am leichtesten unbemerkt verlieren: dass
-`--spieler` die Anwesenden meint und keine Obergrenze, und dass zu wenige
-Spielflaechen eine Uebung wirklich herausfallen lassen.
+werden, sind die, die sich am leichtesten unbemerkt verlieren: dass
+`--spieler` die Anwesenden meint und keine Obergrenze, dass zu wenige
+Spielflaechen eine Uebung wirklich herausfallen lassen, und was der
+Disziplinfilter durchlaesst. Am letzten haengt, ob beim Planen einer
+Beacheinheit eine Hallenuebung im Ergebnis steht.
 """
 
 from __future__ import annotations
@@ -33,6 +35,8 @@ class SucheTest(unittest.TestCase):
         return json.loads(fertig.stdout)
 
     def test_ohne_filter_kommen_alle_uebungen_zurueck(self) -> None:
+        # Der Fixture traegt Karten beider Disziplinen. Der Test haelt damit
+        # auch fest, dass ohne Disziplinfilter alles zurueckkommt.
         gefunden = self.treffer()
 
         self.assertEqual(sorted(e["id"] for e in gefunden), sorted(self.ordner.ids))
@@ -77,6 +81,45 @@ class SucheTest(unittest.TestCase):
 
         self.assertNotIn("ue-0002", gefunden)  # Obergrenze 4
         self.assertIn("ue-0003", gefunden)     # 12 bis 16
+
+    def test_der_disziplinfilter_beach_laesst_die_hallenkarte_draussen(self) -> None:
+        gefunden = [e["id"] for e in self.treffer("--disziplin", "beach")]
+
+        self.assertIn("ue-0004", gefunden)     # nur beach
+        self.assertIn("ue-0005", gefunden)     # halle und beach
+        self.assertNotIn("ue-0001", gefunden)  # nur halle
+
+    def test_der_disziplinfilter_halle_laesst_die_beachkarte_draussen(self) -> None:
+        gefunden = [e["id"] for e in self.treffer("--disziplin", "halle")]
+
+        self.assertIn("ue-0001", gefunden)
+        self.assertIn("ue-0005", gefunden)
+        self.assertNotIn("ue-0004", gefunden)
+
+    def test_beide_werte_zusammen_treffen_jede_disziplin(self) -> None:
+        # Mehrere Werte sind erlaubt und werden als Mengenschnitt gegen die
+        # Liste auf der Karte verknuepft, genau wie beim Element.
+        gefunden = [e["id"] for e in self.treffer("--disziplin", "halle", "beach")]
+
+        self.assertIn("ue-0001", gefunden)  # nur halle
+        self.assertIn("ue-0004", gefunden)  # nur beach
+        self.assertIn("ue-0005", gefunden)  # beides
+
+    def test_auch_die_kurze_trefferliste_nennt_die_disziplin(self) -> None:
+        # Ab vier Treffern faellt die ausfuehrliche Darstellung weg. Gerade
+        # dann soll auffallen, dass da eine Beachkarte zwischen den
+        # Hallenkarten steht.
+        fertig = self.ordner.starte("suche.py")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        zeile = next(z for z in fertig.stdout.splitlines() if z.startswith("ue-0004"))
+        self.assertIn("beach", zeile)
+
+    def test_die_ausfuehrliche_ausgabe_beschriftet_die_disziplin(self) -> None:
+        fertig = self.ordner.starte("suche.py", "--id", "ue-0005", "--lang")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        self.assertIn("Disziplin    halle, beach", fertig.stdout)
 
 
 if __name__ == "__main__":

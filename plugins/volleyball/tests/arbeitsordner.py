@@ -9,6 +9,9 @@ Der Ordner ist absichtlich klein: Wurzeldatei, eine Schwerpunktliste und eine
 Handvoll Karten, die genau die geprueften Faelle abdecken. Wer einen weiteren
 Fall braucht, legt eine Karte dazu, statt eine bestehende umzubiegen. Sonst
 zieht eine Aenderung Tests mit, die von ihr nichts wissen wollen.
+
+Die IDs gehoeren dem Fixture. Wer hier ue-0005 liest, liest nicht die Karte
+ue-0005 aus der echten Bibliothek.
 """
 
 from __future__ import annotations
@@ -139,6 +142,37 @@ STANDARDKARTEN = [
         "dauer_min": 20,
         "dauer_max": 25,
         "spielflaechen": 2,
+        "netz": True,
+    },
+    # Die einzige reine Beachkarte. Sie darf in der Hallensuche nicht
+    # auftauchen und in der ungefilterten Suche sehr wohl.
+    {
+        "id": "ue-0004",
+        "titel": "Annahme zu zweit im Sand",
+        "disziplin": ["beach"],
+        "element": ["annahme"],
+        "spielphase": "sideout",
+        "schwerpunkt": ["annahme"],
+        "spieler_min": 2,
+        "spieler_max": 4,
+        "dauer_min": 10,
+        "dauer_max": 15,
+        "netz": True,
+    },
+    # Laeuft drinnen wie draussen. Sie steht in beiden Disziplinfiltern, das
+    # ist der Fall, den eine Karte mit Einzelwert nicht abbilden koennte.
+    {
+        "id": "ue-0005",
+        "titel": "Zwei gegen Zwei auf dem Kleinfeld",
+        "disziplin": ["halle", "beach"],
+        "element": ["annahme", "angriff"],
+        "spielphase": "sideout",
+        "form": "spielform",
+        "schwerpunkt": ["sideout-sicherheit"],
+        "spieler_min": 4,
+        "spieler_max": 8,
+        "dauer_min": 15,
+        "dauer_max": 20,
         "netz": True,
     },
 ]

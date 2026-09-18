@@ -3,6 +3,7 @@
 
     <python> suche.py --element annahme --spieler 14 --spielflaechen 2
     <python> suche.py --schwerpunkt sideout-sicherheit --level fortgeschritten
+    <python> suche.py --disziplin beach   # Beachübungen und die für beides
     <python> suche.py --form spielform --dauer 20 --lang
     <python> suche.py --id ue-0042
     <python> suche.py --nie-benutzt
@@ -13,6 +14,12 @@ Der Index wird vor jeder Suche neu gebaut, die Treffer sind also immer aktuell.
 für 8 läuft bei 14 Leuten in zwei Gruppen, das zeigt die Trefferliste an.
 `--dauer 20` heißt entsprechend "der Teil hat 20 Minuten", kürzeres passt auch.
 Wer es strikt will, nimmt `--genau`.
+
+`--disziplin beach` zeigt die Beachübungen und die, die für beides taugen,
+`--disziplin halle` spiegelbildlich dasselbe. Ohne das Flag wird nicht
+gefiltert, es kommt alles. Ein Pflichtflag bestrafte jeden schnellen Blick
+in die Bibliothek. Damit die Mischung sichtbar bleibt, steht die Disziplin
+in jeder Trefferzeile.
 
 Mehrere Filter werden mit UND verknüpft. `--json` gibt die Treffer maschinell
 lesbar aus, für den Fall dass ein Skill sie weiterverarbeitet.
@@ -32,7 +39,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    LEVEL, finde_wurzel, hole_index, interpreter, konsole_vorbereiten,
+    DISZIPLINEN, LEVEL, finde_wurzel, hole_index, interpreter,
+    konsole_vorbereiten,
 )
 
 
@@ -93,6 +101,8 @@ def filtere(eintraege, a):
             continue
         if a.typ and e.get("typ") != a.typ:
             continue
+        if a.disziplin and not set(a.disziplin) & set(e.get("disziplin") or []):
+            continue
         if a.element and not set(a.element) & set(e.get("element") or []):
             continue
         if a.schwerpunkt and not set(a.schwerpunkt) & set(e.get("schwerpunkt") or []):
@@ -133,7 +143,12 @@ def zeige(e, lang: bool, anwesend=None):
     art = " (Folge)" if e.get("typ") == "folge" else ""
     g = gruppen(e.get("spieler_max"), anwesend)
     parallel = f"  [{g} Gruppen parallel]" if g > 1 else ""
-    print(f"{e['id']}  {e['titel']}{art}{warn}{parallel}")
+    # Die Disziplin steht in jeder Trefferzeile, auch in der kurzen Liste.
+    # Sonst entgeht bei einer ungefilterten Suche, dass da eine Beachübung
+    # zwischen den Hallenübungen liegt. Fehlt das Feld auf der Karte, steht
+    # hier ein Strich. Welche Karte es ist, sagt `index.py`.
+    disziplin = ", ".join(e.get("disziplin") or []) or "—"
+    print(f"{e['id']}  {e['titel']}{art}{warn}  [{disziplin}]{parallel}")
     if not lang:
         return
     def s(lo, hi, u=""):
@@ -142,6 +157,7 @@ def zeige(e, lang: bool, anwesend=None):
         if hi is None:
             return f"ab {lo}{u}"
         return f"{lo}–{hi}{u}" if lo != hi else f"{hi}{u}"
+    print(f"    Disziplin    {disziplin}")
     print(f"    Element      {', '.join(e.get('element') or []) or '—'}")
     print(f"    Schwerpunkt  {', '.join(e.get('schwerpunkt') or []) or '—'}")
     print(f"    Form         {e.get('form') or '—'} · Spielphase {e.get('spielphase') or '—'}")
@@ -175,6 +191,8 @@ def main() -> int:
     ap.add_argument("--wurzel", type=Path, default=None)
     ap.add_argument("--id")
     ap.add_argument("--text", help="Teilstring im Titel")
+    ap.add_argument("--disziplin", nargs="+", choices=sorted(DISZIPLINEN),
+                    help="halle, beach oder beides; ohne das Flag kommt alles")
     ap.add_argument("--element", nargs="+")
     ap.add_argument("--schwerpunkt", nargs="+")
     ap.add_argument("--form")
