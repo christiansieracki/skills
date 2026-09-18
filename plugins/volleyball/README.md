@@ -27,12 +27,25 @@ heißt der Aufruf `python`.
 plugins/volleyball/
 ├── skills/            die drei SKILL.md
 ├── referenzen/        DATENMODELL, SPRACHE, VORLAGEN, METHODIK, ...
-└── scripts/           index.py, suche.py, leseansicht.py, export_pdf.py
+├── scripts/           index.py, suche.py, leseansicht.py, export_pdf.py
+└── tests/             Linter und Suche gegen einen künstlichen Arbeitsordner
 ```
 
 **Im Plugin liegt das Werkzeug, im Arbeitsordner liegen die Daten.** Übungen,
 Teams, Trainings, Quellen und die Schwerpunktliste gehören dem Verein und
 werden nicht mit einem Plugin-Update überschrieben.
+
+## Tests
+
+```
+python3 -m unittest discover -s plugins/volleyball/tests
+```
+
+Unter Windows heißt der Aufruf `python`. Die Suite baut sich einen künstlichen
+Arbeitsordner im Temp-Verzeichnis und prüft Linter und Suche darüber, so wie
+die Skills sie aufrufen: über die Kommandozeile mit `--wurzel`. Die echte
+Bibliothek wird nie angefasst und muss dafür nicht einmal existieren.
+`unittest` kommt aus der Standardbibliothek, installiert werden muss nichts.
 
 ## Voraussetzungen
 
