@@ -12,6 +12,7 @@ team: <kennung>
 name: "<Anzeigename>"
 saison: "JJJJ/JJ"
 gruppe: <trainingsgruppe>
+disziplin: halle | beach
 niveau: einsteiger | fortgeschritten | ambitioniert
 altersklasse: erwachsene | u20 | u18 | u16 | u14
 trainer: [<name>]

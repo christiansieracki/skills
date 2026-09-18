@@ -42,6 +42,9 @@ class SucheTest(unittest.TestCase):
 
         self.assertEqual(gefunden["titel"], "Sideout-Serie über zwei Spielflächen")
         self.assertEqual(gefunden["element"], ["annahme", "angriff"])
+        # Steht `disziplin` nicht in der Index-Projektion, erreicht das Feld die
+        # Suche gar nicht, egal wie sauber es auf der Karte gepflegt ist.
+        self.assertEqual(gefunden["disziplin"], ["halle"])
         self.assertEqual(gefunden["spielflaechen"], 2)
         self.assertEqual(gefunden["spieler_max"], 16)
         self.assertIs(gefunden["netz"], True)

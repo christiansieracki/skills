@@ -20,6 +20,7 @@ ELEMENTE = {
     "annahme", "zuspiel", "angriff", "block", "abwehr", "aufschlag",
     "ballkontrolle", "athletik", "koordination",
 }
+DISZIPLINEN = {"halle", "beach"}
 SPIELPHASEN = {"sideout", "break", "keine"}
 FORMEN = {"erwaermung", "technik", "komplex", "spielform", "station", "abschluss"}
 LEVEL = ["einsteiger", "fortgeschritten", "ambitioniert"]
@@ -173,7 +174,7 @@ def lies_trainings(wurzel: Path) -> list[dict]:
 # --------------------------------------------------------------------------
 
 SCHLANK = [
-    "id", "titel", "typ", "element", "spielphase", "form", "schwerpunkt",
+    "id", "titel", "typ", "disziplin", "element", "spielphase", "form", "schwerpunkt",
     "level_min", "level_max", "spieler_min", "spieler_max",
     "dauer_min", "dauer_max", "spielflaechen", "netz",
     "erwachsenenbelastung", "belastungshinweis", "material",
@@ -227,6 +228,19 @@ def pruefe(karten, trainings, erlaubt, bekannt) -> list[str]:
             w.append(f"{datei}: Dateiname beginnt nicht mit der id {kid}")
         if k.get("typ") not in TYPEN:
             w.append(f"{datei}: typ {k.get('typ')!r} ist weder uebung noch folge")
+
+        # Pflichtfeld ohne stillen Default: faellt es weg, muss es auffallen.
+        # Ein Default legte eine beim Import vergessene Beachuebung wortlos
+        # unter Halle ab, und dort findet sie nie wieder jemand.
+        disziplin = k.get("disziplin")
+        if not disziplin:
+            w.append(f"{datei}: disziplin fehlt oder ist leer")
+        elif not isinstance(disziplin, list):
+            w.append(f"{datei}: disziplin {disziplin!r} steht nicht in eckigen Klammern")
+        else:
+            for d in disziplin:
+                if d not in DISZIPLINEN:
+                    w.append(f"{datei}: disziplin {d!r} steht nicht in der Liste")
 
         for el in k.get("element") or []:
             if el not in ELEMENTE:

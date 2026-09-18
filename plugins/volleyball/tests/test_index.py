@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import unittest
 
-from arbeitsordner import Arbeitsordner
+from arbeitsordner import OHNE, Arbeitsordner
 
 
 def auffaelligkeiten(ausgabe: str) -> list[str]:
@@ -53,6 +53,65 @@ class LinterTest(unittest.TestCase):
         self.assertEqual(len(gemeldet), 1, fertig.stdout)
         self.assertIn("ue-0009", gemeldet[0])
         self.assertIn("gibt-es-nicht", gemeldet[0])
+
+    def test_fehlende_disziplin_wird_gemeldet(self) -> None:
+        # Das ist der Fall, fuer den es keinen stillen Default gibt: eine Karte,
+        # bei der das Feld beim Import vergessen wurde.
+        self.ordner.lege_karte_an(
+            id="ue-0010", titel="Karte ganz ohne Disziplin", disziplin=OHNE,
+        )
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertIn("ue-0010", gemeldet[0])
+        self.assertIn("disziplin", gemeldet[0])
+
+    def test_leere_disziplin_wird_gemeldet(self) -> None:
+        self.ordner.lege_karte_an(
+            id="ue-0011", titel="Karte mit leerer Disziplinliste", disziplin=[],
+        )
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertIn("ue-0011", gemeldet[0])
+        self.assertIn("disziplin", gemeldet[0])
+
+    def test_unbekannte_disziplin_wird_gemeldet(self) -> None:
+        # Ein Tippfehler macht die Karte sonst unauffindbar: kein Filter trifft
+        # sie mehr.
+        self.ordner.lege_karte_an(
+            id="ue-0012", titel="Karte mit erfundener Disziplin", disziplin=["strand"],
+        )
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertIn("ue-0012", gemeldet[0])
+        self.assertIn("strand", gemeldet[0])
+
+    def test_disziplin_als_einzelwert_wird_gemeldet(self) -> None:
+        # `disziplin: halle` statt `disziplin: [halle]`. Ohne eigene Pruefung
+        # liefe die Wertepruefung ueber die Buchstaben und meldete fuenfmal.
+        self.ordner.lege_karte_an(
+            id="ue-0013", titel="Karte mit Disziplin ohne Klammern", disziplin="halle",
+        )
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertIn("ue-0013", gemeldet[0])
+        self.assertIn("disziplin", gemeldet[0])
+
+    def test_karte_fuer_halle_und_beach_meldet_nichts(self) -> None:
+        self.ordner.lege_karte_an(
+            id="ue-0014", titel="Karte für beide Disziplinen", disziplin=["halle", "beach"],
+        )
+
+        fertig = self.ordner.starte("index.py")
+
+        self.assertEqual(auffaelligkeiten(fertig.stdout), [])
 
 
 if __name__ == "__main__":

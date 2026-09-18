@@ -58,6 +58,24 @@ Fließtext, wo es natürlicher klingt. „Block" allein ist dafür tabu.
 immer ein Raum. Wenn beides in einem Satz vorkommt, lieber „Hallenteil A" und
 „Hallenteil B" schreiben, damit es eindeutig bleibt.
 
+## Halle und Beach
+
+Die Bibliothek trägt Übungen für beide Disziplinen. Auf der Übungskarte steht
+das im Pflichtfeld `disziplin`, als Liste aus `halle` und `beach`. Eine Übung,
+die am Strand genauso läuft wie in der Halle, trägt beide Werte. Ein Team
+spielt immer eine der beiden Disziplinen, das steht im Team-Profil.
+
+„Halle" ist damit doppelt belegt, denn „Hallenteil" meint schon den Raum.
+Deshalb dieselbe Trennung wie bei der Block-Regel:
+
+| Gemeint ist | Begriff | Beispiel |
+|---|---|---|
+| Die Disziplin, in der gespielt wird | **Halle**, **Beach** | „eine Übung für Halle und Beach", „Herren 1 spielt Halle" |
+| Räumliche Aufteilung der Halle | **Hallenteil** | „zwei Hallenteile mit je einem Netz" |
+
+Wie viele Flächen eine Übung braucht, sagt das Feld `spielflaechen`. Es gilt
+für beide Disziplinen.
+
 ## Weitere Sprachregeln
 
 | Nicht verwenden | Stattdessen |

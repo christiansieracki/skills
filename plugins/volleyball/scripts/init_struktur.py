@@ -74,6 +74,7 @@ regeln:
 TEAM_BLOCK = """\
   {team}:
     name: "{name}"
+    disziplin: halle      # halle oder beach, ein Team spielt immer eines von beiden
     ordner: teams/{team}/
     saisonplan: {saisonplan}
     mesozyklen: {mesozyklen}
@@ -195,7 +196,8 @@ def main() -> int:
         print(f"  war schon da  {p}")
 
     print("\nAls Nächstes:")
-    print("  1. Vereinsnamen und Saison in trainingsplanung-root.yml eintragen")
+    print("  1. Vereinsnamen, Saison und Disziplin der Teams in "
+          "trainingsplanung-root.yml eintragen")
     print("  2. Team-Profile anlegen, am einfachsten mit volleyball-saisonplaner")
     print("  3. Erste Übungen holen, am einfachsten mit volleyball-uebungsimport")
     return 0

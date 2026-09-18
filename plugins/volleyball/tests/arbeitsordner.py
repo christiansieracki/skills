@@ -77,6 +77,7 @@ KARTE = {
     "id": "ue-0000",
     "titel": "Ohne Titel",
     "typ": "uebung",
+    "disziplin": ["halle"],
     "element": ["ballkontrolle"],
     "spielphase": "keine",
     "form": "technik",
@@ -142,6 +143,11 @@ STANDARDKARTEN = [
     },
 ]
 
+# Platzhalter fuer ein Feld, das auf dieser Karte gar nicht stehen soll.
+# `disziplin=None` waere etwas anderes: dann stuende `disziplin: null` auf der
+# Karte. Fuer den Fall "Feld fehlt" braucht es deshalb einen eigenen Wert.
+OHNE = object()
+
 UMLAUTE = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
 
 
@@ -189,8 +195,12 @@ class Arbeitsordner:
             self.lege_karte_an(**felder)
 
     def lege_karte_an(self, **felder) -> None:
-        """Legt eine Uebungskarte an. Nicht genannte Felder kommen aus KARTE."""
-        karte = {**KARTE, **felder}
+        """Legt eine Uebungskarte an.
+
+        Nicht genannte Felder kommen aus KARTE. Ein Feld auf `OHNE` gesetzt
+        fehlt auf der Karte ganz.
+        """
+        karte = {k: v for k, v in {**KARTE, **felder}.items() if v is not OHNE}
         datei = self.pfad / "uebungen" / f"{karte['id']}-{_slug(karte['titel'])}.md"
         datei.write_text(_als_karte(karte), encoding="utf-8")
         self.ids.append(karte["id"])

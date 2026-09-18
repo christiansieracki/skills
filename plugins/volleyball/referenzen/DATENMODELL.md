@@ -37,6 +37,7 @@ Dateiname `ue-####-sprechender-slug.md`, Frontmatter komplett:
 id: ue-0042                      # stabil, ändert sich nie
 titel: "Annahme-Challenge auf dem Halbfeld"
 typ: uebung                      # uebung | folge
+disziplin: [halle]               # Liste, halle und/oder beach, Pflicht
 element: [annahme]               # Liste, aus der Liste unten
 spielphase: sideout              # sideout | break | keine
 form: komplex                    # erwaermung technik komplex spielform station abschluss
@@ -74,6 +75,7 @@ einmal vergessen.
 
 ### Kontrollierte Werte
 
+- `disziplin`: halle, beach
 - `element`: annahme, zuspiel, angriff, block, abwehr, aufschlag, ballkontrolle,
   athletik, koordination
 - `spielphase`: sideout, break, keine
@@ -81,6 +83,20 @@ einmal vergessen.
 - `level_min` / `level_max`: einsteiger, fortgeschritten, ambitioniert
 - `schwerpunkt`: nur Kennungen aus `schwerpunkte.md` der Wurzel. Fehlt eine,
   erst dort eintragen lassen, dann verwenden. Nie einfach eine neue erfinden.
+
+### Disziplin
+
+`disziplin` ist Pflicht und trägt eine Liste. Eine Übung, die am Strand genauso
+läuft wie in der Halle, bekommt beide Werte. Eine reine Beachübung trägt nur
+`beach`. Die Bibliothek bleibt dabei eine, mit einem ID-Raum: getrennt wird
+beim Suchen, nicht beim Ablegen.
+
+**Es gibt keinen Default.** Fehlt das Feld oder ist die Liste leer, meldet
+`index.py` das. Ein Default schwiege genau dann, wenn beim Import die Disziplin
+vergessen wurde, und legte die Beachübung wortlos unter Halle ab.
+
+Das Team führt die Disziplin als einzelnen Wert in seinem Profil, weil ein Team
+immer eine von beiden spielt. Die Trainingsgruppe erbt sie von ihrem Leitteam.
 
 ### Übung oder Folge
 
@@ -170,7 +186,7 @@ aus der Standardbibliothek.
 | `leseansicht.py` | aus einem Trainingsplan die HTML-Fassung fürs Handy erzeugen, samt den Schaubildern der verwendeten Übungen |
 | `export_pdf.py` | PDF zum Ausdrucken |
 
-`index.py` ohne Argumente ist auch der Linter: doppelte IDs, unbekannte
-Schwerpunkte, fehlende Level, ins Leere zeigende `variante_von`, Trainingspläne
-mit unbekannten IDs. Vor größeren Änderungen und nach jedem Import laufen
-lassen.
+`index.py` ohne Argumente ist auch der Linter: doppelte IDs, fehlende oder
+unbekannte `disziplin`, unbekannte Schwerpunkte, fehlende Level, ins Leere
+zeigende `variante_von`, Trainingspläne mit unbekannten IDs. Vor größeren
+Änderungen und nach jedem Import laufen lassen.
