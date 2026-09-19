@@ -36,6 +36,17 @@ LEVEL = ["einsteiger", "fortgeschritten", "ambitioniert"]
 TYPEN = {"uebung", "folge"}
 
 
+def disziplin_text(eintrag: dict) -> str:
+    """Die Disziplin einer Karte, wie ein Mensch sie zu sehen bekommt.
+
+    Die Trefferliste der Suche und die Lesebrille `index.md` zeigen dasselbe,
+    damit eine Beachuebung in beiden Ansichten gleich aussieht. Fehlt das Feld,
+    steht hier ein Strich. Der Linter meldet so eine Karte ohnehin, daran soll
+    die Ausgabe nicht scheitern.
+    """
+    return ", ".join(eintrag.get("disziplin") or []) or "—"
+
+
 # --------------------------------------------------------------------------
 # Konsole
 # --------------------------------------------------------------------------

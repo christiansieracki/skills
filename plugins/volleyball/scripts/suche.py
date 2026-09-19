@@ -39,8 +39,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    DISZIPLINEN, LEVEL, finde_wurzel, hole_index, interpreter,
-    konsole_vorbereiten,
+    DISZIPLINEN, LEVEL, disziplin_text, finde_wurzel, hole_index,
+    interpreter, konsole_vorbereiten,
 )
 
 
@@ -145,9 +145,9 @@ def zeige(e, lang: bool, anwesend=None):
     parallel = f"  [{g} Gruppen parallel]" if g > 1 else ""
     # Die Disziplin steht in jeder Trefferzeile, auch in der kurzen Liste.
     # Sonst entgeht bei einer ungefilterten Suche, dass da eine Beachübung
-    # zwischen den Hallenübungen liegt. Fehlt das Feld auf der Karte, steht
-    # hier ein Strich. Welche Karte es ist, sagt `index.py`.
-    disziplin = ", ".join(e.get("disziplin") or []) or "—"
+    # zwischen den Hallenübungen liegt. Wie sie geschrieben wird, steht in
+    # `disziplin_text()`, damit `index.md` dasselbe zeigt.
+    disziplin = disziplin_text(e)
     print(f"{e['id']}  {e['titel']}{art}{warn}  [{disziplin}]{parallel}")
     if not lang:
         return

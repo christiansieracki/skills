@@ -24,7 +24,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    cache_pfad, finde_wurzel, hole_index, konsole_vorbereiten,
+    cache_pfad, disziplin_text, finde_wurzel, hole_index,
+    konsole_vorbereiten,
 )
 
 ELEMENT_TITEL = {
@@ -61,7 +62,8 @@ def schreibe_md(wurzel: Path, daten: dict) -> Path:
 
     for el in sorted(nach_element, key=lambda x: ELEMENT_TITEL.get(x, x)):
         z += [f"## {ELEMENT_TITEL.get(el, el)}", "",
-              "| Übung | Level | Spieler | Dauer | Zuletzt |", "|---|---|---|---|---|"]
+              "| Übung | Disziplin | Level | Spieler | Dauer | Zuletzt |",
+              "|---|---|---|---|---|---|"]
         for e in sorted(nach_element[el], key=lambda x: x["id"]):
             titel = f"[{e['titel']}]({e['datei']})"
             if e.get("typ") == "folge":
@@ -69,7 +71,8 @@ def schreibe_md(wurzel: Path, daten: dict) -> Path:
             if e.get("erwachsenenbelastung"):
                 titel += " ⚠"
             z.append(
-                f"| {titel} | {spanne(e.get('level_min'), e.get('level_max'))} "
+                f"| {titel} | {disziplin_text(e)} "
+                f"| {spanne(e.get('level_min'), e.get('level_max'))} "
                 f"| {spanne(e.get('spieler_min'), e.get('spieler_max'))} "
                 f"| {spanne(e.get('dauer_min'), e.get('dauer_max'), ' min')} "
                 f"| {e.get('zuletzt') or '—'} |"

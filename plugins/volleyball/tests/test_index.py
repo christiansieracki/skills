@@ -1,9 +1,11 @@
-"""Prueft den Linter gegen einen kuenstlichen Arbeitsordner.
+"""Prueft `index.py` gegen einen kuenstlichen Arbeitsordner.
 
     <python> -m unittest discover -s plugins/volleyball/tests
 
-Der Linter ist `index.py`. Geprueft wird, was auf der Konsole ankommt: das ist
-es, was ein Skill und ein Mensch zu sehen bekommen, und damit der Vertrag.
+`index.py` ist der Linter und baut mit `--md` zugleich die Lesebrille
+`index.md`. Geprueft wird, was auf der Konsole ankommt und was in der Datei
+steht: das ist es, was ein Skill und ein Mensch zu sehen bekommen, und damit
+der Vertrag.
 Eine interne Pruefroutine direkt aufzurufen hiesse, ihre Verdrahtung
 nachzubauen. Der Test braeche dann beim ersten Umbau, ohne dass sich das
 Verhalten geaendert haette.
@@ -23,6 +25,20 @@ def auffaelligkeiten(ausgabe: str) -> list[str]:
     Mehr Struktur hat die Ausgabe des Linters heute nicht.
     """
     return [zeile[4:] for zeile in ausgabe.splitlines() if zeile.startswith("  - ")]
+
+
+def disziplin_zu(index_md: str, uebung_id: str) -> set[str]:
+    """Die Disziplinzelle jeder Tabellenzeile, die zu einer Uebung gehoert.
+
+    Eine Uebung steht in so vielen Tabellen, wie sie Elemente hat. In allen
+    muss dasselbe stehen, deshalb eine Menge: bleibt sie einelementig, sind
+    sich die Zeilen einig.
+    """
+    zellen = set()
+    for zeile in index_md.splitlines():
+        if zeile.startswith("|") and f"{uebung_id}-" in zeile:
+            zellen.add(zeile.split("|")[2].strip())
+    return zellen
 
 
 class LinterTest(unittest.TestCase):
@@ -206,6 +222,47 @@ class LinterTest(unittest.TestCase):
         fertig = self.ordner.starte("index.py")
 
         self.assertEqual(auffaelligkeiten(fertig.stdout), [])
+
+
+class IndexMdTest(unittest.TestCase):
+    """Die Lesebrille `index.md`, gebaut mit `--md`.
+
+    Sie zeigt die Bibliothek ungefiltert. Deshalb muss an jeder Zeile stehen,
+    fuer welche Disziplin die Uebung gedacht ist. Sonst steht eine Beachuebung
+    ununterscheidbar zwischen den Hallenuebungen, und das ist genau der Fall,
+    den der Disziplinfilter in der Suche verhindern soll.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def baue(self) -> str:
+        fertig = self.ordner.starte("index.py", "--md")
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        return (self.ordner.pfad / "index.md").read_text(encoding="utf-8")
+
+    def test_ohne_md_entsteht_keine_index_md(self) -> None:
+        # Die Wurzeldatei stellt den Neubau auf ausdrueckliche Ansage. Ein Lauf
+        # ohne das Flag darf die Datei deshalb nicht anfassen.
+        fertig = self.ordner.starte("index.py")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        self.assertFalse((self.ordner.pfad / "index.md").exists())
+
+    def test_die_uebungstabelle_fuehrt_eine_disziplinspalte(self) -> None:
+        self.assertIn(
+            "| Übung | Disziplin | Level | Spieler | Dauer | Zuletzt |", self.baue()
+        )
+
+    def test_die_beachkarte_ist_in_der_tabelle_zu_erkennen(self) -> None:
+        self.assertEqual(disziplin_zu(self.baue(), "ue-0004"), {"beach"})
+
+    def test_die_hallenkarte_ist_in_der_tabelle_zu_erkennen(self) -> None:
+        self.assertEqual(disziplin_zu(self.baue(), "ue-0001"), {"halle"})
+
+    def test_die_karte_fuer_beide_zeigt_beide_werte(self) -> None:
+        self.assertEqual(disziplin_zu(self.baue(), "ue-0005"), {"halle, beach"})
 
 
 if __name__ == "__main__":
