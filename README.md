@@ -20,7 +20,7 @@ Claude-Skills von Christian Sieracki, als Plugin-Marketplace.
 
 | Plugin | Inhalt |
 |---|---|
-| [volleyball](plugins/volleyball) | Saisonplanung, Trainingsdesign und Übungsimport für Volleyballteams |
+| [volleyball](plugins/volleyball) | Saisonplanung, Trainingsdesign, Übungsimport und Schaubilder für Volleyballteams |
 
 ## Lizenz
 

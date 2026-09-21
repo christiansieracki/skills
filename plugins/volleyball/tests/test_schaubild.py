@@ -189,6 +189,24 @@ class SchaubildTest(unittest.TestCase):
         namen = sorted(p.name for p in (self.ordner.pfad / "schaubilder").iterdir())
         self.assertEqual(namen, ["ue-0042.svg", "ue-0042.szene.yml"])
 
+    def test_eine_szene_ausserhalb_des_ordners_laesst_schaubilder_unberuehrt(self) -> None:
+        # Daran haengt die Vorschau-Schleife von volleyball-schaubild: gerendert
+        # wird Runde um Runde neben dem Entwurf im Temp-Verzeichnis, und nach
+        # schaubilder/ kommt erst, was der Trainer freigegeben hat.
+        entwurf = self.ordner.lege_entwurf_an("ue-0042", """
+            form: halle
+            spieler:
+              - bei: 3
+        """)
+
+        fertig = self.ordner.starte("schaubild.py", str(entwurf))
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertTrue((entwurf.parent / "ue-0042.svg").is_file(),
+                        "das Bild entsteht neben seiner Szene")
+        self.assertFalse((self.ordner.pfad / "schaubilder").exists(),
+                         "vor der Freigabe steht in schaubilder/ nichts")
+
     def test_eine_unbekannte_form_bricht_ab_und_schreibt_keine_datei(self) -> None:
         fertig = self.scheitert("ue-0043", """
             form: turnhalle

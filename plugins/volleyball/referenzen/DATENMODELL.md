@@ -1,6 +1,6 @@
 # Datenmodell
 
-Verbindlich für alle drei Skills. Wer hier abweicht, produziert Karten, die
+Verbindlich für alle vier Skills. Wer hier abweicht, produziert Karten, die
 `suche.py` nicht findet.
 
 ## Ordner

@@ -246,6 +246,7 @@ class Arbeitsordner:
     def __init__(self) -> None:
         self.pfad = Path(tempfile.mkdtemp(prefix="trainingsplanung-test-"))
         self.ids: list[str] = []
+        self.entwurfsordner: Path | None = None
         (self.pfad / WURZELDATEI).write_text(ROOT_YML, encoding="utf-8")
         (self.pfad / "schwerpunkte.md").write_text(SCHWERPUNKTE_MD, encoding="utf-8")
         (self.pfad / "uebungen").mkdir()
@@ -291,6 +292,21 @@ class Arbeitsordner:
         ordner = self.pfad / "schaubilder"
         ordner.mkdir(exist_ok=True)
         datei = ordner / f"{name}.szene.yml"
+        datei.write_text(textwrap.dedent(text).strip() + "\n", encoding="utf-8")
+        return datei
+
+    def lege_entwurf_an(self, name: str, text: str) -> Path:
+        """Legt eine Szenendatei ausserhalb des Arbeitsordners ab.
+
+        Dafuer, dass eine Szene auch neben dem Arbeitsordner rendert: der
+        Skill volleyball-schaubild zeichnet Runde um Runde im
+        Temp-Verzeichnis, und nach schaubilder/ kommt erst, was der Trainer
+        freigegeben hat. Der Ordner entsteht beim ersten Aufruf und wird mit
+        weggeraeumt.
+        """
+        if self.entwurfsordner is None:
+            self.entwurfsordner = Path(tempfile.mkdtemp(prefix="trainingsplanung-entwurf-"))
+        datei = self.entwurfsordner / f"{name}.szene.yml"
         datei.write_text(textwrap.dedent(text).strip() + "\n", encoding="utf-8")
         return datei
 
@@ -396,3 +412,5 @@ class Arbeitsordner:
             except OSError:
                 pass
         shutil.rmtree(self.pfad, ignore_errors=True)
+        if self.entwurfsordner is not None:
+            shutil.rmtree(self.entwurfsordner, ignore_errors=True)

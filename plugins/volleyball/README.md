@@ -1,15 +1,16 @@
 # Volleyball Trainingsplanung
 
-Drei Skills, die zusammen auf einem Markdown-Ordner arbeiten.
+Vier Skills, die zusammen auf einem Markdown-Ordner arbeiten.
 
 | Skill | Wofür |
 |---|---|
 | `volleyball-saisonplaner` | Saisonplan und Mesozyklen für ein Team |
 | `volleyball-trainingsdesign` | einzelne Trainingseinheiten |
 | `volleyball-uebungsimport` | neue Übungskarten aus PDFs, Screenshots und Links |
+| `volleyball-schaubild` | Schaubilder zu einer Übung, aus einer Szene gezeichnet |
 
 Sie teilen sich Datenmodell, Skripte und Sprachregeln, deshalb liegen sie in
-einem Plugin und nicht in dreien.
+einem Plugin und nicht in vieren.
 
 ## Wie der Arbeitsordner gefunden wird
 
@@ -25,12 +26,12 @@ heißt der Aufruf `python`.
 
 ```
 plugins/volleyball/
-├── skills/            die drei SKILL.md
+├── skills/            die vier SKILL.md
 ├── referenzen/        DATENMODELL, SPRACHE, VORLAGEN, METHODIK, ...
 ├── scripts/           index.py, suche.py, leseansicht.py, export_pdf.py,
-│                      bilder_aufbereiten.py
-└── tests/             Linter, Suche und Bildaufbereitung gegen einen
-                       künstlichen Arbeitsordner
+│                      bilder_aufbereiten.py, schaubild.py, szene.py
+└── tests/             Linter, Suche, Bildaufbereitung und Schaubilder
+                       gegen einen künstlichen Arbeitsordner
 ```
 
 **Im Plugin liegt das Werkzeug, im Arbeitsordner liegen die Daten.** Übungen,

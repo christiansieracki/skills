@@ -7,7 +7,7 @@
       "name": "volleyball",
       "displayName": "Volleyball Trainingsplanung",
       "source": "./plugins/volleyball",
-      "description": "Saisonplanung, Trainingsdesign und Uebungsimport fuer Volleyballteams. Arbeitet auf einem Markdown-Ordner mit gemeinsamer Uebungsbibliothek.",
+      "description": "Saisonplanung, Trainingsdesign, Uebungsimport und Schaubilder fuer Volleyballteams. Arbeitet auf einem Markdown-Ordner mit gemeinsamer Uebungsbibliothek.",
       "version": "2.0.0",
       "license": "MIT",
       "keywords": ["volleyball", "training", "sport", "trainingsplanung", "deutsch"],
