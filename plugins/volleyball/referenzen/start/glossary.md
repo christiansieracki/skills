@@ -37,6 +37,25 @@ abdeckt und welches Team führt, steht in `trainingsplanung-root.yml`.
 Wer in die Leseansicht tippt, verliert seine Änderung beim nächsten Erzeugen.
 Änderungen gehören immer in die `.md`.
 
+## Szene und Schaubild
+
+| Begriff | Was es ist | Wo es liegt |
+|---|---|---|
+| **Szene** | Die Beschreibung eines Schaubildes in YAML, in Metern gerechnet. Das ist die Quelle, hier wird geändert. | `schaubilder/ue-0042.szene.yml` |
+| **Schaubild** | Das Bild, das daraus entsteht. Ein Erzeugnis: es wird beim nächsten Mal überschrieben. | `schaubilder/ue-0042.svg` |
+| **Feldvorlage** | Die Grundform einer Szene: Halle 9×18 m oder Beach 8×16 m, mit den Linien, die es dort wirklich gibt. | in der Szene, als `form:` |
+
+Dasselbe Verhältnis wie zwischen Trainingsplan und Leseansicht: Wer in das SVG
+tippt, verliert es beim nächsten Erzeugen. Änderungen gehören in die Szene.
+
+Plätze heißen in der Halle nach ihrer **Positionsnummer** 1 bis 6, im Sand nach
+einer **Rolle**. Im Sand gibt es keine Rotation, auf die sich eine Nummer
+beziehen könnte. Die Rollen heißen nach dem, was der Spieler dort tut:
+`block`, `abwehr`, `annahme-links`, `annahme-rechts`, `aufschlag`.
+
+Ältere Schaubilder, die von Hand gezeichnet oder aus einer Quelle
+ausgeschnitten wurden, haben keine Szene. Sie bleiben, wie sie sind.
+
 ## Die Block-Regel
 
 „Block" ist im Volleyball ein Technikelement. Deshalb steht das Wort in unseren

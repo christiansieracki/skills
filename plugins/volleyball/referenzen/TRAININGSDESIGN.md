@@ -21,7 +21,7 @@ Ein kleines Schaubild erzeugen (nicht nur beschreiben), wenn:
 - ein **Stationsaufbau** mit mehreren Gruppen/Positionen erklärt wird,
 - **Laufwege** oder Zuspielmuster für eine Übung sonst nur schwer verständlich wären.
 
-Kein Schaubild bei rein konditionellen Übungen oder wenn eine Zeile Text reicht. Für die Erzeugung das Diagramm-Modul des Visualizers nutzen (Spielfeld als einfache Rechteck-/Linien-Grafik, Positionen/Wege beschriftet); das Schaubild ergänzt den Trainingsplan im Chat, ein Kurzverweis darauf gehört in die abgelegte `trainings/JJJJ-MM-TT.md`.
+Kein Schaubild bei rein konditionellen Übungen oder wenn eine Zeile Text reicht. Erzeugt wird es aus einer Szene mit `scripts/schaubild.py`, wie es `SCHAUBILDER.md` beschreibt; das Schaubild ergänzt den Trainingsplan im Chat, ein Kurzverweis darauf gehört in die abgelegte `trainings/JJJJ-MM-TT.md`.
 
 ## Übungsauswahl: Prinzip
 

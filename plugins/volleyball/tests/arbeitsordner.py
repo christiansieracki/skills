@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 from pathlib import Path
 
 SKRIPTE = Path(__file__).resolve().parent.parent / "scripts"
@@ -278,6 +279,19 @@ class Arbeitsordner:
         ordner.mkdir(exist_ok=True)
         datei = ordner / name
         datei.write_text('<svg xmlns="http://www.w3.org/2000/svg"></svg>', encoding="utf-8")
+        return datei
+
+    def lege_szene_an(self, name: str, text: str) -> Path:
+        """Legt eine Szenendatei unter schaubilder/ ab.
+
+        Der Name ist der Basisname ohne Endung, so wie ihn auch das Skript
+        entgegennimmt. Den Ordner legt erst dieser Aufruf an, damit ein
+        Arbeitsordner ohne Schaubilder auch keinen hat.
+        """
+        ordner = self.pfad / "schaubilder"
+        ordner.mkdir(exist_ok=True)
+        datei = ordner / f"{name}.szene.yml"
+        datei.write_text(textwrap.dedent(text).strip() + "\n", encoding="utf-8")
         return datei
 
     def lege_karte_an(self, **felder) -> None:

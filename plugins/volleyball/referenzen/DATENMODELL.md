@@ -20,7 +20,7 @@ in `scripts/tpdaten.py` macht das.
 ├── trainings/<gruppe>/         JJJJ-MM-TT.md, dazu _vorlage.md
 ├── uebungen/                   flach, eine Datei je Übung
 ├── quellen/                    Originaldokumente
-└── schaubilder/                Bilder, die zu einer Übung gehören
+└── schaubilder/                Schaubilder und die Szenen, aus denen sie entstehen
 ```
 
 Die Gruppe ist, wer zusammen in der Halle steht, daran hängen die Einheiten.
@@ -155,6 +155,32 @@ höchste Nummer plus eins. Format immer vierstellig mit führenden Nullen.
 
 Der Dateiname beginnt mit der ID, darf aber sonst geändert werden.
 
+## Das Schaubild ist ein Erzeugnis, die Szene ist die Quelle
+
+Ein Schaubild wird nicht von Hand gezeichnet. Die Quelle ist eine **Szene**:
+eine Beschreibung in YAML, die durchgehend in Metern rechnet und aus der
+`schaubild.py` ein SVG erzeugt (ADR-0004). Beide liegen in `schaubilder/`
+unter demselben Basisnamen:
+
+```
+schaubilder/ue-0042.szene.yml    die Quelle, hier wird geändert
+schaubilder/ue-0042.svg          das Erzeugnis, wird überschrieben
+```
+
+Auf der Karte steht in `schaubild:` der Dateiname des **Bildes**, nicht der
+Szene. Zeigt er ins Leere, meldet `index.py` das. Das Feld trägt einen
+Dateinamen und schreibt keine Endung vor: ältere Schaubilder ohne Szene bleiben
+liegen, wie sie sind.
+
+Die Grundform einer Szene ist eine **Feldvorlage**: Halle 9×18 m mit Netz und
+beiden Angriffslinien, Beach 8×16 m mit Netz und sonst nichts.
+
+Die Szene wird **nicht vom Linter geprüft.** Sie prüft sich beim Rendern
+selbst, und was nicht rendert, wird nicht geschrieben.
+
+Was Szene, Feldvorlage und Rolle bedeuten, steht im Glossar. Wie eine Szene
+aufgebaut ist, steht in `referenzen/SCHAUBILDER.md`.
+
 ## Der Trainingsplan
 
 `trainings/<gruppe>/JJJJ-MM-TT.md`, Frontmatter mit `datum`, `gruppe`,
@@ -201,7 +227,9 @@ nur auf ausdrückliche Ansage neu gebaut (`index.py --md`).
 ## Skripte
 
 Alle liegen unter `${CLAUDE_PLUGIN_ROOT}/scripts/` und brauchen nur Python 3
-aus der Standardbibliothek.
+aus der Standardbibliothek. Die einzige Ausnahme ist `bilder_aufbereiten.py`,
+das Pillow braucht und ohne es mit einem Installationshinweis abbricht
+(ADR-0005). Kein anderes Skript ändert sich dadurch.
 
 | Skript | Wofür |
 |---|---|
@@ -209,6 +237,8 @@ aus der Standardbibliothek.
 | `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek |
 | `leseansicht.py` | aus einem Trainingsplan die HTML-Fassung fürs Handy erzeugen, samt den Schaubildern der verwendeten Übungen |
 | `export_pdf.py` | PDF zum Ausdrucken |
+| `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen |
+| `bilder_aufbereiten.py` | Quellbilder verkleinern und nach EXIF geradedrehen |
 
 `index.py` ohne Argumente ist auch der Linter: doppelte IDs, fehlende oder
 unbekannte `disziplin`, unbekannte Schwerpunkte, fehlende Level, ins Leere

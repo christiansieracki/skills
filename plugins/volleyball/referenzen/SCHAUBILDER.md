@@ -1,37 +1,218 @@
-# Schaubild-Vorlage: Volleyballfeld
+# Schaubilder: die Szene ist die Quelle
 
-Basis für alle räumlichen Schaubilder (Aufstellungen, Rotationen, Stationen, Laufwege). Über das Diagramm-Modul des Visualizers als SVG rendern. Farben immer über die vom Modul vorgegebenen CSS-Variablen, nicht hart kodieren.
+Ein Schaubild entsteht aus einer **Szene**: einer kurzen Beschreibung in
+YAML, die in Metern rechnet (ADR-0004). Von Hand gezeichnetes SVG gibt es
+nicht mehr. Szene und Bild liegen nebeneinander in `schaubilder/`, unter
+demselben Basisnamen:
 
-## Maße & Orientierung
-
-- Feld 9×18 m, im Schaubild als Hochformat-Rechteck (ein Team pro Feldhälfte).
-- Netz waagerecht in der Mitte, Angriffslinie (3-m-Linie) je Hälfte einzeichnen.
-- Sechs Positionen nach Volleyball-Konvention nummeriert: hinten 1/6/5, vorne 2/3/4. Position 1 = Aufschlagposition rechts hinten.
-
-## Feldvorlage (SVG-Grundgerüst)
-
-```svg
-<svg viewBox="0 0 300 560" xmlns="http://www.w3.org/2000/svg">
-  <!-- Spielfeld -->
-  <rect x="30" y="20" width="240" height="480" fill="none" stroke="currentColor" stroke-width="2"/>
-  <!-- Netz / Mittellinie -->
-  <line x1="30" y1="260" x2="270" y2="260" stroke="currentColor" stroke-width="3" stroke-dasharray="6 4"/>
-  <!-- Angriffslinien (3 m) -->
-  <line x1="30" y1="180" x2="270" y2="180" stroke="currentColor" stroke-width="1"/>
-  <line x1="30" y1="340" x2="270" y2="340" stroke="currentColor" stroke-width="1"/>
-  <!-- Positionsmarker: <circle> mit Nummer; Laufwege als <path> mit Pfeil -->
-</svg>
+```
+schaubilder/ue-0042.szene.yml    die Quelle, hier wird geändert
+schaubilder/ue-0042.svg          das Erzeugnis, wird überschrieben
 ```
 
-## Konventionen
+Dasselbe Muster wie bei Trainingsplan und Leseansicht: Wer in das SVG tippt,
+verliert es beim nächsten Erzeugen. So bleibt ein Bild änderbar. Eine Korrektur
+ein halbes Jahr später kostet drei Zeilen in der Szene statt einer
+Neuzeichnung.
 
-- **Spieler:** Kreis mit Positionsnummer (1-6) oder Kürzel (Z=Zuspiel, D=Diagonal, AA=Außenannahme, MB=Mittelblock, L=Libero).
-- **Laufweg:** durchgezogener Pfeil. **Ballweg:** gestrichelter Pfeil. In einer kurzen Legende unter dem Feld erklären.
-- **Stationsaufbau:** mehrere kleine Felder/Zonen nebeneinander, jede Station beschriftet (Übungsname + Gruppengröße).
-- Beschriftungen kurz halten; das Schaubild ergänzt den Text, ersetzt die Übungsbeschreibung nicht.
+Erzeugt wird mit:
+
+```
+<python> ${CLAUDE_PLUGIN_ROOT}/scripts/schaubild.py ue-0042
+<python> ${CLAUDE_PLUGIN_ROOT}/scripts/schaubild.py ue-0042 --wurzel <pfad>
+```
+
+Das Argument ist der Basisname (dann wird unter `schaubilder/` gesucht) oder
+der Pfad zur Szenendatei. Geschrieben wird erst, wenn das ganze Bild steht:
+Eine Szene, die nicht aufgeht, hinterlässt eine Meldung und das Bild von
+vorher, nie ein halbes.
+
+Auf der Übungskarte steht anschließend der Dateiname des Bildes:
+`schaubild: ue-0042.svg`. `index.py` meldet, wenn er ins Leere zeigt.
+
+## Der Aufbau einer Szene
+
+```yaml
+# Annahme-Zielzone: Aufschlag von hinten, Annahme auf die Position 3.
+form: halle
+
+spieler:
+  - bei: 5
+    text: AA
+  - bei: 6
+    text: L
+  - bei: 3
+    text: Z
+  - bei: [4.5, 16.5]
+    text: A
+
+wege:
+  - art: ballweg
+    von: [4.5, 16.5]
+    nach: 6
+    bogen: 1.4
+  - art: laufweg
+    von: 1
+    nach: [6.5, 7.2]
+```
+
+Drei Schlüssel auf oberster Ebene, mehr gibt es nicht: `form`, `spieler`,
+`wege`. Ein Schlüssel, den es nicht gibt, wird gemeldet statt übergangen. Ein
+vertipptes `spiler:` ergäbe sonst ein leeres Feld, und das sieht fertig aus.
+
+### Gerechnet wird in Metern
+
+Durchgehend. Der Ursprung liegt in der **linken unteren Ecke** des Feldes, `x`
+wächst nach rechts, `y` zur Gegenseite hin. Das Netz liegt auf halber Länge,
+in der Halle also bei 9 m, im Sand bei 8 m.
+
+Gesehen wird von oben, und die eigene Mannschaft steht **unten** und schaut zum
+Netz. Ihre rechte Seite ist damit auch die rechte Seite des Bildes.
+
+Die Umrechnung in Zeichenkoordinaten macht das Skript. In der Szene steht nie
+eine Pixelzahl, und im Bild nie ein Meter. Nur so stimmt ein eingezeichneter
+Abstand mit dem überein, was in der Halle abgeschritten wird.
+
+Die Zeichenfläche wächst um das herum, was neben dem Feld steht. Ein
+Aufschlagspieler bei `[4.5, -1.5]` steht ganz im Bild, statt angeschnitten zu
+werden.
+
+### `form`: die beiden Feldvorlagen
+
+| Wert | Feld | Was darauf gezeichnet wird |
+|---|---|---|
+| `halle` | 9 × 18 m | Rand, Mittellinie, beide Angriffslinien (3 m vom Netz), Netzband |
+| `beach` | 8 × 16 m | Rand, Netzband, sonst nichts |
+
+**Im Sand gibt es weder Angriffs- noch Mittellinie.** Eine Linie im Bild, die
+es draußen nicht gibt, ist eine Ansage an Spieler, die niemand einhalten kann.
+Das Netz steht in beiden Vorlagen als Band um die Feldmitte; in der Halle
+bleibt die Mittellinie darunter sichtbar, im Sand sieht man auf einen Blick,
+dass da keine ist.
+
+Eine Grundform, die es nicht gibt, bricht mit einer Meldung ab.
+
+### `bei`, `von`, `nach`: wo etwas ist
+
+Es gibt genau einen Weg, einen Ort zu nennen, und er sieht überall gleich aus.
+Welche der drei Formen erlaubt ist, hängt an der Grundform:
+
+| Geschrieben als | Bedeutet | Erlaubt in |
+|---|---|---|
+| `bei: 4` | Positionsnummer 1 bis 6 | nur `halle` |
+| `bei: block` | eine Rolle | nur `beach` |
+| `bei: [3.0, 12.5]` | Meter, x und y | überall |
+
+**Positionsnummern in der Halle.** Die sechs Drittelflächen der eigenen
+Hälfte, nach Volleyballkonvention: hinten 1/6/5, vorne 2/3/4, Position 1 ist
+die Aufschlagposition rechts hinten. Ein Marker liegt jeweils in der Mitte
+seiner Fläche.
+
+**Rollen im Sand.** Dort gibt es keine Rotation, auf die sich eine Nummer
+beziehen könnte, also heißt ein Platz nach dem, was der Spieler dort tut. Dafür
+steht das Wort, das im Datenmodell schon dafür da ist: `block`, `abwehr`,
+`annahme` und `aufschlag` sind Elemente einer Übungskarte. Die Annahme braucht
+zwei Plätze und bekommt dafür eine Seitenangabe. `block` ist auch hier das
+Technikelement und kein Zeitabschnitt.
+
+| Rolle | Wo | Kürzel im Marker |
+|---|---|---|
+| `block` | am Netz, Feldmitte | BL |
+| `abwehr` | hinten, Feldmitte | AB |
+| `annahme-links` | linke Hälfte, mittlere Tiefe | AL |
+| `annahme-rechts` | rechte Hälfte, mittlere Tiefe | AR |
+| `aufschlag` | hinter der Grundlinie | AS |
+
+Eine Positionsnummer im Sand und eine Rolle in der Halle brechen beide mit
+einer Meldung ab, statt still auf irgendetwas zurückzufallen.
+
+Alles andere steht in Metern da, auch die Gegenseite. Für die gibt es keine
+Positionsnamen.
+
+### `spieler`
+
+```yaml
+spieler:
+  - bei: 3
+    text: Z
+  - bei: [4.5, 16.5]
+```
+
+`text` ist die Beschriftung im Marker, kurz gehalten: eine Positionsnummer, ein
+Kürzel wie Z, D, AA, MB, L. Fehlt `text`, beschriftet sich eine Position mit
+ihrer Nummer und eine Rolle mit ihrem Kürzel; ein freier Punkt bleibt leer,
+statt einen Namen zu bekommen, den niemand vergeben hat.
+
+Der Marker ist maßstäblich: knapp ein Meter Durchmesser, so viel wie ein Mensch
+von oben braucht.
+
+### `wege`
+
+```yaml
+wege:
+  - art: laufweg
+    von: 4
+    nach: [3.0, 8.4]
+  - art: ballweg
+    von: [4.5, 16.5]
+    nach: 6
+    bogen: 1.4
+```
+
+| Schlüssel | Bedeutung |
+|---|---|
+| `art` | `laufweg` (durchgezogen) oder `ballweg` (gestrichelt) |
+| `von`, `nach` | ein Ort, in den drei Formen von oben |
+| `bogen` | Pfeilhöhe der Krümmung in Metern, optional |
+
+Unterschieden wird über die **Strichart**, nicht allein über die Farbe. Das
+bleibt für den lesbar, der Farben schlecht auseinanderhält, und im Ausdruck in
+Graustufen. Jede Wegart hat ihre eigene Pfeilspitze.
+
+`bogen` ist der größte Abstand der Kurve von der Geraden zwischen `von` und
+`nach`, in Metern. Ein positiver Wert biegt nach **links**, vom Gang `von` →
+`nach` aus gesehen, ein negativer nach rechts. Ohne `bogen` wird gerade
+gezeichnet.
+
+Fängt ein Weg auf einem Spieler an oder hört auf ihm auf, endet er am Rand des
+Markers. Sonst verschwände die Pfeilspitze unter dem Kreis, und mit ihr das
+Einzige, was die Richtung zeigt.
+
+## Farben
+
+Das Bild bringt beide Farbschemata mit und schaltet mit dem Gerät um, genau wie
+die Leseansicht, in der es steckt. Die Farben stehen als CSS-Variablen im Bild:
+`--papier`, `--feld`, `--strich`, `--gedaempft`, `--laufweg`, `--ballweg`.
+
+In der Szene stehen keine Farben. Wer eine braucht, ändert die Palette in
+`scripts/schaubild.py`. Dann ändern sich alle Bilder mit, und so ist es
+gedacht.
+
+`currentColor` wird bewusst nicht benutzt: Die Leseansicht bettet das Schaubild
+als `<img>` ein, und darin gibt es keine Elternfarbe, die färben könnte.
 
 ## Wann welches Schaubild
 
-- **Aufstellung/Rotation:** ein Feld, sechs nummerierte Positionen, ggf. Pfeile für die Rotation.
-- **Angriffs-/Laufsystem:** Lauf- und Ballwege als Pfeile auf einer Feldhälfte.
-- **Stationsbetrieb:** Feld in Zonen unterteilt, Gruppen/Rotation der Gruppen andeuten.
+- **Aufstellung/Rotation:** ein Feld, die beteiligten Positionen, bei Bedarf
+  Laufwege für die Rotation.
+- **Annahme- und Angriffssystem:** Lauf- und Ballwege auf einer Feldhälfte, die
+  Gegenseite nur so weit, wie sie gebraucht wird.
+- **Beach:** dieselbe Szene mit `form: beach`; Plätze über Rollen statt über
+  Nummern.
+
+Beschriftungen kurz halten. Das Schaubild ergänzt den Text der Übungskarte, es
+ersetzt ihn nicht.
+
+## Was noch nicht geht
+
+Das Vokabular wächst mit den nächsten Schritten des Bild-Astes. Das Folgende
+gibt es heute noch nicht, und eine Szene, die es verwendet, bricht ab:
+
+- eine freie Leinwand ohne Spielfeld, für einen Stationsbetrieb, der nicht
+  hineinpasst
+- Geräte (Kasten, Ballwagen, Zielmatte) und Zonen als Fläche
+- Maßketten und beschriftete Abstandsangaben
+- Titel, Legendenspalte und Fußzeile
+
+Ein Stationsaufbau, der aufs Feld passt, wird schon heute aufs Feld gezeichnet
+und hat seinen Maßstab damit geschenkt.
