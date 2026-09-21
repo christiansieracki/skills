@@ -841,7 +841,17 @@ def main() -> int:
         print("Ohne `titel:` steht der Untertitel oben, in der Schrift des Titels.")
         # `ziel()` hat den Basisnamen schon freigelegt. Gehoert die Szene zu
         # einer Uebung, ist er deren ID.
-        vorschlag = kartentitel(datei.stem, angegebene_wurzel or suche_wurzel())
+        #
+        # Gesucht wird der Arbeitsordner zuerst ueber der Szene: dieselbe ID
+        # gibt es in jeder Bibliothek, und gemeint ist die, zu der die Szene
+        # gehoert, nicht die, in der der Aufruf zufaellig steht. Der Rueckfall
+        # auf das Verzeichnis des Aufrufs ist die Vorschau-Schleife von
+        # volleyball-schaubild: ein Entwurf im Temp-Verzeichnis hat keine
+        # Wurzel ueber sich, und ohne den Rueckfall verloere er seinen
+        # Vorschlag.
+        vorschlag = kartentitel(
+            datei.stem,
+            angegebene_wurzel or suche_wurzel(quelle.parent) or suche_wurzel())
         if vorschlag:
             # In Anfuehrungszeichen, und zwar immer: ein Doppelpunkt im Titel
             # laese sich sonst als zweiter Schluessel, eine Raute als

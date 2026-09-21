@@ -278,6 +278,65 @@ class SchaubildTest(unittest.TestCase):
         self.assertIn("titel:", fertig.stdout, "der Hinweis steht da")
         self.assertNotIn("Uebungskarte", fertig.stdout, "nur ohne Wortlaut")
 
+    def test_der_titelvorschlag_kommt_aus_dem_ordner_der_szene(self) -> None:
+        # Dieselbe Uebungs-ID gibt es in jedem Arbeitsordner. Gemeint ist die
+        # Karte aus der Bibliothek, zu der die Szene gehoert, und nicht die
+        # aus der, in der der Aufruf zufaellig steht.
+        fremd = Arbeitsordner()
+        self.addCleanup(fremd.raeume_auf)
+        self.ordner.lege_karte_an(id="ue-0042", titel="Zielzone im eigenen Ordner")
+        fremd.lege_karte_an(id="ue-0042", titel="Zielzone im fremden Ordner")
+        szene = self.ordner.lege_szene_an("ue-0042", """
+            form: halle
+            untertitel: ohne etwas darueber
+        """)
+
+        fertig = self.ordner.starte("schaubild.py", str(szene),
+                                    mit_wurzel=False, verzeichnis=fremd.pfad)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertIn("Zielzone im eigenen Ordner", fertig.stdout,
+                      "der Titel kommt aus der Bibliothek neben der Szene")
+        self.assertNotIn("Zielzone im fremden Ordner", fertig.stdout,
+                         "und nicht aus der, in der der Aufruf steht")
+
+    def test_ein_entwurf_ohne_wurzel_nimmt_den_ordner_des_aufrufs(self) -> None:
+        # Der Rueckfall, und die Vorschau-Schleife von volleyball-schaubild
+        # besteht ganz aus ihm: der Entwurf liegt im Temp-Verzeichnis, ueber
+        # dem keine Wurzel steht, und der Aufruf steht im Arbeitsordner.
+        entwurf = self.ordner.lege_entwurf_an("ue-0001", """
+            form: halle
+            untertitel: ohne etwas darueber
+        """)
+
+        fertig = self.ordner.starte("schaubild.py", str(entwurf),
+                                    mit_wurzel=False, verzeichnis=self.ordner.pfad)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertIn("Annahme im Halbfeld", fertig.stdout,
+                      "ohne Wurzel ueber der Szene zaehlt die ueber dem Aufruf")
+
+    def test_die_angegebene_wurzel_sticht_den_ordner_der_szene(self) -> None:
+        # Wer `--wurzel` nennt, sagt damit, welche Bibliothek gilt. Weder der
+        # Ordner der Szene noch der des Aufrufs redet dann noch mit.
+        fremd = Arbeitsordner()
+        self.addCleanup(fremd.raeume_auf)
+        self.ordner.lege_karte_an(id="ue-0042", titel="Zielzone aus der genannten Wurzel")
+        fremd.lege_karte_an(id="ue-0042", titel="Zielzone neben der Szene")
+        szene = fremd.lege_szene_an("ue-0042", """
+            form: halle
+            untertitel: ohne etwas darueber
+        """)
+
+        fertig = self.ordner.starte("schaubild.py", str(szene), verzeichnis=fremd.pfad)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertIn("Zielzone aus der genannten Wurzel", fertig.stdout,
+                      "der Titel kommt aus der genannten Wurzel")
+        self.assertNotIn("Zielzone neben der Szene", fertig.stdout,
+                         "Szene und Aufruf stehen beide im fremden Ordner "
+                         "und reden trotzdem nicht mit")
+
     def test_ein_basisname_ohne_wurzel_bricht_ab_und_sagt_warum(self) -> None:
         # Die Gegenprobe: ein blosser Name sagt nicht, wo die Szene liegt.
         # Dafuer braucht es den Arbeitsordner wirklich, und die Meldung bleibt
