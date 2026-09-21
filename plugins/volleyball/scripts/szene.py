@@ -430,8 +430,42 @@ def meterangabe(laenge: float) -> str:
 
 
 @dataclass
+class Legendenblock:
+    """Ein Stueck der Legendenspalte: eine Ueberschrift und ihre Zeilen.
+
+    Eine Legende besteht meist aus mehreren Aufzaehlungen: die Aufschlagseite,
+    die Annahmeseite, das Zuspielziel, die Wertung. Wer sie in eine einzige
+    Liste schuettet, laesst den Leser sortieren, was das Bild schon geordnet
+    hat.
+    """
+
+    ueberschrift: str
+    zeilen: list[str]
+
+
+@dataclass
+class Textwerk:
+    """Was neben dem Bild steht: Titel, Untertitel, Legende, Fusszeile.
+
+    Beieinander und nicht als vier lose Felder der Szene, weil es zusammen
+    gesetzt wird: alles hier rechnet in Zeilen, alles andere in Metern. Genau
+    dieser Teil macht aus einer Skizze eine Anleitung. Das Feld zeigt, wo
+    jemand steht, das Textwerk sagt, warum.
+
+    Leere Zeichenketten und eine leere Liste heissen: gibt es nicht. Die
+    meisten Schaubilder tragen keinen Titel, und das ist in Ordnung.
+    """
+
+    titel: str = ""
+    untertitel: str = ""
+    legende: list[Legendenblock] = field(default_factory=list)
+    fusszeile: str = ""
+
+
+@dataclass
 class Szene:
     grundform: Grundform
+    textwerk: Textwerk = field(default_factory=Textwerk)
     spieler: list[Spieler] = field(default_factory=list)
     wege: list[Weg] = field(default_factory=list)
     geraete: list[Geraet] = field(default_factory=list)
@@ -494,8 +528,10 @@ def normale(von: Ort, nach: Ort) -> Ort:
 # Einlesen
 # --------------------------------------------------------------------------
 
-SZENE_SCHLUESSEL = {"form", "groesse", "spieler", "wege", "geraete", "abstaende"}
+SZENE_SCHLUESSEL = {"form", "groesse", "titel", "untertitel", "legende",
+                    "fusszeile", "spieler", "wege", "geraete", "abstaende"}
 SPIELER_SCHLUESSEL = {"bei", "text"}
+LEGENDEN_SCHLUESSEL = {"ueberschrift", "zeilen"}
 WEG_SCHLUESSEL = {"art", "von", "nach", "bogen"}
 WEGARTEN = ("laufweg", "ballweg")
 GERAET_SCHLUESSEL = {"text", "teile"}
@@ -531,6 +567,20 @@ def _als_liste(wert, wo: str) -> list:
     if not isinstance(wert, list):
         raise SzeneFehler(f"{wo}: hier steht eine Liste mit Strichen, nicht {wert!r}.")
     return wert
+
+
+def _als_zeile(wert, wo: str) -> str:
+    """Eine Zeile Text, wie sie im Bild stehen soll.
+
+    Eine Liste oder eine Abbildung waere keine: wer unter `titel:` versehentlich
+    eine Folge anfaengt, bekommt sonst deren Python-Schreibweise ins Bild
+    gesetzt und sieht sie erst dort.
+    """
+    if wert is None:
+        return ""
+    if isinstance(wert, (list, dict)):
+        raise SzeneFehler(f"{wo}: hier steht eine Zeile Text, nicht {wert!r}.")
+    return str(wert).strip()
 
 
 def _als_zahl(wert, wo: str, was: str) -> float:
@@ -730,6 +780,57 @@ def _lies_geraet(eintrag, grundform: Grundform, wo: str) -> Geraet:
     return Geraet(teile=teile, text=str(eintrag.get("text") or ""))
 
 
+def _lies_textwerk(roh: dict) -> Textwerk:
+    """Liest Titel, Untertitel, Legende und Fusszeile aus der Szene.
+
+    Zusammen gelesen, weil sie zusammen geprueft werden: ein Untertitel ohne
+    Titel ist eine zweite Zeile unter nichts, und das sieht man dem fertigen
+    Bild als Schluderei an, nicht als Absicht.
+    """
+    titel = _als_zeile(roh.get("titel"), "titel")
+    untertitel = _als_zeile(roh.get("untertitel"), "untertitel")
+    if untertitel and not titel:
+        raise SzeneFehler(
+            f"Es gibt einen Untertitel, aber keinen Titel. {untertitel!r} steht "
+            f"damit als zweite Zeile unter nichts. `titel:` nennt die erste."
+        )
+    return Textwerk(
+        titel=titel,
+        untertitel=untertitel,
+        legende=_lies_legende(roh.get("legende")),
+        fusszeile=_als_zeile(roh.get("fusszeile"), "fusszeile"),
+    )
+
+
+def _lies_legende(wert) -> list[Legendenblock]:
+    """Die Legendenbloecke, jeder mit Ueberschrift und Zeilen.
+
+    Beides ist Pflicht. Warum, sagen die Meldungen weiter unten; sie sind der
+    Text, den der Trainer zu sehen bekommt.
+    """
+    bloecke = []
+    for nummer, eintrag in enumerate(_als_liste(wert, "legende"), 1):
+        wo = f"Legendenblock {nummer}"
+        eintrag = _als_abbildung(eintrag, wo)
+        _pruefe_schluessel(eintrag, LEGENDEN_SCHLUESSEL, wo)
+        ueberschrift = _als_zeile(eintrag.get("ueberschrift"), f"{wo}, ueberschrift")
+        if not ueberschrift:
+            raise SzeneFehler(
+                f"{wo}: es fehlt die Ueberschrift. Ohne sie steht da eine "
+                f"Liste, von der niemand weiss, wovon sie handelt."
+            )
+        zeilen = [zeile for nr, roh in
+                  enumerate(_als_liste(eintrag.get("zeilen"), f"{wo}, zeilen"), 1)
+                  if (zeile := _als_zeile(roh, f"{wo}, Zeile {nr}"))]
+        if not zeilen:
+            raise SzeneFehler(
+                f"{wo}: unter {ueberschrift!r} steht keine Zeile. Eine "
+                f"Ueberschrift allein erklaert nichts."
+            )
+        bloecke.append(Legendenblock(ueberschrift=ueberschrift, zeilen=zeilen))
+    return bloecke
+
+
 def _lies_abstand(eintrag, grundform: Grundform, wo: str) -> Abstand:
     eintrag = _als_abbildung(eintrag, wo)
     _pruefe_schluessel(eintrag, ABSTAND_SCHLUESSEL, wo)
@@ -775,6 +876,7 @@ def lies_szene(text: str) -> Szene:
             f"{', '.join(grundformen())}."
         )
     form = lies_grundform(name, roh.get("groesse"))
+    werk = _lies_textwerk(roh)
 
     spieler = []
     for nummer, eintrag in enumerate(_als_liste(roh.get("spieler"), "spieler"), 1):
@@ -816,5 +918,5 @@ def lies_szene(text: str) -> Szene:
                  for nummer, eintrag
                  in enumerate(_als_liste(roh.get("abstaende"), "abstaende"), 1)]
 
-    return Szene(grundform=form, spieler=spieler, wege=wege,
+    return Szene(grundform=form, textwerk=werk, spieler=spieler, wege=wege,
                  geraete=geraete, abstaende=abstaende)

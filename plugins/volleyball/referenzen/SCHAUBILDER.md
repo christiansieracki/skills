@@ -33,8 +33,19 @@ Auf der Übungskarte steht anschließend der Dateiname des Bildes:
 ## Der Aufbau einer Szene
 
 ```yaml
-# Annahme-Zielzone: Aufschlag von hinten, Annahme auf die Position 3.
+titel: Annahme-Zielzone
+untertitel: Aufschlag von hinten, Annahme auf die Position 3
 form: halle
+
+legende:
+  - ueberschrift: Aufschlagseite
+    zeilen:
+      - AS schlägt von hinter der Grundlinie
+      - flach und lang, wechselnde Ziele
+  - ueberschrift: Wertung
+    zeilen:
+      - 3 Punkte in der Zielzone
+      - 1 Punkt spielbar daneben
 
 spieler:
   - bei: 5
@@ -54,14 +65,20 @@ wege:
   - art: laufweg
     von: 1
     nach: [6.5, 7.2]
+
+fusszeile: "Quelle: Volleyball-Magazin 09/2026, Seite 12"
 ```
 
-Auf oberster Ebene gibt es sechs Schlüssel, mehr nicht:
+Auf oberster Ebene gibt es zehn Schlüssel, mehr nicht:
 
 | Schlüssel | Wofür |
 |---|---|
 | `form` | die Grundform: `halle`, `beach` oder `frei` |
 | `groesse` | die Maße der freien Leinwand, nur bei `form: frei` |
+| `titel` | die Überschrift über dem Bild |
+| `untertitel` | die zweite Zeile darunter |
+| `legende` | die Legendenspalte neben dem Bild, in Legendenblöcken |
+| `fusszeile` | die Zeile unter dem Bild, meist die Quelle |
 | `spieler` | Marker mit Beschriftung |
 | `wege` | Lauf- und Ballwege |
 | `geraete` | Kasten, Ballwagen, Zielmatte und was sonst im Weg steht |
@@ -293,6 +310,65 @@ gestrichelte Maßhilfslinien halten die verschobene Linie an dem fest, was sie
 misst. Das braucht man, sobald eine Kette sonst quer durch die Marker liefe,
 deren Abstand sie angibt.
 
+### `titel`, `untertitel`, `legende`, `fusszeile`
+
+Das Textwerk neben dem Bild. Es macht aus einer Skizze eine Anleitung: Das Feld
+zeigt, wo jemand steht, das Textwerk sagt, worum es geht, was die Zeichen
+bedeuten und woher die Übung kommt.
+
+```yaml
+titel: Annahme-Zielzone
+untertitel: Aufschlag von hinten, Annahme auf die Position 3
+
+legende:
+  - ueberschrift: Aufschlagseite
+    zeilen:
+      - AS schlägt von hinter der Grundlinie
+      - flach und lang, wechselnde Ziele
+  - ueberschrift: Wertung
+    zeilen:
+      - 3 Punkte in der Zielzone
+      - 1 Punkt spielbar daneben
+
+fusszeile: "Quelle: Volleyball-Magazin 09/2026, Seite 12"
+```
+
+Alle vier sind freiwillig. Die meisten Schaubilder tragen keinen Titel, eine
+Aufstellung erklärt sich oft von selbst.
+
+Ein Text mit Doppelpunkt darin gehört in Anführungszeichen, wie die Fußzeile
+oben. Ohne sie läse YAML `Quelle:` als zweiten Schlüssel.
+
+**Wo was steht.** Titel und Untertitel stehen über dem Bild, die Legende als
+Spalte rechts daneben, die Fußzeile darunter. Titel und Fußzeile sitzen auf
+derselben linken Kante wie die Grundform, damit das Textwerk nicht wie ein
+zweites Blatt hinter dem ersten aussieht. Die Legendenspalte beginnt oben auf
+Höhe der Grundform. Steht jemand hinter der Grundlinie, fängt sie also unter
+diesem Marker an.
+
+**Die Legende steht in Legendenblöcken.** Sie ist selten eine einzige
+Aufzählung, meist sind es mehrere: die Aufschlagseite, die Annahmeseite, das
+Zuspielziel, die Wertung. Jeder Legendenblock braucht eine `ueberschrift` und
+mindestens eine Zeile unter `zeilen`. Fehlt eines von beidem, bricht die Szene
+ab: ohne Überschrift steht da eine Liste, von der niemand weiß, wovon sie
+handelt, und eine Überschrift ohne Zeilen erklärt nichts und nimmt trotzdem
+Platz neben dem Feld weg.
+
+**Das Blatt wächst mit.** Eine lange Zeile macht das Bild breiter, eine lange
+Spalte macht es höher. Abgeschnitten wird nichts. Dass die halbe Erklärung
+fehlt, sieht man dem Bild sonst nicht an, es wirkt fertig. Gebrochen wird eine
+Zeile trotzdem nicht: Wo ein Umbruch hingehört, entscheidet, wer sie schreibt.
+Kurz halten lohnt sich also. Im vorhandenen
+`2026-09-15-annahme-zielzone.svg` nimmt die Legendenspalte mehr Platz ein als
+das Feld.
+
+Ein `untertitel` ohne `titel` bricht ab. Eine zweite Zeile unter nichts liest
+sich wie ein angefangener Satz.
+
+Der Titel wird zugleich der Name des Bildes, im SVG als `<title>`. Das trägt,
+wo das Bild für sich steht, etwa in der Vorschau beim Zeichnen. In der
+Leseansicht steckt es als `<img>` mit eigenem `alt`, dort zählt das.
+
 ## Farben
 
 Das Bild bringt beide Farbschemata mit und schaltet mit dem Gerät um, genau wie
@@ -327,6 +403,5 @@ ersetzt ihn nicht.
 Das Vokabular wächst mit den nächsten Schritten des Bild-Astes. Das Folgende
 gibt es heute noch nicht, und eine Szene, die es verwendet, bricht ab:
 
-- Titel, Untertitel, Legendenspalte und Fußzeile
 - Zonen als Fläche mit Rand und Beschriftung, als eigene Sorte mit eigener
   Darstellung

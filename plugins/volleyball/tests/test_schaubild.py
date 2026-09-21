@@ -731,6 +731,217 @@ class SchaubildTest(unittest.TestCase):
                          "derselbe Aufbau misst auf beiden Grundformen dasselbe")
         self.assertEqual(mit_klasse(auf_leinwand, "feld"), [])
 
+    # -- Titel, Legende und Fusszeile --------------------------------------
+
+    def test_eine_szene_traegt_titel_und_untertitel_ueber_dem_bild(self) -> None:
+        baum = self.zeichne("kopf", """
+            form: halle
+            titel: Annahme-Zielzone
+            untertitel: Aufschlag von hinten, Annahme auf die Drei
+            spieler:
+              - bei: 3
+        """)
+
+        self.assertEqual([e.text for e in mit_klasse(baum, "titel")],
+                         ["Annahme-Zielzone"])
+        self.assertEqual([e.text for e in mit_klasse(baum, "untertitel")],
+                         ["Aufschlag von hinten, Annahme auf die Drei"])
+        titel, unter = mit_klasse(baum, "titel")[0], mit_klasse(baum, "untertitel")[0]
+        feld = mit_klasse(baum, "feld")[0]
+        self.assertLess(float(titel.get("y")), float(unter.get("y")),
+                        "der Untertitel steht unter dem Titel")
+        self.assertLess(float(unter.get("y")), float(feld.get("y")),
+                        "und beide ueber dem Feld")
+
+    def test_der_titel_ist_zugleich_der_name_des_bildes(self) -> None:
+        # Sonst hat `role="img"` nichts zu melden, und eine Vorlesehilfe sagt
+        # ueber das ganze Schaubild nur "Grafik".
+        baum = self.zeichne("name", """
+            form: halle
+            titel: Annahme-Zielzone
+        """)
+
+        self.assertEqual(baum.find(SVG + "title").text, "Annahme-Zielzone")
+
+    def test_titel_und_fusszeile_sitzen_auf_derselben_kante_wie_das_bild(self) -> None:
+        # Ein Titel, der zwei Finger neben dem Feld anfaengt, liest sich wie
+        # ein zweites Blatt hinter dem ersten.
+        baum = self.zeichne("kante", """
+            form: halle
+            titel: Annahme-Zielzone
+            fusszeile: "Quelle: Volleyball-Magazin 09/2026"
+        """)
+
+        feld = mit_klasse(baum, "feld")[0]
+        for klasse in ("titel", "fusszeile"):
+            with self.subTest(klasse=klasse):
+                self.assertAlmostEqual(float(mit_klasse(baum, klasse)[0].get("x")),
+                                       float(feld.get("x")), places=2)
+
+    def test_ein_untertitel_ohne_titel_bricht_ab(self) -> None:
+        # Eine zweite Zeile unter nichts liest sich wie ein angefangener Satz.
+        fertig = self.scheitert("nur-unter", """
+            form: halle
+            untertitel: ohne etwas darueber
+        """)
+
+        self.assertIn("Titel", fertig.stdout)
+        self.assertFalse(self.bild("nur-unter").exists())
+
+    def test_die_legende_steht_in_bloecken_aus_ueberschrift_und_zeilen(self) -> None:
+        baum = self.zeichne("legende", """
+            form: halle
+            legende:
+              - ueberschrift: Aufschlagseite
+                zeilen:
+                  - AS schlaegt von Position 1
+                  - flach ueber das Netz
+              - ueberschrift: Wertung
+                zeilen:
+                  - 3 Punkte in der Zielzone
+        """)
+
+        bloecke = mit_klasse(baum, "legendenblock")
+        self.assertEqual(len(bloecke), 2, "zwei Legendenbloecke, nicht eine lange Liste")
+        self.assertEqual([[e.text for e in mit_klasse(b, "legendenkopf")]
+                          for b in bloecke],
+                         [["Aufschlagseite"], ["Wertung"]])
+        self.assertEqual([[e.text for e in mit_klasse(b, "legendenzeile")]
+                          for b in bloecke],
+                         [["AS schlaegt von Position 1", "flach ueber das Netz"],
+                          ["3 Punkte in der Zielzone"]])
+        # Gelesen wird von oben nach unten: erst die Ueberschrift, dann ihre
+        # Zeilen, dann der naechste Block.
+        hoehen = [float(e.get("y")) for b in bloecke for e in b]
+        self.assertEqual(hoehen, sorted(hoehen))
+
+    def test_die_legendenspalte_steht_neben_dem_feld_und_nicht_darauf(self) -> None:
+        # Sie erklaert das Bild. Eine Erklaerung, die das Erklaerte verdeckt,
+        # ist keine.
+        baum = self.zeichne("neben", """
+            form: halle
+            legende:
+              - ueberschrift: Wertung
+                zeilen:
+                  - 3 Punkte in der Zielzone
+        """)
+
+        feld = mit_klasse(baum, "feld")[0]
+        rechts = float(feld.get("x")) + float(feld.get("width"))
+        for e in mit_klasse(baum, "legendenkopf") + mit_klasse(baum, "legendenzeile"):
+            self.assertGreater(float(e.get("x")), rechts, f"{e.text!r} liegt im Feld")
+
+    def test_ein_legendenblock_ohne_ueberschrift_oder_ohne_zeilen_bricht_ab(self) -> None:
+        # Ein Block ohne Ueberschrift ist eine Liste, von der niemand weiss,
+        # wovon sie handelt; eine Ueberschrift ohne Zeilen erklaert nichts.
+        for name, block in (("ohne-kopf", "- zeilen:\n    - eine Zeile"),
+                            ("ohne-zeilen", "- ueberschrift: Wertung")):
+            with self.subTest(fall=name):
+                fertig = self.scheitert(name, "form: halle\nlegende:\n  " + block)
+
+                self.assertIn("Legendenblock 1", fertig.stdout)
+                self.assertFalse(self.bild(name).exists())
+
+    def test_die_fusszeile_steht_unter_dem_bild(self) -> None:
+        baum = self.zeichne("fuss", """
+            form: halle
+            fusszeile: "Quelle: Volleyball-Magazin 09/2026, Seite 12"
+        """)
+
+        self.assertEqual([e.text for e in mit_klasse(baum, "fusszeile")],
+                         ["Quelle: Volleyball-Magazin 09/2026, Seite 12"])
+        feld = mit_klasse(baum, "feld")[0]
+        unterkante = float(feld.get("y")) + float(feld.get("height"))
+        self.assertGreater(float(mit_klasse(baum, "fusszeile")[0].get("y")), unterkante)
+
+    def test_das_feld_bleibt_massstaeblich_neben_dem_textwerk(self) -> None:
+        # Das Textwerk rueckt das Bild, es verzerrt es nicht. Ohne diese
+        # Zusicherung stuende derselbe Spieler mit Titel woanders als ohne.
+        baum = self.zeichne("beides", """
+            form: halle
+            titel: Annahme-Zielzone
+            untertitel: mit Legende daneben
+            fusszeile: aus dem Magazin
+            legende:
+              - ueberschrift: Wertung
+                zeilen:
+                  - 3 Punkte in der Zielzone
+            spieler:
+              - bei: [3.0, 12.5]
+                text: A
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        self.assertAlmostEqual(feld.verhaeltnis, 9 / 18, places=3)
+        kreis = mit_klasse(baum, "marker")[0]
+        x, y = feld.meter(float(kreis.get("cx")), float(kreis.get("cy")))
+        self.assertAlmostEqual(x, 3.0, places=2)
+        self.assertAlmostEqual(y, 12.5, places=2)
+
+    def test_eine_lange_zeile_macht_das_blatt_breiter_statt_abgeschnitten(self) -> None:
+        # Eine halb abgeschnittene Legende ist die stillste aller
+        # Fehlermeldungen: das Bild sieht fertig aus.
+        def mit(zeile: str) -> ET.Element:
+            return self.zeichne(f"breite-{len(zeile)}", f"""
+                form: halle
+                legende:
+                  - ueberschrift: Wertung
+                    zeilen:
+                      - {zeile}
+            """)
+
+        kurz = mit("drei Punkte")
+        lang = mit("drei Punkte fuer jeden Ball, der in der Zielzone aufkommt")
+
+        self.assertGreater(zahlen(lang.get("viewBox"))[2],
+                           zahlen(kurz.get("viewBox"))[2],
+                           "die laengere Zeile braucht mehr Blatt")
+        for e in mit_klasse(lang, "legendenzeile"):
+            self.assertLess(float(e.get("x")), zahlen(lang.get("viewBox"))[2])
+        # Das Feld darunter bleibt, wie es war: gewachsen ist das Blatt.
+        self.assertAlmostEqual(Feldmass(kurz, HALLE).breite,
+                               Feldmass(lang, HALLE).breite, places=2)
+
+    def test_eine_legende_laenger_als_das_feld_waechst_ins_blatt_hinein(self) -> None:
+        def mit(bloecke: int) -> ET.Element:
+            szene = "form: halle\nlegende:\n" + "".join(
+                f"  - ueberschrift: Abschnitt {n}\n    zeilen:\n"
+                f"      - eine Zeile\n      - noch eine\n"
+                for n in range(1, bloecke + 1))
+            return self.zeichne(f"spalte-{bloecke}", szene)
+
+        kurz, lang = mit(1), mit(14)
+
+        self.assertGreater(zahlen(lang.get("viewBox"))[3],
+                           zahlen(kurz.get("viewBox"))[3])
+        letzte = max(float(e.get("y")) for e in mit_klasse(lang, "legendenzeile"))
+        self.assertLess(letzte, zahlen(lang.get("viewBox"))[3],
+                        "die letzte Zeile steht noch im Bild")
+        self.assertAlmostEqual(Feldmass(kurz, HALLE).hoehe,
+                               Feldmass(lang, HALLE).hoehe, places=2)
+
+    def test_das_textwerk_nimmt_nur_farben_die_auf_dem_papier_stehen(self) -> None:
+        # Titel, Legende und Fusszeile stehen auf dem Papier und nicht auf dem
+        # Feld. Gegen das Papier geprueft sind --strich und --gedaempft.
+        baum = self.zeichne("farben", """
+            form: halle
+            titel: Annahme-Zielzone
+            untertitel: mit Legende daneben
+            fusszeile: aus dem Magazin
+            legende:
+              - ueberschrift: Wertung
+                zeilen:
+                  - 3 Punkte in der Zielzone
+        """)
+
+        stil = baum.find(SVG + "style").text
+        for klasse in ("titel", "untertitel", "legendenkopf", "legendenzeile",
+                       "fusszeile"):
+            with self.subTest(klasse=klasse):
+                farbe = re.search(rf"\.{klasse}\{{[^}}]*fill:var\(--(\w+)\)", stil)
+                self.assertIsNotNone(farbe, f".{klasse} setzt keine Farbe")
+                self.assertIn(farbe.group(1), ("strich", "gedaempft"))
+
     # -- Lesbarkeit ---------------------------------------------------------
 
     def test_das_bild_bleibt_in_hellem_und_dunklem_farbschema_lesbar(self) -> None:
@@ -755,7 +966,12 @@ class SchaubildTest(unittest.TestCase):
                     self.assertGreaterEqual(
                         kontrast(farben[vorne], farben["feld"]), 4.5,
                         f"{vorne} hebt sich im Schema {name} zu wenig vom Feld ab")
+            # Auf dem Papier steht das Textwerk: Titel und Legende in
+            # --strich, Untertitel und Fusszeile in --gedaempft. Beide muessen
+            # sich davon abheben, sonst ist die Erklaerung zum Bild weg.
             self.assertGreaterEqual(kontrast(farben["strich"], farben["papier"]), 4.5)
+            self.assertGreaterEqual(kontrast(farben["gedaempft"], farben["papier"]),
+                                    4.5)
             # Ein Geraet ist eine Flaeche mit Rand. Faellt der Rand in die
             # Flaeche, steht ein Farbfleck im Bild statt eines Kastens.
             self.assertGreaterEqual(kontrast(farben["gedaempft"], farben["geraet"]),
@@ -772,6 +988,14 @@ class SchaubildTest(unittest.TestCase):
         ):
             with self.subTest(form=name):
                 baum = self.zeichne(f"rauch-{name}", kopf + f"""
+titel: Aufbau & Ablauf
+untertitel: mit allem, was das Vokabular hergibt
+fusszeile: "Quelle: Magazin & Co."
+legende:
+  - ueberschrift: Wertung & Punkte
+    zeilen:
+      - drei Punkte in der Zielzone
+      - ein Punkt daneben
 spieler:
   - bei: {wo}
     text: "Z & A"
@@ -807,6 +1031,7 @@ wege:
                 self.assertEqual(len(mit_klasse(baum, "weg")), 2)
                 self.assertEqual(len(mit_klasse(baum, "geraet")), 1)
                 self.assertEqual(len(mit_klasse(baum, "abstand")), 2)
+                self.assertEqual(len(mit_klasse(baum, "legendenblock")), 1)
 
     def test_ein_punkt_ausserhalb_des_feldes_bleibt_im_bild(self) -> None:
         # Ein Aufschlagspieler steht hinter der Grundlinie. Ihn abzuschneiden

@@ -29,8 +29,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from szene import (Feldvorlage, Ort, Szene, SzeneFehler, Weg,  # noqa: E402
-                   lies_szene, normale, scheitel)
+from szene import (Feldvorlage, Legendenblock, Ort, Szene,  # noqa: E402
+                   SzeneFehler, Weg, lies_szene, normale, scheitel)
 from tpdaten import finde_wurzel, konsole_vorbereiten  # noqa: E402
 
 # Zeicheneinheiten je Meter. Die Zahl steht genau einmal im Plugin; alles
@@ -63,6 +63,31 @@ KLEINSCHRIFT = 13
 # und eher zu breit: ein angeschnittenes Wort ist schlimmer als ein Finger Luft
 # zu viel.
 ZEICHENBREITE = 0.6
+
+# Die Schriftgroessen des Textwerks, in Zeicheneinheiten. Sie stehen
+# beieinander, weil ihr Verhaeltnis die Rangfolge macht: der Titel vor dem
+# Untertitel, die Ueberschrift eines Legendenblocks vor seinen Zeilen, die
+# Fusszeile zuletzt. Wer eine davon anfasst, sieht hier, wogegen.
+SCHRIFT = {
+    "titel": 22,
+    "untertitel": 15,
+    "legendenkopf": 14,
+    "legendenzeile": KLEINSCHRIFT,
+    "fusszeile": 12,
+}
+
+# Die Hoehe einer Textzeile als Vielfaches ihrer Schriftgroesse.
+ZEILENABSTAND = 1.5
+
+# Die Luft zwischen zwei Legendenbloecken, in Zeicheneinheiten. Eine halbe
+# Zeile: genug, dass die Bloecke auseinanderfallen, wenig genug, dass sie eine
+# Spalte bleiben.
+BLOCKABSTAND = KLEINSCHRIFT * ZEILENABSTAND / 2
+
+# Der Rand des Blattes um das Textwerk, in Zeicheneinheiten. Derselbe wie der
+# Rand um das Feld, damit Titel, Legende und Fusszeile auf denselben Kanten
+# sitzen wie das Bild und nicht auf zweiten daneben.
+SEITENRAND = RAND * MASSSTAB
 
 # Die Farben. Zwei Saetze derselben Namen, einer je Schema, damit das Bild in
 # einer hellen wie in einer dunklen Leseansicht lesbar bleibt. Die Werte sind
@@ -99,10 +124,15 @@ class Blatt:
     hin. Im SVG waechst y nach unten, deshalb wird es hier gespiegelt. Wer
     diesen Umstand vergisst, zeichnet ein Bild, in dem die Aufschlagposition
     vorn am Netz steht.
+
+    `kopf` ist die Hoehe des Textwerks ueber dem Bild. Das Bild rueckt darum
+    nach unten, ohne dass sich an seinem Massstab etwas aendert: ein Titel
+    verschiebt das Feld, er verzerrt es nicht.
     """
 
-    def __init__(self, links: float, unten: float, rechts: float, oben: float) -> None:
-        self._links, self._oben = links, oben
+    def __init__(self, links: float, unten: float, rechts: float, oben: float,
+                 kopf: float = 0.0) -> None:
+        self._links, self._oben, self._kopf = links, oben, kopf
         self.breite = (rechts - links) * MASSSTAB
         self.hoehe = (oben - unten) * MASSSTAB
 
@@ -110,7 +140,7 @@ class Blatt:
         return (meter - self._links) * MASSSTAB
 
     def y(self, meter: float) -> float:
-        return (self._oben - meter) * MASSSTAB
+        return self._kopf + (self._oben - meter) * MASSSTAB
 
     def laenge(self, meter: float) -> float:
         return meter * MASSSTAB
@@ -126,16 +156,130 @@ def grenzen(s: Szene) -> tuple[float, float, float, float]:
     # Eine Beschriftung braucht Platz nach ihrer Laenge und nicht nach LUFT.
     hoch = KLEINSCHRIFT / MASSSTAB / 2
     for text, (x, y) in s.beschriftungen():
-        breit = len(text) * KLEINSCHRIFT * ZEICHENBREITE / MASSSTAB / 2
+        breit = textbreite(text, KLEINSCHRIFT) / MASSSTAB / 2
         xs += [x - breit, x + breit]
         ys += [y - hoch, y + hoch]
     return min(xs), min(ys), max(xs), max(ys)
+
+
+def textbreite(text: str, groesse: float) -> float:
+    """Wie breit ein Text in dieser Schriftgroesse ungefaehr wird.
+
+    Geschaetzt aus der Zeichenzahl. Genau messen koennte nur, wer die
+    Schriftdatei kennt, und die steht erst im Betrachter fest. Geschaetzt wird
+    deshalb eher zu breit: ein Finger Luft zu viel ist besser als ein
+    abgeschnittenes Wort.
+    """
+    return len(text) * groesse * ZEICHENBREITE
+
+
+def zeilenhoehe(sorte: str) -> float:
+    """Wie viel Blatt eine Zeile dieser Sorte in der Hoehe braucht."""
+    return SCHRIFT[sorte] * ZEILENABSTAND
 
 
 def koord(wert: float) -> str:
     """Eine Zeichenkoordinate so kurz wie moeglich, ohne Genauigkeit zu verlieren."""
     text = f"{wert:.2f}".rstrip("0").rstrip(".")
     return "0" if text in ("", "-0") else text
+
+
+# Eine gesetzte Zeile des Textwerks: ihre Sorte, ihr Text, ihre Oberkante in
+# Zeicheneinheiten. Wo sie steht, entscheidet der Satzspiegel; was in ihr
+# steht, die Szene.
+Zeile = tuple[str, str, float]
+
+
+def zeilensatz(eintraege: list[tuple[str, str]],
+               oben: float) -> tuple[list[Zeile], float]:
+    """Setzt Zeilen untereinander ab `oben` und gibt sie samt Unterkante zurueck.
+
+    Jede Zeile des Textwerks geht hier durch, und zwar einmal: gesetzt wird
+    beim Bemessen des Blattes, gelesen wird danach beim Zeichnen. Zwei
+    getrennte Rechnungen liefen frueher oder spaeter auseinander, und dann
+    stuende eine Zeile halb ausserhalb des Bildes oder das Feld im Titel.
+    """
+    satz: list[Zeile] = []
+    y = oben
+    for sorte, text in eintraege:
+        satz.append((sorte, text, y))
+        y += zeilenhoehe(sorte)
+    return satz, y
+
+
+def legendensatz(bloecke: list[Legendenblock],
+                 oben: float) -> tuple[list[list[Zeile]], float]:
+    """Setzt die Legendenspalte und gibt sie samt ihrer Unterkante zurueck."""
+    satz: list[list[Zeile]] = []
+    y = oben
+    for block in bloecke:
+        if satz:
+            y += BLOCKABSTAND
+        zeilen, y = zeilensatz(
+            [("legendenkopf", block.ueberschrift)]
+            + [("legendenzeile", text) for text in block.zeilen], y)
+        satz.append(zeilen)
+    return satz, y
+
+
+class Satzspiegel:
+    """Wo auf dem Blatt das Bild steht und wo das Textwerk daneben.
+
+    Das Bild rechnet in Metern, das Textwerk in Zeilen. Beide treffen sich
+    hier: der Satzspiegel schiebt das Bild unter den Titel, setzt die Legende
+    daneben und die Fusszeile darunter und sagt am Ende, wie gross das Blatt
+    dafuer sein muss.
+
+    Gross genug ist es immer. Ein Blatt, das nach dem Feld bemessen waere,
+    schnitte eine lange Legende ab, und dass die halbe Erklaerung fehlt, sieht
+    man dem Bild nicht an: es wirkt fertig.
+
+    `breite` und `hoehe` sind das ganze Blatt. Der Bildblock darin misst
+    `blatt.breite` und `blatt.hoehe`; `textkante` und `spaltenkante` sind die
+    beiden linken Kanten, an denen das Textwerk anfaengt.
+    """
+
+    def __init__(self, s: Szene) -> None:
+        self.werk = s.textwerk
+        self.kopfzeilen, unterkante = zeilensatz(
+            [(sorte, text) for sorte, text
+             in (("titel", self.werk.titel), ("untertitel", self.werk.untertitel))
+             if text],
+            SEITENRAND)
+        self.kopf = unterkante if self.kopfzeilen else 0.0
+        self.blatt = Blatt(*grenzen(s), kopf=self.kopf)
+
+        # Titel und Fusszeile sitzen auf der linken Kante der Grundform, nicht
+        # auf der des Blattes. Die waechst mit, sobald neben dem Feld jemand
+        # steht, und ein Titel, der sich danach richtet, spraenge von Bild zu
+        # Bild an eine andere Stelle.
+        self.textkante = self.blatt.x(0)
+
+        # Die Legende faengt am rechten Rand des Bildblocks an. Der liegt einen
+        # Feldrand weit neben allem, was gezeichnet ist, und gibt der Spalte
+        # ihre Gasse, ohne dass es dafuer eine zweite Zahl braeuchte. Oben
+        # steht sie mit der Grundform auf einer Hoehe.
+        self.spaltenkante = self.blatt.breite
+        self.legende, spaltenende = legendensatz(
+            self.werk.legende, self.blatt.y(s.grundform.laenge))
+
+        unten = self.kopf + self.blatt.hoehe
+        if self.legende:
+            unten = max(unten, spaltenende + SEITENRAND)
+        self.fusszeilen, unten = zeilensatz(
+            [("fusszeile", self.werk.fusszeile)] if self.werk.fusszeile else [],
+            unten)
+        self.hoehe = unten + (SEITENRAND if self.fusszeilen else 0.0)
+
+        # Breit genug fuer alles, was rechts am weitesten hinausragt: der
+        # Bildblock, die laengste Legendenzeile, der laengste Text darunter
+        # oder darueber.
+        kanten = [self.blatt.breite]
+        kanten += [self.spaltenkante + textbreite(text, SCHRIFT[sorte]) + SEITENRAND
+                   for block in self.legende for sorte, text, _ in block]
+        kanten += [self.textkante + textbreite(text, SCHRIFT[sorte]) + SEITENRAND
+                   for sorte, text, _ in self.kopfzeilen + self.fusszeilen]
+        self.breite = max(kanten)
 
 
 # --------------------------------------------------------------------------
@@ -181,6 +325,22 @@ def stil() -> str:
         + ".masshilfslinie{stroke:var(--gedaempft);stroke-width:1;"
           "stroke-dasharray:4 4}"
         + f".massbeschriftung{{fill:var(--strich);font-size:{KLEINSCHRIFT}}}"
+        # Das Textwerk steht auf dem Papier und liest sich von links. Eine
+        # Beschriftung im Feld steht um ihren Punkt herum und deshalb mittig;
+        # eine Legendenzeile faengt an einer Kante an wie jeder andere Satz.
+        + ".textwerk text{text-anchor:start}"
+        + f".titel{{fill:var(--strich);font-size:{SCHRIFT['titel']};"
+          "font-weight:700}"
+        + f".untertitel{{fill:var(--gedaempft);font-size:{SCHRIFT['untertitel']};"
+          "font-weight:400}"
+        + f".legendenkopf{{fill:var(--strich);font-size:{SCHRIFT['legendenkopf']}}}"
+        # Die Zeilen stehen leichter da als die Ueberschrift darueber. Sonst
+        # stuende eine Wand aus Fettschrift neben dem Feld, und die zoege den
+        # Blick von dem weg, was sie erklaeren soll.
+        + f".legendenzeile{{fill:var(--strich);"
+          f"font-size:{SCHRIFT['legendenzeile']};font-weight:400}}"
+        + f".fusszeile{{fill:var(--gedaempft);font-size:{SCHRIFT['fusszeile']};"
+          "font-weight:400}"
     )
 
 
@@ -429,13 +589,51 @@ def marker(s: Szene, blatt: Blatt) -> str:
     return "".join(teile)
 
 
+def textzeile(x: float, zeile: Zeile) -> str:
+    """Eine gesetzte Zeile als SVG, in ihrer Zeilenhoehe senkrecht zentriert.
+
+    Gesetzt wird zur Mitte und nicht zur Grundlinie, weil das Stylesheet
+    `dominant-baseline` schon auf die Mitte stellt. So braucht keine Stelle
+    hier die Kennwerte der Schrift zu kennen, die erst im Betrachter
+    feststehen.
+    """
+    sorte, text, oben = zeile
+    y = oben + zeilenhoehe(sorte) / 2
+    return (f'<text class="{sorte}" x="{koord(x)}" y="{koord(y)}">'
+            f'{html.escape(text)}</text>')
+
+
+def textwerk(spiegel: Satzspiegel) -> str:
+    """Titel und Untertitel oben, die Legende daneben, die Fusszeile darunter."""
+    teile = [textzeile(spiegel.textkante, zeile) for zeile in spiegel.kopfzeilen]
+    for block in spiegel.legende:
+        # Je Legendenblock eine Gruppe: eine Ueberschrift mit ihren Zeilen ist
+        # ein Gedanke und nicht eine Handvoll Texte, die zufaellig
+        # untereinander stehen.
+        teile.append('<g class="legendenblock">')
+        teile.extend(textzeile(spiegel.spaltenkante, zeile) for zeile in block)
+        teile.append("</g>")
+    teile += [textzeile(spiegel.textkante, zeile) for zeile in spiegel.fusszeilen]
+    return f'<g class="textwerk">{"".join(teile)}</g>' if teile else ""
+
+
 def zeichne(s: Szene) -> str:
     """Das ganze Bild als SVG-Text, in einem Stueck."""
-    blatt = Blatt(*grenzen(s))
+    spiegel = Satzspiegel(s)
+    blatt = spiegel.blatt
     teile = [
         f'<svg xmlns="http://www.w3.org/2000/svg" '
-        f'viewBox="0 0 {koord(blatt.breite)} {koord(blatt.hoehe)}" '
-        f'width="{koord(blatt.breite)}" height="{koord(blatt.hoehe)}" role="img">',
+        f'viewBox="0 0 {koord(spiegel.breite)} {koord(spiegel.hoehe)}" '
+        f'width="{koord(spiegel.breite)}" height="{koord(spiegel.hoehe)}" '
+        f'role="img">',
+    ]
+    # Der Titel ist zugleich der Name des Bildes. Das traegt ueberall dort,
+    # wo das SVG fuer sich steht, etwa in der Vorschau beim Zeichnen: `role`
+    # allein sagt einer Vorlesehilfe nur "Grafik". In der Leseansicht steckt
+    # das Bild als `<img>` mit eigenem `alt`, dort zaehlt das.
+    if s.textwerk.titel:
+        teile.append(f"<title>{html.escape(s.textwerk.titel)}</title>")
+    teile += [
         f"<style>{stil()}</style>",
         spitzen(),
         '<rect class="papier" x="0" y="0" width="100%" height="100%"/>',
@@ -452,6 +650,9 @@ def zeichne(s: Szene) -> str:
     besetzt = [(spieler.x, spieler.y) for spieler in s.spieler]
     teile.extend(pfad(weg, blatt, besetzt) for weg in s.wege)
     teile.append(marker(s, blatt))
+    # Das Textwerk zuletzt. Es steht zwar neben dem Bild und nicht darin, aber
+    # was erklaert, soll von nichts verdeckt werden, was spaeter dazukommt.
+    teile.append(textwerk(spiegel))
     teile.append("</svg>")
     return "".join(teile) + "\n"
 

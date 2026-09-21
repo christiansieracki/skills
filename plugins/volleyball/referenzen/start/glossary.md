@@ -48,6 +48,8 @@ Wer in die Leseansicht tippt, verliert seine Änderung beim nächsten Erzeugen.
 | **freie Leinwand** | Eine Fläche mit angesagtem Maß in Metern, ohne Spielfeld darauf. Für einen Aufbau, der auf kein Feld passt. | `form: frei` mit `groesse:` |
 | **Gerät** | Ein Kasten, ein Ballwagen, eine Zielmatte im Schaubild, aus Rechtecken und Kreisen zusammengesetzt und beschriftet. | in der Szene, unter `geraete:` |
 | **Maßkette** | Eine Abstandsangabe als Linie mit Maßstrichen und der gemessenen Zahl. Der beschriftete Pfeil daneben zeigt denselben Abstand anders. | in der Szene, unter `abstaende:` |
+| **Textwerk** | Was neben dem Bild steht: Titel und Untertitel oben, die Legende daneben, die Fußzeile darunter. Es macht aus einer Skizze eine Anleitung. | in der Szene, ganz außen |
+| **Legendenblock** | Ein Stück der Legende: eine Überschrift und die Zeilen darunter. Mehrere davon ergeben die Legendenspalte neben dem Bild. | in der Szene, unter `legende:` |
 
 Dasselbe Verhältnis wie zwischen Trainingsplan und Leseansicht: Wer in das SVG
 tippt, verliert es beim nächsten Erzeugen. Änderungen gehören in die Szene.
