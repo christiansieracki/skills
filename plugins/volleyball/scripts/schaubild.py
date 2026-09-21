@@ -29,8 +29,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from szene import (Feldvorlage, Legendenblock, Ort, Szene,  # noqa: E402
-                   SzeneFehler, Weg, lies_szene, normale, scheitel)
+from szene import (Feldvorlage, Flaeche, Legendenblock, Ort,  # noqa: E402
+                   Szene, SzeneFehler, Weg, lies_szene, normale, scheitel)
 from tpdaten import finde_wurzel, konsole_vorbereiten  # noqa: E402
 
 # Zeicheneinheiten je Meter. Die Zahl steht genau einmal im Plugin; alles
@@ -101,6 +101,10 @@ HELL = {
     "laufweg": "#8a5a2b",
     "ballweg": "#2b5a8a",
     "geraet": "#efebe4",
+    # Die Zone liegt naeher am Boden als das Geraet. Ueber ihr stehen Marker
+    # und laufen Wege, und eine Flaeche, die kraeftig genug ist, um
+    # aufzufallen, ist auch kraeftig genug, um das zu verdecken, worum es geht.
+    "zone": "#f6f3ed",
 }
 DUNKEL = {
     "papier": "#171614",
@@ -110,6 +114,7 @@ DUNKEL = {
     "laufweg": "#d6a36b",
     "ballweg": "#7fb0dd",
     "geraet": "#2e2a25",
+    "zone": "#272421",
 }
 
 
@@ -311,10 +316,21 @@ def stil() -> str:
         + ".netz{fill:none;stroke:var(--gedaempft);stroke-width:1.4;stroke-dasharray:7 5}"
         + ".marker{fill:var(--feld);stroke:var(--strich);stroke-width:1.8}"
         + ".teil{fill:var(--geraet);stroke:var(--gedaempft);stroke-width:1.6}"
+        # Eine Zone ist kein Geraet: ein Geraet ist ein Gegenstand, eine Zone
+        # eine Absprache. Unterschieden wird ueber die Strichart und nicht
+        # allein ueber die Farbe, damit der Unterschied im Graustufendruck
+        # stehen bleibt und fuer den lesbar ist, der Farben schlecht
+        # auseinanderhaelt.
+        + ".zonenflaeche{fill:var(--zone);stroke:var(--gedaempft);"
+          "stroke-width:1.6;stroke-dasharray:8 5}"
         + "text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,"
           "sans-serif;font-weight:600;text-anchor:middle;dominant-baseline:central}"
         + ".beschriftung{fill:var(--strich)}"
         + f".geraetname{{fill:var(--gedaempft);font-size:{KLEINSCHRIFT}}}"
+        # Der Name der Zone steht voll da, der des Geraetes gedaempft. Was ein
+        # Kasten ist, sieht man ihm an; was auf einer Flaeche gilt, sagt allein
+        # ihr Wort.
+        + f".zonenname{{fill:var(--strich);font-size:{KLEINSCHRIFT}}}"
         + ".weg{fill:none;stroke-width:2.6;stroke-linecap:round}"
         + ".laufweg{stroke:var(--laufweg)}"
         + ".ballweg{stroke:var(--ballweg);stroke-dasharray:9 6}"
@@ -364,9 +380,22 @@ def spitzen() -> str:
 
 
 def untergrund(s: Szene, blatt: Blatt) -> str:
-    """Was unter dem Aufbau liegt: ein Spielfeld oder die freie Leinwand."""
-    return (feld(s, blatt) if isinstance(s.grundform, Feldvorlage)
-            else leinwand(s, blatt))
+    """Was unter dem Aufbau liegt: der Boden, die Zonenflaechen, die Linien.
+
+    Der Boden ist ein Spielfeld oder die freie Leinwand. Die Zonen liegen
+    darauf und unter den Feldlinien: eine Zielzone verdeckt damit nicht die
+    Angriffslinie, an der sie in der Halle abgemessen wird. Eine Linie des
+    Feldes gehoert zum Boden und nicht zum Aufbau.
+
+    Die Beschriftungen der Zonen kommen erst ganz zuletzt dazu, siehe
+    zonennamen().
+    """
+    if isinstance(s.grundform, Feldvorlage):
+        boden, linien = feldboden(s, blatt), feldlinien(s, blatt)
+    else:
+        boden, linien = leinwand(s, blatt), ""
+    return (f'<g class="untergrund {s.grundform.name}">'
+            f'{boden}{zonenflaechen(s, blatt)}{linien}</g>')
 
 
 def leinwand(s: Szene, blatt: Blatt) -> str:
@@ -383,19 +412,25 @@ def leinwand(s: Szene, blatt: Blatt) -> str:
             f'height="{koord(blatt.laenge(g.laenge))}"/>')
 
 
-def feld(s: Szene, blatt: Blatt) -> str:
-    """Die Feldvorlage: Rand, Mittellinie, Angriffslinien, Netz.
+def feldboden(s: Szene, blatt: Blatt) -> str:
+    """Die Flaeche der Feldvorlage, ohne die Linien darauf."""
+    v = s.grundform
+    return (f'<rect class="feld" x="{koord(blatt.x(0))}" '
+            f'y="{koord(blatt.y(v.laenge))}" '
+            f'width="{koord(blatt.laenge(v.breite))}" '
+            f'height="{koord(blatt.laenge(v.laenge))}"/>')
 
-    Gezeichnet wird nur, was die Vorlage kennt. Im Sand gibt es weder
-    Angriffs- noch Mittellinie, und eine Linie im Bild, die es draussen nicht
-    gibt, ist eine Ansage, die niemand einhalten kann.
+
+def feldlinien(s: Szene, blatt: Blatt) -> str:
+    """Mittellinie, Angriffslinien und Netz der Feldvorlage.
+
+    Getrennt von der Flaeche, weil dazwischen die Zonen liegen. Gezeichnet
+    wird nur, was die Vorlage kennt: im Sand gibt es weder Angriffs- noch
+    Mittellinie, und eine Linie im Bild, die es draussen nicht gibt, ist eine
+    Ansage, die niemand einhalten kann.
     """
     v = s.grundform
-    teile = [f'<g class="feldvorlage {v.name}">']
-    teile.append(
-        f'<rect class="feld" x="{koord(blatt.x(0))}" y="{koord(blatt.y(v.laenge))}" '
-        f'width="{koord(blatt.laenge(v.breite))}" height="{koord(blatt.laenge(v.laenge))}"/>'
-    )
+    teile = []
 
     def quer(klasse: str, bei: float) -> str:
         return (f'<line class="{klasse}" x1="{koord(blatt.x(0))}" y1="{koord(blatt.y(bei))}" '
@@ -414,7 +449,6 @@ def feld(s: Szene, blatt: Blatt) -> str:
         f'<rect class="netz" x="{koord(blatt.x(0))}" y="{koord(blatt.y(v.netz + band / 2))}" '
         f'width="{koord(blatt.laenge(v.breite))}" height="{koord(blatt.laenge(band))}"/>'
     )
-    teile.append("</g>")
     return "".join(teile)
 
 
@@ -489,6 +523,52 @@ def pfad(weg: Weg, blatt: Blatt, besetzt: list[Ort]) -> str:
             f'marker-end="url(#spitze-{weg.art})"/>')
 
 
+def flaeche(klasse: str, was: Flaeche, blatt: Blatt) -> str:
+    """Eine Grundform als SVG: ein Kreis oder ein Rechteck um seinen Mittelpunkt.
+
+    Dieselbe Rechnung fuer Geraeteteil und Zone. Was die beiden bedeuten und
+    wie sie aussehen, steht in `klasse` und im Stylesheet. Ihr Mass steht
+    hier, und es ist dasselbe.
+    """
+    x, y = was.bei
+    if was.form == "kreis":
+        return (f'<circle class="{klasse}" cx="{koord(blatt.x(x))}" '
+                f'cy="{koord(blatt.y(y))}" '
+                f'r="{koord(blatt.laenge(was.breite / 2))}"/>')
+    return (f'<rect class="{klasse}" x="{koord(blatt.x(x - was.breite / 2))}" '
+            f'y="{koord(blatt.y(y + was.laenge / 2))}" '
+            f'width="{koord(blatt.laenge(was.breite))}" '
+            f'height="{koord(blatt.laenge(was.laenge))}"/>')
+
+
+def beschriftung(klasse: str, text: str, bei: Ort, blatt: Blatt) -> str:
+    """Ein Wort an einem Ort in Metern, mittig um ihn herum gesetzt."""
+    x, y = bei
+    return (f'<text class="{klasse}" x="{koord(blatt.x(x))}" '
+            f'y="{koord(blatt.y(y))}">{html.escape(text)}</text>')
+
+
+def zonenflaechen(s: Szene, blatt: Blatt) -> str:
+    """Die Flaechen der Zonen, jede mit gestricheltem Rand.
+
+    Ohne ihre Beschriftung: die Flaeche liegt unter dem Aufbau, das Wort
+    darueber. Warum die beiden auseinanderliegen, steht bei zonennamen().
+    """
+    return "".join(flaeche("zonenflaeche", zone, blatt) for zone in s.zonen)
+
+
+def zonennamen(s: Szene, blatt: Blatt) -> str:
+    """Die Beschriftungen der Zonen, ueber allem, was in ihnen steht.
+
+    Die Flaeche einer Zone gehoert unter den Aufbau, ihr Wort nicht. Ein
+    Marker deckt einen ganzen Meter ab; stuende das Wort mit seiner Flaeche
+    unten, waere es weg, sobald jemand darauf steht. Eine Zone ohne lesbares
+    Wort ist aber nur noch ein Farbfleck, der aussieht wie ein Geraet.
+    """
+    return "".join(beschriftung("zonenname", zone.text, zone.name_bei, blatt)
+                   for zone in s.zonen)
+
+
 def geraete(s: Szene, blatt: Blatt) -> str:
     """Die Geraete, jedes aus seinen Teilen und mit seinem Namen darunter.
 
@@ -498,24 +578,10 @@ def geraete(s: Szene, blatt: Blatt) -> str:
     stuecke = []
     for geraet in s.geraete:
         stuecke.append('<g class="geraet">')
-        for teil in geraet.teile:
-            x, y = teil.bei
-            if teil.form == "kreis":
-                stuecke.append(
-                    f'<circle class="teil" cx="{koord(blatt.x(x))}" '
-                    f'cy="{koord(blatt.y(y))}" '
-                    f'r="{koord(blatt.laenge(teil.breite / 2))}"/>')
-            else:
-                stuecke.append(
-                    f'<rect class="teil" x="{koord(blatt.x(x - teil.breite / 2))}" '
-                    f'y="{koord(blatt.y(y + teil.laenge / 2))}" '
-                    f'width="{koord(blatt.laenge(teil.breite))}" '
-                    f'height="{koord(blatt.laenge(teil.laenge))}"/>')
+        stuecke.extend(flaeche("teil", teil, blatt) for teil in geraet.teile)
         if geraet.text:
-            nx, ny = geraet.name_bei
             stuecke.append(
-                f'<text class="geraetname" x="{koord(blatt.x(nx))}" '
-                f'y="{koord(blatt.y(ny))}">{html.escape(geraet.text)}</text>')
+                beschriftung("geraetname", geraet.text, geraet.name_bei, blatt))
         stuecke.append("</g>")
     return "".join(stuecke)
 
@@ -560,10 +626,8 @@ def abstaende(s: Szene, blatt: Blatt) -> str:
             enden = (' marker-start="url(#spitze-mass)"'
                      ' marker-end="url(#spitze-mass)"')
         stuecke.append(strecke("masslinie", blatt, a, b, enden))
-        tx, ty = abstand.text_bei
-        stuecke.append(
-            f'<text class="massbeschriftung" x="{koord(blatt.x(tx))}" '
-            f'y="{koord(blatt.y(ty))}">{html.escape(abstand.text)}</text>')
+        stuecke.append(beschriftung("massbeschriftung", abstand.text,
+                                    abstand.text_bei, blatt))
         stuecke.append("</g>")
     return "".join(stuecke)
 
@@ -650,6 +714,10 @@ def zeichne(s: Szene) -> str:
     besetzt = [(spieler.x, spieler.y) for spieler in s.spieler]
     teile.extend(pfad(weg, blatt, besetzt) for weg in s.wege)
     teile.append(marker(s, blatt))
+    # Die Zonennamen ueber den Aufbau. Die Flaechen liegen ganz unten, ihre
+    # Woerter ganz oben: was eine Zone bedeutet, soll nicht unter dem
+    # verschwinden, was in ihr steht.
+    teile.append(zonennamen(s, blatt))
     # Das Textwerk zuletzt. Es steht zwar neben dem Bild und nicht darin, aber
     # was erklaert, soll von nichts verdeckt werden, was spaeter dazukommt.
     teile.append(textwerk(spiegel))

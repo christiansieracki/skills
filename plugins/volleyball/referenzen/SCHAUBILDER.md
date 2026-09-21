@@ -47,6 +47,12 @@ legende:
       - 3 Punkte in der Zielzone
       - 1 Punkt spielbar daneben
 
+zonen:
+  - text: Zielzone
+    form: rechteck
+    bei: [4.5, 7.5]
+    groesse: [3.0, 3.0]
+
 spieler:
   - bei: 5
     text: AA
@@ -69,7 +75,7 @@ wege:
 fusszeile: "Quelle: Volleyball-Magazin 09/2026, Seite 12"
 ```
 
-Auf oberster Ebene gibt es zehn Schlüssel, mehr nicht:
+Auf oberster Ebene gibt es elf Schlüssel, mehr nicht:
 
 | Schlüssel | Wofür |
 |---|---|
@@ -81,6 +87,7 @@ Auf oberster Ebene gibt es zehn Schlüssel, mehr nicht:
 | `fusszeile` | die Zeile unter dem Bild, meist die Quelle |
 | `spieler` | Marker mit Beschriftung |
 | `wege` | Lauf- und Ballwege |
+| `zonen` | Flächen, die etwas bedeuten: Zielzone, Aufschlagbereich |
 | `geraete` | Kasten, Ballwagen, Zielmatte und was sonst im Weg steht |
 | `abstaende` | Maßketten und beschriftete Pfeile |
 
@@ -235,6 +242,71 @@ Fängt ein Weg auf einem Spieler an oder hört auf ihm auf, endet er am Rand des
 Markers. Sonst verschwände die Pfeilspitze unter dem Kreis, und mit ihr das
 Einzige, was die Richtung zeigt.
 
+### `zonen`
+
+```yaml
+zonen:
+  - text: Zielzone
+    form: rechteck
+    bei: [4.5, 7.5]
+    groesse: [3.0, 3.0]
+  - text: Aufschlagziel
+    form: kreis
+    bei: [2.0, 3.0]
+    groesse: 2.0
+```
+
+Eine **Zone** ist eine Fläche im Schaubild, die etwas bedeutet: die Zielzone
+einer Annahme, der Bereich, in den aufgeschlagen wird, das Stück Feld, das ein
+Blockspieler abdeckt. Sie besteht aus einer einzigen Grundform, hat einen Rand
+und eine Beschriftung und ist maßstäblich wie alles andere in einer Szene.
+
+| Schlüssel | Bedeutung |
+|---|---|
+| `text` | die Beschriftung, **Pflicht** |
+| `form` | `rechteck` oder `kreis`, wie beim Gerät |
+| `bei` | der Mittelpunkt, in den drei Formen von oben |
+| `groesse` | `[breite, laenge]` in Metern, beim Kreis der Durchmesser |
+
+**Eine Zone ist kein Gerät.** Ein Rechteck als Gerät zeichnet ebenfalls eine
+Fläche mit Rand und Beschriftung, und man könnte eine Zielzone als Kasten
+hinstellen. Das wäre aber eine falsche Ansage: Ein Gerät ist ein Gegenstand,
+den jemand in die Halle stellt, eine Zone ist eine Absprache. Wer den
+Unterschied im Bild nicht sieht, räumt in der Halle einen Kasten von einer
+Stelle weg, an der nie einer stand. Beide sehen deshalb verschieden aus:
+
+| | Gerät | Zone |
+|---|---|---|
+| ist | ein Gegenstand | eine Absprache |
+| Rand | durchgezogen | gestrichelt |
+| Füllung | `--geraet` | `--zone`, näher am Boden |
+| Beschriftung | darunter, gedämpft, freiwillig | darin oben, in Strichfarbe, Pflicht |
+| besteht aus | einem Teil oder mehreren | einer Grundform |
+
+Unterschieden wird über die **Strichart**, nicht allein über die Farbe, genau
+wie bei Lauf- und Ballweg. Das bleibt im Graustufendruck stehen.
+
+**Die Füllung bleibt zurückhaltend.** Über einer Zone stehen Marker und laufen
+Wege, und eine Fläche, die kräftig genug ist, um aufzufallen, ist auch kräftig
+genug, um das zu verdecken, worum es geht. Aus demselben Grund liegt die Zone
+unter den Linien des Feldes: Eine Zielzone löscht nicht die Angriffslinie, an
+der sie in der Halle abgemessen wird.
+
+Die Beschriftung steht **in** der Zone. Ein Rechteck trägt sie an seiner
+Oberkante, weil in der Mitte einer Zone meist jemand steht. Ein Kreis trägt sie
+in der Mitte: oben ist er schmal, und das Wort stünde zu beiden Seiten daneben.
+
+Gezeichnet wird sie als Letztes, über allem, was in der Zone steht. Ein Marker
+deckt einen ganzen Meter ab, und mit der Fläche zusammen unten wäre das Wort
+weg, sobald jemand darauf steht. Eine Zone ohne lesbares Wort ist aber nur noch
+ein Farbfleck, der aussieht wie ein Gerät. Aus demselben Grund bricht eine Zone
+ohne `text:` ab.
+
+Zwei Flächen unter einem Wort gibt es nicht. Das wäre eine Absprache an zwei
+Stellen, und die schreibt man als zwei Zonen hin.
+
+Zonen gibt es auf dem Feld und auf der freien Leinwand.
+
 ### `geraete`
 
 ```yaml
@@ -374,7 +446,7 @@ Leseansicht steckt es als `<img>` mit eigenem `alt`, dort zählt das.
 Das Bild bringt beide Farbschemata mit und schaltet mit dem Gerät um, genau wie
 die Leseansicht, in der es steckt. Die Farben stehen als CSS-Variablen im Bild:
 `--papier`, `--feld`, `--strich`, `--gedaempft`, `--laufweg`, `--ballweg`,
-`--geraet`.
+`--geraet`, `--zone`.
 
 In der Szene stehen keine Farben. Wer eine braucht, ändert die Palette in
 `scripts/schaubild.py`. Dann ändern sich alle Bilder mit, und so ist es
@@ -388,7 +460,8 @@ als `<img>` ein, und darin gibt es keine Elternfarbe, die färben könnte.
 - **Aufstellung/Rotation:** ein Feld, die beteiligten Positionen, bei Bedarf
   Laufwege für die Rotation.
 - **Annahme- und Angriffssystem:** Lauf- und Ballwege auf einer Feldhälfte, die
-  Gegenseite nur so weit, wie sie gebraucht wird.
+  Gegenseite nur so weit, wie sie gebraucht wird. Wohin der Ball soll, ist eine
+  Zone.
 - **Beach:** dieselbe Szene mit `form: beach`; Plätze über Rollen statt über
   Nummern.
 - **Stationsbetrieb:** aufs Feld, solange er hineinpasst. Sonst `form: frei`
@@ -397,11 +470,3 @@ als `<img>` ein, und darin gibt es keine Elternfarbe, die färben könnte.
 
 Beschriftungen kurz halten. Das Schaubild ergänzt den Text der Übungskarte, es
 ersetzt ihn nicht.
-
-## Was noch nicht geht
-
-Das Vokabular wächst mit den nächsten Schritten des Bild-Astes. Das Folgende
-gibt es heute noch nicht, und eine Szene, die es verwendet, bricht ab:
-
-- Zonen als Fläche mit Rand und Beschriftung, als eigene Sorte mit eigener
-  Darstellung

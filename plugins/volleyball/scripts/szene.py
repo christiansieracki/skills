@@ -316,18 +316,25 @@ class Weg:
 # Der Abstand der Geraetebeschriftung unter dem Geraet, in Metern.
 NAMENSABSTAND = 0.55
 
+# Der Abstand der Zonenbeschriftung unter der Oberkante der Zone, in Metern.
+ZONENNAMENSABSTAND = 0.45
+
 # Der Abstand der Massbeschriftung neben ihrer Linie, in Metern.
 TEXTABSTAND = 0.45
 
-TEILFORMEN = ("rechteck", "kreis")
+FLAECHENFORMEN = ("rechteck", "kreis")
 
 
 @dataclass
-class Teil:
-    """Eine Grundform eines Geraetes, in Metern: Mittelpunkt und Masse.
+class Flaeche:
+    """Eine Grundform in Metern: Mittelpunkt und Masse.
+
+    Die gemeinsame Geometrie von Geraeteteil und Zone. Was eine Flaeche
+    bedeutet, entscheidet, wer sie traegt; wie gross sie ist und wo sie liegt,
+    steht hier und nur hier.
 
     Ein Kreis traegt seinen Durchmesser in beiden Massen. Das spart die zweite
-    Sorte Teil und kostet nichts: wer `breite` liest, bekommt bei beiden
+    Sorte Flaeche und kostet nichts: wer `breite` liest, bekommt bei beiden
     Formen die Ausdehnung in x.
     """
 
@@ -345,6 +352,50 @@ class Teil:
 
 
 @dataclass
+class Zone(Flaeche):
+    """Eine Flaeche, die etwas bedeutet, mit Rand und Beschriftung.
+
+    Die Zielzone einer Annahme, der Bereich, in den aufgeschlagen wird, das
+    Stueck Feld, das ein Blockspieler abdeckt.
+
+    **Eine Zone ist kein Geraet.** Ein Geraet ist ein Gegenstand, den jemand in
+    die Halle stellt; eine Zone ist eine Absprache ueber ein Stueck Boden. Wer
+    den Unterschied im Bild nicht sieht, raeumt in der Halle einen Kasten von
+    einer Stelle weg, an der nie einer stand. Beide sehen deshalb verschieden
+    aus.
+
+    Die Beschriftung ist Pflicht und nicht wie beim Geraet freiwillig. Eine
+    Flaeche ohne Wort sagt nicht, was auf ihr gilt, und bleibt damit ein
+    Farbfleck, der nach Gegenstand aussieht.
+    """
+
+    text: str
+
+    @property
+    def name_bei(self) -> Ort:
+        """Wo die Beschriftung steht: in der Zone, nicht darunter.
+
+        Eine Zone ist gross genug fuer ihr Wort, und darin steht es bei dem,
+        was es benennt. Genau daran unterscheidet sie sich im Bild vom
+        Geraet, dessen Name unter ihm steht.
+
+        Ein Rechteck traegt es an der Oberkante, weil in der Mitte einer Zone
+        meist jemand steht. Unter die Mitte rutscht die Zeile dabei nie,
+        sonst faellt sie bei einer flachen Zone aus dem heraus, was sie
+        benennt.
+
+        Ein Kreis hat keine Oberkante, an die sich ein Wort haengen liesse:
+        oben ist er schmal, und das Wort stuende zu beiden Seiten daneben. Er
+        traegt es deshalb in der Mitte, wo er am breitesten ist.
+        """
+        links, unten, rechts, oben = self.rahmen
+        mitte = ((links + rechts) / 2, (unten + oben) / 2)
+        if self.form == "kreis":
+            return mitte
+        return (mitte[0], max(oben - ZONENNAMENSABSTAND, mitte[1]))
+
+
+@dataclass
 class Geraet:
     """Ein Kasten, ein Ballwagen, eine Zielmatte: Teile mit einem Namen.
 
@@ -354,7 +405,7 @@ class Geraet:
     darauf, und die Zielmatte ist ein Rechteck.
     """
 
-    teile: list[Teil]
+    teile: list[Flaeche]
     text: str
 
     @property
@@ -375,10 +426,6 @@ class Geraet:
         """
         links, unten, rechts, _ = self.rahmen
         return ((links + rechts) / 2, unten - NAMENSABSTAND)
-
-    def punkte(self) -> list[Ort]:
-        links, unten, rechts, oben = self.rahmen
-        return [(links, unten), (rechts, oben)]
 
 
 @dataclass
@@ -468,6 +515,7 @@ class Szene:
     textwerk: Textwerk = field(default_factory=Textwerk)
     spieler: list[Spieler] = field(default_factory=list)
     wege: list[Weg] = field(default_factory=list)
+    zonen: list[Zone] = field(default_factory=list)
     geraete: list[Geraet] = field(default_factory=list)
     abstaende: list[Abstand] = field(default_factory=list)
 
@@ -482,8 +530,11 @@ class Szene:
         gesammelt = [(s.x, s.y) for s in self.spieler]
         for weg in self.wege:
             gesammelt.extend([weg.von, weg.nach, scheitel(weg.von, weg.nach, weg.bogen)])
-        for geraet in self.geraete:
-            gesammelt.extend(geraet.punkte())
+        # Alles mit einem Rahmen gibt seine beiden Ecken ab. Was dazwischen
+        # liegt, liegt auch im Bild dazwischen.
+        for umrissen in (*self.zonen, *self.geraete):
+            links, unten, rechts, oben = umrissen.rahmen
+            gesammelt += [(links, unten), (rechts, oben)]
         for abstand in self.abstaende:
             gesammelt.extend(abstand.punkte())
         return gesammelt
@@ -495,7 +546,8 @@ class Szene:
         Schriftgroesse. Die kennt schaubild.py. Hier steht deshalb nur, was wo
         steht; wie breit es wird, rechnet der Zeichner aus.
         """
-        texte = [(g.text, g.name_bei) for g in self.geraete if g.text]
+        texte = [(z.text, z.name_bei) for z in self.zonen]
+        texte += [(g.text, g.name_bei) for g in self.geraete if g.text]
         return texte + [(a.text, a.text_bei) for a in self.abstaende if a.text]
 
 
@@ -529,13 +581,15 @@ def normale(von: Ort, nach: Ort) -> Ort:
 # --------------------------------------------------------------------------
 
 SZENE_SCHLUESSEL = {"form", "groesse", "titel", "untertitel", "legende",
-                    "fusszeile", "spieler", "wege", "geraete", "abstaende"}
+                    "fusszeile", "spieler", "wege", "zonen", "geraete",
+                    "abstaende"}
 SPIELER_SCHLUESSEL = {"bei", "text"}
 LEGENDEN_SCHLUESSEL = {"ueberschrift", "zeilen"}
 WEG_SCHLUESSEL = {"art", "von", "nach", "bogen"}
 WEGARTEN = ("laufweg", "ballweg")
 GERAET_SCHLUESSEL = {"text", "teile"}
 TEIL_SCHLUESSEL = {"form", "bei", "groesse"}
+ZONEN_SCHLUESSEL = {"text", "form", "bei", "groesse"}
 ABSTAND_SCHLUESSEL = {"art", "von", "nach", "versatz", "text"}
 ABSTANDSARTEN = ("masskette", "pfeil")
 
@@ -741,20 +795,24 @@ def _beschriftung(wert, bei) -> str:
     return ""
 
 
-def _lies_teil(eintrag, grundform: Grundform, wo: str) -> Teil:
-    """Eine Grundform eines Geraetes.
+def _lies_flaeche(eintrag: dict, grundform: Grundform, wo: str,
+                  was: str) -> Flaeche:
+    """`form`, `bei` und `groesse` einer Flaeche, in Metern.
 
-    Ein Kreis bekommt eine Zahl als `groesse`, sein Durchmesser; ein Rechteck
-    ein Paar. Zwei Schreibweisen fuer denselben Schluessel, weil ein Kreis mit
-    zwei Massen eine Ellipse waere, und die gibt es hier nicht.
+    Gemeinsam fuer Geraeteteil und Zone, weil beide dieselbe Geometrie haben
+    und sich in ihrer Bedeutung unterscheiden, nicht in ihrem Mass. `was`
+    nennt in der Meldung, wovon die Rede ist; gelesen wird fuer beide mit
+    derselben Rechnung.
+
+    Ein Kreis bekommt eine Zahl als `groesse`, seinen Durchmesser; ein
+    Rechteck ein Paar. Zwei Schreibweisen fuer denselben Schluessel, weil ein
+    Kreis mit zwei Massen eine Ellipse waere, und die gibt es hier nicht.
     """
-    eintrag = _als_abbildung(eintrag, wo)
-    _pruefe_schluessel(eintrag, TEIL_SCHLUESSEL, wo)
     art = eintrag.get("form")
-    if art not in TEILFORMEN:
+    if art not in FLAECHENFORMEN:
         raise SzeneFehler(
-            f"{wo}: {art!r} ist keine Grundform fuer ein Geraeteteil. Es gibt "
-            f"{', '.join(TEILFORMEN)}."
+            f"{wo}: {art!r} ist keine Grundform fuer {was}. Es gibt "
+            f"{', '.join(FLAECHENFORMEN)}."
         )
     bei = ort(eintrag.get("bei"), grundform, f"{wo}, bei")
     groesse = eintrag.get("groesse")
@@ -763,8 +821,14 @@ def _lies_teil(eintrag, grundform: Grundform, wo: str) -> Teil:
         if durchmesser <= 0:
             raise SzeneFehler(f"{wo}: ein Kreis mit dem Durchmesser "
                               f"{durchmesser:g} misst nichts.")
-        return Teil(art, bei, durchmesser, durchmesser)
-    return Teil(art, bei, *_masse(groesse, wo))
+        return Flaeche(art, bei, durchmesser, durchmesser)
+    return Flaeche(art, bei, *_masse(groesse, wo))
+
+
+def _lies_teil(eintrag, grundform: Grundform, wo: str) -> Flaeche:
+    eintrag = _als_abbildung(eintrag, wo)
+    _pruefe_schluessel(eintrag, TEIL_SCHLUESSEL, wo)
+    return _lies_flaeche(eintrag, grundform, wo, "ein Geraeteteil")
 
 
 def _lies_geraet(eintrag, grundform: Grundform, wo: str) -> Geraet:
@@ -775,9 +839,33 @@ def _lies_geraet(eintrag, grundform: Grundform, wo: str) -> Geraet:
     if not teile:
         raise SzeneFehler(
             f"{wo}: ein Geraet besteht aus mindestens einem Teil. Unter `teile:` "
-            f"steht, woraus: {', '.join(TEILFORMEN)}."
+            f"steht, woraus: {', '.join(FLAECHENFORMEN)}."
         )
     return Geraet(teile=teile, text=str(eintrag.get("text") or ""))
+
+
+def _lies_zone(eintrag, grundform: Grundform, wo: str) -> Zone:
+    """Eine Zone: eine Flaeche mit einem Wort darauf.
+
+    Anders als ein Geraet besteht sie aus einer einzigen Grundform. Zwei
+    Flaechen unter einem Wort waeren eine Absprache an zwei Stellen, und die
+    schreibt man als zwei Zonen hin.
+    """
+    eintrag = _als_abbildung(eintrag, wo)
+    _pruefe_schluessel(eintrag, ZONEN_SCHLUESSEL, wo)
+    text = _als_zeile(eintrag.get("text"), f"{wo}, text")
+    if not text:
+        raise SzeneFehler(
+            f"{wo}: es fehlt die Beschriftung. Eine Zone ist eine Absprache, "
+            f"und ohne Wort steht da eine Flaeche, von der niemand weiss, was "
+            f"auf ihr gilt. `text:` nennt sie."
+        )
+    # Feld fuer Feld benannt statt der Reihe nach ausgepackt: eine Flaeche,
+    # die morgen ein Feld mehr traegt, faellt hier auf, statt still daneben
+    # zu greifen.
+    grund = _lies_flaeche(eintrag, grundform, wo, "eine Zone")
+    return Zone(form=grund.form, bei=grund.bei, breite=grund.breite,
+                laenge=grund.laenge, text=text)
 
 
 def _lies_textwerk(roh: dict) -> Textwerk:
@@ -910,6 +998,10 @@ def lies_szene(text: str) -> Szene:
         normale(weg.von, weg.nach)  # meldet einen Weg der Laenge null
         wege.append(weg)
 
+    zonen = [_lies_zone(eintrag, form, f"Zone {nummer}")
+             for nummer, eintrag
+             in enumerate(_als_liste(roh.get("zonen"), "zonen"), 1)]
+
     geraete = [_lies_geraet(eintrag, form, f"Geraet {nummer}")
                for nummer, eintrag
                in enumerate(_als_liste(roh.get("geraete"), "geraete"), 1)]
@@ -919,4 +1011,4 @@ def lies_szene(text: str) -> Szene:
                  in enumerate(_als_liste(roh.get("abstaende"), "abstaende"), 1)]
 
     return Szene(grundform=form, textwerk=werk, spieler=spieler, wege=wege,
-                 geraete=geraete, abstaende=abstaende)
+                 zonen=zonen, geraete=geraete, abstaende=abstaende)

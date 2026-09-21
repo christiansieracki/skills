@@ -589,6 +589,244 @@ class SchaubildTest(unittest.TestCase):
         self.assertIn("rechteck", fertig.stdout, "die Meldung nennt, was es gibt")
         self.assertFalse(self.bild("dreieck").exists())
 
+    # -- Zonen -------------------------------------------------------------
+
+    def test_eine_zone_ist_eine_massstaebliche_flaeche_mit_beschriftung(self) -> None:
+        baum = self.zeichne("zielzone", """
+            form: halle
+            zonen:
+              - text: Zielzone
+                form: rechteck
+                bei: [4.5, 6.0]
+                groesse: [3.0, 2.0]
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        flaechen = mit_klasse(baum, "zonenflaeche")
+        self.assertEqual(len(flaechen), 1)
+        flaeche = flaechen[0]
+        self.assertAlmostEqual(feld.strecke(float(flaeche.get("width"))), 3.0, places=2)
+        self.assertAlmostEqual(feld.strecke(float(flaeche.get("height"))), 2.0, places=2)
+        # Um ihren Mittelpunkt herum, wie jede Flaeche in einer Szene.
+        links, oben = feld.meter(float(flaeche.get("x")), float(flaeche.get("y")))
+        self.assertAlmostEqual(links, 3.0, places=2)
+        self.assertAlmostEqual(oben, 7.0, places=2)
+
+        # Die Beschriftung steht in der Zone. Eine Flaeche ist gross genug fuer
+        # ihr Wort, und darin steht es bei dem, was es benennt.
+        name = mit_klasse(baum, "zonenname")[0]
+        self.assertEqual(name.text, "Zielzone")
+        x, y = feld.meter(float(name.get("x")), float(name.get("y")))
+        self.assertAlmostEqual(x, 4.5, places=2)
+        self.assertTrue(5.0 < y < 7.0, f"die Beschriftung liegt bei {y:.2f} m")
+
+    def test_eine_runde_zone_traegt_ihren_durchmesser(self) -> None:
+        baum = self.zeichne("kreiszone", """
+            form: halle
+            zonen:
+              - text: Aufschlagziel
+                form: kreis
+                bei: [4.5, 3.0]
+                groesse: 2.0
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        kreis = mit_klasse(baum, "zonenflaeche")[0]
+        self.assertAlmostEqual(feld.strecke(float(kreis.get("r"))) * 2, 2.0, places=2)
+
+        # Und ihr Wort in der Mitte, wo sie am breitesten ist. An der
+        # Oberkante ist ein Kreis schmal, und das Wort stuende zu beiden
+        # Seiten daneben statt darin.
+        name = mit_klasse(baum, "zonenname")[0]
+        x, y = feld.meter(float(name.get("x")), float(name.get("y")))
+        self.assertAlmostEqual(x, 4.5, places=2)
+        self.assertAlmostEqual(y, 3.0, places=2)
+
+    def test_eine_zone_ist_im_bild_von_einem_geraet_unterscheidbar(self) -> None:
+        # Ein Geraet ist ein Gegenstand, den jemand in die Halle stellt, eine
+        # Zone eine Absprache. Wer den Unterschied im Bild nicht sieht, raeumt
+        # einen Kasten von einer Stelle weg, an der nie einer stand.
+        baum = self.zeichne("beides", """
+            form: halle
+            zonen:
+              - text: Zielzone
+                form: rechteck
+                bei: [2.5, 6.0]
+                groesse: [3.0, 2.0]
+            geraete:
+              - text: Kasten
+                teile:
+                  - form: rechteck
+                    bei: [7.0, 6.0]
+                    groesse: [1.6, 0.8]
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        self.assertEqual(len(mit_klasse(baum, "zonenflaeche")), 1)
+        self.assertEqual(len(mit_klasse(baum, "teil")), 1)
+
+        stil = baum.find(SVG + "style").text
+        zone = re.search(r"\.zonenflaeche\{([^}]*)\}", stil).group(1)
+        teil = re.search(r"\.teil\{([^}]*)\}", stil).group(1)
+        # Unterschieden wird ueber die Strichart und nicht allein ueber die
+        # Farbe: so bleibt der Unterschied im Graustufendruck stehen und fuer
+        # den lesbar, der Farben schlecht auseinanderhaelt.
+        self.assertIn("stroke-dasharray", zone, "die Zone hat einen eigenen Rand")
+        self.assertNotIn("stroke-dasharray", teil, "das Geraet steht durchgezogen da")
+        self.assertNotEqual(re.search(r"fill:var\(--(\w+)\)", zone).group(1),
+                            re.search(r"fill:var\(--(\w+)\)", teil).group(1))
+
+        # Und an der Beschriftung: die der Zone steht in ihr, die des Geraetes
+        # darunter.
+        _, in_der_zone = feld.meter(
+            0.0, float(mit_klasse(baum, "zonenname")[0].get("y")))
+        _, unter_dem_geraet = feld.meter(
+            0.0, float(mit_klasse(baum, "geraetname")[0].get("y")))
+        self.assertGreater(in_der_zone, 5.0, "die Zone reicht von 5 bis 7 m")
+        self.assertLess(unter_dem_geraet, 5.6, "der Kasten reicht bis 5,6 m")
+
+    def test_eine_zone_liegt_unter_dem_aufbau_und_unter_den_feldlinien(self) -> None:
+        baum = self.zeichne("darunter", """
+            form: halle
+            zonen:
+              - text: Zielzone
+                form: rechteck
+                bei: [4.5, 6.0]
+                groesse: [6.0, 4.0]
+            spieler:
+              - bei: 3
+            wege:
+              - art: ballweg
+                von: [4.5, 1.0]
+                nach: 3
+        """)
+
+        reihenfolge = list(baum.iter())
+
+        def stelle(klasse: str) -> int:
+            return reihenfolge.index(mit_klasse(baum, klasse)[0])
+
+        zone = stelle("zonenflaeche")
+        # Ueber einer Zone stehen Marker und laufen Wege. Eine Flaeche, die
+        # kraeftig genug waere, um aufzufallen, verdeckte sonst, worum es geht.
+        self.assertLess(zone, stelle("marker"))
+        self.assertLess(zone, stelle("weg"))
+        # Die Angriffslinie gehoert zum Boden und nicht zum Aufbau. Eine
+        # Zielzone darueber loeschte die Linie, an der sie abgemessen wird.
+        self.assertLess(zone, stelle("angriffslinie"))
+
+    def test_das_wort_einer_zone_bleibt_unter_einem_marker_lesbar(self) -> None:
+        # Die Flaeche einer Zone gehoert unter den Aufbau, ihr Wort nicht. Ein
+        # Marker deckt einen ganzen Meter ab. Stuende das Wort mit seiner
+        # Flaeche unten, waere es weg, sobald jemand darauf steht, und eine
+        # Zone ohne lesbares Wort ist nur noch ein Farbfleck.
+        baum = self.zeichne("beschriftet", """
+            form: halle
+            zonen:
+              - text: Zielzone
+                form: rechteck
+                bei: [4.5, 6.0]
+                groesse: [3.0, 1.2]
+            spieler:
+              - bei: [4.5, 6.0]
+                text: Z
+        """)
+
+        reihenfolge = list(baum.iter())
+
+        def stelle(klasse: str) -> int:
+            return reihenfolge.index(mit_klasse(baum, klasse)[0])
+
+        # Der Marker liegt wirklich auf dem Wort: sonst pruefte der Test die
+        # Reihenfolge an einem Fall, in dem sie egal waere.
+        feld = Feldmass(baum, HALLE)
+        name = mit_klasse(baum, "zonenname")[0]
+        kreis = mit_klasse(baum, "marker")[0]
+        abstand = abs(float(name.get("y")) - float(kreis.get("cy")))
+        self.assertLess(abstand, float(kreis.get("r")))
+
+        self.assertGreater(stelle("zonenname"), stelle("marker"))
+        self.assertLess(stelle("zonenflaeche"), stelle("marker"),
+                        "die Flaeche bleibt trotzdem unten")
+        # Und massstaeblich steht das Wort weiter da, wo es hingehoert.
+        self.assertAlmostEqual(feld.meter(float(name.get("x")), 0.0)[0], 4.5,
+                               places=2)
+
+    def test_eine_zone_laesst_sich_auf_der_freien_leinwand_zeichnen(self) -> None:
+        baum = self.zeichne("zone-leinwand", """
+            form: frei
+            groesse: [12.0, 9.0]
+            zonen:
+              - text: Wartebereich
+                form: rechteck
+                bei: [3.0, 4.0]
+                groesse: [2.0, 3.0]
+        """)
+
+        bezug = Feldmass(baum, LEINWAND, "leinwand")
+        flaeche = mit_klasse(baum, "zonenflaeche")[0]
+        self.assertAlmostEqual(bezug.strecke(float(flaeche.get("width"))), 2.0, places=2)
+        self.assertAlmostEqual(bezug.strecke(float(flaeche.get("height"))), 3.0, places=2)
+        links, oben = bezug.meter(float(flaeche.get("x")), float(flaeche.get("y")))
+        self.assertAlmostEqual(links, 2.0, places=2)
+        self.assertAlmostEqual(oben, 5.5, places=2)
+
+    def test_eine_zone_ohne_beschriftung_bricht_ab(self) -> None:
+        # Eine Zone ist eine Absprache. Ohne Wort steht da eine Flaeche, von
+        # der niemand weiss, was auf ihr gilt, und die aussieht wie ein Geraet.
+        fertig = self.scheitert("stumm", """
+            form: halle
+            zonen:
+              - form: rechteck
+                bei: [4.5, 6.0]
+                groesse: [3.0, 2.0]
+        """)
+
+        self.assertIn("Beschriftung", fertig.stdout)
+        self.assertFalse(self.bild("stumm").exists())
+
+    def test_eine_zone_ohne_mass_bricht_ab(self) -> None:
+        fertig = self.scheitert("masslos", """
+            form: halle
+            zonen:
+              - text: Zielzone
+                form: rechteck
+                bei: [4.5, 6.0]
+        """)
+
+        self.assertIn("Zone 1", fertig.stdout)
+        self.assertFalse(self.bild("masslos").exists())
+
+    def test_eine_unbekannte_grundform_einer_zone_bricht_ab(self) -> None:
+        fertig = self.scheitert("sechseck", """
+            form: halle
+            zonen:
+              - text: Zielzone
+                form: sechseck
+                bei: [4.5, 6.0]
+                groesse: [3.0, 2.0]
+        """)
+
+        self.assertIn("sechseck", fertig.stdout)
+        self.assertIn("rechteck", fertig.stdout, "die Meldung nennt, was es gibt")
+        self.assertFalse(self.bild("sechseck").exists())
+
+    def test_eine_zone_neben_dem_feld_bleibt_ganz_im_bild(self) -> None:
+        baum = self.zeichne("danebenzone", """
+            form: halle
+            zonen:
+              - text: Ablage
+                form: rechteck
+                bei: [11.0, 9.0]
+                groesse: [2.0, 3.0]
+        """)
+
+        breite, hoehe = zahlen(baum.get("viewBox"))[2:]
+        flaeche = mit_klasse(baum, "zonenflaeche")[0]
+        rechts = float(flaeche.get("x")) + float(flaeche.get("width"))
+        self.assertLess(rechts, breite, "die Zone liegt ganz im Bild")
+        self.assertGreater(hoehe, 0)
+
     # -- Abstandsangaben ---------------------------------------------------
 
     def test_eine_masskette_ueber_sechs_meter_ist_ein_drittel_der_feldlaenge(self) -> None:
@@ -962,10 +1200,15 @@ class SchaubildTest(unittest.TestCase):
         self.assertNotEqual(hell, dunkel, "sonst waere das zweite Schema Zierrat")
         for name, farben in (("hell", hell), ("dunkel", dunkel)):
             for vorne in ("strich", "gedaempft", "laufweg", "ballweg"):
-                with self.subTest(schema=name, farbe=vorne):
-                    self.assertGreaterEqual(
-                        kontrast(farben[vorne], farben["feld"]), 4.5,
-                        f"{vorne} hebt sich im Schema {name} zu wenig vom Feld ab")
+                for grund in ("feld", "zone"):
+                    with self.subTest(schema=name, farbe=vorne, grund=grund):
+                        # Auch ueber einer Zone: dort stehen Marker und laufen
+                        # Wege, und eine Flaeche, die das verdeckt, verdeckt
+                        # genau das, worum es geht.
+                        self.assertGreaterEqual(
+                            kontrast(farben[vorne], farben[grund]), 4.5,
+                            f"{vorne} hebt sich im Schema {name} zu wenig "
+                            f"vom {grund} ab")
             # Auf dem Papier steht das Textwerk: Titel und Legende in
             # --strich, Untertitel und Fusszeile in --gedaempft. Beide muessen
             # sich davon abheben, sonst ist die Erklaerung zum Bild weg.
@@ -976,6 +1219,11 @@ class SchaubildTest(unittest.TestCase):
             # Flaeche, steht ein Farbfleck im Bild statt eines Kastens.
             self.assertGreaterEqual(kontrast(farben["gedaempft"], farben["geraet"]),
                                     4.5)
+            # Die Zone ist zurueckhaltender als das Geraet: ihre Fuellung
+            # liegt naeher am Boden. Sonst stuende eine Absprache so kraeftig
+            # im Bild wie ein Kasten.
+            self.assertLess(abs(1 - kontrast(farben["zone"], farben["feld"])),
+                            abs(1 - kontrast(farben["geraet"], farben["feld"])))
 
     def test_jede_grundform_ergibt_wohlgeformtes_xml(self) -> None:
         # Rauchtest ueber alle Grundformen mit allem, was das Vokabular hergibt.
@@ -1000,6 +1248,11 @@ spieler:
   - bei: {wo}
     text: "Z & A"
   - bei: [2.0, 2.0]
+zonen:
+  - text: Zielzone & Rand
+    form: rechteck
+    bei: [4.0, 4.0]
+    groesse: [3.0, 2.0]
 geraete:
   - text: Kasten & Wagen
     teile:
@@ -1030,6 +1283,8 @@ wege:
                 self.assertEqual(len(mit_klasse(baum, "marker")), 2)
                 self.assertEqual(len(mit_klasse(baum, "weg")), 2)
                 self.assertEqual(len(mit_klasse(baum, "geraet")), 1)
+                self.assertEqual(len(mit_klasse(baum, "zonenflaeche")), 1)
+                self.assertEqual(len(mit_klasse(baum, "zonenname")), 1)
                 self.assertEqual(len(mit_klasse(baum, "abstand")), 2)
                 self.assertEqual(len(mit_klasse(baum, "legendenblock")), 1)
 

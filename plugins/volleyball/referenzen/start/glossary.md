@@ -46,6 +46,7 @@ Wer in die Leseansicht tippt, verliert seine Änderung beim nächsten Erzeugen.
 | **Grundform** | Worauf eine Szene gezeichnet wird: eine Feldvorlage oder eine freie Leinwand. | in der Szene, als `form:` |
 | **Feldvorlage** | Ein Spielfeld als Grundform: Halle 9×18 m oder Beach 8×16 m, mit den Linien, die es dort wirklich gibt. | `form: halle`, `form: beach` |
 | **freie Leinwand** | Eine Fläche mit angesagtem Maß in Metern, ohne Spielfeld darauf. Für einen Aufbau, der auf kein Feld passt. | `form: frei` mit `groesse:` |
+| **Zone** | Eine Fläche im Schaubild, die etwas bedeutet: eine Zielzone, ein Aufschlagbereich, das abgedeckte Stück Feld. Hat Rand und Beschriftung. | in der Szene, unter `zonen:` |
 | **Gerät** | Ein Kasten, ein Ballwagen, eine Zielmatte im Schaubild, aus Rechtecken und Kreisen zusammengesetzt und beschriftet. | in der Szene, unter `geraete:` |
 | **Maßkette** | Eine Abstandsangabe als Linie mit Maßstrichen und der gemessenen Zahl. Der beschriftete Pfeil daneben zeigt denselben Abstand anders. | in der Szene, unter `abstaende:` |
 | **Textwerk** | Was neben dem Bild steht: Titel und Untertitel oben, die Legende daneben, die Fußzeile darunter. Es macht aus einer Skizze eine Anleitung. | in der Szene, ganz außen |
@@ -57,6 +58,12 @@ tippt, verliert es beim nächsten Erzeugen. Änderungen gehören in die Szene.
 Was aufs Feld passt, wird aufs Feld gezeichnet und hat seinen Maßstab damit
 geschenkt. Die freie Leinwand ist für den Rest da. Maßstäblich sind beide, und
 eine Abstandsangabe darin auch.
+
+**Zone oder Gerät?** Ein Gerät ist ein Gegenstand, den jemand in die Halle
+stellt. Eine Zone ist eine Absprache über ein Stück Boden. Beide sind Flächen
+mit Rand und Beschriftung und sehen deshalb im Bild verschieden aus: Wer den
+Unterschied nicht sieht, räumt einen Kasten von einer Stelle weg, an der nie
+einer stand.
 
 Plätze heißen in der Halle nach ihrer **Positionsnummer** 1 bis 6, im Sand nach
 einer **Rolle**. Im Sand gibt es keine Rotation, auf die sich eine Nummer
