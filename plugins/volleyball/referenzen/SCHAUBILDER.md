@@ -82,7 +82,7 @@ Auf oberster Ebene gibt es elf Schlüssel, mehr nicht:
 | `form` | die Grundform: `halle`, `beach` oder `frei` |
 | `groesse` | die Maße der freien Leinwand, nur bei `form: frei` |
 | `titel` | die Überschrift über dem Bild |
-| `untertitel` | die zweite Zeile darunter |
+| `untertitel` | die zweite Zeile darunter, ohne `titel` die erste |
 | `legende` | die Legendenspalte neben dem Bild, in Legendenblöcken |
 | `fusszeile` | die Zeile unter dem Bild, meist die Quelle |
 | `spieler` | Marker mit Beschriftung |
@@ -412,8 +412,9 @@ Ein Text mit Doppelpunkt darin gehört in Anführungszeichen, wie die Fußzeile
 oben. Ohne sie läse YAML `Quelle:` als zweiten Schlüssel.
 
 **Wo was steht.** Titel und Untertitel stehen über dem Bild, die Legende als
-Spalte rechts daneben, die Fußzeile darunter. Titel und Fußzeile sitzen auf
-derselben linken Kante wie die Grundform, damit das Textwerk nicht wie ein
+Spalte rechts daneben, die Fußzeile darunter. Steht kein `titel` da, rückt der
+Untertitel an dessen Platz, dazu weiter unten mehr. Titel und Fußzeile sitzen
+auf derselben linken Kante wie die Grundform, damit das Textwerk nicht wie ein
 zweites Blatt hinter dem ersten aussieht. Die Legendenspalte beginnt oben auf
 Höhe der Grundform. Steht jemand hinter der Grundlinie, fängt sie also unter
 diesem Marker an.
@@ -434,12 +435,25 @@ Kurz halten lohnt sich also. Im vorhandenen
 `2026-09-15-annahme-zielzone.svg` nimmt die Legendenspalte mehr Platz ein als
 das Feld.
 
-Ein `untertitel` ohne `titel` bricht ab. Eine zweite Zeile unter nichts liest
-sich wie ein angefangener Satz.
+**Ein `untertitel` ohne `titel` rückt nach oben.** Er bekommt den Platz und die
+Schrift des Titels. Eine einzelne Zeile über dem Feld ist eine Überschrift,
+gleich unter welchem Schlüssel sie in der Szene steht. Ein Abbruch kostete das
+ganze Bild und eine Runde der Vorschau-Schleife, und das für eine Kleinigkeit.
 
-Der Titel wird zugleich der Name des Bildes, im SVG als `<title>`. Das trägt,
-wo das Bild für sich steht, etwa in der Vorschau beim Zeichnen. In der
-Leseansicht steckt es als `<img>` mit eigenem `alt`, dort zählt das.
+Das Skript sagt beim Schreiben, dass es das getan hat, und schlägt einen
+`titel:` vor: den der Übungskarte, deren ID der Basisname der Szene ist.
+`schaubilder/ue-0042.szene.yml` gehört zu `uebungen/ue-0042-*.md`, und dort
+steht der Titel schon. Übernehmen kostet eine Zeile. Ist der Basisname keine
+Übungs-ID, gibt es die Karte nicht oder trägt sie keinen Titel, steht der
+Hinweis ohne Wortlaut da. Geraten wird nichts.
+
+In der Szene ändert sich nichts. Der Text steht weiter unter `untertitel:`,
+verschoben wird die Zeile allein im Satz.
+
+Die oberste Zeile wird zugleich der Name des Bildes, im SVG als `<title>`.
+Das ist der `titel:`, und ohne ihn der Untertitel, der an seiner Stelle steht.
+Es trägt, wo das Bild für sich steht, etwa in der Vorschau beim Zeichnen. In
+der Leseansicht steckt es als `<img>` mit eigenem `alt`, dort zählt das.
 
 ## Farben
 

@@ -35,6 +35,11 @@ FORMEN = {"erwaermung", "technik", "komplex", "spielform", "station", "abschluss
 LEVEL = ["einsteiger", "fortgeschritten", "ambitioniert"]
 TYPEN = {"uebung", "folge"}
 
+# Das Muster einer Uebungs-ID, wie DATENMODELL.md es festlegt. Es steht einmal
+# da, weil drei Stellen danach fragen: der Linter, die Suche nach Verweisen im
+# Text und das Schaubild, das zu einem Basisnamen die Karte sucht.
+ID_MUSTER = r"ue-\d{4}"
+
 
 def disziplin_text(eintrag: dict) -> str:
     """Die Disziplin einer Karte, wie ein Mensch sie zu sehen bekommt.
@@ -219,7 +224,7 @@ def lies_trainings(wurzel: Path) -> list[dict]:
             continue
         fm, rumpf = lies_frontmatter(pfad)
         fm["datei"] = pfad.relative_to(wurzel).as_posix()
-        fm["verwendet"] = sorted(set(re.findall(r"\bue-\d{4}\b", rumpf)))
+        fm["verwendet"] = sorted(set(re.findall(rf"\b{ID_MUSTER}\b", rumpf)))
         einheiten.append(fm)
     return einheiten
 
@@ -280,7 +285,7 @@ def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
             w.append(f"{datei}: id {kid} gibt es schon in {gesehen[kid]}")
         gesehen[kid] = datei
 
-        if not re.fullmatch(r"ue-\d{4}", str(kid)):
+        if not re.fullmatch(ID_MUSTER, str(kid)):
             w.append(f"{datei}: id {kid} passt nicht zum Muster ue-####")
         if not str(Path(datei).name).startswith(str(kid)):
             w.append(f"{datei}: Dateiname beginnt nicht mit der id {kid}")

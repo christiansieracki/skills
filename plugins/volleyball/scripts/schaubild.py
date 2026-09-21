@@ -25,13 +25,15 @@ from __future__ import annotations
 
 import argparse
 import html
+import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from szene import (Feldvorlage, Flaeche, Legendenblock, Ort,  # noqa: E402
                    Szene, SzeneFehler, Weg, lies_szene, normale, scheitel)
-from tpdaten import finde_wurzel, konsole_vorbereiten  # noqa: E402
+from tpdaten import (ID_MUSTER, finde_wurzel,  # noqa: E402
+                     konsole_vorbereiten, lies_frontmatter)
 
 # Zeicheneinheiten je Meter. Die Zahl steht genau einmal im Plugin; alles
 # andere rechnet in Metern und geht durch Blatt.
@@ -246,11 +248,14 @@ class Satzspiegel:
 
     def __init__(self, s: Szene) -> None:
         self.werk = s.textwerk
+        # Ohne Titel bekommt der Untertitel dessen Platz und dessen Schrift.
+        # Verschoben wird die Zeile allein hier im Satz: in der Szene steht sie
+        # weiter unter `untertitel:`, so wie der Trainer sie geschrieben hat.
+        kopf = [("titel", self.werk.oberste_zeile)]
+        if not self.werk.untertitel_steht_oben:
+            kopf.append(("untertitel", self.werk.untertitel))
         self.kopfzeilen, unterkante = zeilensatz(
-            [(sorte, text) for sorte, text
-             in (("titel", self.werk.titel), ("untertitel", self.werk.untertitel))
-             if text],
-            SEITENRAND)
+            [(sorte, text) for sorte, text in kopf if text], SEITENRAND)
         self.kopf = unterkante if self.kopfzeilen else 0.0
         self.blatt = Blatt(*grenzen(s), kopf=self.kopf)
 
@@ -691,12 +696,14 @@ def zeichne(s: Szene) -> str:
         f'width="{koord(spiegel.breite)}" height="{koord(spiegel.hoehe)}" '
         f'role="img">',
     ]
-    # Der Titel ist zugleich der Name des Bildes. Das traegt ueberall dort,
-    # wo das SVG fuer sich steht, etwa in der Vorschau beim Zeichnen: `role`
-    # allein sagt einer Vorlesehilfe nur "Grafik". In der Leseansicht steckt
-    # das Bild als `<img>` mit eigenem `alt`, dort zaehlt das.
-    if s.textwerk.titel:
-        teile.append(f"<title>{html.escape(s.textwerk.titel)}</title>")
+    # Die oberste Zeile ist zugleich der Name des Bildes. Das traegt ueberall
+    # dort, wo das SVG fuer sich steht, etwa in der Vorschau beim Zeichnen:
+    # `role` allein sagt einer Vorlesehilfe nur "Grafik". In der Leseansicht
+    # steckt das Bild als `<img>` mit eigenem `alt`, dort zaehlt das. Steht
+    # oben ein Untertitel, benennt er das Bild genauso: er steht dort in jeder
+    # Hinsicht als Titel und nicht nur in dessen Schrift.
+    if s.textwerk.oberste_zeile:
+        teile.append(f"<title>{html.escape(s.textwerk.oberste_zeile)}</title>")
     teile += [
         f"<style>{stil()}</style>",
         spitzen(),
@@ -763,6 +770,27 @@ def ziel(quelle: Path) -> Path:
     return quelle.with_name(stamm + ".svg")
 
 
+def kartentitel(basisname: str, wurzel: Path) -> str:
+    """Der `titel:` der Uebungskarte, deren ID dieser Basisname ist.
+
+    `schaubilder/ue-0042.szene.yml` gehoert zu `uebungen/ue-0042-*.md`, und
+    dort steht der Titel schon. Gesucht wird darum eine einzige Datei und nicht
+    die ganze Bibliothek: das Skript braucht den Titel nur, um ihn
+    vorzuschlagen, und dafuer lohnt kein Index.
+
+    Geraten wird nichts. Ein Basisname, der keine Uebungs-ID ist, eine ID ohne
+    Karte, eine Karte ohne `titel:`: in allen drei Faellen kommt eine leere
+    Zeichenkette zurueck, und der Hinweis steht dann ohne Wortlaut da.
+    """
+    if not re.fullmatch(ID_MUSTER, basisname):
+        return ""
+    karten = sorted((wurzel / "uebungen").glob(f"{basisname}-*.md"))
+    if not karten:
+        return ""
+    frontmatter, _ = lies_frontmatter(karten[0])
+    return str(frontmatter.get("titel") or "")
+
+
 def main() -> int:
     konsole_vorbereiten()
     ap = argparse.ArgumentParser(
@@ -782,7 +810,8 @@ def main() -> int:
         return 1
 
     try:
-        bild = zeichne(lies_szene(quelle.read_text(encoding="utf-8")))
+        s = lies_szene(quelle.read_text(encoding="utf-8"))
+        bild = zeichne(s)
     except SzeneFehler as fehler:
         # Erst rendern, dann schreiben: eine Szene, die nicht aufgeht, laesst
         # das Bild von vorher heil liegen, statt es halb zu ersetzen.
@@ -794,6 +823,20 @@ def main() -> int:
     datei.parent.mkdir(parents=True, exist_ok=True)
     datei.write_text(bild, encoding="utf-8")
     print(f"Geschrieben: {datei}")
+    # Gesagt wird es trotzdem: das Bild ist fertig, aber der Trainer soll
+    # wissen, dass seine Zeile oben in der Titelschrift steht, und mit einem
+    # Wort daraus einen `titel:` machen koennen, wenn er will.
+    if s.textwerk.untertitel_steht_oben:
+        print("Ohne `titel:` steht der Untertitel oben, in der Schrift des Titels.")
+        # `ziel()` hat den Basisnamen schon freigelegt. Gehoert die Szene zu
+        # einer Uebung, ist er deren ID.
+        vorschlag = kartentitel(datei.stem, wurzel)
+        if vorschlag:
+            # In Anfuehrungszeichen, und zwar immer: ein Doppelpunkt im Titel
+            # laese sich sonst als zweiter Schluessel, eine Raute als
+            # Kommentar. Der Vorschlag soll eine Zeile sein, die der Trainer
+            # uebernehmen kann, ohne sie nachzubessern.
+            print(f'Auf der Uebungskarte steht dazu: titel: "{vorschlag}"')
     return 0
 
 

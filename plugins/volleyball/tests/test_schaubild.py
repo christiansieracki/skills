@@ -21,6 +21,7 @@ zusichern will, und nicht die Zahl, mit der es zustande kam.
 from __future__ import annotations
 
 import re
+import subprocess
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -159,10 +160,19 @@ class SchaubildTest(unittest.TestCase):
 
     def zeichne(self, name: str, szene: str) -> ET.Element:
         """Legt die Szene ab, zeichnet sie und gibt das geparste SVG zurueck."""
+        self.laufe(name, szene)
+        return ET.fromstring(self.bild(name).read_text(encoding="utf-8"))
+
+    def laufe(self, name: str, szene: str) -> subprocess.CompletedProcess:
+        """Zeichnet eine Szene und gibt den Lauf samt seinen Meldungen zurueck.
+
+        Fuer die Faelle, in denen nicht nur das Bild zaehlt, sondern auch, was
+        das Skript dem Trainer dazu sagt.
+        """
         self.ordner.lege_szene_an(name, szene)
         fertig = self.ordner.starte("schaubild.py", name)
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        return ET.fromstring(self.bild(name).read_text(encoding="utf-8"))
+        return fertig
 
     def bild(self, name: str) -> Path:
         return self.ordner.pfad / "schaubilder" / f"{name}.svg"
@@ -1034,15 +1044,84 @@ class SchaubildTest(unittest.TestCase):
                 self.assertAlmostEqual(float(mit_klasse(baum, klasse)[0].get("x")),
                                        float(feld.get("x")), places=2)
 
-    def test_ein_untertitel_ohne_titel_bricht_ab(self) -> None:
-        # Eine zweite Zeile unter nichts liest sich wie ein angefangener Satz.
-        fertig = self.scheitert("nur-unter", """
+    def test_ein_untertitel_ohne_titel_steht_oben_in_der_schrift_des_titels(self) -> None:
+        # Abzubrechen hiesse, dem Trainer wegen einer Kleinigkeit das ganze
+        # Bild vorzuenthalten. Eine einzelne Zeile ueber dem Feld ist ein
+        # Titel, gleich unter welchem Schluessel sie in der Szene steht.
+        baum = self.zeichne("ue-0001", """
             form: halle
             untertitel: ohne etwas darueber
         """)
 
-        self.assertIn("Titel", fertig.stdout)
-        self.assertFalse(self.bild("nur-unter").exists())
+        self.assertEqual([e.text for e in mit_klasse(baum, "titel")],
+                         ["ohne etwas darueber"])
+        self.assertEqual(mit_klasse(baum, "untertitel"), [],
+                         "keine zweite Zeile, die kleiner gesetzt waere")
+        zeile, feld = mit_klasse(baum, "titel")[0], mit_klasse(baum, "feld")[0]
+        self.assertLess(float(zeile.get("y")), float(feld.get("y")),
+                        "die Zeile steht ueber dem Feld")
+        self.assertEqual(baum.find(SVG + "title").text, "ohne etwas darueber",
+                         "und ist damit auch der Name des Bildes")
+
+        # Dieselbe Zeile als `titel:` geschrieben schiebt das Feld genauso weit
+        # nach unten. Gemessen ist damit die Schrift und nicht nur die Klasse:
+        # eine kleiner gesetzte Zeile braeuchte weniger Platz.
+        als_titel = self.zeichne("mit-titel", """
+            form: halle
+            titel: ohne etwas darueber
+        """)
+        self.assertAlmostEqual(float(feld.get("y")),
+                               float(mit_klasse(als_titel, "feld")[0].get("y")),
+                               2, "der Kopf ist so hoch wie mit einem echten Titel")
+
+    def test_ohne_titel_wird_der_titel_der_uebungskarte_vorgeschlagen(self) -> None:
+        # Der Basisname der Szene ist die Uebungs-ID, und auf der Karte steht
+        # der Titel schon. Der Trainer uebernimmt ihn mit einer Zeile oder
+        # laesst es.
+        fertig = self.laufe("ue-0001", """
+            form: halle
+            untertitel: ohne etwas darueber
+        """)
+
+        self.assertIn("titel:", fertig.stdout,
+                      "das Skript meldet, was es getan hat")
+        self.assertIn("Annahme im Halbfeld", fertig.stdout,
+                      "und nennt den Titel der Karte ue-0001 als Vorschlag")
+
+    def test_ohne_passende_uebungskarte_steht_der_hinweis_ohne_wortlaut(self) -> None:
+        # Drei Wege, auf denen kein Vorschlag zustande kommt. Geraten wird auf
+        # keinem davon, und das Bild entsteht auf allen dreien.
+        (self.ordner.pfad / "uebungen" / "ue-0009-ohne-titel.md").write_text(
+            "---\nid: ue-0009\n---\n", encoding="utf-8")
+
+        for name, warum in (("aufstellung", "keine Uebungs-ID"),
+                            ("ue-9999", "eine ID ohne Karte"),
+                            ("ue-0009", "eine Karte ohne Titel")):
+            with self.subTest(warum=warum):
+                fertig = self.laufe(name, """
+                    form: halle
+                    untertitel: ohne etwas darueber
+                """)
+
+                self.assertTrue(self.bild(name).exists(),
+                                "geschrieben wird trotzdem")
+                self.assertIn("titel:", fertig.stdout, "der Hinweis steht da")
+                self.assertNotIn("Uebungskarte", fertig.stdout,
+                                 "nur ohne Wortlaut")
+
+    def test_die_szene_bleibt_stehen_wie_sie_geschrieben_ist(self) -> None:
+        # Wer die Szene liest, soll nicht suchen muessen, welche Zeile das
+        # Skript wohin geschoben hat.
+        datei = self.ordner.lege_szene_an("ue-0001", """
+            form: halle
+            untertitel: ohne etwas darueber
+        """)
+        vorher = datei.read_text(encoding="utf-8")
+
+        self.ordner.starte("schaubild.py", "ue-0001")
+
+        self.assertEqual(datei.read_text(encoding="utf-8"), vorher)
+        self.assertIn("untertitel: ohne etwas darueber", vorher)
 
     def test_die_legende_steht_in_bloecken_aus_ueberschrift_und_zeilen(self) -> None:
         baum = self.zeichne("legende", """

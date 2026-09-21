@@ -508,6 +508,27 @@ class Textwerk:
     legende: list[Legendenblock] = field(default_factory=list)
     fusszeile: str = ""
 
+    @property
+    def oberste_zeile(self) -> str:
+        """Die Zeile ueber dem Bild: der Titel, und ohne ihn der Untertitel."""
+        return self.titel or self.untertitel
+
+    @property
+    def untertitel_steht_oben(self) -> bool:
+        """Ob der Untertitel den Platz des Titels bekommt, weil keiner da ist.
+
+        Eine einzelne Zeile ueber dem Feld ist ein Titel, gleich unter welchem
+        Schluessel sie in der Szene steht. Deswegen bricht dieser Fall nicht
+        ab: der Trainer verloere sonst das ganze Bild an eine Kleinigkeit,
+        obwohl alles andere an der Szene steht.
+
+        Die Szene bleibt dabei, wie sie geschrieben ist. `titel` ist weiter
+        leer und der Text steht weiter in `untertitel`; wer die beiden
+        vertauscht faende, muesste beim Lesen suchen, welche Zeile wohin
+        geschoben wurde.
+        """
+        return bool(self.untertitel and not self.titel)
+
 
 @dataclass
 class Szene:
@@ -871,20 +892,14 @@ def _lies_zone(eintrag, grundform: Grundform, wo: str) -> Zone:
 def _lies_textwerk(roh: dict) -> Textwerk:
     """Liest Titel, Untertitel, Legende und Fusszeile aus der Szene.
 
-    Zusammen gelesen, weil sie zusammen geprueft werden: ein Untertitel ohne
-    Titel ist eine zweite Zeile unter nichts, und das sieht man dem fertigen
-    Bild als Schluderei an, nicht als Absicht.
+    Zusammen gelesen, weil sie zusammen gesetzt werden. Geprueft wird dabei
+    jede Zeile fuer sich. Ein Untertitel ohne Titel geht hier durch; was mit
+    ihm geschieht, entscheidet der Satz, und `Textwerk.untertitel_steht_oben`
+    sagt es ihm.
     """
-    titel = _als_zeile(roh.get("titel"), "titel")
-    untertitel = _als_zeile(roh.get("untertitel"), "untertitel")
-    if untertitel and not titel:
-        raise SzeneFehler(
-            f"Es gibt einen Untertitel, aber keinen Titel. {untertitel!r} steht "
-            f"damit als zweite Zeile unter nichts. `titel:` nennt die erste."
-        )
     return Textwerk(
-        titel=titel,
-        untertitel=untertitel,
+        titel=_als_zeile(roh.get("titel"), "titel"),
+        untertitel=_als_zeile(roh.get("untertitel"), "untertitel"),
         legende=_lies_legende(roh.get("legende")),
         fusszeile=_als_zeile(roh.get("fusszeile"), "fusszeile"),
     )
