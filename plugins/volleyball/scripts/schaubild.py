@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from szene import (Feldvorlage, Flaeche, Legendenblock, Ort,  # noqa: E402
                    Szene, SzeneFehler, Weg, lies_szene, normale, scheitel)
 from tpdaten import (ID_MUSTER, finde_wurzel,  # noqa: E402
-                     konsole_vorbereiten, lies_frontmatter)
+                     konsole_vorbereiten, lies_frontmatter, suche_wurzel)
 
 # Zeicheneinheiten je Meter. Die Zahl steht genau einmal im Plugin; alles
 # andere rechnet in Metern und geht durch Blatt.
@@ -739,12 +739,18 @@ def zeichne(s: Szene) -> str:
 ENDUNG = ".szene.yml"
 
 
-def finde_szene(angabe: str, wurzel: Path) -> Path:
+def finde_szene(angabe: str, wurzel: Path | None) -> Path:
     """Findet die Szenendatei zu dem, was auf der Kommandozeile stand.
 
     Erlaubt ist beides: der Pfad zur Datei und der blosse Basisname, wie er
     auch im Feld `schaubild:` steht. Der Basisname ist der haeufigere Fall,
     weil der Zeichen-Skill von einer Uebungs-ID kommt.
+
+    `wurzel` ist der Arbeitsordner, sofern einer angegeben wurde. Gebraucht
+    wird er allein in der letzten Zeile, wo aus einem relativen Pfad ein
+    vollstaendiger wird, und erst dort wird er notfalls gesucht. Ein absoluter
+    Pfad sagt schon allein, wo die Szene liegt, und rendert deshalb auch
+    ausserhalb eines Arbeitsordners.
     """
     kandidat = Path(angabe)
     if kandidat.suffix not in (".yml", ".yaml"):
@@ -754,7 +760,7 @@ def finde_szene(angabe: str, wurzel: Path) -> Path:
     # Ein blosser Name ohne Ordner meint schaubilder/, dort gehoeren Szenen hin.
     if kandidat.parent == Path("."):
         kandidat = Path("schaubilder") / kandidat
-    return wurzel / kandidat
+    return (wurzel or finde_wurzel()) / kandidat
 
 
 def ziel(quelle: Path) -> Path:
@@ -770,7 +776,7 @@ def ziel(quelle: Path) -> Path:
     return quelle.with_name(stamm + ".svg")
 
 
-def kartentitel(basisname: str, wurzel: Path) -> str:
+def kartentitel(basisname: str, wurzel: Path | None) -> str:
     """Der `titel:` der Uebungskarte, deren ID dieser Basisname ist.
 
     `schaubilder/ue-0042.szene.yml` gehoert zu `uebungen/ue-0042-*.md`, und
@@ -778,11 +784,12 @@ def kartentitel(basisname: str, wurzel: Path) -> str:
     die ganze Bibliothek: das Skript braucht den Titel nur, um ihn
     vorzuschlagen, und dafuer lohnt kein Index.
 
-    Geraten wird nichts. Ein Basisname, der keine Uebungs-ID ist, eine ID ohne
-    Karte, eine Karte ohne `titel:`: in allen drei Faellen kommt eine leere
-    Zeichenkette zurueck, und der Hinweis steht dann ohne Wortlaut da.
+    Geraten wird nichts. Kein Arbeitsordner, ein Basisname, der keine
+    Uebungs-ID ist, eine ID ohne Karte, eine Karte ohne `titel:`: in allen vier
+    Faellen kommt eine leere Zeichenkette zurueck, und der Hinweis steht dann
+    ohne Wortlaut da.
     """
-    if not re.fullmatch(ID_MUSTER, basisname):
+    if wurzel is None or not re.fullmatch(ID_MUSTER, basisname):
         return ""
     karten = sorted((wurzel / "uebungen").glob(f"{basisname}-*.md"))
     if not karten:
@@ -801,8 +808,12 @@ def main() -> int:
     ap.add_argument("--wurzel", type=Path, default=None)
     a = ap.parse_args()
 
-    wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
-    quelle = finde_szene(a.szene, wurzel)
+    # Gesucht wird der Arbeitsordner erst dort, wo er gebraucht wird: beim
+    # relativen Szenenpfad, und beim Nachschlagen des Kartentitels. Ein
+    # absoluter Pfad kommt ohne ihn aus und rendert deshalb auch aus einem
+    # Verzeichnis heraus, ueber dem keine Wurzeldatei steht.
+    angegebene_wurzel = a.wurzel.resolve() if a.wurzel else None
+    quelle = finde_szene(a.szene, angegebene_wurzel)
     if not quelle.is_file():
         print(f"Keine Szene unter {quelle}")
         print("Eine Szene heisst <basisname>.szene.yml und liegt in schaubilder/,")
@@ -830,7 +841,7 @@ def main() -> int:
         print("Ohne `titel:` steht der Untertitel oben, in der Schrift des Titels.")
         # `ziel()` hat den Basisnamen schon freigelegt. Gehoert die Szene zu
         # einer Uebung, ist er deren ID.
-        vorschlag = kartentitel(datei.stem, wurzel)
+        vorschlag = kartentitel(datei.stem, angegebene_wurzel or suche_wurzel())
         if vorschlag:
             # In Anfuehrungszeichen, und zwar immer: ein Doppelpunkt im Titel
             # laese sich sonst als zweiter Schluessel, eine Raute als

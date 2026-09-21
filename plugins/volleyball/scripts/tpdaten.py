@@ -89,20 +89,32 @@ def interpreter() -> str:
 # Wurzel finden
 # --------------------------------------------------------------------------
 
-def finde_wurzel(start: Path | None = None) -> Path:
-    """Sucht ab `start` aufwaerts nach der Markerdatei.
+def suche_wurzel(start: Path | None = None) -> Path | None:
+    """Sucht ab `start` aufwaerts nach der Markerdatei, ohne abzubrechen.
 
     Damit ist es egal, wie der Ordner heisst und wo er liegt, solange
     trainingsplanung-root.yml mitwandert.
+
+    Fuer die Stellen, an denen ein fehlender Arbeitsordner kein Fehler ist,
+    sondern nur heisst, dass es hier nichts nachzuschlagen gibt. Wer ihn
+    wirklich braucht, nimmt `finde_wurzel()` und bekommt die Meldung.
     """
     p = (start or Path.cwd()).resolve()
     for kandidat in [p, *p.parents]:
         if (kandidat / MARKER).is_file():
             return kandidat
-    raise SystemExit(
-        f"Keine {MARKER} gefunden. Das Skript aus dem Trainingsplanungs-Ordner\n"
-        f"heraus starten oder den Pfad mit --wurzel angeben."
-    )
+    return None
+
+
+def finde_wurzel(start: Path | None = None) -> Path:
+    """Sucht den Arbeitsordner und bricht ab, wenn keiner da ist."""
+    wurzel = suche_wurzel(start)
+    if wurzel is None:
+        raise SystemExit(
+            f"Keine {MARKER} gefunden. Das Skript aus dem Trainingsplanungs-Ordner\n"
+            f"heraus starten oder den Pfad mit --wurzel angeben."
+        )
+    return wurzel
 
 
 # --------------------------------------------------------------------------

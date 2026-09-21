@@ -241,6 +241,75 @@ class SchaubildTest(unittest.TestCase):
         self.assertIn("spiler", fertig.stdout)
         self.assertFalse(self.bild("ue-0044").exists())
 
+    # -- Der Weg zur Szene -------------------------------------------------
+
+    def test_ein_absoluter_pfad_rendert_auch_ohne_arbeitsordner(self) -> None:
+        # Der Pfad sagt schon allein, wo die Szene liegt. Wer so eine Szene von
+        # Hand zeichnet, soll das aus jedem Verzeichnis heraus koennen, auch
+        # aus einem, ueber dem keine Wurzeldatei steht. Eine Suche vorweg
+        # verlangte etwas, das dieser Lauf gar nicht braucht.
+        entwurf = self.ordner.lege_entwurf_an("ue-0042", """
+            form: halle
+            spieler:
+              - bei: 3
+        """)
+
+        fertig = self.ordner.starte("schaubild.py", str(entwurf),
+                                    mit_wurzel=False, verzeichnis=entwurf.parent)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertTrue((entwurf.parent / "ue-0042.svg").is_file(),
+                        "das Bild entsteht neben seiner Szene")
+
+    def test_ohne_arbeitsordner_steht_der_hinweis_ohne_wortlaut(self) -> None:
+        # Der Titelvorschlag kommt von einer Uebungskarte, und ohne
+        # Arbeitsordner gibt es keine. Geraten wird deshalb nichts, und
+        # abgebrochen erst recht nicht: das Bild steht zu dem Zeitpunkt schon.
+        entwurf = self.ordner.lege_entwurf_an("ue-0001", """
+            form: halle
+            untertitel: ohne etwas darueber
+        """)
+
+        fertig = self.ordner.starte("schaubild.py", str(entwurf),
+                                    mit_wurzel=False, verzeichnis=entwurf.parent)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertTrue((entwurf.parent / "ue-0001.svg").is_file())
+        self.assertIn("titel:", fertig.stdout, "der Hinweis steht da")
+        self.assertNotIn("Uebungskarte", fertig.stdout, "nur ohne Wortlaut")
+
+    def test_ein_basisname_ohne_wurzel_bricht_ab_und_sagt_warum(self) -> None:
+        # Die Gegenprobe: ein blosser Name sagt nicht, wo die Szene liegt.
+        # Dafuer braucht es den Arbeitsordner wirklich, und die Meldung bleibt
+        # die alte.
+        daneben = self.ordner.lege_entwurfsordner_an()
+
+        fertig = self.ordner.starte("schaubild.py", "ue-0042",
+                                    mit_wurzel=False, verzeichnis=daneben)
+
+        gesagt = fertig.stdout + fertig.stderr
+        self.assertNotEqual(fertig.returncode, 0)
+        self.assertIn("trainingsplanung-root.yml", gesagt)
+        self.assertIn("--wurzel", gesagt, "die Meldung nennt den Ausweg")
+
+    def test_ein_relativer_pfad_zaehlt_ab_der_wurzel(self) -> None:
+        # Die dritte Form, und die einzige, bei der beides im Spiel ist:
+        # Wurzel und Pfad. Gerufen wird von woanders, damit der Test wirklich
+        # die Wurzel misst und nicht das Verzeichnis des Testlaufs.
+        self.ordner.lege_szene_an("ue-0042", """
+            form: halle
+            spieler:
+              - bei: 3
+        """)
+        daneben = self.ordner.lege_entwurfsordner_an()
+
+        fertig = self.ordner.starte("schaubild.py", "schaubilder/ue-0042.szene.yml",
+                                    verzeichnis=daneben)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertTrue(self.bild("ue-0042").is_file(),
+                        "das Bild steht in schaubilder/, nicht im Verzeichnis des Aufrufs")
+
     # -- Die beiden Feldvorlagen -------------------------------------------
 
     def test_das_hallenfeld_misst_neun_zu_achtzehn(self) -> None:

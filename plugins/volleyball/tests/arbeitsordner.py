@@ -1,9 +1,10 @@
 """Baut einen kuenstlichen Arbeitsordner im Temp-Verzeichnis.
 
 Die Tests pruefen Linter und Suche so, wie die Skills sie aufrufen: ueber die
-Kommandozeile, mit `--wurzel` auf diesen Ordner. Beide Skripte nehmen den
-Wurzelpfad schon als Argument entgegen, der Fixture ist also ohne eine Zeile
-Produktionscode injizierbar. Die echte Bibliothek wird dabei nie angefasst.
+Kommandozeile, in aller Regel mit `--wurzel` auf diesen Ordner. Die Skripte
+nehmen den Wurzelpfad schon als Argument entgegen, der Fixture ist also ohne
+eine Zeile Produktionscode injizierbar. Die echte Bibliothek wird dabei nie
+angefasst.
 
 Der Ordner ist absichtlich klein: Wurzeldatei, eine Schwerpunktliste und eine
 Handvoll Karten, die genau die geprueften Faelle abdecken. Wer einen weiteren
@@ -295,18 +296,26 @@ class Arbeitsordner:
         datei.write_text(textwrap.dedent(text).strip() + "\n", encoding="utf-8")
         return datei
 
+    def lege_entwurfsordner_an(self) -> Path:
+        """Ein Ordner neben dem Arbeitsordner, ohne Wurzeldatei ueber sich.
+
+        Das Gegenstueck zum Arbeitsordner: hier laesst sich pruefen, was ein
+        Skript tut, wenn es von einem fremden Fleck aus gerufen wird. Er
+        entsteht beim ersten Aufruf und wird mit weggeraeumt.
+        """
+        if self.entwurfsordner is None:
+            self.entwurfsordner = Path(tempfile.mkdtemp(prefix="trainingsplanung-entwurf-"))
+        return self.entwurfsordner
+
     def lege_entwurf_an(self, name: str, text: str) -> Path:
         """Legt eine Szenendatei ausserhalb des Arbeitsordners ab.
 
         Dafuer, dass eine Szene auch neben dem Arbeitsordner rendert: der
         Skill volleyball-schaubild zeichnet Runde um Runde im
         Temp-Verzeichnis, und nach schaubilder/ kommt erst, was der Trainer
-        freigegeben hat. Der Ordner entsteht beim ersten Aufruf und wird mit
-        weggeraeumt.
+        freigegeben hat.
         """
-        if self.entwurfsordner is None:
-            self.entwurfsordner = Path(tempfile.mkdtemp(prefix="trainingsplanung-entwurf-"))
-        datei = self.entwurfsordner / f"{name}.szene.yml"
+        datei = self.lege_entwurfsordner_an() / f"{name}.szene.yml"
         datei.write_text(textwrap.dedent(text).strip() + "\n", encoding="utf-8")
         return datei
 
@@ -364,7 +373,9 @@ class Arbeitsordner:
 
     def starte(self, skript: str, *argumente: str,
                eingabe: str | None = None,
-               umgebung: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+               umgebung: dict[str, str] | None = None,
+               mit_wurzel: bool = True,
+               verzeichnis: Path | None = None) -> subprocess.CompletedProcess:
         """Ruft ein Skript so auf, wie die Skills es tun: ueber die Kommandozeile.
 
         Der Interpreter ist der, unter dem die Tests laufen. Damit stimmt er
@@ -384,14 +395,23 @@ class Arbeitsordner:
         sie zu ersetzen. Damit laesst sich eine Bibliothek ausblenden, ohne
         dem Skript dafuer einen Schalter zu geben, den es im Betrieb nicht
         braucht.
+
+        `mit_wurzel=False` laesst `--wurzel` weg und `verzeichnis` sagt, wo
+        der Aufruf steht. Beide zusammen sind der Aufruf von Hand: dann sucht
+        das Skript den Arbeitsordner selbst, ab dem angegebenen Verzeichnis
+        aufwaerts, und findet neben dem Arbeitsordner keinen. Ohne die beiden
+        liefe jeder Aufruf mit `--wurzel` und im Verzeichnis des Testlaufs,
+        und die Suche waere nie gepruefter Code.
         """
         # subprocess.run nimmt `input` und `stdin` nicht zusammen entgegen.
         strom = ({"input": eingabe} if eingabe is not None
                  else {"stdin": subprocess.DEVNULL})
+        wurzel = ["--wurzel", str(self.pfad)] if mit_wurzel else []
         return subprocess.run(
-            [sys.executable, str(SKRIPTE / skript), "--wurzel", str(self.pfad), *argumente],
+            [sys.executable, str(SKRIPTE / skript), *wurzel, *argumente],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             env={**os.environ, **(umgebung or {})},
+            cwd=str(verzeichnis) if verzeichnis is not None else None,
             check=False, **strom,
         )
 
