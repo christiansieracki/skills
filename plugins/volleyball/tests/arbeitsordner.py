@@ -16,6 +16,7 @@ ue-0005 aus der echten Bibliothek.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -26,6 +27,12 @@ from pathlib import Path
 SKRIPTE = Path(__file__).resolve().parent.parent / "scripts"
 
 WURZELDATEI = "trainingsplanung-root.yml"
+
+# EXIF-Tag 0x0112, dieselbe Zahl, die bilder_aufbereiten.py ORIENTIERUNG nennt.
+# Sie steht hier noch einmal, weil die Tests die Skripte ueber die
+# Kommandozeile aufrufen und nicht importieren. Zweimal ausgeschrieben waere
+# sie zweimal zu raten.
+ORIENTIERUNG = 274
 
 ROOT_YML = """\
 # Wurzeldatei eines kuenstlichen Arbeitsordners fuer die Tests.
@@ -284,17 +291,78 @@ class Arbeitsordner:
         datei.write_text(_als_karte(karte), encoding="utf-8")
         self.ids.append(karte["id"])
 
-    def starte(self, skript: str, *argumente: str) -> subprocess.CompletedProcess:
+    def lege_quelldatei_an(self, name: str, inhalt: bytes) -> Path:
+        """Legt eine Datei in `quellen/` ab, Byte fuer Byte wie angegeben.
+
+        Fuer die Faelle, in denen es auf den Inhalt gar nicht ankommt: eine
+        Datei, die nur schwer genug sein muss, damit die Bildaufbereitung sie
+        in die Liste nimmt. Ein echtes Bild dafuer zu erzeugen braeuchte
+        Pillow, und der Test, der ohne Pillow laeuft, bekaeme es nicht.
+        """
+        datei = self.pfad / "quellen" / name
+        datei.parent.mkdir(parents=True, exist_ok=True)
+        datei.write_bytes(inhalt)
+        return datei
+
+    def lege_quellbild_an(self, name: str, groesse: tuple[int, int],
+                          orientierung: int | None = None) -> Path:
+        """Erzeugt ein Bild in `quellen/` zur Laufzeit. Braucht Pillow.
+
+        Das Bild ist Rauschen, und das mit Absicht: nur unkomprimierbarer
+        Inhalt bringt eine Datei zuverlaessig ueber die Schwelle von 2 MB,
+        ohne dass hier eine Dateigroesse geraten werden muss. Die Alternative
+        waere ein eingechecktes Foto. Das hiesse Binaermaterial im Repo,
+        dessen Bedingung niemand mehr ansieht.
+
+        `orientierung` schreibt den EXIF-Eintrag 0x0112. 6 heisst "fuer die
+        Anzeige um 90 Grad drehen", der Wert, den die Magazinseiten tragen.
+        """
+        from PIL import Image  # nur hier noetig, der Rest der Suite laeuft ohne
+
+        breite, hoehe = groesse
+        bild = Image.frombytes("RGB", groesse, os.urandom(breite * hoehe * 3))
+        datei = self.pfad / "quellen" / name
+        datei.parent.mkdir(parents=True, exist_ok=True)
+        if datei.suffix.lower() == ".png":
+            bild.save(datei, "PNG")
+            return datei
+        exif = Image.Exif()
+        if orientierung is not None:
+            exif[ORIENTIERUNG] = orientierung
+        bild.save(datei, "JPEG", quality=95, exif=exif)
+        return datei
+
+    def starte(self, skript: str, *argumente: str,
+               eingabe: str | None = None,
+               umgebung: dict[str, str] | None = None) -> subprocess.CompletedProcess:
         """Ruft ein Skript so auf, wie die Skills es tun: ueber die Kommandozeile.
 
         Der Interpreter ist der, unter dem die Tests laufen. Damit stimmt er
         auf jedem Rechner, ohne dass hier zwischen `python` und `python3`
         entschieden werden muss.
+
+        Ohne `eingabe` haengt stdin am Nullgeraet. Ein Skript, das eine
+        Rueckfrage stellt, bekommt damit sofort ein EOF statt auf eine Eingabe
+        zu warten, die nie kommt. Ohne das bliebe die Suite an der Rueckfrage
+        der Bildaufbereitung haengen, sobald sie aus einem Terminal laeuft.
+
+        `eingabe` beantwortet die Rueckfrage. Nur so ist der Ja-Zweig
+        pruefbar, und er ist der, hinter dem das Ersetzen der Originale
+        haengt.
+
+        `umgebung` legt sich ueber die Umgebungsvariablen des Testlaufs, statt
+        sie zu ersetzen. Damit laesst sich eine Bibliothek ausblenden, ohne
+        dem Skript dafuer einen Schalter zu geben, den es im Betrieb nicht
+        braucht.
         """
+        # subprocess.run nimmt `input` und `stdin` nicht zusammen entgegen.
+        strom = ({"input": eingabe} if eingabe is not None
+                 else {"stdin": subprocess.DEVNULL})
         return subprocess.run(
             [sys.executable, str(SKRIPTE / skript), "--wurzel", str(self.pfad), *argumente],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
-            check=False,
+            env={**os.environ, **(umgebung or {})},
+            check=False, **strom,
         )
 
     def raeume_auf(self) -> None:

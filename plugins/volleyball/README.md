@@ -27,8 +27,10 @@ heißt der Aufruf `python`.
 plugins/volleyball/
 ├── skills/            die drei SKILL.md
 ├── referenzen/        DATENMODELL, SPRACHE, VORLAGEN, METHODIK, ...
-├── scripts/           index.py, suche.py, leseansicht.py, export_pdf.py
-└── tests/             Linter und Suche gegen einen künstlichen Arbeitsordner
+├── scripts/           index.py, suche.py, leseansicht.py, export_pdf.py,
+│                      bilder_aufbereiten.py
+└── tests/             Linter, Suche und Bildaufbereitung gegen einen
+                       künstlichen Arbeitsordner
 ```
 
 **Im Plugin liegt das Werkzeug, im Arbeitsordner liegen die Daten.** Übungen,
@@ -47,12 +49,20 @@ die Skills sie aufrufen: über die Kommandozeile mit `--wurzel`. Die echte
 Bibliothek wird nie angefasst und muss dafür nicht einmal existieren.
 `unittest` kommt aus der Standardbibliothek, installiert werden muss nichts.
 
+Die Prüfungen der Bildaufbereitung werden übersprungen, wenn Pillow fehlt.
+Die Begründung steht im Kopf von `tests/test_bilder.py`.
+
 ## Voraussetzungen
 
-Python 3 für die Skripte, nur Standardbibliothek. Für den PDF-Export pandoc,
-dazu eine PDF-Maschine wie wkhtmltopdf oder weasyprint. Fehlt die Maschine,
-druckt Edge oder Chrome die HTML-Fassung, dafür ist keine Installation nötig.
-Und eine Claude-Umgebung, die Dateien lesen und schreiben darf.
+Python 3 für die Skripte, nur Standardbibliothek. Eine begrenzte Ausnahme ist
+`bilder_aufbereiten.py`: es braucht Pillow und sagt im Klartext, wie es zu
+installieren ist, wenn es fehlt. Kein anderes Skript hängt daran, eine frische
+Installation ist also sofort benutzbar.
+
+Für den PDF-Export pandoc, dazu eine PDF-Maschine wie wkhtmltopdf oder
+weasyprint. Fehlt die Maschine, druckt Edge oder Chrome die HTML-Fassung, dafür
+ist keine Installation nötig. Und eine Claude-Umgebung, die Dateien lesen und
+schreiben darf.
 
 Aufgerufen wird Python auf macOS und Linux mit `python3`, unter Windows mit
 `python`. Dort zeigt `python3` auf den Platzhalter aus dem Microsoft Store und

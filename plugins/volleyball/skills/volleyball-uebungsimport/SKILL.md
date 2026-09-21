@@ -38,6 +38,22 @@ Leute warten.
 Eine Datei, die noch nicht in `quellen/` liegt, gehört dorthin, bevor Karten
 daraus entstehen. Die Karten verweisen mit `quelldatei:` darauf zurück.
 
+### Fotos, die sich nicht öffnen lassen
+
+Abfotografierte Seiten kommen oft mit 50 Megapixeln und 7 MB je Datei aus dem
+Handy. So groß lassen sie sich nicht lesen, und mit EXIF-Orientierung liegen
+sie zusätzlich quer. Dann vor dem Zerlegen aufbereiten:
+
+`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/bilder_aufbereiten.py quellen/<ordner>`
+
+Das verkleinert alles über 2 MB auf 2000 Pixel lange Kante und dreht nach EXIF
+gerade. Kleinere Dateien bleiben unangetastet, die Dateinamen bleiben, und die
+Originale werden ersetzt. Deshalb fragt das Skript einmal für den ganzen
+Stapel. Den Menschen fragen, bevor `--ja` mitgegeben wird.
+
+Fehlt Pillow, sagt das Skript, wie es zu installieren ist, und schreibt nichts.
+Das nicht umgehen und die Bilder auch nicht anders anfassen.
+
 ## Zerlegen
 
 Jedes Stück Material ist eins von dreien. `DATENMODELL.md` hat die Prüffrage:
