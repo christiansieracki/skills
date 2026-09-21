@@ -55,7 +55,7 @@ belastungshinweis: ""            # Klartext, wenn erwachsenenbelastung true ist
 material: [zielmatte, baelle]    # kleingeschrieben, ohne Umlaute
 schaubild: null                  # Dateiname in schaubilder/, landet in der Leseansicht
 quelle: "..."                    # nie leer
-quelldatei: null                 # Datei in quellen/, wenn die Karte daher kommt
+quelldatei: null                 # Datei in quellen/, freier Text, bei zwei Seiten beide
 variante_von: null               # id, wenn abgeleitet
 autor: christian
 angelegt: 2026-09-17

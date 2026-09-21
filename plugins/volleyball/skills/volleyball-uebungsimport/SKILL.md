@@ -67,6 +67,17 @@ Jedes Stück Material ist eins von dreien. `DATENMODELL.md` hat die Prüffrage:
 Ein DVV-Athletikplan ist eine Folge. In zwölf Karten zerlegt wäre seine
 Dosierung weg.
 
+### Über Seitengrenzen hinweg
+
+Eine Übung hört selten da auf, wo die Seite aufhört. Läuft der Ablauf oben auf
+der Folgeseite weiter, gehört er zu derselben Übung und ergibt eine Karte.
+Also erst bis zum Ende des Ablaufs lesen, dann zerlegen. Sonst steht der Aufbau
+auf der einen Karte und die Dosierung auf der anderen.
+
+`quelldatei:` nennt dann beide Seiten: `seite-04.jpg, seite-05.jpg` bei
+abfotografierten Seiten, `dvv-athletik.pdf S. 12-13` bei einem PDF. Das Feld
+ist freier Text, mehr braucht es dafür nicht.
+
 ## Disziplin vorschlagen
 
 Jede Karte trägt `disziplin`, eine Liste aus `halle` und `beach`. Der
@@ -186,6 +197,35 @@ jetzt zeigen.
 Danach anbieten, `index.py --md` laufen zu lassen, damit die Lesebrille
 `index.md` die neuen Übungen kennt.
 
+## Schaubilder vorschlagen
+
+Wenn die Karten stehen und geprüft sind, einmal über sie schauen. Ein
+Schaubild wird vorgeschlagen, wo es einen Anlass gibt: die Quelle zeigt ein
+Feldbild, oder der Ablauf auf der Karte ist räumlich, also eine Aufstellung,
+Laufwege, eine Zielzone oder ein Stationsaufbau. Alles andere bleibt aus der
+Liste. Zu drei Sätzen Kräftigung hilft ein Bild niemandem.
+
+Der Vorschlag kommt gesammelt am Ende, mit ID und Titel je Kandidat. Zwischen
+zwei Karten wird nichts gezeichnet, sonst zerfällt das Zerlegen einer Quelle
+in fünfzehn Bildschleifen.
+
+Welcher Weg empfohlen wird, entscheidet die Zahl der Kandidaten:
+
+| Kandidaten | Empfehlung |
+|---|---|
+| ein oder zwei | gleich mitzeichnen, solange das Material frisch im Blick ist: `volleyball-schaubild` aufrufen |
+| drei oder mehr | den Import hier abschließen und das Zeichnen einer frischen Sitzung mit `volleyball-schaubild` überlassen |
+
+Ein Bild kostet eine Runde aus Rendern, Ansehen und Nachschärfen. Ein
+Kontextfenster trägt das Importwissen und ein Dutzend solcher Runden nicht
+zusammen. Die frische Sitzung findet die Karten über dieselbe Suche wieder,
+weil auf ihnen noch kein `schaubild:` steht.
+
+Das bleibt eine Empfehlung. Der Nutzer entscheidet. Zeigt die Quelle ein
+brauchbares Feldbild, kann es stattdessen ausgeschnitten, nach `schaubilder/`
+gelegt und mit seinem Dateinamen in `schaubild:` eingetragen werden. Das Feld
+schreibt keine Endung vor und braucht keine Szene daneben.
+
 ## Was der Nutzer am Ende hört
 
 Wie viele Karten dazugekommen sind, welche IDs, und welche Disziplin jede von
@@ -194,3 +234,6 @@ haben, und was du beim Zerlegen entschieden hast, wo es nicht eindeutig war.
 Neue Schwerpunkt-Kennungen, die du nach Freigabe eingetragen hast, stehen mit
 dabei, und ebenso die, für die es kein Ja gab. Fragen, die du unterwegs gestellt und selbst
 beantwortet hast, gehören ebenfalls hinein, damit er sie kippen kann.
+
+Zum Schluss die Kandidaten für ein Schaubild, die offen geblieben sind, mit
+ihren IDs. Aus dieser Zeile kopiert er sie in die nächste Sitzung.

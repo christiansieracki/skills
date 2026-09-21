@@ -89,13 +89,21 @@ Bibliothek wandert, entscheidet die Nachbereitung.
 
 ## Schaubild
 
-Wenn Aufstellung, Rotation, Laufwege oder ein Stationsaufbau in Textform
-schwer zu fassen sind, ein kleines Schaubild erzeugen. Konventionen in
-`${CLAUDE_PLUGIN_ROOT}/referenzen/SCHAUBILDER.md`.
+Steht eine Übung im Plan, deren Aufstellung, Rotation, Laufwege oder
+Stationsaufbau sich in Textform schwer fassen lassen, und ist ihr Feld
+`schaubild:` leer, `volleyball-schaubild` aufrufen. Der Skill zeichnet das
+Bild, holt die Freigabe und trägt es auf der Karte nach.
 
-Vorher prüfen, ob die Übung schon eins hat: das Feld `schaubild:` auf der
-Karte. Ein Aufbaubild gehört zur Übung und liegt in `schaubilder/`. Eine
-Aufstellung nur für diesen Abend gehört zum Training.
+Ist das Feld gefüllt, ist das Bild da und steckt später in der Leseansicht.
+
+Vorgeschlagen wird das, wenn der Plan steht, und für alle betroffenen Übungen
+zusammen. Der Trainer sagt, ob heute Abend dafür Zeit ist. Ein Bild kostet
+eine Runde aus Rendern, Ansehen und Nachschärfen, und mitten im Entwurf reißt
+das die Planung auseinander.
+
+Ein Aufbaubild gehört zur Übung und liegt in `schaubilder/`. Eine Aufstellung
+nur für diesen Abend gehört zum Training. Das sagst du dem Skill dazu, dann
+heißt das Bild nach Datum und Thema und landet auf keiner Karte.
 
 ## Schreiben
 
