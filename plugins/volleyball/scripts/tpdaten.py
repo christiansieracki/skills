@@ -259,15 +259,18 @@ def baue_index(wurzel: Path) -> dict:
         e["anzahl_einsaetze"] = len(hist)
         eintraege.append(e)
 
+    warnungen = schwerpunkt_warnungen + pruefe(
+        wurzel, karten, trainings, schwerpunkte, bekannt
+    )
     return {
         "wurzel": str(wurzel),
         "anzahl": len(eintraege),
         "uebungen": eintraege,
-        "warnungen": schwerpunkt_warnungen + pruefe(karten, trainings, schwerpunkte, bekannt),
+        "warnungen": warnungen,
     }
 
 
-def pruefe(karten, trainings, schwerpunkte, bekannt) -> list[str]:
+def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
     w: list[str] = []
     gesehen: dict[str, str] = {}
 
@@ -340,6 +343,13 @@ def pruefe(karten, trainings, schwerpunkte, bekannt) -> list[str]:
 
         if k.get("erwachsenenbelastung") and not (k.get("belastungshinweis") or "").strip():
             w.append(f"{datei}: erwachsenenbelastung ist gesetzt, aber belastungshinweis ist leer")
+
+        # Ein toter Bildverweis faellt sonst nirgends auf: die Leseansicht
+        # laesst das Bild still weg, und gemerkt wird es erst in der Halle am
+        # Blatt ohne Bild.
+        bild = k.get("schaubild")
+        if bild and not (wurzel / "schaubilder" / str(bild)).is_file():
+            w.append(f"{datei}: schaubild zeigt auf {bild}, das es unter schaubilder/ nicht gibt")
 
         vv = k.get("variante_von")
         if vv and vv not in bekannt:

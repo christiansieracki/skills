@@ -214,6 +214,45 @@ class LinterTest(unittest.TestCase):
 
         self.assertEqual(auffaelligkeiten(fertig.stdout), [])
 
+    def test_toter_schaubild_verweis_wird_gemeldet(self) -> None:
+        # Der Fall aus dem Ticket, und zwar der haeufige: der Ordner steht, nur
+        # diese eine Datei ist umbenannt oder geloescht worden.
+        self.ordner.lege_schaubild_an("ue-0020-alter-name.svg")
+        self.ordner.lege_karte_an(
+            id="ue-0020",
+            titel="Karte mit totem Schaubild-Verweis",
+            schaubild="gibt-es-nicht.svg",
+        )
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertIn("ue-0020", gemeldet[0])
+        self.assertIn("gibt-es-nicht.svg", gemeldet[0])
+
+    def test_vorhandenes_schaubild_meldet_nichts(self) -> None:
+        self.ordner.lege_schaubild_an("ue-0021-aufbau.svg")
+        self.ordner.lege_karte_an(
+            id="ue-0021",
+            titel="Karte mit vorhandenem Schaubild",
+            schaubild="ue-0021-aufbau.svg",
+        )
+
+        fertig = self.ordner.starte("index.py")
+
+        self.assertEqual(auffaelligkeiten(fertig.stdout), [])
+
+    def test_karte_ohne_schaubild_meldet_nichts(self) -> None:
+        # Das Feld ist optional. Die Standardkarten fuehren es leer, hier fehlt
+        # es ganz. Beide Schreibweisen duerfen nichts ausloesen.
+        self.ordner.lege_karte_an(
+            id="ue-0022", titel="Karte ganz ohne Schaubild", schaubild=OHNE,
+        )
+
+        fertig = self.ordner.starte("index.py")
+
+        self.assertEqual(auffaelligkeiten(fertig.stdout), [])
+
     def test_karte_fuer_halle_und_beach_meldet_nichts(self) -> None:
         self.ordner.lege_karte_an(
             id="ue-0014", titel="Karte für beide Disziplinen", disziplin=["halle", "beach"],

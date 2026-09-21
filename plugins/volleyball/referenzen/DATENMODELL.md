@@ -212,5 +212,6 @@ aus der Standardbibliothek.
 
 `index.py` ohne Argumente ist auch der Linter: doppelte IDs, fehlende oder
 unbekannte `disziplin`, unbekannte Schwerpunkte, fehlende Level, ins Leere
-zeigende `variante_von`, Trainingspläne mit unbekannten IDs. Vor größeren
+zeigende `variante_von`, `schaubild` auf eine Datei, die es unter
+`schaubilder/` nicht gibt, Trainingspläne mit unbekannten IDs. Vor größeren
 Änderungen und nach jedem Import laufen lassen.

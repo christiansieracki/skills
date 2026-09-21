@@ -260,6 +260,19 @@ class Arbeitsordner:
             encoding="utf-8",
         )
 
+    def lege_schaubild_an(self, name: str) -> Path:
+        """Legt eine Datei unter schaubilder/ ab.
+
+        Was drinsteht, zaehlt nicht: der Linter schaut nur nach, ob es die
+        Datei gibt. Den Ordner legt erst dieser Aufruf an, damit ein
+        Arbeitsordner ohne Schaubilder auch keinen hat.
+        """
+        ordner = self.pfad / "schaubilder"
+        ordner.mkdir(exist_ok=True)
+        datei = ordner / name
+        datei.write_text('<svg xmlns="http://www.w3.org/2000/svg"></svg>', encoding="utf-8")
+        return datei
+
     def lege_karte_an(self, **felder) -> None:
         """Legt eine Uebungskarte an.
 
