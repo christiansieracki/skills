@@ -31,6 +31,29 @@ SVG = "{http://www.w3.org/2000/svg}"
 
 HALLE = (9.0, 18.0)
 BEACH = (8.0, 16.0)
+# Die Leinwand der Stationstests: ein Hallenteil, auf den kein ganzes Feld
+# passt. Die Masse stehen in der Szene und hier, sonst gaebe es nichts, wogegen
+# das Bild gemessen wuerde.
+LEINWAND = (12.0, 9.0)
+
+# Ein Stationsaufbau, wortgleich fuer beide Grundformen. Er steht einmal da,
+# damit der Vergleich zwischen Feld und Leinwand wirklich derselbe Aufbau ist
+# und nicht zwei aehnliche.
+STATION = """
+geraete:
+  - text: Kasten
+    teile:
+      - form: rechteck
+        bei: [3.0, 4.0]
+        groesse: [1.6, 0.8]
+abstaende:
+  - art: masskette
+    von: [3.0, 2.0]
+    nach: [3.0, 5.0]
+spieler:
+  - bei: [1.0, 2.0]
+    text: A
+"""
 
 
 # --------------------------------------------------------------------------
@@ -49,15 +72,22 @@ def zahlen(text: str) -> list[float]:
 class Feldmass:
     """Rechnet Zeichenkoordinaten zurueck in Meter.
 
-    Die Umrechnung haengt allein am Feldrechteck im Bild und an den Massen, die
-    das Feld laut Regelwerk hat. Der Massstab des Skripts kommt darin nicht vor:
-    verdoppelte er sich morgen, blieben diese Pruefungen gruen, und das ist
+    Die Umrechnung haengt allein am Rechteck der Grundform im Bild und an den
+    Massen, die sie in Metern hat. Der Massstab des Skripts kommt darin nicht
+    vor: verdoppelte er sich morgen, blieben diese Pruefungen gruen, und das ist
     genau richtig.
+
+    `klasse` nennt das Rechteck, an dem gemessen wird: das Feld oder die freie
+    Leinwand. Beide tragen ihre Masse in Metern, also misst derselbe Helfer in
+    beiden Bildern. Genau das ist die Zusicherung, dass ein Aufbau auf der
+    Leinwand denselben Massstab bekommt wie auf dem Feld.
     """
 
-    def __init__(self, baum, masse: tuple[float, float]) -> None:
-        rechtecke = mit_klasse(baum, "feld")
-        assert len(rechtecke) == 1, f"{len(rechtecke)} Feldrechtecke im Bild"
+    def __init__(self, baum, masse: tuple[float, float],
+                 klasse: str = "feld") -> None:
+        rechtecke = mit_klasse(baum, klasse)
+        assert len(rechtecke) == 1, (
+            f"{len(rechtecke)} Rechtecke der Klasse {klasse!r} im Bild")
         r = rechtecke[0]
         self.x = float(r.get("x"))
         self.y = float(r.get("y"))
@@ -93,6 +123,18 @@ def pfeilhoehe(feld: "Feldmass", d: str) -> float:
     mitte = feld.meter((x0 + 2 * sx + x1) / 4, (y0 + 2 * sy + y1) / 4)
     sehne = feld.meter((x0 + x1) / 2, (y0 + y1) / 2)
     return ((mitte[0] - sehne[0]) ** 2 + (mitte[1] - sehne[1]) ** 2) ** 0.5
+
+
+def laenge_im_bild(linie: ET.Element) -> float:
+    """Die gezeichnete Laenge einer Linie, in Zeicheneinheiten.
+
+    Gemessen wird an den Enden, die im Bild wirklich stehen. Ob eine
+    Abstandsangabe massstaeblich ist, entscheidet sich genau hier und nicht an
+    der Zahl, die danebensteht.
+    """
+    dx = float(linie.get("x2")) - float(linie.get("x1"))
+    dy = float(linie.get("y2")) - float(linie.get("y1"))
+    return (dx * dx + dy * dy) ** 0.5
 
 
 def kontrast(vorne: str, hinten: str) -> float:
@@ -419,6 +461,276 @@ class SchaubildTest(unittest.TestCase):
             self.assertGreater(abstand, radius,
                                "der Weg reicht bis in den Marker hinein")
 
+    # -- Die freie Leinwand ------------------------------------------------
+
+    def test_eine_freie_leinwand_rendert_ohne_feld_in_der_angegebenen_groesse(self) -> None:
+        # Was auf kein Spielfeld passt, bekommt eine Flaeche mit angesagtem
+        # Mass. Ein Feld darunter waere eine Ansage, die es in dem Hallenteil
+        # nicht gibt.
+        baum = self.zeichne("station", """
+            form: frei
+            groesse: [12.0, 9.0]
+            spieler:
+              - bei: [1.0, 2.0]
+                text: A
+        """)
+
+        self.assertEqual(mit_klasse(baum, "feld"), [], "kein Spielfeld darunter")
+        self.assertEqual(mit_klasse(baum, "netz"), [], "und kein Netz")
+        flaeche = Feldmass(baum, LEINWAND, "leinwand")
+        self.assertAlmostEqual(flaeche.verhaeltnis, 12 / 9, places=3)
+
+    def test_auf_der_leinwand_steht_ein_punkt_da_wo_er_angesagt_ist(self) -> None:
+        # Der Ursprung liegt auch hier in der linken unteren Ecke. Ohne das
+        # haette die Leinwand ihren eigenen Massstab, und derselbe Aufbau waere
+        # auf dem Feld ein anderer.
+        baum = self.zeichne("punkt", """
+            form: frei
+            groesse: [12.0, 9.0]
+            spieler:
+              - bei: [3.0, 7.5]
+                text: A
+        """)
+
+        flaeche = Feldmass(baum, LEINWAND, "leinwand")
+        kreis = mit_klasse(baum, "marker")[0]
+        x, y = flaeche.meter(float(kreis.get("cx")), float(kreis.get("cy")))
+        self.assertAlmostEqual(x, 3.0, places=2)
+        self.assertAlmostEqual(y, 7.5, places=2)
+
+    def test_die_freie_leinwand_braucht_ein_mass(self) -> None:
+        # Ohne Mass waere der Massstab geraten, und ein Schaubild, dessen
+        # Abstaende luegen, ist schlimmer als eines ohne Abstaende.
+        fertig = self.scheitert("ohne-mass", """
+            form: frei
+            spieler:
+              - bei: [1.0, 1.0]
+        """)
+
+        self.assertIn("groesse", fertig.stdout)
+        self.assertFalse(self.bild("ohne-mass").exists())
+
+    def test_eine_feldvorlage_nimmt_keine_groesse_entgegen(self) -> None:
+        # Das Hallenfeld misst 9x18 m. Eine zweite Zahl daneben waere entweder
+        # wirkungslos oder falsch, und beides faellt niemandem auf.
+        fertig = self.scheitert("zu-viel", """
+            form: halle
+            groesse: [12.0, 9.0]
+        """)
+
+        self.assertIn("groesse", fertig.stdout)
+        self.assertIn("frei", fertig.stdout, "die Meldung nennt, wo es sie gibt")
+
+    def test_auf_der_leinwand_gibt_es_weder_positionsnummern_noch_rollen(self) -> None:
+        # Beide beziehen sich auf ein Feld. Ohne Feld gibt es nichts, worauf.
+        for name, wo, wort in (("nummer", "4", "Positionsnummern"),
+                               ("rolle", "block", "Rollen")):
+            with self.subTest(ort=name):
+                fertig = self.scheitert(f"leer-{name}", f"""
+                    form: frei
+                    groesse: [12.0, 9.0]
+                    spieler:
+                      - bei: {wo}
+                """)
+
+                self.assertIn(wort, fertig.stdout)
+                self.assertIn("[x, y]", fertig.stdout, "die Meldung nennt den Ausweg")
+                self.assertNotIn("Sand", fertig.stdout,
+                                 "auf der Leinwand hilft der Hinweis auf Beach nicht")
+
+    # -- Geraete -----------------------------------------------------------
+
+    def test_ein_geraet_wird_aus_grundformen_zusammengesetzt_und_beschriftet(self) -> None:
+        baum = self.zeichne("kasten", """
+            form: halle
+            geraete:
+              - text: Kasten mit Ballwagen
+                teile:
+                  - form: rechteck
+                    bei: [4.5, 6.0]
+                    groesse: [1.6, 0.8]
+                  - form: kreis
+                    bei: [4.5, 6.0]
+                    groesse: 0.6
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        gruppen = mit_klasse(baum, "geraet")
+        self.assertEqual(len(gruppen), 1, "ein Geraet, nicht zwei Formen")
+        kasten, wagen = mit_klasse(gruppen[0], "teil")
+        # Beide Teile stehen massstaeblich da, sonst waere der Kasten eine
+        # Kiste unbekannter Groesse.
+        self.assertAlmostEqual(feld.strecke(float(kasten.get("width"))), 1.6, places=2)
+        self.assertAlmostEqual(feld.strecke(float(kasten.get("height"))), 0.8, places=2)
+        self.assertAlmostEqual(feld.strecke(float(wagen.get("r"))) * 2, 0.6, places=2)
+        mitte = feld.meter(float(wagen.get("cx")), float(wagen.get("cy")))
+        self.assertEqual(tuple(round(w, 2) for w in mitte), (4.5, 6.0))
+
+        beschriftung = mit_klasse(gruppen[0], "geraetname")[0]
+        self.assertEqual(beschriftung.text, "Kasten mit Ballwagen")
+        # Sie steht unter dem Geraet. Ein Wort wie "Ballwagen" passt in keinen
+        # Ballwagen, und halb verdeckt ist es schlechter als daneben.
+        _, unter = feld.meter(float(beschriftung.get("x")),
+                            float(beschriftung.get("y")))
+        self.assertLess(unter, 6.0 - 0.4, "die Beschriftung liegt im Geraet")
+
+    def test_eine_unbekannte_grundform_eines_geraetes_bricht_ab(self) -> None:
+        fertig = self.scheitert("dreieck", """
+            form: halle
+            geraete:
+              - text: Kasten
+                teile:
+                  - form: dreieck
+                    bei: [4.5, 6.0]
+                    groesse: [1.0, 1.0]
+        """)
+
+        self.assertIn("dreieck", fertig.stdout)
+        self.assertIn("rechteck", fertig.stdout, "die Meldung nennt, was es gibt")
+        self.assertFalse(self.bild("dreieck").exists())
+
+    # -- Abstandsangaben ---------------------------------------------------
+
+    def test_eine_masskette_ueber_sechs_meter_ist_ein_drittel_der_feldlaenge(self) -> None:
+        # Der Massstab einer Abstandsangabe ist derselbe wie der des Feldes.
+        # Sonst saehen zwei Strecken gleich aus und bedeuteten Verschiedenes.
+        baum = self.zeichne("kette", """
+            form: halle
+            abstaende:
+              - art: masskette
+                von: [1.5, 2.0]
+                nach: [7.5, 2.0]
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        linie = mit_klasse(baum, "masslinie")[0]
+        self.assertAlmostEqual(laenge_im_bild(linie) / feld.hoehe, 1 / 3, places=3)
+
+    def test_ein_beschrifteter_pfeil_ist_genauso_massstaeblich_wie_eine_masskette(self) -> None:
+        # Welche der beiden Darstellungen uebersichtlicher ist, haengt am
+        # Anwendungsfall. Am Massstab haengt es nicht.
+        baum = self.zeichne("beides", """
+            form: halle
+            abstaende:
+              - art: masskette
+                von: [1.5, 2.0]
+                nach: [7.5, 2.0]
+              - art: pfeil
+                von: [1.5, 4.0]
+                nach: [7.5, 4.0]
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        kette, pfeil = mit_klasse(baum, "masskette")[0], mit_klasse(baum, "pfeil")[0]
+        for art, gruppe in (("masskette", kette), ("pfeil", pfeil)):
+            with self.subTest(art=art):
+                linie = mit_klasse(gruppe, "masslinie")[0]
+                self.assertAlmostEqual(feld.strecke(laenge_im_bild(linie)), 6.0,
+                                       places=2)
+
+        # Unterschieden wird an den Enden: die Kette bekommt Massstriche, der
+        # Pfeil Spitzen an beiden Enden. Einfach bepfeilt laese er sich als Weg.
+        self.assertEqual(len(mit_klasse(kette, "massstrich")), 2)
+        self.assertEqual(len(mit_klasse(pfeil, "massstrich")), 0)
+        spitzen = mit_klasse(pfeil, "masslinie")[0]
+        self.assertTrue(spitzen.get("marker-start") and spitzen.get("marker-end"))
+        self.assertIsNone(mit_klasse(kette, "masslinie")[0].get("marker-end"))
+
+    def test_eine_abstandsangabe_beschriftet_sich_mit_der_gemessenen_laenge(self) -> None:
+        # Die Zahl wird gemessen und nicht abgeschrieben. Wer etwas anderes
+        # hinschreiben will, schreibt es hin und verantwortet es.
+        baum = self.zeichne("zahlen", """
+            form: halle
+            abstaende:
+              - art: masskette
+                von: [1.0, 2.0]
+                nach: [7.0, 2.0]
+              - art: pfeil
+                von: [1.0, 4.0]
+                nach: [5.5, 4.0]
+              - art: masskette
+                von: [1.0, 6.0]
+                nach: [7.0, 6.0]
+                text: je 2 m
+        """)
+
+        self.assertEqual([e.text for e in mit_klasse(baum, "massbeschriftung")],
+                         ["6 m", "4,5 m", "je 2 m"])
+
+    def test_der_versatz_rueckt_die_masslinie_zur_seite_ohne_sie_zu_kuerzen(self) -> None:
+        # Eine Kette quer durch die Marker, deren Abstand sie angibt, liest
+        # niemand. Verschoben wird sie, verkuerzt nicht.
+        baum = self.zeichne("versatz", """
+            form: halle
+            abstaende:
+              - art: masskette
+                von: [1.5, 2.0]
+                nach: [7.5, 2.0]
+                versatz: 1.0
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        linie = mit_klasse(baum, "masslinie")[0]
+        self.assertAlmostEqual(feld.strecke(laenge_im_bild(linie)), 6.0, places=2)
+        _, neben = feld.meter(float(linie.get("x1")), float(linie.get("y1")))
+        self.assertAlmostEqual(neben, 3.0, places=2, msg="einen Meter nach links")
+        # Zwei Masshilfslinien halten die Kette an dem fest, was sie misst.
+        self.assertEqual(len(mit_klasse(baum, "masshilfslinie")), 2)
+
+    def test_ein_abstand_zwischen_einem_ort_und_sich_selbst_bricht_ab(self) -> None:
+        # Und meldet sich als Abstand. Eine Meldung ueber einen Weg schickte den
+        # Leser in die Zeilen, in denen gar nichts steht.
+        fertig = self.scheitert("null", """
+            form: halle
+            abstaende:
+              - art: masskette
+                von: 4
+                nach: 4
+        """)
+
+        self.assertIn("Abstand 1", fertig.stdout)
+        self.assertNotIn("Weg", fertig.stdout)
+        self.assertFalse(self.bild("null").exists())
+
+    def test_ein_wahrheitswert_als_versatz_wird_gemeldet(self) -> None:
+        # `false` ist in Python eine Null, in einer Szene aber keine Angabe in
+        # Metern. Still als "nicht verschoben" durchzugehen waere die Art
+        # Fehler, die man dem fertigen Bild nicht ansieht.
+        fertig = self.scheitert("wahrheitswert", """
+            form: halle
+            abstaende:
+              - art: masskette
+                von: [1.0, 2.0]
+                nach: [7.0, 2.0]
+                versatz: false
+        """)
+
+        self.assertIn("Versatz", fertig.stdout)
+        self.assertFalse(self.bild("wahrheitswert").exists())
+
+    # -- Der Stationsaufbau -------------------------------------------------
+
+    def test_derselbe_stationsaufbau_geht_aufs_feld_und_auf_die_leinwand(self) -> None:
+        # Was aufs Feld passt, wird aufs Feld gezeichnet und hat seinen
+        # Massstab geschenkt. Die freie Leinwand ist der Ausnahmefall, und sie
+        # misst denselben Kasten genauso.
+        auf_feld = self.zeichne("station-feld", "form: halle" + STATION)
+        auf_leinwand = self.zeichne("station-leinwand",
+                                    "form: frei\ngroesse: [12.0, 9.0]" + STATION)
+
+        gemessen = []
+        for baum, masse, klasse in ((auf_feld, HALLE, "feld"),
+                                    (auf_leinwand, LEINWAND, "leinwand")):
+            bezug = Feldmass(baum, masse, klasse)
+            kasten = mit_klasse(baum, "teil")[0]
+            kette = mit_klasse(baum, "masslinie")[0]
+            gemessen.append((round(bezug.strecke(float(kasten.get("width"))), 2),
+                             round(bezug.strecke(laenge_im_bild(kette)), 2)))
+
+        self.assertEqual(gemessen, [(1.6, 3.0), (1.6, 3.0)],
+                         "derselbe Aufbau misst auf beiden Grundformen dasselbe")
+        self.assertEqual(mit_klasse(auf_leinwand, "feld"), [])
+
     # -- Lesbarkeit ---------------------------------------------------------
 
     def test_das_bild_bleibt_in_hellem_und_dunklem_farbschema_lesbar(self) -> None:
@@ -444,29 +756,57 @@ class SchaubildTest(unittest.TestCase):
                         kontrast(farben[vorne], farben["feld"]), 4.5,
                         f"{vorne} hebt sich im Schema {name} zu wenig vom Feld ab")
             self.assertGreaterEqual(kontrast(farben["strich"], farben["papier"]), 4.5)
+            # Ein Geraet ist eine Flaeche mit Rand. Faellt der Rand in die
+            # Flaeche, steht ein Farbfleck im Bild statt eines Kastens.
+            self.assertGreaterEqual(kontrast(farben["gedaempft"], farben["geraet"]),
+                                    4.5)
 
-    def test_jede_feldvorlage_ergibt_wohlgeformtes_xml(self) -> None:
-        # Rauchtest ueber beide Grundformen mit allem, was das Vokabular hergibt.
-        for form, wo in (("halle", "3"), ("beach", "block")):
-            with self.subTest(form=form):
-                baum = self.zeichne(f"rauch-{form}", f"""
-                    form: {form}
-                    spieler:
-                      - bei: {wo}
-                        text: "Z & A"
-                      - bei: [2.0, 2.0]
-                    wege:
-                      - art: laufweg
-                        von: {wo}
-                        nach: [2.0, 2.0]
-                      - art: ballweg
-                        von: [2.0, 2.0]
-                        nach: {wo}
-                        bogen: -1.0
-                """)
+    def test_jede_grundform_ergibt_wohlgeformtes_xml(self) -> None:
+        # Rauchtest ueber alle Grundformen mit allem, was das Vokabular hergibt.
+        # Der Kopf steht je Grundform buendig da, weil die Leinwand eine zweite
+        # Zeile braucht und eine eingerueckte Zeile keine Szene mehr waere.
+        for name, kopf, wo in (
+            ("halle", "form: halle", "3"),
+            ("beach", "form: beach", "block"),
+            ("frei", "form: frei\ngroesse: [10.0, 6.0]", "[5.0, 4.0]"),
+        ):
+            with self.subTest(form=name):
+                baum = self.zeichne(f"rauch-{name}", kopf + f"""
+spieler:
+  - bei: {wo}
+    text: "Z & A"
+  - bei: [2.0, 2.0]
+geraete:
+  - text: Kasten & Wagen
+    teile:
+      - form: rechteck
+        bei: [3.0, 3.0]
+        groesse: [1.6, 0.8]
+      - form: kreis
+        bei: [3.0, 3.0]
+        groesse: 0.5
+abstaende:
+  - art: masskette
+    von: [2.0, 2.0]
+    nach: [3.0, 3.0]
+  - art: pfeil
+    von: [2.0, 2.0]
+    nach: {wo}
+    versatz: -0.8
+wege:
+  - art: laufweg
+    von: {wo}
+    nach: [2.0, 2.0]
+  - art: ballweg
+    von: [2.0, 2.0]
+    nach: {wo}
+    bogen: -1.0
+""")
                 self.assertTrue(baum.tag.endswith("svg"))
                 self.assertEqual(len(mit_klasse(baum, "marker")), 2)
                 self.assertEqual(len(mit_klasse(baum, "weg")), 2)
+                self.assertEqual(len(mit_klasse(baum, "geraet")), 1)
+                self.assertEqual(len(mit_klasse(baum, "abstand")), 2)
 
     def test_ein_punkt_ausserhalb_des_feldes_bleibt_im_bild(self) -> None:
         # Ein Aufschlagspieler steht hinter der Grundlinie. Ihn abzuschneiden

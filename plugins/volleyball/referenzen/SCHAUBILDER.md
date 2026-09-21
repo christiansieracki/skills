@@ -56,8 +56,18 @@ wege:
     nach: [6.5, 7.2]
 ```
 
-Drei Schlüssel auf oberster Ebene, mehr gibt es nicht: `form`, `spieler`,
-`wege`. Ein Schlüssel, den es nicht gibt, wird gemeldet statt übergangen. Ein
+Auf oberster Ebene gibt es sechs Schlüssel, mehr nicht:
+
+| Schlüssel | Wofür |
+|---|---|
+| `form` | die Grundform: `halle`, `beach` oder `frei` |
+| `groesse` | die Maße der freien Leinwand, nur bei `form: frei` |
+| `spieler` | Marker mit Beschriftung |
+| `wege` | Lauf- und Ballwege |
+| `geraete` | Kasten, Ballwagen, Zielmatte und was sonst im Weg steht |
+| `abstaende` | Maßketten und beschriftete Pfeile |
+
+Ein Schlüssel, den es nicht gibt, wird gemeldet statt übergangen. Ein
 vertipptes `spiler:` ergäbe sonst ein leeres Feld, und das sieht fertig aus.
 
 ### Gerechnet wird in Metern
@@ -77,20 +87,46 @@ Die Zeichenfläche wächst um das herum, was neben dem Feld steht. Ein
 Aufschlagspieler bei `[4.5, -1.5]` steht ganz im Bild, statt angeschnitten zu
 werden.
 
-### `form`: die beiden Feldvorlagen
+### `form`: die Grundform
 
-| Wert | Feld | Was darauf gezeichnet wird |
+| Wert | Fläche | Was darauf gezeichnet wird |
 |---|---|---|
 | `halle` | 9 × 18 m | Rand, Mittellinie, beide Angriffslinien (3 m vom Netz), Netzband |
 | `beach` | 8 × 16 m | Rand, Netzband, sonst nichts |
+| `frei` | aus `groesse` | nichts, nur die Fläche |
 
 **Im Sand gibt es weder Angriffs- noch Mittellinie.** Eine Linie im Bild, die
 es draußen nicht gibt, ist eine Ansage an Spieler, die niemand einhalten kann.
-Das Netz steht in beiden Vorlagen als Band um die Feldmitte; in der Halle
+Das Netz steht in beiden Feldvorlagen als Band um die Feldmitte; in der Halle
 bleibt die Mittellinie darunter sichtbar, im Sand sieht man auf einen Blick,
 dass da keine ist.
 
 Eine Grundform, die es nicht gibt, bricht mit einer Meldung ab.
+
+### `frei`: die freie Leinwand
+
+Für das, was auf kein Spielfeld passt: ein Stationsbetrieb quer durch die
+Halle, ein Aufbau im Gang, eine Ecke mit drei Kästen. Die Leinwand ist ein
+Stück Boden mit angesagtem Maß:
+
+```yaml
+form: frei
+groesse: [12.0, 9.0]    # Breite und Länge in Metern
+```
+
+Gerechnet wird wie auf dem Feld: Ursprung in der linken unteren Ecke, `x` nach
+rechts, `y` nach oben. Derselbe Aufbau misst hier also dasselbe wie dort, und
+der Wechsel zwischen beiden Grundformen kostet eine Zeile.
+
+**Was aufs Feld passt, gehört aufs Feld.** Dort ist der Maßstab geschenkt. Die
+Leinwand ist für den Rest da.
+
+Die Fläche bekommt keine Linie am Rand und kein Netz. Dass sie trotzdem
+dasteht, sagt in der Halle, wie viel Boden der Aufbau braucht.
+
+Ohne `groesse:` bricht die Szene ab. Eine Feldvorlage nimmt umgekehrt kein
+`groesse:` entgegen: das Hallenfeld misst 9 × 18 m, und eine zweite Zahl
+daneben wäre entweder wirkungslos oder falsch.
 
 ### `bei`, `von`, `nach`: wo etwas ist
 
@@ -102,6 +138,10 @@ Welche der drei Formen erlaubt ist, hängt an der Grundform:
 | `bei: 4` | Positionsnummer 1 bis 6 | nur `halle` |
 | `bei: block` | eine Rolle | nur `beach` |
 | `bei: [3.0, 12.5]` | Meter, x und y | überall |
+
+Auf der freien Leinwand gibt es weder Nummern noch Rollen. Beide beziehen sich
+auf ein Feld, und ohne Feld gibt es nichts, worauf. Dort stehen Orte in Metern
+da.
 
 **Positionsnummern in der Halle.** Die sechs Drittelflächen der eigenen
 Hälfte, nach Volleyballkonvention: hinten 1/6/5, vorne 2/3/4, Position 1 ist
@@ -178,11 +218,87 @@ Fängt ein Weg auf einem Spieler an oder hört auf ihm auf, endet er am Rand des
 Markers. Sonst verschwände die Pfeilspitze unter dem Kreis, und mit ihr das
 Einzige, was die Richtung zeigt.
 
+### `geraete`
+
+```yaml
+geraete:
+  - text: Kasten mit Ballwagen
+    teile:
+      - form: rechteck
+        bei: [2.0, 7.0]
+        groesse: [1.6, 0.8]
+      - form: kreis
+        bei: [2.0, 7.0]
+        groesse: 0.6
+  - text: Zielmatte
+    teile:
+      - form: rechteck
+        bei: [9.5, 6.5]
+        groesse: [2.0, 1.0]
+```
+
+Ein Gerät wird aus Grundformen zusammengesetzt. Es gibt zwei:
+
+| `form` | `bei` | `groesse` |
+|---|---|---|
+| `rechteck` | Mittelpunkt | `[breite, laenge]` in Metern |
+| `kreis` | Mittelpunkt | Durchmesser in Metern, eine Zahl |
+
+Zusammengesetzt statt aufgezählt, weil eine feste Liste von Geräten immer das
+eine nicht kennt, das dieser Aufbau braucht. Zwei Grundformen tragen weit: der
+Ballwagen auf dem Kasten ist ein Rechteck mit einem Kreis darauf, die
+Zielmatte ist ein Rechteck, ein Hütchen ist ein kleiner Kreis.
+
+Alle Teile eines Eintrags gehören zu einem Gerät und bekommen zusammen einen
+Namen. `text` steht **unter** dem Gerät, mittig. Ein Wort wie „Ballwagen" passt
+in keinen Ballwagen. Wer darunter noch eine Maßkette legt, gibt ihr mit
+`versatz` etwas mehr Abstand.
+
+Auch ein Gerät ist maßstäblich. Ein Kasten von 1,6 × 0,8 m ist im Bild so
+lang wie ein Sechstel der Feldbreite.
+
+### `abstaende`
+
+```yaml
+abstaende:
+  - art: masskette
+    von: [6.0, 2.0]
+    nach: [9.0, 2.0]
+    versatz: -0.9
+  - art: pfeil
+    von: 4
+    nach: [1.5, 12.0]
+    text: gut 4 m
+```
+
+| Schlüssel | Bedeutung |
+|---|---|
+| `art` | `masskette` (Linie mit Maßstrichen) oder `pfeil` (Linie mit Spitzen an beiden Enden) |
+| `von`, `nach` | die beiden Orte, deren Abstand gemeint ist, in den drei Formen von oben |
+| `versatz` | wie weit die Linie danebengerückt wird, in Metern, optional |
+| `text` | die Beschriftung, optional |
+
+**Maßstäblich ist beides.** Maßkette und Pfeil zeichnen dieselbe Strecke und
+unterscheiden sich allein an den Enden. Welche der beiden übersichtlicher ist,
+hängt am Anwendungsfall. Der Pfeil trägt an beiden Enden eine Spitze; einfach
+bepfeilt läse er sich als Weg.
+
+Ohne `text` steht da, was gemessen wurde: `6 m`, `4,5 m`. Wer selbst etwas
+hinschreibt, verantwortet es. Gezeichnet wird in beiden Fällen die Strecke
+zwischen `von` und `nach`.
+
+`versatz` rückt die Linie zur Seite, ohne sie zu kürzen. Positiv heißt nach
+**links**, vom Gang `von` → `nach` aus gesehen, genau wie bei `bogen`. Zwei
+gestrichelte Maßhilfslinien halten die verschobene Linie an dem fest, was sie
+misst. Das braucht man, sobald eine Kette sonst quer durch die Marker liefe,
+deren Abstand sie angibt.
+
 ## Farben
 
 Das Bild bringt beide Farbschemata mit und schaltet mit dem Gerät um, genau wie
 die Leseansicht, in der es steckt. Die Farben stehen als CSS-Variablen im Bild:
-`--papier`, `--feld`, `--strich`, `--gedaempft`, `--laufweg`, `--ballweg`.
+`--papier`, `--feld`, `--strich`, `--gedaempft`, `--laufweg`, `--ballweg`,
+`--geraet`.
 
 In der Szene stehen keine Farben. Wer eine braucht, ändert die Palette in
 `scripts/schaubild.py`. Dann ändern sich alle Bilder mit, und so ist es
@@ -199,6 +315,9 @@ als `<img>` ein, und darin gibt es keine Elternfarbe, die färben könnte.
   Gegenseite nur so weit, wie sie gebraucht wird.
 - **Beach:** dieselbe Szene mit `form: beach`; Plätze über Rollen statt über
   Nummern.
+- **Stationsbetrieb:** aufs Feld, solange er hineinpasst. Sonst `form: frei`
+  mit dem Maß des Hallenteils, Geräte für den Aufbau und Maßketten für die
+  Abstände, die in der Halle abgeschritten werden.
 
 Beschriftungen kurz halten. Das Schaubild ergänzt den Text der Übungskarte, es
 ersetzt ihn nicht.
@@ -208,11 +327,6 @@ ersetzt ihn nicht.
 Das Vokabular wächst mit den nächsten Schritten des Bild-Astes. Das Folgende
 gibt es heute noch nicht, und eine Szene, die es verwendet, bricht ab:
 
-- eine freie Leinwand ohne Spielfeld, für einen Stationsbetrieb, der nicht
-  hineinpasst
-- Geräte (Kasten, Ballwagen, Zielmatte) und Zonen als Fläche
-- Maßketten und beschriftete Abstandsangaben
-- Titel, Legendenspalte und Fußzeile
-
-Ein Stationsaufbau, der aufs Feld passt, wird schon heute aufs Feld gezeichnet
-und hat seinen Maßstab damit geschenkt.
+- Titel, Untertitel, Legendenspalte und Fußzeile
+- Zonen als Fläche mit Rand und Beschriftung, als eigene Sorte mit eigener
+  Darstellung

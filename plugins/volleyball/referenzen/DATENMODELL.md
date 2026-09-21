@@ -172,8 +172,11 @@ Szene. Zeigt er ins Leere, meldet `index.py` das. Das Feld trägt einen
 Dateinamen und schreibt keine Endung vor: ältere Schaubilder ohne Szene bleiben
 liegen, wie sie sind.
 
-Die Grundform einer Szene ist eine **Feldvorlage**: Halle 9×18 m mit Netz und
-beiden Angriffslinien, Beach 8×16 m mit Netz und sonst nichts.
+Die **Grundform** einer Szene ist eine **Feldvorlage** oder eine **freie
+Leinwand**. Als Feldvorlage gibt es Halle 9×18 m mit Netz und beiden
+Angriffslinien und Beach 8×16 m mit Netz und sonst nichts. Die freie Leinwand
+trägt ihr Maß in Metern und hat kein Feld darunter. Sie ist für den
+Stationsaufbau da, der auf kein Feld passt.
 
 Die Szene wird **nicht vom Linter geprüft.** Sie prüft sich beim Rendern
 selbst, und was nicht rendert, wird nicht geschrieben.

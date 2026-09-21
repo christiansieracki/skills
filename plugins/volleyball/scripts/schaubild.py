@@ -29,7 +29,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from szene import Ort, Szene, SzeneFehler, Weg, lies_szene, scheitel  # noqa: E402
+from szene import (Feldvorlage, Ort, Szene, SzeneFehler, Weg,  # noqa: E402
+                   lies_szene, normale, scheitel)
 from tpdaten import finde_wurzel, konsole_vorbereiten  # noqa: E402
 
 # Zeicheneinheiten je Meter. Die Zahl steht genau einmal im Plugin; alles
@@ -48,6 +49,21 @@ LUFT = 0.8
 # wie ein Mensch von oben Platz braucht, und damit massstaeblich statt geraten.
 MARKER = 0.45
 
+# Laenge eines Massstrichs quer zur Masslinie, in Metern. Ein Strich, kein
+# Balken: er markiert das Ende einer Masskette, ohne mit dem Aufbau um
+# Aufmerksamkeit zu streiten.
+MASSSTRICH = 0.5
+
+# Schriftgroesse der kleinen Beschriftungen an Geraeten und Abstaenden, in
+# Zeicheneinheiten. Sie steht einmal da und geht von hier sowohl ins Stylesheet
+# als auch in die Rechnung, wie viel Platz ein Wort neben dem Aufbau braucht.
+KLEINSCHRIFT = 13
+
+# Wie breit ein Zeichen im Verhaeltnis zu seiner Hoehe ungefaehr ist. Geschaetzt
+# und eher zu breit: ein angeschnittenes Wort ist schlimmer als ein Finger Luft
+# zu viel.
+ZEICHENBREITE = 0.6
+
 # Die Farben. Zwei Saetze derselben Namen, einer je Schema, damit das Bild in
 # einer hellen wie in einer dunklen Leseansicht lesbar bleibt. Die Werte sind
 # die aus leseansicht.py, damit Schaubild und Blatt nicht zwei Handschriften
@@ -59,6 +75,7 @@ HELL = {
     "gedaempft": "#6b6560",
     "laufweg": "#8a5a2b",
     "ballweg": "#2b5a8a",
+    "geraet": "#efebe4",
 }
 DUNKEL = {
     "papier": "#171614",
@@ -67,6 +84,7 @@ DUNKEL = {
     "gedaempft": "#9a938c",
     "laufweg": "#d6a36b",
     "ballweg": "#7fb0dd",
+    "geraet": "#2e2a25",
 }
 
 
@@ -99,12 +117,18 @@ class Blatt:
 
 
 def grenzen(s: Szene) -> tuple[float, float, float, float]:
-    """Der Ausschnitt in Metern: das Feld mit Rand, erweitert um alles Weitere."""
-    xs = [-RAND, s.vorlage.breite + RAND]
-    ys = [-RAND, s.vorlage.laenge + RAND]
+    """Der Ausschnitt in Metern: die Grundform mit Rand, erweitert um alles Weitere."""
+    xs = [-RAND, s.grundform.breite + RAND]
+    ys = [-RAND, s.grundform.laenge + RAND]
     for x, y in s.punkte():
         xs += [x - LUFT, x + LUFT]
         ys += [y - LUFT, y + LUFT]
+    # Eine Beschriftung braucht Platz nach ihrer Laenge und nicht nach LUFT.
+    hoch = KLEINSCHRIFT / MASSSTAB / 2
+    for text, (x, y) in s.beschriftungen():
+        breit = len(text) * KLEINSCHRIFT * ZEICHENBREITE / MASSSTAB / 2
+        xs += [x - breit, x + breit]
+        ys += [y - hoch, y + hoch]
     return min(xs), min(ys), max(xs), max(ys)
 
 
@@ -135,34 +159,68 @@ def stil() -> str:
         + "@media (prefers-color-scheme:dark){" + farbblock(DUNKEL) + "}"
         + ".papier{fill:var(--papier)}"
         + ".feld{fill:var(--feld);stroke:var(--strich);stroke-width:2.4}"
+        # Die Leinwand bekommt keinen Rand. Sie ist ein Stueck Boden und kein
+        # Feld; eine Linie im Bild, die es in der Halle nicht gibt, ist eine
+        # Ansage, die niemand einhalten kann.
+        + ".leinwand{fill:var(--feld)}"
         + ".linie{fill:none;stroke:var(--strich);stroke-width:1.4}"
         + ".netz{fill:none;stroke:var(--gedaempft);stroke-width:1.4;stroke-dasharray:7 5}"
         + ".marker{fill:var(--feld);stroke:var(--strich);stroke-width:1.8}"
-        + ".beschriftung{fill:var(--strich);font-family:"
-          "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"
-          "font-weight:600;text-anchor:middle;dominant-baseline:central}"
+        + ".teil{fill:var(--geraet);stroke:var(--gedaempft);stroke-width:1.6}"
+        + "text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,"
+          "sans-serif;font-weight:600;text-anchor:middle;dominant-baseline:central}"
+        + ".beschriftung{fill:var(--strich)}"
+        + f".geraetname{{fill:var(--gedaempft);font-size:{KLEINSCHRIFT}}}"
         + ".weg{fill:none;stroke-width:2.6;stroke-linecap:round}"
         + ".laufweg{stroke:var(--laufweg)}"
         + ".ballweg{stroke:var(--ballweg);stroke-dasharray:9 6}"
+        # Die Linie einer Abstandsangabe tritt zurueck, die Zahl nicht:
+        # gelesen wird die Zahl, die Linie sagt nur, wozu sie gehoert.
+        + ".masslinie{fill:none;stroke:var(--gedaempft);stroke-width:1.4}"
+        + ".massstrich{stroke:var(--gedaempft);stroke-width:1.8}"
+        + ".masshilfslinie{stroke:var(--gedaempft);stroke-width:1;"
+          "stroke-dasharray:4 4}"
+        + f".massbeschriftung{{fill:var(--strich);font-size:{KLEINSCHRIFT}}}"
     )
 
 
 def spitzen() -> str:
-    """Je Wegart eine Pfeilspitze.
+    """Je Sorte Pfeil eine Spitze.
 
-    Zwei statt einer, weil eine SVG-Markierung die Strichfarbe ihres Pfades
-    nicht erbt. Eine gemeinsame Spitze haette am Ballweg die Farbe des
-    Laufwegs.
+    Eine je Sorte statt einer gemeinsamen, weil eine SVG-Markierung die
+    Strichfarbe ihres Pfades nicht erbt. Eine gemeinsame Spitze haette am
+    Ballweg die Farbe des Laufwegs und am Abstandspfeil ebenfalls.
     """
     teile = ["<defs>"]
-    for art in ("laufweg", "ballweg"):
+    for art, farbe in (("laufweg", "laufweg"), ("ballweg", "ballweg"),
+                       ("mass", "gedaempft")):
         teile.append(
             f'<marker id="spitze-{art}" viewBox="0 0 10 10" refX="9" refY="5" '
             f'markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse">'
-            f'<path d="M0 0 L10 5 L0 10 Z" fill="var(--{art})"/></marker>'
+            f'<path d="M0 0 L10 5 L0 10 Z" fill="var(--{farbe})"/></marker>'
         )
     teile.append("</defs>")
     return "".join(teile)
+
+
+def untergrund(s: Szene, blatt: Blatt) -> str:
+    """Was unter dem Aufbau liegt: ein Spielfeld oder die freie Leinwand."""
+    return (feld(s, blatt) if isinstance(s.grundform, Feldvorlage)
+            else leinwand(s, blatt))
+
+
+def leinwand(s: Szene, blatt: Blatt) -> str:
+    """Die freie Leinwand: die Flaeche in der angesagten Groesse, sonst nichts.
+
+    Keine Linie am Rand und kein Netz. Dass die Flaeche trotzdem dasteht, sagt
+    dem Trainer, wie viel Boden der Aufbau braucht, und dem Bild seinen
+    Massstab.
+    """
+    g = s.grundform
+    return (f'<rect class="leinwand" x="{koord(blatt.x(0))}" '
+            f'y="{koord(blatt.y(g.laenge))}" '
+            f'width="{koord(blatt.laenge(g.breite))}" '
+            f'height="{koord(blatt.laenge(g.laenge))}"/>')
 
 
 def feld(s: Szene, blatt: Blatt) -> str:
@@ -172,7 +230,7 @@ def feld(s: Szene, blatt: Blatt) -> str:
     Angriffs- noch Mittellinie, und eine Linie im Bild, die es draussen nicht
     gibt, ist eine Ansage, die niemand einhalten kann.
     """
-    v = s.vorlage
+    v = s.grundform
     teile = [f'<g class="feldvorlage {v.name}">']
     teile.append(
         f'<rect class="feld" x="{koord(blatt.x(0))}" y="{koord(blatt.y(v.laenge))}" '
@@ -271,6 +329,85 @@ def pfad(weg: Weg, blatt: Blatt, besetzt: list[Ort]) -> str:
             f'marker-end="url(#spitze-{weg.art})"/>')
 
 
+def geraete(s: Szene, blatt: Blatt) -> str:
+    """Die Geraete, jedes aus seinen Teilen und mit seinem Namen darunter.
+
+    Die Teile stehen in derselben Gruppe, damit ein Ballwagen auf einem Kasten
+    ein Geraet ist und nicht zwei Formen mit einem Namen dazwischen.
+    """
+    stuecke = []
+    for geraet in s.geraete:
+        stuecke.append('<g class="geraet">')
+        for teil in geraet.teile:
+            x, y = teil.bei
+            if teil.form == "kreis":
+                stuecke.append(
+                    f'<circle class="teil" cx="{koord(blatt.x(x))}" '
+                    f'cy="{koord(blatt.y(y))}" '
+                    f'r="{koord(blatt.laenge(teil.breite / 2))}"/>')
+            else:
+                stuecke.append(
+                    f'<rect class="teil" x="{koord(blatt.x(x - teil.breite / 2))}" '
+                    f'y="{koord(blatt.y(y + teil.laenge / 2))}" '
+                    f'width="{koord(blatt.laenge(teil.breite))}" '
+                    f'height="{koord(blatt.laenge(teil.laenge))}"/>')
+        if geraet.text:
+            nx, ny = geraet.name_bei
+            stuecke.append(
+                f'<text class="geraetname" x="{koord(blatt.x(nx))}" '
+                f'y="{koord(blatt.y(ny))}">{html.escape(geraet.text)}</text>')
+        stuecke.append("</g>")
+    return "".join(stuecke)
+
+
+def strecke(klasse: str, blatt: Blatt, von: Ort, nach: Ort, zusatz: str = "") -> str:
+    """Eine gerade Linie zwischen zwei Orten in Metern."""
+    return (f'<line class="{klasse}" x1="{koord(blatt.x(von[0]))}" '
+            f'y1="{koord(blatt.y(von[1]))}" x2="{koord(blatt.x(nach[0]))}" '
+            f'y2="{koord(blatt.y(nach[1]))}"{zusatz}/>')
+
+
+def abstaende(s: Szene, blatt: Blatt) -> str:
+    """Die Abstandsangaben: Massketten und beschriftete Pfeile.
+
+    Beide zeichnen dieselbe Strecke und unterscheiden sich allein an den
+    Enden. Dass ein Abstand massstaeblich stimmt, ist damit keine Frage der
+    Sorgfalt, sondern eine Folge des Aufbaus: die Laenge entsteht an einer
+    Stelle, und die ist fuer beide Darstellungen dieselbe.
+
+    Der Pfeil traegt an beiden Enden eine Spitze. Einfach bepfeilt laese er
+    sich als Weg, und dann stuende eine Bewegung im Bild, die niemand gemeint
+    hat.
+    """
+    stuecke = []
+    for abstand in s.abstaende:
+        a, b = abstand.enden
+        nx, ny = normale(abstand.von, abstand.nach)
+        stuecke.append(f'<g class="abstand {abstand.art}">')
+        if abstand.versatz:
+            # Die Masshilfslinien halten die verschobene Linie an dem fest,
+            # was sie misst. Ohne sie schwebte eine Zahl neben dem Aufbau.
+            stuecke.append(strecke("masshilfslinie", blatt, abstand.von, a))
+            stuecke.append(strecke("masshilfslinie", blatt, abstand.nach, b))
+        if abstand.art == "masskette":
+            for punkt in (a, b):
+                stuecke.append(strecke(
+                    "massstrich", blatt,
+                    (punkt[0] - nx * MASSSTRICH / 2, punkt[1] - ny * MASSSTRICH / 2),
+                    (punkt[0] + nx * MASSSTRICH / 2, punkt[1] + ny * MASSSTRICH / 2)))
+            enden = ""
+        else:
+            enden = (' marker-start="url(#spitze-mass)"'
+                     ' marker-end="url(#spitze-mass)"')
+        stuecke.append(strecke("masslinie", blatt, a, b, enden))
+        tx, ty = abstand.text_bei
+        stuecke.append(
+            f'<text class="massbeschriftung" x="{koord(blatt.x(tx))}" '
+            f'y="{koord(blatt.y(ty))}">{html.escape(abstand.text)}</text>')
+        stuecke.append("</g>")
+    return "".join(stuecke)
+
+
 def marker(s: Szene, blatt: Blatt) -> str:
     """Die Spielermarker samt Beschriftung.
 
@@ -302,7 +439,12 @@ def zeichne(s: Szene) -> str:
         f"<style>{stil()}</style>",
         spitzen(),
         '<rect class="papier" x="0" y="0" width="100%" height="100%"/>',
-        feld(s, blatt),
+        untergrund(s, blatt),
+        # Geraete unter die Abstandsangaben, die Abstandsangaben unter die
+        # Wege: von unten nach oben wird das Bild von dem, was steht, zu dem,
+        # was passiert. Was zuletzt kommt, bleibt sichtbar.
+        geraete(s, blatt),
+        abstaende(s, blatt),
     ]
     # Wege unter die Marker: ein Pfeil, der einen Spieler streift, soll nicht
     # quer durch sein Kuerzel laufen. Wer auf einem Spieler anfaengt oder

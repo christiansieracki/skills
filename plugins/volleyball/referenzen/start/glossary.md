@@ -43,10 +43,18 @@ Wer in die Leseansicht tippt, verliert seine Änderung beim nächsten Erzeugen.
 |---|---|---|
 | **Szene** | Die Beschreibung eines Schaubildes in YAML, in Metern gerechnet. Das ist die Quelle, hier wird geändert. | `schaubilder/ue-0042.szene.yml` |
 | **Schaubild** | Das Bild, das daraus entsteht. Ein Erzeugnis: es wird beim nächsten Mal überschrieben. | `schaubilder/ue-0042.svg` |
-| **Feldvorlage** | Die Grundform einer Szene: Halle 9×18 m oder Beach 8×16 m, mit den Linien, die es dort wirklich gibt. | in der Szene, als `form:` |
+| **Grundform** | Worauf eine Szene gezeichnet wird: eine Feldvorlage oder eine freie Leinwand. | in der Szene, als `form:` |
+| **Feldvorlage** | Ein Spielfeld als Grundform: Halle 9×18 m oder Beach 8×16 m, mit den Linien, die es dort wirklich gibt. | `form: halle`, `form: beach` |
+| **freie Leinwand** | Eine Fläche mit angesagtem Maß in Metern, ohne Spielfeld darauf. Für einen Aufbau, der auf kein Feld passt. | `form: frei` mit `groesse:` |
+| **Gerät** | Ein Kasten, ein Ballwagen, eine Zielmatte im Schaubild, aus Rechtecken und Kreisen zusammengesetzt und beschriftet. | in der Szene, unter `geraete:` |
+| **Maßkette** | Eine Abstandsangabe als Linie mit Maßstrichen und der gemessenen Zahl. Der beschriftete Pfeil daneben zeigt denselben Abstand anders. | in der Szene, unter `abstaende:` |
 
 Dasselbe Verhältnis wie zwischen Trainingsplan und Leseansicht: Wer in das SVG
 tippt, verliert es beim nächsten Erzeugen. Änderungen gehören in die Szene.
+
+Was aufs Feld passt, wird aufs Feld gezeichnet und hat seinen Maßstab damit
+geschenkt. Die freie Leinwand ist für den Rest da. Maßstäblich sind beide, und
+eine Abstandsangabe darin auch.
 
 Plätze heißen in der Halle nach ihrer **Positionsnummer** 1 bis 6, im Sand nach
 einer **Rolle**. Im Sand gibt es keine Rotation, auf die sich eine Nummer

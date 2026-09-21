@@ -209,7 +209,7 @@ ROLLEN_KUERZEL = {
 
 @dataclass(frozen=True)
 class Feldvorlage:
-    """Eine Grundform: Masse in Metern und die Linien, die es darauf gibt.
+    """Ein Spielfeld: Masse in Metern und die Linien, die es darauf gibt.
 
     Der Ursprung liegt in der linken unteren Ecke des Feldes. x waechst nach
     rechts, y zur Gegenseite hin. Das Netz liegt auf halber Laenge.
@@ -251,6 +251,48 @@ FELDVORLAGEN = {
     ),
 }
 
+# Der Name der freien Leinwand in `form:`. Sie steht neben den Feldvorlagen
+# und nicht darunter: eine Feldvorlage ist eine Grundform unter anderen, kein
+# Normalfall mit einer Ausnahme daneben.
+FREI = "frei"
+
+
+@dataclass(frozen=True)
+class Leinwand:
+    """Eine freie Flaeche in Metern, ohne Spielfeld darauf.
+
+    Fuer das, was auf kein Feld passt: ein Stationsbetrieb quer durch die
+    Halle, ein Aufbau im Gang, eine Ecke mit drei Kaesten. Der Ursprung liegt
+    wie beim Feld in der linken unteren Ecke, x waechst nach rechts, y nach
+    oben. Damit misst derselbe Aufbau hier dasselbe wie dort, und der Wechsel
+    zwischen beiden Grundformen kostet eine Zeile.
+
+    Was aufs Feld passt, gehoert aufs Feld: dort ist der Massstab geschenkt.
+    Die Leinwand ist der Ausnahmefall, nicht der bequemere Weg.
+
+    Positionsnummern und Rollen gibt es hier nicht. Beide beziehen sich auf ein
+    Feld, und ohne Feld gibt es nichts, worauf. Sie stehen trotzdem als leere
+    Abbildungen da, damit `ort()` beide Grundformen gleich behandelt.
+    """
+
+    breite: float
+    laenge: float
+    name: str = FREI
+
+    @property
+    def positionen(self) -> dict[int, Ort]:
+        return {}
+
+    @property
+    def rollen(self) -> dict[str, Ort]:
+        return {}
+
+
+# Die Grundform einer Szene: ein Spielfeld oder die freie Leinwand. Beide
+# tragen name, breite, laenge, positionen und rollen; mehr braucht weder das
+# Einlesen noch das Zeichnen von einer Grundform zu wissen.
+Grundform = Feldvorlage | Leinwand
+
 
 # --------------------------------------------------------------------------
 # Was in einer Szene steht
@@ -271,23 +313,156 @@ class Weg:
     bogen: float  # Pfeilhoehe in Metern, 0 heisst gerade
 
 
+# Der Abstand der Geraetebeschriftung unter dem Geraet, in Metern.
+NAMENSABSTAND = 0.55
+
+# Der Abstand der Massbeschriftung neben ihrer Linie, in Metern.
+TEXTABSTAND = 0.45
+
+TEILFORMEN = ("rechteck", "kreis")
+
+
+@dataclass
+class Teil:
+    """Eine Grundform eines Geraetes, in Metern: Mittelpunkt und Masse.
+
+    Ein Kreis traegt seinen Durchmesser in beiden Massen. Das spart die zweite
+    Sorte Teil und kostet nichts: wer `breite` liest, bekommt bei beiden
+    Formen die Ausdehnung in x.
+    """
+
+    form: str     # rechteck | kreis
+    bei: Ort
+    breite: float
+    laenge: float
+
+    @property
+    def rahmen(self) -> tuple[float, float, float, float]:
+        """Links, unten, rechts, oben in Metern."""
+        x, y = self.bei
+        return (x - self.breite / 2, y - self.laenge / 2,
+                x + self.breite / 2, y + self.laenge / 2)
+
+
+@dataclass
+class Geraet:
+    """Ein Kasten, ein Ballwagen, eine Zielmatte: Teile mit einem Namen.
+
+    Zusammengesetzt statt aufgezaehlt, weil eine feste Liste von Geraeten
+    immer das eine nicht kennt, das dieser Aufbau braucht. Zwei Grundformen
+    tragen weit: der Ballwagen auf dem Kasten ist ein Rechteck mit einem Kreis
+    darauf, und die Zielmatte ist ein Rechteck.
+    """
+
+    teile: list[Teil]
+    text: str
+
+    @property
+    def rahmen(self) -> tuple[float, float, float, float]:
+        """Der Kasten um alle Teile, links, unten, rechts, oben in Metern."""
+        ecken = [teil.rahmen for teil in self.teile]
+        return (min(e[0] for e in ecken), min(e[1] for e in ecken),
+                max(e[2] for e in ecken), max(e[3] for e in ecken))
+
+    @property
+    def name_bei(self) -> Ort:
+        """Wo die Beschriftung steht: mittig unter dem Geraet.
+
+        Unter dem Geraet und nicht darin. Ein Wort wie "Ballwagen" passt in
+        keinen Ballwagen, und halb verdeckt ist es schlechter zu lesen als
+        daneben. Wer dieselbe Regel fuer alle Geraete nimmt, bekommt ausserdem
+        ein Bild, in dem die Namen auf einer Hoehe stehen statt jeder woanders.
+        """
+        links, unten, rechts, _ = self.rahmen
+        return ((links + rechts) / 2, unten - NAMENSABSTAND)
+
+    def punkte(self) -> list[Ort]:
+        links, unten, rechts, oben = self.rahmen
+        return [(links, unten), (rechts, oben)]
+
+
+@dataclass
+class Abstand:
+    """Eine Abstandsangabe zwischen zwei Orten, in Metern.
+
+    `von` und `nach` sind die Orte, deren Abstand gemeint ist. Die Enden der
+    gezeichneten Linie liegen um `versatz` daneben, damit eine Kette nicht quer
+    durch die Marker laeuft, deren Abstand sie angibt. Gemessen und beschriftet
+    wird trotzdem die Strecke zwischen `von` und `nach`: ein Schaubild, dessen
+    Abstaende luegen, ist schlimmer als eines ohne Abstaende.
+    """
+
+    art: str       # masskette | pfeil
+    von: Ort
+    nach: Ort
+    versatz: float  # Meter nach links, vom Gang von -> nach aus gesehen
+    text: str
+
+    @property
+    def enden(self) -> tuple[Ort, Ort]:
+        """Die beiden Enden der gezeichneten Linie, um den Versatz verschoben."""
+        nx, ny = normale(self.von, self.nach)
+        return ((self.von[0] + nx * self.versatz, self.von[1] + ny * self.versatz),
+                (self.nach[0] + nx * self.versatz, self.nach[1] + ny * self.versatz))
+
+    @property
+    def text_bei(self) -> Ort:
+        """Wo die Zahl steht: neben der Mitte der Linie.
+
+        Auf der Seite, auf die auch der Versatz zeigt. Sonst landete die Zahl
+        zwischen der Linie und dem, was sie misst, also genau dort, wo schon
+        etwas steht.
+        """
+        (ax, ay), (bx, by) = self.enden
+        nx, ny = normale(self.von, self.nach)
+        weite = TEXTABSTAND if self.versatz >= 0 else -TEXTABSTAND
+        return ((ax + bx) / 2 + nx * weite, (ay + by) / 2 + ny * weite)
+
+    def punkte(self) -> list[Ort]:
+        return [self.von, self.nach, *self.enden]
+
+
+def meterangabe(laenge: float) -> str:
+    """Eine Laenge als Text, wie sie in der Halle gesagt wird: "6 m", "4,5 m"."""
+    gerundet = round(laenge, 1)
+    zahl = f"{gerundet:g}".replace(".", ",")
+    return f"{zahl} m"
+
+
 @dataclass
 class Szene:
-    vorlage: Feldvorlage
+    grundform: Grundform
     spieler: list[Spieler] = field(default_factory=list)
     wege: list[Weg] = field(default_factory=list)
+    geraete: list[Geraet] = field(default_factory=list)
+    abstaende: list[Abstand] = field(default_factory=list)
 
     def punkte(self) -> list[Ort]:
         """Alles, was auf dem Blatt Platz braucht, in Metern.
 
         Damit waechst die Zeichenflaeche um das herum, was ausserhalb des
-        Feldes steht, etwa ein Aufschlagspieler hinter der Grundlinie. Ihn
-        abzuschneiden waere die stillste aller Fehlermeldungen.
+        Feldes steht, etwa ein Aufschlagspieler hinter der Grundlinie, ein
+        Kasten neben der Seitenlinie oder die Zahl einer Masskette. Etwas
+        davon abzuschneiden waere die stillste aller Fehlermeldungen.
         """
         gesammelt = [(s.x, s.y) for s in self.spieler]
         for weg in self.wege:
             gesammelt.extend([weg.von, weg.nach, scheitel(weg.von, weg.nach, weg.bogen)])
+        for geraet in self.geraete:
+            gesammelt.extend(geraet.punkte())
+        for abstand in self.abstaende:
+            gesammelt.extend(abstand.punkte())
         return gesammelt
+
+    def beschriftungen(self) -> list[tuple[str, Ort]]:
+        """Die Texte neben dem Aufbau, je mit dem Ort, an dem sie stehen.
+
+        Auch sie brauchen Platz im Bild, und wie viel, haengt an der
+        Schriftgroesse. Die kennt schaubild.py. Hier steht deshalb nur, was wo
+        steht; wie breit es wird, rechnet der Zeichner aus.
+        """
+        texte = [(g.text, g.name_bei) for g in self.geraete if g.text]
+        return texte + [(a.text, a.text_bei) for a in self.abstaende if a.text]
 
 
 def scheitel(von: Ort, nach: Ort, bogen: float) -> Ort:
@@ -319,10 +494,14 @@ def normale(von: Ort, nach: Ort) -> Ort:
 # Einlesen
 # --------------------------------------------------------------------------
 
-SZENE_SCHLUESSEL = {"form", "spieler", "wege"}
+SZENE_SCHLUESSEL = {"form", "groesse", "spieler", "wege", "geraete", "abstaende"}
 SPIELER_SCHLUESSEL = {"bei", "text"}
 WEG_SCHLUESSEL = {"art", "von", "nach", "bogen"}
 WEGARTEN = ("laufweg", "ballweg")
+GERAET_SCHLUESSEL = {"text", "teile"}
+TEIL_SCHLUESSEL = {"form", "bei", "groesse"}
+ABSTAND_SCHLUESSEL = {"art", "von", "nach", "versatz", "text"}
+ABSTANDSARTEN = ("masskette", "pfeil")
 
 
 def _pruefe_schluessel(werte: dict, erlaubt: set[str], wo: str) -> None:
@@ -354,13 +533,93 @@ def _als_liste(wert, wo: str) -> list:
     return wert
 
 
-def ort(wert, vorlage: Feldvorlage, wo: str) -> Ort:
+def _als_zahl(wert, wo: str, was: str) -> float:
+    """Eine Zahl in Metern. `bool` ist in Python eine Zahl, hier aber keine."""
+    if not isinstance(wert, (int, float)) or isinstance(wert, bool):
+        raise SzeneFehler(f"{wo}: {wert!r} ist {was}.")
+    return float(wert)
+
+
+def _masse(wert, wo: str) -> tuple[float, float]:
+    """Ein Paar `[breite, laenge]` in Metern, beides groesser als null."""
+    if not isinstance(wert, list) or len(wert) != 2:
+        raise SzeneFehler(
+            f"{wo}: {wert!r} sind keine Masse. Erwartet wird [breite, laenge] "
+            f"in Metern."
+        )
+    breite = _als_zahl(wert[0], wo, "keine Breite in Metern")
+    laenge = _als_zahl(wert[1], wo, "keine Laenge in Metern")
+    if breite <= 0 or laenge <= 0:
+        raise SzeneFehler(
+            f"{wo}: [{breite:g}, {laenge:g}] misst nichts. Breite und Laenge "
+            f"sind groesser als null."
+        )
+    return breite, laenge
+
+
+def grundformen() -> list[str]:
+    """Alles, was in `form:` stehen darf."""
+    return sorted([*FELDVORLAGEN, FREI])
+
+
+def lies_grundform(name, groesse) -> Grundform:
+    """Loest `form:` und `groesse:` zur Grundform der Szene auf.
+
+    Die beiden Schluessel gehoeren zusammen und werden deshalb zusammen
+    geprueft. Ein Mass neben einer Feldvorlage waere entweder wirkungslos oder
+    falsch, und beides faellt niemandem auf; eine Leinwand ohne Mass haette
+    keinen Massstab, den man ihr ansehen koennte.
+    """
+    if name == FREI:
+        if groesse is None:
+            raise SzeneFehler(
+                f"Die freie Leinwand braucht ein Mass: `groesse: [breite, "
+                f"laenge]` in Metern. Ohne das waere der Massstab geraten, und "
+                f"ein Schaubild, dessen Abstaende luegen, ist schlimmer als "
+                f"eines ohne Abstaende."
+            )
+        return Leinwand(*_masse(groesse, "Die Leinwand"))
+
+    if name not in FELDVORLAGEN:
+        raise SzeneFehler(
+            f"Die Grundform {name!r} gibt es nicht. Es gibt "
+            f"{', '.join(grundformen())}."
+        )
+    vorlage = FELDVORLAGEN[name]
+    if groesse is not None:
+        raise SzeneFehler(
+            f"Das Feld {name!r} misst {vorlage.breite:g} x {vorlage.laenge:g} m. "
+            f"`groesse:` gibt es nur bei der freien Leinwand ({FREI!r}), die "
+            f"kein Feld unter sich hat."
+        )
+    return vorlage
+
+
+def _ortsformen(grundform: Grundform) -> str:
+    """Wie ein Ort in dieser Grundform genannt werden darf.
+
+    Zusammengesetzt aus dem, was die Grundform hergibt, statt je Fall
+    ausgeschrieben. Sonst stuende in der Meldung zur freien Leinwand ein
+    Hinweis auf Positionsnummern, die es dort gerade nicht gibt.
+    """
+    formen = []
+    if grundform.positionen:
+        formen.append("eine Positionsnummer ("
+                      + ", ".join(str(p) for p in sorted(grundform.positionen)) + ")")
+    if grundform.rollen:
+        formen.append("eine Rolle (" + ", ".join(sorted(grundform.rollen)) + ")")
+    formen.append("[x, y] in Metern")
+    return "Moeglich ist: " + ", ".join(formen) + "."
+
+
+def ort(wert, grundform: Grundform, wo: str) -> Ort:
     """Loest `bei:`, `von:` und `nach:` zu einem Punkt in Metern auf.
 
     Es gibt genau einen Weg, einen Ort zu nennen, und er sieht ueberall gleich
     aus: eine Zahl ist eine Positionsnummer, ein Wort ist eine Rolle, ein Paar
     in eckigen Klammern sind Meter. Welche der drei Formen erlaubt ist, sagt
-    die Grundform. Nummern gibt es nur in der Halle, Rollen nur im Sand.
+    die Grundform. Nummern gibt es nur in der Halle, Rollen nur im Sand, und
+    auf der freien Leinwand gibt es weder das eine noch das andere.
     """
     if wert is None:
         raise SzeneFehler(f"{wo}: es fehlt die Angabe, wo das ist.")
@@ -378,38 +637,42 @@ def ort(wert, vorlage: Feldvorlage, wo: str) -> Ort:
 
     if isinstance(wert, (int, float)):
         nummer = int(wert)
-        if not vorlage.positionen:
+        if not grundform.positionen:
+            grund = ("Im Sand wird nicht rotiert, also bezieht sich keine Nummer "
+                     "auf etwas." if grundform.rollen else
+                     "Ohne Feld gibt es nichts, worauf sich eine Nummer beziehen "
+                     "koennte.")
             raise SzeneFehler(
-                f"{wo}: Positionsnummern gibt es auf dem Feld {vorlage.name!r} "
-                f"nicht. Im Sand wird nicht rotiert, also bezieht sich keine "
-                f"Nummer auf etwas. Einen Platz hier ueber eine Rolle nennen "
-                f"({', '.join(sorted(vorlage.rollen))}) oder ueber [x, y] in Metern."
+                f"{wo}: Positionsnummern gibt es in der Grundform "
+                f"{grundform.name!r} nicht. {grund} {_ortsformen(grundform)}"
             )
-        if nummer != wert or nummer not in vorlage.positionen:
+        if nummer != wert or nummer not in grundform.positionen:
             raise SzeneFehler(
                 f"{wo}: {wert!r} ist keine Position. Es gibt die Positionen "
-                f"{', '.join(str(p) for p in sorted(vorlage.positionen))}."
+                f"{', '.join(str(p) for p in sorted(grundform.positionen))}."
             )
-        return vorlage.positionen[nummer]
+        return grundform.positionen[nummer]
 
     name = str(wert)
-    if not vorlage.rollen:
-        hinweis = (f"Einen Platz hier ueber eine Positionsnummer nennen "
-                   f"({', '.join(str(p) for p in sorted(vorlage.positionen))}) "
-                   f"oder ueber [x, y] in Metern.")
-        if name.isdigit():
+    if not grundform.rollen:
+        if name.isdigit() and grundform.positionen:
             raise SzeneFehler(f"{wo}: {name!r} steht in Anfuehrungszeichen und gilt "
                               f"damit als Rolle. Als Position ohne sie schreiben.")
+        # Warum es sie nicht gibt, haengt an der Grundform. Auf der Leinwand
+        # traegt gar kein Platz einen Namen, und ein Hinweis auf den Sand
+        # schickte den Leser in die falsche Richtung.
+        grund = ("Rollen benennen Plaetze nur im Sand." if grundform.positionen
+                 else "Ohne Feld traegt kein Platz einen Namen.")
         raise SzeneFehler(
-            f"{wo}: Rollen benennen Plaetze nur im Sand, nicht auf dem Feld "
-            f"{vorlage.name!r}. {hinweis}"
+            f"{wo}: In der Grundform {grundform.name!r} gibt es keine Rollen. "
+            f"{grund} {_ortsformen(grundform)}"
         )
-    if name not in vorlage.rollen:
+    if name not in grundform.rollen:
         raise SzeneFehler(
             f"{wo}: die Rolle {name!r} gibt es nicht. Es gibt "
-            f"{', '.join(sorted(vorlage.rollen))}."
+            f"{', '.join(sorted(grundform.rollen))}."
         )
-    return vorlage.rollen[name]
+    return grundform.rollen[name]
 
 
 def _beschriftung(wert, bei) -> str:
@@ -428,6 +691,78 @@ def _beschriftung(wert, bei) -> str:
     return ""
 
 
+def _lies_teil(eintrag, grundform: Grundform, wo: str) -> Teil:
+    """Eine Grundform eines Geraetes.
+
+    Ein Kreis bekommt eine Zahl als `groesse`, sein Durchmesser; ein Rechteck
+    ein Paar. Zwei Schreibweisen fuer denselben Schluessel, weil ein Kreis mit
+    zwei Massen eine Ellipse waere, und die gibt es hier nicht.
+    """
+    eintrag = _als_abbildung(eintrag, wo)
+    _pruefe_schluessel(eintrag, TEIL_SCHLUESSEL, wo)
+    art = eintrag.get("form")
+    if art not in TEILFORMEN:
+        raise SzeneFehler(
+            f"{wo}: {art!r} ist keine Grundform fuer ein Geraeteteil. Es gibt "
+            f"{', '.join(TEILFORMEN)}."
+        )
+    bei = ort(eintrag.get("bei"), grundform, f"{wo}, bei")
+    groesse = eintrag.get("groesse")
+    if art == "kreis":
+        durchmesser = _als_zahl(groesse, wo, "kein Durchmesser in Metern")
+        if durchmesser <= 0:
+            raise SzeneFehler(f"{wo}: ein Kreis mit dem Durchmesser "
+                              f"{durchmesser:g} misst nichts.")
+        return Teil(art, bei, durchmesser, durchmesser)
+    return Teil(art, bei, *_masse(groesse, wo))
+
+
+def _lies_geraet(eintrag, grundform: Grundform, wo: str) -> Geraet:
+    eintrag = _als_abbildung(eintrag, wo)
+    _pruefe_schluessel(eintrag, GERAET_SCHLUESSEL, wo)
+    teile = [_lies_teil(t, grundform, f"{wo}, Teil {n}")
+             for n, t in enumerate(_als_liste(eintrag.get("teile"), f"{wo}, teile"), 1)]
+    if not teile:
+        raise SzeneFehler(
+            f"{wo}: ein Geraet besteht aus mindestens einem Teil. Unter `teile:` "
+            f"steht, woraus: {', '.join(TEILFORMEN)}."
+        )
+    return Geraet(teile=teile, text=str(eintrag.get("text") or ""))
+
+
+def _lies_abstand(eintrag, grundform: Grundform, wo: str) -> Abstand:
+    eintrag = _als_abbildung(eintrag, wo)
+    _pruefe_schluessel(eintrag, ABSTAND_SCHLUESSEL, wo)
+    art = eintrag.get("art")
+    if art not in ABSTANDSARTEN:
+        raise SzeneFehler(
+            f"{wo}: {art!r} ist keine Art von Abstandsangabe. Es gibt "
+            f"{', '.join(ABSTANDSARTEN)}."
+        )
+    von = ort(eintrag.get("von"), grundform, f"{wo}, von")
+    nach = ort(eintrag.get("nach"), grundform, f"{wo}, nach")
+    laenge = ((nach[0] - von[0]) ** 2 + (nach[1] - von[1]) ** 2) ** 0.5
+    if not laenge:
+        raise SzeneFehler(
+            f"{wo}: `von` und `nach` sind derselbe Ort. Zwischen einem Ort und "
+            f"sich selbst gibt es keinen Abstand einzuzeichnen."
+        )
+    # `or 0` waere hier falsch: es machte aus `versatz: false` still eine Null
+    # und nicht die Meldung, die _als_zahl fuer einen Wahrheitswert bereithaelt.
+    versatz = eintrag.get("versatz")
+    # Ohne eigenen Text steht da, was gemessen wurde. Wer selbst etwas
+    # hinschreibt, verantwortet es: gezeichnet wird in beiden Faellen die
+    # Strecke zwischen `von` und `nach`.
+    return Abstand(
+        art=art,
+        von=von,
+        nach=nach,
+        versatz=_als_zahl(0 if versatz is None else versatz, wo,
+                          "kein Versatz in Metern"),
+        text=str(eintrag.get("text") or meterangabe(laenge)),
+    )
+
+
 def lies_szene(text: str) -> Szene:
     """Macht aus dem Text einer Szenendatei eine gepruefte Szene."""
     roh = lies_yaml(text)
@@ -437,14 +772,9 @@ def lies_szene(text: str) -> Szene:
     if name is None:
         raise SzeneFehler(
             f"Der Szene fehlt die Grundform. `form:` nennt eine von "
-            f"{', '.join(sorted(FELDVORLAGEN))}."
+            f"{', '.join(grundformen())}."
         )
-    if name not in FELDVORLAGEN:
-        raise SzeneFehler(
-            f"Die Grundform {name!r} gibt es nicht. Es gibt "
-            f"{', '.join(sorted(FELDVORLAGEN))}."
-        )
-    vorlage = FELDVORLAGEN[name]
+    form = lies_grundform(name, roh.get("groesse"))
 
     spieler = []
     for nummer, eintrag in enumerate(_als_liste(roh.get("spieler"), "spieler"), 1):
@@ -452,7 +782,7 @@ def lies_szene(text: str) -> Szene:
         eintrag = _als_abbildung(eintrag, wo)
         _pruefe_schluessel(eintrag, SPIELER_SCHLUESSEL, wo)
         bei = eintrag.get("bei")
-        x, y = ort(bei, vorlage, wo)
+        x, y = ort(bei, form, wo)
         spieler.append(Spieler(x, y, _beschriftung(eintrag.get("text"), bei)))
 
     wege = []
@@ -471,11 +801,20 @@ def lies_szene(text: str) -> Szene:
             raise SzeneFehler(f"{wo}: bogen {bogen!r} ist keine Pfeilhoehe in Metern.")
         weg = Weg(
             art=art,
-            von=ort(eintrag.get("von"), vorlage, f"{wo}, von"),
-            nach=ort(eintrag.get("nach"), vorlage, f"{wo}, nach"),
+            von=ort(eintrag.get("von"), form, f"{wo}, von"),
+            nach=ort(eintrag.get("nach"), form, f"{wo}, nach"),
             bogen=float(bogen),
         )
         normale(weg.von, weg.nach)  # meldet einen Weg der Laenge null
         wege.append(weg)
 
-    return Szene(vorlage=vorlage, spieler=spieler, wege=wege)
+    geraete = [_lies_geraet(eintrag, form, f"Geraet {nummer}")
+               for nummer, eintrag
+               in enumerate(_als_liste(roh.get("geraete"), "geraete"), 1)]
+
+    abstaende = [_lies_abstand(eintrag, form, f"Abstand {nummer}")
+                 for nummer, eintrag
+                 in enumerate(_als_liste(roh.get("abstaende"), "abstaende"), 1)]
+
+    return Szene(grundform=form, spieler=spieler, wege=wege,
+                 geraete=geraete, abstaende=abstaende)
