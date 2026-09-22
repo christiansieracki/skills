@@ -22,3 +22,8 @@ See `docs/agents/triage-labels.md`.
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root.
 See `docs/agents/domain.md`.
+
+### Open points
+
+`docs/offene-punkte.md` holds what came up during work and has no ticket yet.
+Read it before planning a wave; add to it when something falls out of scope.
