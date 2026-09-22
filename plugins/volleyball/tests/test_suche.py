@@ -34,6 +34,20 @@ class SucheTest(unittest.TestCase):
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
         return json.loads(fertig.stdout)
 
+    def quelldateizeile(self, uid: str, **felder) -> str:
+        """Legt eine Karte an und gibt ihre Quelldatei-Zeile zurueck.
+
+        Die drei Faelle weiter unten unterscheiden sich allein darin, wie die
+        `quelldatei:` auf der Karte geschrieben ist, und pruefen alle dieselbe
+        eine Zeile.
+        """
+        self.ordner.lege_karte_an(id=uid, **felder)
+        fertig = self.ordner.starte("suche.py", "--id", uid, "--lang")
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        zeilen = [z for z in fertig.stdout.splitlines() if "Quelldatei" in z]
+        self.assertEqual(1, len(zeilen), f"keine Quelldatei-Zeile:\n{fertig.stdout}")
+        return zeilen[0]
+
     def test_ohne_filter_kommen_alle_uebungen_zurueck(self) -> None:
         # Der Fixture traegt Karten beider Disziplinen. Der Test haelt damit
         # auch fest, dass ohne Disziplinfilter alles zurueckkommt.
@@ -120,6 +134,45 @@ class SucheTest(unittest.TestCase):
 
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
         self.assertIn("Disziplin    halle, beach", fertig.stdout)
+
+    def test_eine_uebung_ueber_zwei_seiten_nennt_beide_seiten(self) -> None:
+        # Eine Uebung hoert selten da auf, wo die Seite aufhoert. Laeuft sie
+        # ueber zwei Fotos, nennt `quelldatei:` laut DATENMODELL.md beide, und
+        # beide liegen unter quellen/. Ein Praefix am Anfang der Angabe saesse
+        # nur vor der ersten.
+        zeile = self.quelldateizeile(
+            "ue-0010", titel="Abwehr über zwei Seiten",
+            quelldatei="magazin/seite-04.jpg, magazin/seite-05.jpg")
+
+        self.assertIn("in quellen/", zeile)
+        self.assertIn("magazin/seite-04.jpg, magazin/seite-05.jpg", zeile)
+        self.assertEqual(1, zeile.count("quellen/"))
+
+    def test_zwei_seiten_mit_und_getrennt_werden_genauso_gezeigt(self) -> None:
+        # Das Feld ist freier Text, und wer zwei Seiten nennt, trennt sie mal
+        # mit einem Komma und mal mit einem "und". An der Schreibweise darf
+        # die Ausgabe nicht haengen: die zweite Seite soll in beiden Faellen
+        # genauso dastehen wie die erste.
+        zeile = self.quelldateizeile(
+            "ue-0011", titel="Abwehr über zwei Seiten, anders geschrieben",
+            quelldatei="magazin/seite-04.jpg und magazin/seite-05.jpg")
+
+        self.assertIn("in quellen/", zeile)
+        self.assertIn("magazin/seite-04.jpg und magazin/seite-05.jpg", zeile)
+        self.assertEqual(1, zeile.count("quellen/"))
+
+    def test_was_keine_datei_ist_wird_nicht_zu_einem_pfad(self) -> None:
+        # Hinter dem Dateinamen steht oft eine Seitenzahl, und der Bestand
+        # fuehrt Namen mit Leerzeichen darin. Nichts davon ist ein eigener
+        # Pfad: `quellen/S. 1` gibt es nicht.
+        zeile = self.quelldateizeile(
+            "ue-0012", titel="Vorschlag aus der Sammlung",
+            quelldatei="unsortiert/Vorschlag Dienstag 14.09.23 _ H1.pdf, S. 1")
+
+        self.assertIn(
+            "in quellen/ · unsortiert/Vorschlag Dienstag 14.09.23 _ H1.pdf, S. 1",
+            zeile)
+        self.assertEqual(1, zeile.count("quellen/"))
 
 
 if __name__ == "__main__":
