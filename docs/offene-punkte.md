@@ -76,6 +76,12 @@ Liste würde statt freier Text. Das wäre eine Schemaänderung und bricht
 bestehende Karten, gehört also in eine Welle, die ohnehin am Datenmodell
 arbeitet.
 
+Seit dem PlayDrill-Import (siehe unten) drängt die Frage. Jede PlayDrill-Karte
+hat genau eine Quelldatei und zeigt damit genau die Zeile ohne kopierbaren
+Pfad. Schreibt ein automatischer Lauf die übrigen rund 335 Karten, bevor das
+entschieden ist, geht die Umstellung über rund 370 Karten statt über 34. Die
+Frage gehört deshalb vor den Massenimport, nicht erst in die Wissenskarte.
+
 ## Im Arbeitsordner, nicht im Plugin
 
 Zwei Dinge betreffen `Nextcloud/_Training/trainingsplanung` und keinen Code.
@@ -90,16 +96,6 @@ Sie ist damit zugleich das Einzige, was zeigt, wie die handgezeichnete Fassung
 aussah. Entweder bleibt sie als dieser Beleg liegen, oder sie wird neu erzeugt,
 oder sie wird weggeräumt. Eine Entscheidung steht aus.
 
-### `index.md` kennt 18 Übungen, die Bibliothek hat 20
-
-Die Lesebrille wird nur auf ausdrückliche Ansage neu gebaut, so steht es in
-`trainingsplanung-root.yml` unter `index_md_automatisch: false`. Seit dem
-Import von `ue-0019` und `ue-0020` ist sie veraltet.
-
-```
-<python> scripts/index.py --wurzel <pfad> --md
-```
-
 ### Die Seiten 28 und 29 des Magazins sind noch nicht importiert
 
 Das Volleyball-Magazin 09/2026 trägt auf diesen beiden Seiten eine
@@ -111,6 +107,81 @@ festgelegte Zonen.
 Die beiden Seiten sind aufbereitet und lesbar. Aus dem Artikel auf den Seiten
 22 bis 25 sind bisher zwei von vier Übungen importiert; die Seiten 30 bis 36
 sind Theorie und Diagnostik ohne Übungen.
+
+Die Übungen auf den Seiten 28 und 29 brauchen genau das, was dem
+Szenen-Vokabular oben fehlt: eine benannte Stelle am Feld für den Anwurf, die
+Zonen für die Shots, den Angreifer auf der Kiste als hervorgehobenen Marker.
+Sie taugen deshalb als Abnahme für die Welle, die diese Lücken schließt, so wie
+das Magazin die Abnahme von Welle 1b war.
+
+## Neu seit der Abnahme
+
+Aufgefallen am 28.09.2026.
+
+### `export_pdf.py` endet mit Exitcode 0, auch wenn nichts exportiert ist
+
+Nach „Fertig: 0/7 exportiert." gibt das Skript 0 zurück. Ob der Export
+geklappt hat, steht damit nur in der Ausgabe, nicht im Rückgabewert.
+Aufgefallen bei der Diagnose des Edge-Fehlers: Die Schleife musste deshalb die
+PDFs zählen, statt den Exitcode zu lesen. Saisonplaner und Trainingsdesign
+rufen das Skript auf und sehen einen Fehlschlag nur, wenn sie die Ausgabe
+lesen.
+
+### Ein PDF über Edge dauert zehn bis zwanzig Sekunden
+
+Jede Datei bekommt einen eigenen, frischen Profilordner, und so lange braucht
+Edge damit. Die sieben Trainings unter `trainings/h1-h2` dauern zusammen gut
+zwei Minuten. `--no-first-run`, `--disable-extensions` und
+`--disable-component-update` haben nichts Messbares gebracht. Naheliegend wäre
+ein Profil für den ganzen Lauf statt eines je Datei. Ob Edge damit schneller
+ist, ist nicht gemessen.
+
+### Den PlayDrill-Import automatisieren
+
+Unter `quellen/playdrill/` liegen 343 PDFs, eine Übung je Datei. Davon sind 8
+Karte. Der Ablauf steht in `PLAYDRILL_IMPORT_LOG.md` im Arbeitsordner: eine
+Übung je Sitzung, die Zeile übernehmen und die Karten-ID mit einer Sperrdatei
+reservieren, damit parallele Sitzungen nicht dieselbe Nummer nehmen. So dauert
+der Rest über dreihundert Sitzungen. Gewünscht ist ein Lauf, der jede Übung in
+einem eigenen Subagenten bearbeitet, wenig Tokens braucht und nichts erfindet.
+
+Was dafür schon feststeht:
+
+- Die PDFs haben eine Textebene, und `pdftotext` ist installiert. Den Text
+  kann ein Skript ziehen, ohne Modell. Nur das Feldbild braucht ein Modell,
+  das Bilder liest.
+- Der größte Posten sind die festen Kosten je Übung. Import-Skill,
+  `DATENMODELL.md`, `SPRACHE.md` und `glossary.md` sind zusammen etwa 33 KB,
+  geschätzt 9 000 bis 10 000 Tokens, bevor die Quelle gelesen ist. Über 335
+  Übungen sind das rund drei Millionen Tokens nur für die Regeln. Der
+  Orchestrator fällt daneben kaum ins Gewicht.
+- Ein Subagent kann nicht nachfragen. Das Log verlangt aber je Übung
+  Rückfragen: die Lesart des Feldbilds, wenn unter „Ausführung" nur der
+  Platzhalter steht, dazu `spieler_min` und einen Vorschlag für `level_max`.
+  Die Rückfragen müssen also gesammelt statt gestellt werden, mit dem
+  ausgeschnittenen Feldbild daneben, wie es die Absprache vom 26.09.2026
+  verlangt.
+- Die 8 fertigen Karten sind ein Maßstab gegen Erfundenes: ein Probelauf über
+  Nr. 1 bis 8, verglichen mit dem, was schon abgenommen ist.
+- Das Szenen-Vokabular spielt keine Rolle. Laut Absprache vom 26.09.2026
+  bekommt jede PlayDrill-Karte das ausgeschnittene PlayDrill-Bild, gezeichnet
+  wird nichts.
+
+Zu entscheiden:
+
+- Das Agent-Tool aus einer Sitzung heraus oder ein Skript, das `claude -p` je
+  PDF startet. Im zweiten Fall sammelt kein Orchestrator Kontext an, und ein
+  abgebrochener Lauf macht bei der ersten offenen Zeile weiter.
+- Welches Modell die Subagenten nehmen.
+- Was als belegt gilt: aus dem Text, aus einer Regel zum Dateinamen, oder es
+  wird eine Rückfrage.
+- Welche Status das Log dazubekommt, etwa `entwurf` oder `rückfrage`.
+- Ob der Ablauf ins Plugin gehört oder in den Arbeitsordner.
+- Ob `quelldatei:` vorher eine Liste wird, siehe oben.
+
+Zwei Fragen beantwortet erst ein Probelauf: was eine Übung wirklich kostet,
+und ob Text und Feldbild reichen, ohne dass etwas erfunden wird. Dafür reicht
+ein `/prototype` über etwa fünf Übungen, eine davon mit Platzhaltertext.
 
 ## Aus Welle 1b bewusst ausgelassen
 
@@ -126,7 +197,22 @@ Steht so in #10 unter *Out of Scope* und gilt weiter.
 
 ## Was als Nächstes ansteht
 
-Die Reihenfolge stammt aus #10 und ist dort begründet.
+Die Reihenfolge stammt aus #10 und ist dort begründet. Zwei Vorhaben kannte
+#10 noch nicht: die Welle zum Szenen-Vokabular und den PlayDrill-Import. Wo sie
+sich einreihen, ist nicht entschieden.
+
+### Eine kleine Welle für das Szenen-Vokabular
+
+Die vier Punkte zum Schaubild aus der Abnahme: Beschriftung am Feld, Fußzeile
+mit mehreren Zeilen, hervorgehobener Marker, Zonenbeschriftung. Die ersten drei
+erweitern das Vokabular aus ADR-0004 und brauchen vorher eine Entscheidung, der
+vierte ist eine Reparatur. Abnahme an den Magazinseiten 28 und 29. Hängt nicht
+am PlayDrill-Import.
+
+### Der PlayDrill-Import als Lauf
+
+Siehe oben unter *Neu seit der Abnahme*. Braucht ein Interview, einen
+Probelauf und eine eigene Spec.
 
 ### Der zweite Ast von Welle 1b: die Wissenskarte
 
