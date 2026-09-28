@@ -48,8 +48,9 @@ Wer in die Leseansicht tippt, verliert seine Änderung beim nächsten Erzeugen.
 | **freie Leinwand** | Eine Fläche mit angesagtem Maß in Metern, ohne Spielfeld darauf. Für einen Aufbau, der auf kein Feld passt. | `form: frei` mit `groesse:` |
 | **Zone** | Eine Fläche im Schaubild, die etwas bedeutet: eine Zielzone, ein Aufschlagbereich, das abgedeckte Stück Feld. Hat Rand und Beschriftung. | in der Szene, unter `zonen:` |
 | **Gerät** | Ein Kasten, ein Ballwagen, eine Zielmatte im Schaubild, aus Rechtecken und Kreisen zusammengesetzt und beschriftet. | in der Szene, unter `geraete:` |
+| **Stelle** | Ein Ort im Schaubild, der einen Namen braucht, ohne dass dort etwas steht: die Feldmitte, zu der gespielt wird, der Startpunkt eines Laufwegs, eine Linie des Feldes. Nur ein Wort, keine Fläche. | in der Szene, unter `stellen:` |
 | **Maßkette** | Eine Abstandsangabe als Linie mit Maßstrichen und der gemessenen Zahl. Der beschriftete Pfeil daneben zeigt denselben Abstand anders. | in der Szene, unter `abstaende:` |
-| **Textwerk** | Was neben dem Bild steht: Titel und Untertitel oben, die Legende daneben, die Fußzeile darunter. Es macht aus einer Skizze eine Anleitung. | in der Szene, ganz außen |
+| **Textwerk** | Was neben dem Bild steht: Titel und Untertitel oben, die Legende daneben, die Fußzeile mit Zeichenerklärung und Quelle darunter. Es macht aus einer Skizze eine Anleitung. | in der Szene, ganz außen |
 | **Legendenblock** | Ein Stück der Legende: eine Überschrift und die Zeilen darunter. Mehrere davon ergeben die Legendenspalte neben dem Bild. | in der Szene, unter `legende:` |
 
 Dasselbe Verhältnis wie zwischen Trainingsplan und Leseansicht: Wer in das SVG
@@ -62,8 +63,17 @@ eine Abstandsangabe darin auch.
 **Zone oder Gerät?** Ein Gerät ist ein Gegenstand, den jemand in die Halle
 stellt. Eine Zone ist eine Absprache über ein Stück Boden. Beide sind Flächen
 mit Rand und Beschriftung und sehen deshalb im Bild verschieden aus: Wer den
-Unterschied nicht sieht, räumt einen Kasten von einer Stelle weg, an der nie
-einer stand.
+Unterschied nicht sieht, räumt einen Kasten weg, wo nie einer stand.
+
+**Zone oder Stelle?** Eine Zone ist eine Absprache über ein Stück Boden und hat
+eine Fläche. Eine Stelle ist nur der Name eines Ortes, an dem nichts steht.
+Steht dort jemand oder etwas, trägt dessen Marker oder Gerät den Namen, und es
+braucht keine Stelle.
+
+**Hervorgehoben** wird ein Spieler, der in der Übung eine Sonderrolle hat: der
+Zuspieler, der nicht mitrotiert, oder der Angreifer auf der Kiste, der die
+Bälle bringt. Sein Marker fällt auf einen Blick auf, die anderen bleiben
+Umriss. Worin die Sonderrolle besteht, sagt die Legende.
 
 Plätze heißen in der Halle nach ihrer **Positionsnummer** 1 bis 6, im Sand nach
 einer **Rolle**. Im Sand gibt es keine Rotation, auf die sich eine Nummer

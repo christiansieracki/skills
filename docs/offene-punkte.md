@@ -183,6 +183,19 @@ Zwei Fragen beantwortet erst ein Probelauf: was eine Übung wirklich kostet,
 und ob Text und Feldbild reichen, ohne dass etwas erfunden wird. Dafür reicht
 ein `/prototype` über etwa fünf Übungen, eine davon mit Platzhaltertext.
 
+### Die Zeichenerklärung könnte das Skript selbst setzen
+
+Die Fußzeile eines Schaubilds trägt Zeichenerklärung und Quelle. Die
+Zeichenerklärung schreibt bisher, wer die Szene schreibt, etwa „gestrichelter
+Pfeil = Ballweg". Dabei weiß `schaubild.py`, welche Wegarten und Abstandsarten
+in der Szene vorkommen, und könnte die Zeile selbst setzen. Einen Vorläufer
+gibt es schon: Eine Maßkette ohne `text:` schreibt die gemessene Zahl hin.
+
+Beim Zuschnitt der Welle zum Szenen-Vokabular bewusst draußen gelassen. Es ist
+neues Verhalten und keine Lücke im Vokabular. Zu entscheiden wäre, ob die
+selbst gesetzte Zeile eine geschriebene ersetzt oder nur einspringt, wenn keine
+dasteht.
+
 ## Aus Welle 1b bewusst ausgelassen
 
 Steht so in #10 unter *Out of Scope* und gilt weiter.
