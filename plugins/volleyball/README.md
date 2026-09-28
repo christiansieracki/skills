@@ -30,8 +30,8 @@ plugins/volleyball/
 ├── referenzen/        DATENMODELL, SPRACHE, VORLAGEN, METHODIK, ...
 ├── scripts/           index.py, suche.py, leseansicht.py, export_pdf.py,
 │                      bilder_aufbereiten.py, schaubild.py, szene.py
-└── tests/             Linter, Suche, Bildaufbereitung und Schaubilder
-                       gegen einen künstlichen Arbeitsordner
+└── tests/             Linter, Suche, Bildaufbereitung, Schaubilder und
+                       PDF-Export gegen einen künstlichen Arbeitsordner
 ```
 
 **Im Plugin liegt das Werkzeug, im Arbeitsordner liegen die Daten.** Übungen,
@@ -52,6 +52,10 @@ Bibliothek wird nie angefasst und muss dafür nicht einmal existieren.
 
 Die Prüfungen der Bildaufbereitung werden übersprungen, wenn Pillow fehlt.
 Die Begründung steht im Kopf von `tests/test_bilder.py`.
+
+Der Test des PDF-Exports läuft nur, wo das Skript über Edge oder Chrome
+druckt, und braucht dann zehn bis zwanzig Sekunden. Warum, steht im Kopf von
+`tests/test_export.py`.
 
 ## Voraussetzungen
 

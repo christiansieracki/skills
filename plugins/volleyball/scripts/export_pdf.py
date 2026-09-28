@@ -167,11 +167,27 @@ def baue_html(src: Path, css_pfad: Path, ziel: Path) -> None:
     )
 
 
+def ohne_kompatibilitaetsschicht() -> dict[str, str]:
+    """Die Umgebung ohne __COMPAT_LAYER, fuer den Aufruf des Browsers.
+
+    Windows setzt die Variable fuer Prozesse, die aus manchen Anwendungen
+    heraus starten, etwa `DetectorsAppHealth` aus der Claude-App. Edge startet
+    sich dann ohne sie neu, und der Prozess, auf den das Skript wartet, kehrt
+    sofort zurueck. Das PDF kommt Sekunden spaeter, wenn der Temp-Ordner mit
+    der HTML-Fassung schon weg ist. Ohne die Variable bleibt Edge ein einziger
+    Prozess und kehrt erst zurueck, wenn das PDF geschrieben ist.
+    """
+    return {k: v for k, v in os.environ.items() if k.upper() != "__COMPAT_LAYER"}
+
+
 def md_to_pdf(src: Path, dest: Path, weg: tuple[str, str]) -> bool:
     dest.parent.mkdir(parents=True, exist_ok=True)
     art, werkzeug = weg
+    umgebung = None
 
-    with tempfile.TemporaryDirectory() as tmp:
+    # Haelt ein Browser den Profilordner noch, bleibt der Temp-Ordner eben
+    # liegen. Sonst braeche das Aufraeumen einer Datei den ganzen Lauf ab.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         css_pfad = Path(tmp) / "druck.css"
         css_pfad.write_text(CSS, encoding="utf-8")
         try:
@@ -187,11 +203,13 @@ def md_to_pdf(src: Path, dest: Path, weg: tuple[str, str]) -> bool:
                            "--no-pdf-header-footer",
                            "--user-data-dir=" + str(Path(tmp) / "profil"),
                            "--print-to-pdf=" + str(dest), html.as_uri()]
+                    umgebung = ohne_kompatibilitaetsschicht()
                 else:
                     cmd = ["wkhtmltopdf", "--quiet", "--encoding", "utf-8",
                            str(html), str(dest)]
 
-            ergebnis = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            ergebnis = subprocess.run(cmd, capture_output=True, text=True,
+                                      timeout=180, env=umgebung)
             if ergebnis.returncode != 0:
                 print(f"  FEHLER bei {src.name}: {ergebnis.stderr.strip()[:200]}")
                 return False
