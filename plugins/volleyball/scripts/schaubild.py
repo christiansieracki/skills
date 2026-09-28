@@ -277,8 +277,7 @@ class Satzspiegel:
         if self.legende:
             unten = max(unten, spaltenende + SEITENRAND)
         self.fusszeilen, unten = zeilensatz(
-            [("fusszeile", self.werk.fusszeile)] if self.werk.fusszeile else [],
-            unten)
+            [("fusszeile", zeile) for zeile in self.werk.fusszeile], unten)
         self.hoehe = unten + (SEITENRAND if self.fusszeilen else 0.0)
 
         # Breit genug fuer alles, was rechts am weitesten hinausragt: der

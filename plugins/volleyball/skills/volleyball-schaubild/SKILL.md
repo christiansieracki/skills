@@ -83,8 +83,8 @@ an einer geratenen Stelle steht in der Halle falsch.
 | im Ablauf: Abstände, die in der Halle abgeschritten werden | `abstaende` |
 | `material` | `geraete` |
 | `titel` der Karte | `titel`, wo das Bild für sich steht |
-| Ziel und Wertung, in kurzen Zeilen | `legende` |
-| `quelle` | `fusszeile` |
+| Besetzung, Ziel und Wertung, in kurzen Zeilen | `legende` |
+| `quelle` und Zeichenerklärung | `fusszeile` |
 
 Trägt die Karte `[halle, beach]`, fragen, für welches Feld das Bild gilt. Ein
 Bild zeigt ein Feld.

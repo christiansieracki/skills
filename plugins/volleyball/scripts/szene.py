@@ -506,7 +506,7 @@ class Textwerk:
     titel: str = ""
     untertitel: str = ""
     legende: list[Legendenblock] = field(default_factory=list)
-    fusszeile: str = ""
+    fusszeile: list[str] = field(default_factory=list)
 
     @property
     def oberste_zeile(self) -> str:
@@ -644,6 +644,12 @@ def _als_liste(wert, wo: str) -> list:
     return wert
 
 
+# Zur Abbildung wird eine Zeile meist ungewollt: `- Quelle: Magazin` in einer
+# Liste liest sich als Schluessel mit Wert. Wo eine Abbildung statt einer Zeile
+# steht, nennt die Meldung deshalb diesen Ausweg.
+DOPPELPUNKT_AUSWEG = "Eine Zeile mit Doppelpunkt darin gehoert in Anfuehrungszeichen."
+
+
 def _als_zeile(wert, wo: str) -> str:
     """Eine Zeile Text, wie sie im Bild stehen soll.
 
@@ -653,9 +659,23 @@ def _als_zeile(wert, wo: str) -> str:
     """
     if wert is None:
         return ""
-    if isinstance(wert, (list, dict)):
+    if isinstance(wert, dict):
+        raise SzeneFehler(f"{wo}: hier steht eine Zeile Text, nicht {wert!r}. "
+                          f"{DOPPELPUNKT_AUSWEG}")
+    if isinstance(wert, list):
         raise SzeneFehler(f"{wo}: hier steht eine Zeile Text, nicht {wert!r}.")
     return str(wert).strip()
+
+
+def _als_zeilen(werte: list, wo: str) -> list[str]:
+    """Zeilen Text untereinander, leere Eintraege fallen weg.
+
+    Fuer die Zeilen eines Legendenblocks und die der Fusszeile, damit beide
+    dieselbe Regel haben und nicht zwei aehnliche. Ein leerer Eintrag ist
+    meist ein Strich zu viel und kein Absatz, den jemand wollte.
+    """
+    return [zeile for nr, roh in enumerate(werte, 1)
+            if (zeile := _als_zeile(roh, f"{wo}, Zeile {nr}"))]
 
 
 def _als_zahl(wert, wo: str, was: str) -> float:
@@ -901,8 +921,27 @@ def _lies_textwerk(roh: dict) -> Textwerk:
         titel=_als_zeile(roh.get("titel"), "titel"),
         untertitel=_als_zeile(roh.get("untertitel"), "untertitel"),
         legende=_lies_legende(roh.get("legende")),
-        fusszeile=_als_zeile(roh.get("fusszeile"), "fusszeile"),
+        fusszeile=_lies_fusszeile(roh.get("fusszeile")),
     )
+
+
+def _lies_fusszeile(wert) -> list[str]:
+    """Die Zeilen unter dem Bild: eine allein oder eine Liste davon.
+
+    Eine einzelne Zeile ist, was die Szenen vor der Liste kannten, und sie
+    bleibt gueltig: sie ist eine Liste mit einem Eintrag. Umgebrochen wird
+    nicht. Wo eine Zeile endet, entscheidet, wer die Szene schreibt, sonst
+    landete ein Umbruch mitten in einer Quellenangabe.
+
+    Leere Eintraege fallen weg wie in einem Legendenblock, und damit auch
+    eine Fusszeile, unter der nichts steht.
+    """
+    if isinstance(wert, dict):
+        raise SzeneFehler(
+            f"fusszeile: hier steht eine Zeile Text oder eine Liste von Zeilen "
+            f"mit Strichen, nicht {wert!r}. {DOPPELPUNKT_AUSWEG}"
+        )
+    return _als_zeilen(wert if isinstance(wert, list) else [wert], "fusszeile")
 
 
 def _lies_legende(wert) -> list[Legendenblock]:
@@ -922,9 +961,7 @@ def _lies_legende(wert) -> list[Legendenblock]:
                 f"{wo}: es fehlt die Ueberschrift. Ohne sie steht da eine "
                 f"Liste, von der niemand weiss, wovon sie handelt."
             )
-        zeilen = [zeile for nr, roh in
-                  enumerate(_als_liste(eintrag.get("zeilen"), f"{wo}, zeilen"), 1)
-                  if (zeile := _als_zeile(roh, f"{wo}, Zeile {nr}"))]
+        zeilen = _als_zeilen(_als_liste(eintrag.get("zeilen"), f"{wo}, zeilen"), wo)
         if not zeilen:
             raise SzeneFehler(
                 f"{wo}: unter {ueberschrift!r} steht keine Zeile. Eine "

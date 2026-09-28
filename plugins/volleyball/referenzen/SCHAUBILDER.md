@@ -84,7 +84,7 @@ Auf oberster Ebene gibt es elf Schlüssel, mehr nicht:
 | `titel` | die Überschrift über dem Bild |
 | `untertitel` | die zweite Zeile darunter, ohne `titel` die erste |
 | `legende` | die Legendenspalte neben dem Bild, in Legendenblöcken |
-| `fusszeile` | die Zeile unter dem Bild, meist die Quelle |
+| `fusszeile` | die Zeilen unter dem Bild: Zeichenerklärung und Quelle |
 | `spieler` | Marker mit Beschriftung |
 | `wege` | Lauf- und Ballwege |
 | `zonen` | Flächen, die etwas bedeuten: Zielzone, Aufschlagbereich |
@@ -402,14 +402,16 @@ legende:
       - 3 Punkte in der Zielzone
       - 1 Punkt spielbar daneben
 
-fusszeile: "Quelle: Volleyball-Magazin 09/2026, Seite 12"
+fusszeile:
+  - Durchgezogen ist ein Laufweg, gestrichelt ein Ballweg
+  - "Quelle: Volleyball-Magazin 09/2026, Seite 12"
 ```
 
 Alle vier sind freiwillig. Die meisten Schaubilder tragen keinen Titel, eine
 Aufstellung erklärt sich oft von selbst.
 
-Ein Text mit Doppelpunkt darin gehört in Anführungszeichen, wie die Fußzeile
-oben. Ohne sie läse YAML `Quelle:` als zweiten Schlüssel.
+Ein Text mit Doppelpunkt darin gehört in Anführungszeichen, wie die Quelle
+oben. Ohne sie läse YAML `Quelle:` als Schlüssel, und die Szene bricht ab.
 
 **Wo was steht.** Titel und Untertitel stehen über dem Bild, die Legende als
 Spalte rechts daneben, die Fußzeile darunter. Steht kein `titel` da, rückt der
@@ -427,11 +429,23 @@ ab: ohne Überschrift steht da eine Liste, von der niemand weiß, wovon sie
 handelt, und eine Überschrift ohne Zeilen erklärt nichts und nimmt trotzdem
 Platz neben dem Feld weg.
 
+**Die Fußzeile trägt Zeichenerklärung und Quelle.** Was die Zeichen im Bild
+bedeuten und woher die Übung kommt, steht unter dem Bild. Wer in der Übung
+welche Aufgabe hat, die Besetzung, gehört in die Legende: Sie sagt, was im Bild
+geschieht, die Fußzeile, wie man es liest. `fusszeile` nimmt eine einzelne
+Zeile oder eine Liste von Zeilen, jede mit Strich. Die Zeilen stehen
+untereinander, in der Reihenfolge der Szene. Leere Einträge fallen weg, wie in
+einem Legendenblock. Stehen unter `fusszeile` Schlüssel mit Werten oder eine
+Liste in der Liste, bricht die Szene ab, statt deren Schreibweise ins Bild zu
+setzen.
+
 **Das Blatt wächst mit.** Eine lange Zeile macht das Bild breiter, eine lange
-Spalte macht es höher. Abgeschnitten wird nichts. Dass die halbe Erklärung
-fehlt, sieht man dem Bild sonst nicht an, es wirkt fertig. Gebrochen wird eine
-Zeile trotzdem nicht: Wo ein Umbruch hingehört, entscheidet, wer sie schreibt.
-Kurz halten lohnt sich also. Im vorhandenen
+Spalte oder eine Fußzeile aus mehreren Zeilen macht es höher. Abgeschnitten
+wird nichts. Dass die halbe Erklärung fehlt, sieht man dem Bild sonst nicht
+an, es wirkt fertig. Gebrochen wird eine Zeile trotzdem nicht: Wo ein Umbruch
+hingehört, entscheidet, wer sie schreibt. In der Fußzeile heißt das zwei
+Einträge statt einer langen Zeile, damit kein Umbruch mitten in einer
+Quellenangabe landet. Kurz halten lohnt sich also. Im vorhandenen
 `2026-09-15-annahme-zielzone.svg` nimmt die Legendenspalte mehr Platz ein als
 das Feld.
 

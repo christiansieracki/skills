@@ -1317,6 +1317,110 @@ class SchaubildTest(unittest.TestCase):
         unterkante = float(feld.get("y")) + float(feld.get("height"))
         self.assertGreater(float(mit_klasse(baum, "fusszeile")[0].get("y")), unterkante)
 
+    def test_eine_liste_unter_fusszeile_ergibt_eine_zeile_je_eintrag(self) -> None:
+        # Ein Schaubild aus einer Magazinquelle traegt darunter zwei Zeilen:
+        # was die Zeichen bedeuten und woher die Uebung kommt.
+        baum = self.zeichne("fuss-liste", """
+            form: halle
+            titel: Einarmige Abwehr
+            fusszeile:
+              - "Zeichen: Kreis Spieler, gestrichelt Ballweg"
+              - "Quelle: Volleyball-Magazin 09/2026, Seite 28"
+        """)
+
+        zeilen = mit_klasse(baum, "fusszeile")
+        self.assertEqual([e.text for e in zeilen],
+                         ["Zeichen: Kreis Spieler, gestrichelt Ballweg",
+                          "Quelle: Volleyball-Magazin 09/2026, Seite 28"])
+        feld = mit_klasse(baum, "feld")[0]
+        unterkante = float(feld.get("y")) + float(feld.get("height"))
+        oben, unten = (float(e.get("y")) for e in zeilen)
+        self.assertGreater(oben, unterkante, "beide stehen unter dem Bild")
+        self.assertGreater(unten, oben, "in der Reihenfolge der Szene untereinander")
+        for e in zeilen + mit_klasse(baum, "titel"):
+            with self.subTest(zeile=e.text):
+                self.assertAlmostEqual(float(e.get("x")), float(feld.get("x")),
+                                       places=2)
+
+    def test_jede_zeile_der_fusszeile_laesst_das_blatt_mitwachsen(self) -> None:
+        # Abgeschnitten wird nichts, auch nicht die zweite Zeile. Dass die
+        # Quelle fehlt, saehe man dem Bild nicht an.
+        def mit(name: str, *zeilen: str) -> ET.Element:
+            return self.zeichne(name, "form: halle\nfusszeile:\n" + "".join(
+                f'  - "{zeile}"\n' for zeile in zeilen))
+
+        eine = mit("fuss-eine", "Quelle: Magazin")
+        zwei = mit("fuss-zwei", "Zeichen: Kreis Spieler", "Quelle: Magazin")
+        # Eine einzelne Zeile ist eine Liste mit einem Eintrag, und so
+        # geschrieben ergibt sie dasselbe Blatt wie ohne Strich.
+        ohne_strich = self.zeichne("fuss-ohne-strich",
+                                   'form: halle\nfusszeile: "Quelle: Magazin"')
+        self.assertEqual(zahlen(ohne_strich.get("viewBox")), zahlen(eine.get("viewBox")))
+        self.assertEqual([e.text for e in mit_klasse(ohne_strich, "fusszeile")],
+                         ["Quelle: Magazin"])
+        lang = mit("fuss-lang", "Zeichen: Kreis Spieler",
+                   "Quelle: Volleyball-Magazin 09/2026, Praxiseinheit "
+                   "Grundfertigkeiten der einarmigen Abwehr, Seite 28 und 29")
+
+        _, _, breite_zwei, hoehe_zwei = zahlen(zwei.get("viewBox"))
+        _, _, breite_lang, _ = zahlen(lang.get("viewBox"))
+        self.assertGreater(hoehe_zwei, zahlen(eine.get("viewBox"))[3],
+                           "die zweite Zeile braucht mehr Blatt nach unten")
+        self.assertLess(max(float(e.get("y")) for e in mit_klasse(zwei, "fusszeile")),
+                        hoehe_zwei, "die letzte Zeile steht noch im Bild")
+        self.assertGreater(breite_lang, breite_zwei,
+                           "eine lange zweite Zeile macht das Blatt breiter")
+        # Gewachsen ist das Blatt, das Feld darauf bleibt, wie es war.
+        self.assertAlmostEqual(Feldmass(zwei, HALLE).breite,
+                               Feldmass(lang, HALLE).breite, places=2)
+
+    def test_leere_eintraege_der_fusszeile_fallen_weg(self) -> None:
+        # So wie in einem Legendenblock. Eine leere Zeile unter dem Bild ist
+        # nur ein Loch, das nach vergessenem Text aussieht.
+        mit_leeren = self.zeichne("fuss-leer", """
+            form: halle
+            fusszeile:
+              - "Zeichen: Kreis Spieler"
+              -
+              - ""
+              - "Quelle: Magazin"
+        """)
+        ohne = self.zeichne("fuss-ohne-leere", """
+            form: halle
+            fusszeile:
+              - "Zeichen: Kreis Spieler"
+              - "Quelle: Magazin"
+        """)
+
+        self.assertEqual([e.text for e in mit_klasse(mit_leeren, "fusszeile")],
+                         ["Zeichen: Kreis Spieler", "Quelle: Magazin"])
+        self.assertEqual(zahlen(mit_leeren.get("viewBox")),
+                         zahlen(ohne.get("viewBox")),
+                         "und nehmen auch keinen Platz weg")
+
+    def test_eine_abbildung_oder_verschachtelte_liste_in_der_fusszeile_bricht_ab(
+            self) -> None:
+        # Sonst stuende ihre Python-Schreibweise im Bild, und das sieht man
+        # erst dort. Am haeufigsten ist die Abbildung als Eintrag: eine
+        # Quellenangabe mit Doppelpunkt, aber ohne Anfuehrungszeichen.
+        for name, fuss, gesucht in (
+            ("fuss-abbildung", "fusszeile:\n  quelle: Magazin",
+             ["fusszeile", "Liste", "Anfuehrungszeichen"]),
+            ("fuss-eintrag",
+             'fusszeile:\n  - "Zeichen: Kreis Spieler"\n'
+             "  - Quelle: Volleyball-Magazin 09/2026",
+             ["fusszeile, Zeile 2", "Anfuehrungszeichen"]),
+            ("fuss-verschachtelt",
+             'fusszeile:\n  - "Quelle: Magazin"\n  - [Zeichen, Quelle]',
+             ["fusszeile, Zeile 2"]),
+        ):
+            with self.subTest(fall=name):
+                fertig = self.scheitert(name, "form: halle\n" + fuss)
+
+                for wort in gesucht:
+                    self.assertIn(wort, fertig.stdout)
+                self.assertFalse(self.bild(name).exists())
+
     def test_das_feld_bleibt_massstaeblich_neben_dem_textwerk(self) -> None:
         # Das Textwerk rueckt das Bild, es verzerrt es nicht. Ohne diese
         # Zusicherung stuende derselbe Spieler mit Titel woanders als ohne.
