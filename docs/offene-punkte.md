@@ -192,6 +192,33 @@ Temp-Ordner des einen Rechners. Das Risiko hat jeder Import. Mit dem
 Sammelimport, der dreißig Karten auf einmal freigibt, wird es wahrscheinlicher.
 Bewusst nicht in der Welle zum Sammelimport, weil es jeden Import betrifft.
 
+## Aus Welle 1d
+
+Aufgefallen am 30.09.2026 bei #31.
+
+### Ein Kartenentwurf mit unvollständigem Frontmatter oder mit `id`
+
+Die Spec in #29 verlangt unter „Prüfen" auch „Frontmatter vollständig, ohne
+`id`". #31 hatte nur „kein lesbares Frontmatter", und die Liste der Prüfungen in
+#34 nennt den Punkt nicht. Damit gehört er keinem Ticket.
+
+Heute gilt: `sammelimport.py pruefen` verlangt nur ein lesbares Frontmatter mit
+`titel`, weil ohne Titel kein Dateiname entsteht. Trägt ein Entwurf eine `id`,
+besteht er die Prüfung, und `uebernehmen` ersetzt sie still durch die neu
+vergebene. Ein fehlendes Pflichtfeld fällt erst dem Linter auf, nach der
+Übernahme. Naheliegend wäre, beides in #34 mitzunehmen: Pflichtfelder laut
+`DATENMODELL.md` und eine `id` im Entwurf als Grund für `offen`.
+
+### Eine Quelldatei mit Komma im Namen
+
+`quelldatei:` nennt bei zwei Seiten beide Dateien, getrennt durch Komma, so
+steht es im Datenmodell. Die Übersicht in `sammelimport.md` setzt jede Datei in
+Backticks und kommt deshalb mit Kommas im Dateinamen klar. `quelldatei:` auf
+der Karte nicht. Die Prüfung „`quelldatei` existiert unter `quellen/`" aus #34
+muss den Wert wieder in Dateien zerlegen und kann bei so einem Namen nicht
+sagen, wo eine Datei aufhört. Betrifft PlayDrill, sobald ein Dateiname dort ein
+Komma trägt. `quelldatei:` als Liste ist in #29 ausdrücklich draußen.
+
 ## Aus Welle 1b bewusst ausgelassen
 
 Steht so in #10 unter *Out of Scope* und gilt weiter.
