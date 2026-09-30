@@ -75,7 +75,7 @@ wege:
 fusszeile: "Quelle: Volleyball-Magazin 09/2026, Seite 12"
 ```
 
-Auf oberster Ebene gibt es elf Schlüssel, mehr nicht:
+Auf oberster Ebene gibt es zwölf Schlüssel, mehr nicht:
 
 | Schlüssel | Wofür |
 |---|---|
@@ -88,6 +88,7 @@ Auf oberster Ebene gibt es elf Schlüssel, mehr nicht:
 | `spieler` | Marker mit Beschriftung |
 | `wege` | Lauf- und Ballwege |
 | `zonen` | Flächen, die etwas bedeuten: Zielzone, Aufschlagbereich |
+| `stellen` | Orte, an denen nichts steht und die einen Namen brauchen: Feldmitte, Netz |
 | `geraete` | Kasten, Ballwagen, Zielmatte und was sonst im Weg steht |
 | `abstaende` | Maßketten und beschriftete Pfeile |
 
@@ -261,7 +262,8 @@ gezeichnet.
 
 Fängt ein Weg auf einem Spieler an oder hört auf ihm auf, endet er am Rand des
 Markers. Sonst verschwände die Pfeilspitze unter dem Kreis, und mit ihr das
-Einzige, was die Richtung zeigt.
+Einzige, was die Richtung zeigt. An einer Stelle endet er genauso, am Rand
+ihres Wortes.
 
 ### `zonen`
 
@@ -293,8 +295,8 @@ und eine Beschriftung und ist maßstäblich wie alles andere in einer Szene.
 Fläche mit Rand und Beschriftung, und man könnte eine Zielzone als Kasten
 hinstellen. Das wäre aber eine falsche Ansage: Ein Gerät ist ein Gegenstand,
 den jemand in die Halle stellt, eine Zone ist eine Absprache. Wer den
-Unterschied im Bild nicht sieht, räumt in der Halle einen Kasten von einer
-Stelle weg, an der nie einer stand. Beide sehen deshalb verschieden aus:
+Unterschied im Bild nicht sieht, räumt in der Halle einen Kasten weg, wo nie
+einer stand. Beide sehen deshalb verschieden aus:
 
 | | Gerät | Zone |
 |---|---|---|
@@ -326,9 +328,69 @@ bleibt das Wort auch über einem hervorgehobenen Marker lesbar, der in
 Strichfarbe gefüllt ist.
 
 Zwei Flächen unter einem Wort gibt es nicht. Das wäre eine Absprache an zwei
-Stellen, und die schreibt man als zwei Zonen hin.
+Orten, und die schreibt man als zwei Zonen hin.
 
 Zonen gibt es auf dem Feld und auf der freien Leinwand.
+
+### `stellen`
+
+```yaml
+stellen:
+  - bei: [4.5, 4.5]
+    text: Feldmitte
+  - bei: [9.8, 9.0]
+    text: Netz
+```
+
+Eine **Stelle** ist ein Ort im Schaubild, der einen Namen braucht, ohne dass
+dort etwas steht: die Feldmitte, zu der gespielt wird, der Startpunkt eines
+Laufwegs, eine Linie des Feldes. Gezeichnet wird nur das Wort, zentriert auf
+den Ort, in Kleinschrift und Strichfarbe. Es gibt keinen Punkt, keinen Rand
+und keine Fläche.
+
+| Schlüssel | Bedeutung |
+|---|---|
+| `bei` | der Ort, in den drei Formen von oben, **Pflicht** |
+| `text` | das Wort, **Pflicht** |
+
+Eine Stelle ist nur ein Wort. Ohne `text` bliebe nichts von ihr, was im Bild
+stünde, und die Szene bricht ab. Ohne `bei` bricht sie ebenso ab, wie bei
+jedem anderen Ort. Andere Schlüssel gibt es nicht.
+
+**Zone oder Stelle?** Eine Zone ist eine Absprache über ein Stück Boden und
+hat eine Fläche. Eine Stelle ist nur der Name eines Ortes, an dem nichts
+steht. Die Feldmitte, zu der ein Abwehrball gespielt wird, ist kein Stück
+Boden mit einem Maß, und ein Rand darum wäre eine Ansage, die es in der Halle
+nicht gibt: Wer ihn sieht, sperrt etwas ab. Das Netz ist eine Linie.
+
+| | Zone | Stelle |
+|---|---|---|
+| ist | eine Absprache über ein Stück Boden | der Name eines Ortes |
+| im Bild | Fläche, gestrichelter Rand, Wort darin | nur das Wort |
+| Maß | `groesse`, Pflicht | keins |
+
+Steht an dem Ort jemand oder etwas, trägt dessen Marker oder Gerät den Namen,
+und es braucht keine Stelle. Geprüft wird das nicht.
+
+**Ein Weg hört vor dem Wort auf.** Beginnt oder endet ein Weg am Ort einer
+Stelle, endet er am Rand ihres Wortes, so wie am Rand eines Markers. Das gilt
+auch für einen Weg mit `bogen`. Dafür muss in `von` oder `nach` derselbe Ort
+stehen wie in `bei`, auf fünf Zentimeter genau. Einen Namen, über den ein Weg
+die Stelle findet, gibt es nicht. Waagerecht ist ein Wort breiter als
+senkrecht, und ein langes Wort hält einen Weg weiter von seinem Ort fern als
+ein kurzes. Mehr als zwei Drittel eines Weges fallen dabei nie weg. Ist er
+dafür zu kurz, ragt die Spitze ins Wort; dann hilft ein kürzeres Wort oder ein
+längerer Weg.
+
+Das Wort steht **über allem**, auch über den Wörtern der Zonen und über den
+Markern, denn außer dem Wort hat eine Stelle nichts.
+
+Eine Linie des Feldes benennt man neben dem Feld auf ihrer Höhe, wie das Netz
+oben. Auf der Linie selbst liefe sie mitten durch das Wort. Neben dem Feld
+wächst das Blatt mit, statt das Wort anzuschneiden.
+
+Stellen gibt es auf dem Feld und auf der freien Leinwand. Eine
+Positionsnummer im Sand und eine Rolle in der Halle brechen auch hier ab.
 
 ### `geraete`
 
@@ -488,7 +550,7 @@ In der Szene ändert sich nichts. Der Text steht weiter unter `untertitel:`,
 verschoben wird die Zeile allein im Satz.
 
 Die oberste Zeile wird zugleich der Name des Bildes, im SVG als `<title>`.
-Das ist der `titel:`, und ohne ihn der Untertitel, der an seiner Stelle steht.
+Das ist der `titel:`, und ohne ihn der Untertitel, der dann dort oben steht.
 Es trägt, wo das Bild für sich steht, etwa in der Vorschau beim Zeichnen. In
 der Leseansicht steckt es als `<img>` mit eigenem `alt`, dort zählt das.
 
@@ -512,7 +574,7 @@ als `<img>` ein, und darin gibt es keine Elternfarbe, die färben könnte.
   Laufwege für die Rotation.
 - **Annahme- und Angriffssystem:** Lauf- und Ballwege auf einer Feldhälfte, die
   Gegenseite nur so weit, wie sie gebraucht wird. Wohin der Ball soll, ist eine
-  Zone.
+  Zone, und ohne Maß eine Stelle, etwa die Feldmitte.
 - **Beach:** dieselbe Szene mit `form: beach`; Plätze über Rollen statt über
   Nummern.
 - **Stationsbetrieb:** aufs Feld, solange er hineinpasst. Sonst `form: frei`

@@ -11,7 +11,7 @@ Jahr spaeter drei Zeilen kostet statt einer Neuzeichnung. Wer in das SVG
 tippt, verliert es beim naechsten Erzeugen, genau wie bei der Leseansicht.
 
 Gerechnet wird in der Szene durchgehend in Metern. Die Umrechnung in
-Zeichenkoordinaten passiert allein hier, an einer Stelle: nur so stimmt ein
+Zeichenkoordinaten passiert allein hier und nirgends sonst: nur so stimmt ein
 eingezeichneter Abstand mit dem ueberein, was in der Halle abgeschritten wird.
 
 Geschrieben wird erst, wenn das ganze Bild steht. Eine Szene, die nicht
@@ -50,6 +50,10 @@ LUFT = 0.8
 # Radius eines Spielermarkers in Metern. Knapp ein Meter Durchmesser: so gross
 # wie ein Mensch von oben Platz braucht, und damit massstaeblich statt geraten.
 MARKER = 0.45
+
+# Die Luft zwischen dem Ende eines Weges und dem Marker oder Wort, an dem er
+# aufhoert, in Metern. Genug, dass die Pfeilspitze frei steht.
+WEGABSTAND = 0.15
 
 # Laenge eines Massstrichs quer zur Masslinie, in Metern. Ein Strich, kein
 # Balken: er markiert das Ende einer Masskette, ohne mit dem Aufbau um
@@ -161,12 +165,23 @@ def grenzen(s: Szene) -> tuple[float, float, float, float]:
         xs += [x - LUFT, x + LUFT]
         ys += [y - LUFT, y + LUFT]
     # Eine Beschriftung braucht Platz nach ihrer Laenge und nicht nach LUFT.
-    hoch = KLEINSCHRIFT / MASSSTAB / 2
-    for text, (x, y) in s.beschriftungen():
-        breit = textbreite(text, KLEINSCHRIFT) / MASSSTAB / 2
-        xs += [x - breit, x + breit]
-        ys += [y - hoch, y + hoch]
+    for text, bei in s.beschriftungen():
+        links, unten, rechts, oben = wortflaeche(text, bei).rahmen
+        xs += [links, rechts]
+        ys += [unten, oben]
     return min(xs), min(ys), max(xs), max(ys)
+
+
+def wortflaeche(text: str, bei: Ort) -> Flaeche:
+    """Der Platz, den eine Beschriftung im Feld um ihren Ort einnimmt, in Metern.
+
+    Geschaetzt, siehe textbreite(). Dieselbe Rechnung laesst das Blatt um ein
+    Wort wachsen und einen Weg vor dem Wort einer Stelle aufhoeren. Zwei
+    Schaetzungen liefen auseinander, und dann stuende ein Wort im Bild, das
+    der Weg fuer kleiner haelt.
+    """
+    return Flaeche("rechteck", bei, textbreite(text, KLEINSCHRIFT) / MASSSTAB,
+                   KLEINSCHRIFT / MASSSTAB)
 
 
 def textbreite(text: str, groesse: float) -> float:
@@ -262,7 +277,7 @@ class Satzspiegel:
         # Titel und Fusszeile sitzen auf der linken Kante der Grundform, nicht
         # auf der des Blattes. Die waechst mit, sobald neben dem Feld jemand
         # steht, und ein Titel, der sich danach richtet, spraenge von Bild zu
-        # Bild an eine andere Stelle.
+        # Bild woandershin.
         self.textkante = self.blatt.x(0)
 
         # Die Legende faengt am rechten Rand des Bildblocks an. Der liegt einen
@@ -349,6 +364,11 @@ def stil() -> str:
         + f".zonenname{{fill:var(--strich);font-size:{KLEINSCHRIFT};"
           "stroke:var(--zone);stroke-width:3;stroke-linejoin:round;"
           "paint-order:stroke}"
+        # Eine Stelle ist nur ihr Wort, voll und so gross wie das einer Zone.
+        # Den Hof des Zonenworts braucht sie nicht: er hebt das Wort von einem
+        # gefuellten Marker ab, und wo einer steht, traegt er den Namen und
+        # die Stelle entfaellt.
+        + f".stelle{{fill:var(--strich);font-size:{KLEINSCHRIFT}}}"
         + ".weg{fill:none;stroke-width:2.6;stroke-linecap:round}"
         + ".laufweg{stroke:var(--laufweg)}"
         + ".ballweg{stroke:var(--ballweg);stroke-dasharray:9 6}"
@@ -485,21 +505,36 @@ def steuerpunkt(von: Ort, nach: Ort, bogen: float) -> Ort | None:
     return (2 * sx - (von[0] + nach[0]) / 2, 2 * sy - (von[1] + nach[1]) / 2)
 
 
-def _geschoben(punkt: Ort, ziel: Ort, strecke: float) -> Ort:
-    """Schiebt `punkt` um `strecke` Meter auf `ziel` zu."""
-    dx, dy = ziel[0] - punkt[0], ziel[1] - punkt[1]
+def aussparungen(s: Szene) -> list[Flaeche]:
+    """Was ein Weg an seinem Ende auslaesst: die Marker und die Woerter der Stellen.
+
+    Ein Pfeil, der in der Mitte eines Spielers oder im Wort einer Stelle
+    endet, verliert seine Spitze darunter, und damit das Einzige, was die
+    Richtung zeigt. Beide nehmen einen Platz um ihren Ort ein, der Marker einen
+    Kreis, das Wort ein Rechteck, und an dessen Rand hoert der Weg auf.
+    """
+    marker = [Flaeche("kreis", (spieler.x, spieler.y), 2 * MARKER, 2 * MARKER)
+              for spieler in s.spieler]
+    return marker + [wortflaeche(stelle.text, stelle.bei) for stelle in s.stellen]
+
+
+def _kuerzung(ende: Ort, hin: Ort, ausgespart: list[Flaeche]) -> tuple[Ort, float]:
+    """In welche Richtung und wie weit ein Ende des Weges auf `hin` zu rueckt.
+
+    Steht an dem Ende nichts, rueckt es nicht. Stehen dort ein Marker und ein
+    Wort, zaehlt das, was weiter reicht.
+    """
+    dx, dy = hin[0] - ende[0], hin[1] - ende[1]
     laenge = (dx * dx + dy * dy) ** 0.5
     if laenge == 0:
-        return punkt
-    return (punkt[0] + dx / laenge * strecke, punkt[1] + dy / laenge * strecke)
+        return (0.0, 0.0), 0.0
+    richtung = (dx / laenge, dy / laenge)
+    raender = [f.rand(richtung) for f in ausgespart if trifft(ende, f.bei)]
+    return richtung, (max(raender) + WEGABSTAND if raender else 0.0)
 
 
-def enden(weg: Weg, besetzt: list[Ort]) -> tuple[Ort, Ort, Ort | None]:
-    """Laesst einen Weg am Rand eines Markers anfangen und aufhoeren.
-
-    Ein Pfeil, der in der Mitte eines Spielers endet, verliert seine Spitze
-    unter dessen Marker, und damit das Einzige, was die Richtung zeigt. Also
-    hoert der Weg am Kreisrand auf, mit etwas Luft davor.
+def enden(weg: Weg, ausgespart: list[Flaeche]) -> tuple[Ort, Ort, Ort | None]:
+    """Laesst einen Weg am Rand eines Markers oder Wortes anfangen und aufhoeren.
 
     Gekuerzt wird entlang der Tangente, bei einer Kurve also zum Steuerpunkt
     hin. Zur Sehne hin gekuerzt rutschte der Anfang eines stark gebogenen Weges
@@ -507,19 +542,25 @@ def enden(weg: Weg, besetzt: list[Ort]) -> tuple[Ort, Ort, Ort | None]:
 
     Der Steuerpunkt wird danach neu gesetzt, aus den gekuerzten Enden. Bliebe
     der alte stehen, waere die Pfeilhoehe des gezeichneten Bogens eine andere
-    als die angesagte, sobald ein Ende auf einem Spieler liegt. `bogen` ist ein
-    Mass und muss auch dann nachmessbar bleiben.
+    als die angesagte, sobald ein Ende auf einem Spieler oder an einer Stelle
+    liegt. `bogen` ist ein Mass und muss auch dann nachmessbar bleiben.
     """
     von, nach = weg.von, weg.nach
     steuer = steuerpunkt(von, nach, weg.bogen)
+    richtung_von, weit_von = _kuerzung(von, steuer or nach, ausgespart)
+    richtung_nach, weit_nach = _kuerzung(nach, steuer or von, ausgespart)
+    # Beide Enden zusammen nie mehr als zwei Drittel: ein kurzer Weg zwischen
+    # zwei Nachbarpositionen soll schrumpfen, nicht sich umdrehen. Die Grenze
+    # gilt fuer beide zusammen und nicht je Seite, damit ein breites Wort am
+    # einen Ende den Platz bekommt, den am anderen niemand braucht.
     dx, dy = nach[0] - von[0], nach[1] - von[1]
-    # Nie mehr als ein Drittel je Seite: ein kurzer Weg zwischen zwei
-    # Nachbarpositionen soll schrumpfen, nicht sich umdrehen.
-    strecke = min(MARKER + 0.15, (dx * dx + dy * dy) ** 0.5 / 3)
-    if any(trifft(von, p) for p in besetzt):
-        von = _geschoben(von, steuer or nach, strecke)
-    if any(trifft(nach, p) for p in besetzt):
-        nach = _geschoben(nach, steuer or von, strecke)
+    hoechstens = (dx * dx + dy * dy) ** 0.5 * 2 / 3
+    if weit_von + weit_nach > hoechstens:
+        faktor = hoechstens / (weit_von + weit_nach)
+        weit_von, weit_nach = weit_von * faktor, weit_nach * faktor
+    von = (von[0] + richtung_von[0] * weit_von, von[1] + richtung_von[1] * weit_von)
+    nach = (nach[0] + richtung_nach[0] * weit_nach,
+            nach[1] + richtung_nach[1] * weit_nach)
     return von, nach, steuerpunkt(von, nach, weg.bogen)
 
 
@@ -528,9 +569,9 @@ def trifft(a: Ort, b: Ort) -> bool:
     return abs(a[0] - b[0]) < 0.05 and abs(a[1] - b[1]) < 0.05
 
 
-def pfad(weg: Weg, blatt: Blatt, besetzt: list[Ort]) -> str:
+def pfad(weg: Weg, blatt: Blatt, ausgespart: list[Flaeche]) -> str:
     """Ein Weg, gerade oder gekruemmt, mit Pfeilspitze am Ende."""
-    (x0, y0), (x1, y1), steuer = enden(weg, besetzt)
+    (x0, y0), (x1, y1), steuer = enden(weg, ausgespart)
     anfang = f"M{koord(blatt.x(x0))} {koord(blatt.y(y0))}"
     if steuer:
         mitte = f"Q{koord(blatt.x(steuer[0]))} {koord(blatt.y(steuer[1]))} "
@@ -587,6 +628,17 @@ def zonennamen(s: Szene, blatt: Blatt) -> str:
                    for zone in s.zonen)
 
 
+def stellen(s: Szene, blatt: Blatt) -> str:
+    """Die Woerter der Stellen, jedes zentriert auf seinen Ort.
+
+    Nur das Wort. Ein Punkt darunter liesse sich an einer Linie des Feldes
+    nicht setzen, und ein Rand oder eine Flaeche machten aus der Stelle eine
+    Zone (ADR-0007).
+    """
+    return "".join(beschriftung("stelle", stelle.text, stelle.bei, blatt)
+                   for stelle in s.stellen)
+
+
 def geraete(s: Szene, blatt: Blatt) -> str:
     """Die Geraete, jedes aus seinen Teilen und mit seinem Namen darunter.
 
@@ -616,8 +668,8 @@ def abstaende(s: Szene, blatt: Blatt) -> str:
 
     Beide zeichnen dieselbe Strecke und unterscheiden sich allein an den
     Enden. Dass ein Abstand massstaeblich stimmt, ist damit keine Frage der
-    Sorgfalt, sondern eine Folge des Aufbaus: die Laenge entsteht an einer
-    Stelle, und die ist fuer beide Darstellungen dieselbe.
+    Sorgfalt, sondern eine Folge des Aufbaus: die Laenge entsteht in einer
+    Rechnung, und die ist fuer beide Darstellungen dieselbe.
 
     Der Pfeil traegt an beiden Enden eine Spitze. Einfach bepfeilt laese er
     sich als Weg, und dann stuende eine Bewegung im Bild, die niemand gemeint
@@ -676,9 +728,8 @@ def textzeile(x: float, zeile: Zeile) -> str:
     """Eine gesetzte Zeile als SVG, in ihrer Zeilenhoehe senkrecht zentriert.
 
     Gesetzt wird zur Mitte und nicht zur Grundlinie, weil das Stylesheet
-    `dominant-baseline` schon auf die Mitte stellt. So braucht keine Stelle
-    hier die Kennwerte der Schrift zu kennen, die erst im Betrachter
-    feststehen.
+    `dominant-baseline` schon auf die Mitte stellt. So braucht hier nichts die
+    Kennwerte der Schrift zu kennen, die erst im Betrachter feststehen.
     """
     sorte, text, oben = zeile
     y = oben + zeilenhoehe(sorte) / 2
@@ -730,15 +781,19 @@ def zeichne(s: Szene) -> str:
         abstaende(s, blatt),
     ]
     # Wege unter die Marker: ein Pfeil, der einen Spieler streift, soll nicht
-    # quer durch sein Kuerzel laufen. Wer auf einem Spieler anfaengt oder
-    # aufhoert, wird dafuer bis an dessen Kreisrand gekuerzt.
-    besetzt = [(spieler.x, spieler.y) for spieler in s.spieler]
-    teile.extend(pfad(weg, blatt, besetzt) for weg in s.wege)
+    # quer durch sein Kuerzel laufen. Wer auf einem Spieler oder an einer
+    # Stelle anfaengt oder aufhoert, wird dafuer bis an den Rand des Markers
+    # oder des Wortes gekuerzt.
+    ausgespart = aussparungen(s)
+    teile.extend(pfad(weg, blatt, ausgespart) for weg in s.wege)
     teile.append(marker(s, blatt))
     # Die Zonennamen ueber den Aufbau. Die Flaechen liegen ganz unten, ihre
     # Woerter ganz oben: was eine Zone bedeutet, soll nicht unter dem
     # verschwinden, was in ihr steht.
     teile.append(zonennamen(s, blatt))
+    # Die Stellen noch darueber. Eine Stelle hat nichts als ihr Wort; liegt
+    # etwas darueber, ist sie weg.
+    teile.append(stellen(s, blatt))
     # Das Textwerk zuletzt. Es steht zwar neben dem Bild und nicht darin, aber
     # was erklaert, soll von nichts verdeckt werden, was spaeter dazukommt.
     teile.append(textwerk(spiegel))

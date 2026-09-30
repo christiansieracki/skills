@@ -230,6 +230,25 @@ def farbvariable(baum, element: ET.Element, eigenschaft: str) -> str:
     return treffer.group(1)
 
 
+# Wie breit ein Zeichen mindestens ist, als Anteil seiner Schriftgroesse.
+# Knapp geschaetzt: ein Wort aus gewoehnlichen Buchstaben ist in einer
+# serifenlosen Schrift breiter. Ragt ein Weg schon in diesen Kasten hinein,
+# ragt er sicher ins Wort; ragt schon der Kasten ueber das Blatt, ragt das Wort
+# erst recht. Die Zahl ist eine Annahme ueber Schrift; das Skript rechnet
+# mit seiner eigenen.
+MINDESTBREITE = 0.5
+
+
+def wortkasten(baum, wort: ET.Element) -> tuple[float, float]:
+    """Wie weit ein Wort mindestens von seiner Mitte reicht, in Zeicheneinheiten.
+
+    Halbe Breite und halbe Hoehe. Die Schriftgroesse kommt aus dem Stylesheet
+    des Bildes, so wie der Betrachter sie anwendet.
+    """
+    groesse = float(stilwert(baum, wort, "font-size"))
+    return len(wort.text) * groesse * MINDESTBREITE / 2, groesse / 2
+
+
 def marker_nach_beschriftung(baum) -> dict[str, tuple[ET.Element, ET.Element]]:
     """Jeder beschriftete Spielermarker samt Beschriftung, nach deren Text.
 
@@ -970,7 +989,7 @@ class SchaubildTest(unittest.TestCase):
     def test_eine_zone_ist_im_bild_von_einem_geraet_unterscheidbar(self) -> None:
         # Ein Geraet ist ein Gegenstand, den jemand in die Halle stellt, eine
         # Zone eine Absprache. Wer den Unterschied im Bild nicht sieht, raeumt
-        # einen Kasten von einer Stelle weg, an der nie einer stand.
+        # einen Kasten weg, wo nie einer stand.
         baum = self.zeichne("beides", """
             form: halle
             zonen:
@@ -1028,17 +1047,17 @@ class SchaubildTest(unittest.TestCase):
 
         reihenfolge = list(baum.iter())
 
-        def stelle(klasse: str) -> int:
+        def rang(klasse: str) -> int:
             return reihenfolge.index(mit_klasse(baum, klasse)[0])
 
-        zone = stelle("zonenflaeche")
+        zone = rang("zonenflaeche")
         # Ueber einer Zone stehen Marker und laufen Wege. Eine Flaeche, die
         # kraeftig genug waere, um aufzufallen, verdeckte sonst, worum es geht.
-        self.assertLess(zone, stelle("marker"))
-        self.assertLess(zone, stelle("weg"))
+        self.assertLess(zone, rang("marker"))
+        self.assertLess(zone, rang("weg"))
         # Die Angriffslinie gehoert zum Boden und nicht zum Aufbau. Eine
         # Zielzone darueber loeschte die Linie, an der sie abgemessen wird.
-        self.assertLess(zone, stelle("angriffslinie"))
+        self.assertLess(zone, rang("angriffslinie"))
 
     def test_das_wort_einer_zone_bleibt_unter_einem_marker_lesbar(self) -> None:
         # Die Flaeche einer Zone gehoert unter den Aufbau, ihr Wort nicht. Ein
@@ -1059,7 +1078,7 @@ class SchaubildTest(unittest.TestCase):
 
         reihenfolge = list(baum.iter())
 
-        def stelle(klasse: str) -> int:
+        def rang(klasse: str) -> int:
             return reihenfolge.index(mit_klasse(baum, klasse)[0])
 
         # Der Marker liegt wirklich auf dem Wort: sonst pruefte der Test die
@@ -1070,8 +1089,8 @@ class SchaubildTest(unittest.TestCase):
         abstand = abs(float(name.get("y")) - float(kreis.get("cy")))
         self.assertLess(abstand, float(kreis.get("r")))
 
-        self.assertGreater(stelle("zonenname"), stelle("marker"))
-        self.assertLess(stelle("zonenflaeche"), stelle("marker"),
+        self.assertGreater(rang("zonenname"), rang("marker"))
+        self.assertLess(rang("zonenflaeche"), rang("marker"),
                         "die Flaeche bleibt trotzdem unten")
         # Und massstaeblich steht das Wort weiter da, wo es hingehoert.
         self.assertAlmostEqual(feld.meter(float(name.get("x")), 0.0)[0], 4.5,
@@ -1184,6 +1203,272 @@ class SchaubildTest(unittest.TestCase):
         rechts = float(flaeche.get("x")) + float(flaeche.get("width"))
         self.assertLess(rechts, breite, "die Zone liegt ganz im Bild")
         self.assertGreater(hoehe, 0)
+
+    # -- Stellen -----------------------------------------------------------
+
+    def test_eine_stelle_steht_an_ihrem_ort(self) -> None:
+        # In denselben drei Formen wie alles andere, damit es keine zweite
+        # Schreibweise zu lernen gibt, und auf jeder Grundform, die sie
+        # hergibt. Geprueft wird der Ort in Metern, mit etwas Spielraum, wo die
+        # Angabe eine Flaeche meint und keinen Punkt.
+        for name, kopf, bei, masse, klasse, (links, rechts, unten, oben) in (
+            ("meter", "form: halle", "[3.0, 12.5]", HALLE, "feld",
+             (2.99, 3.01, 12.49, 12.51)),
+            # Die Drittelflaeche, die im Feld die Nummer 4 traegt.
+            ("position", "form: halle", "4", HALLE, "feld", (0, 3, 6, 9)),
+            # Am Netz und in der Mitte der Breite, dort, wo geblockt wird.
+            ("rolle", "form: beach", "block", BEACH, "feld",
+             (8 / 3, 16 / 3, 16 / 3, 8)),
+            ("leinwand", "form: frei\ngroesse: [12.0, 9.0]", "[3.0, 7.5]",
+             LEINWAND, "leinwand", (2.99, 3.01, 7.49, 7.51)),
+        ):
+            with self.subTest(ort=name):
+                baum = self.zeichne(f"stelle-{name}", kopf + f"""
+stellen:
+  - bei: {bei}
+    text: Feldmitte
+""")
+
+                bezug = Feldmass(baum, masse, klasse)
+                woerter = mit_klasse(baum, "stelle")
+                self.assertEqual([e.text for e in woerter], ["Feldmitte"])
+                x, y = bezug.meter(float(woerter[0].get("x")),
+                                   float(woerter[0].get("y")))
+                self.assertTrue(links < x < rechts, f"x liegt bei {x:.2f} m")
+                self.assertTrue(unten < y < oben, f"y liegt bei {y:.2f} m")
+
+    def test_auch_eine_stelle_nimmt_nur_die_orte_ihrer_grundform(self) -> None:
+        # So wie ueberall sonst. Still auf eine Hallenposition zurueckzufallen
+        # hiesse, ein Wort an einen Ort zu setzen, den es im Sand nicht gibt.
+        for name, form, bei, wort in (("sand", "beach", "4", "Positionsnummern"),
+                                      ("halle", "halle", "block", "Rollen")):
+            with self.subTest(form=form):
+                fertig = self.scheitert(f"stelle-{name}", f"""
+                    form: {form}
+                    stellen:
+                      - bei: {bei}
+                        text: Feldmitte
+                """)
+
+                self.assertIn("Stelle 1", fertig.stdout)
+                self.assertIn(wort, fertig.stdout)
+                self.assertFalse(self.bild(f"stelle-{name}").exists())
+
+    def test_eine_stelle_ohne_wort_ohne_ort_oder_mit_vertipptem_schluessel_bricht_ab(
+            self) -> None:
+        # Eine Stelle ist nur ein Wort. Ohne es stuende in der Szene etwas,
+        # das nach fertig aussieht und im Bild nicht vorkommt. Ein vertippter
+        # Schluessel waere die stillste Art, das Wort zu verlieren.
+        for name, eintrag, gesucht in (
+            ("ohne-text", "- bei: [4.5, 4.5]", ["text", "Wort"]),
+            ("leerer-text", '- bei: [4.5, 4.5]\n    text: ""', ["text", "Wort"]),
+            ("ohne-bei", "- text: Feldmitte", ["bei"]),
+            ("vertippt", "- bei: [4.5, 4.5]\n    txt: Feldmitte", ["txt"]),
+        ):
+            with self.subTest(fall=name):
+                fertig = self.scheitert(f"stelle-{name}",
+                                        "form: halle\nstellen:\n  " + eintrag)
+
+                self.assertIn("Stelle 1", fertig.stdout)
+                for wort in gesucht:
+                    self.assertIn(wort, fertig.stdout)
+                self.assertFalse(self.bild(f"stelle-{name}").exists())
+
+    def test_eine_stelle_zeichnet_nur_ihr_wort(self) -> None:
+        # Keinen Punkt, keinen Rand, keine Flaeche. Mit einem Rand saehe sie
+        # aus wie eine Zone, und die Spieler sperrten in der Halle etwas ab,
+        # das es nicht gibt (ADR-0007).
+        # Die Zone steht in beiden Szenen, damit es ein Wort gibt, mit dessen
+        # Schrift sich die der Stelle vergleichen laesst.
+        zone = """
+form: halle
+zonen:
+  - text: Zielzone
+    form: rechteck
+    bei: [4.5, 14.0]
+    groesse: [3.0, 2.0]
+"""
+        ohne = self.zeichne("ohne-stelle", zone)
+        mit = self.zeichne("mit-stelle", zone + """
+stellen:
+  - bei: [4.5, 4.5]
+    text: Feldmitte
+""")
+
+        def formen(baum) -> list[tuple[str, str]]:
+            umrisse = {SVG + t for t in ("rect", "circle", "ellipse", "line",
+                                         "path", "polygon", "polyline")}
+            return sorted((e.tag, e.get("class") or "") for e in baum.iter()
+                          if e.tag in umrisse)
+
+        self.assertEqual(formen(mit), formen(ohne),
+                         "zum Bild kommt nichts dazu, was eine Form haette")
+        wort = mit_klasse(mit, "stelle")[0]
+        self.assertIsNone(stilwert(mit, wort, "stroke"), "und das Wort hat keinen Rand")
+        # In Strichfarbe und so gross wie das Wort einer Zone. Eine Stelle ist
+        # eine Beschriftung im Feld wie jede andere, nur ohne etwas darunter.
+        self.assertEqual(farbvariable(mit, wort, "fill"), "strich")
+        self.assertEqual(stilwert(mit, wort, "font-size"),
+                         stilwert(mit, mit_klasse(mit, "zonenname")[0], "font-size"))
+
+    def test_das_wort_einer_stelle_steht_ueber_allem_im_bild(self) -> None:
+        # Auch ueber den Zonenwoertern und den Markern. Eine Stelle hat nichts
+        # als ihr Wort; liegt etwas darueber, ist sie weg.
+        baum = self.zeichne("obenauf", """
+            form: halle
+            zonen:
+              - text: Zielzone
+                form: rechteck
+                bei: [4.5, 6.0]
+                groesse: [3.0, 2.0]
+            geraete:
+              - text: Kasten
+                teile:
+                  - form: rechteck
+                    bei: [7.0, 3.0]
+                    groesse: [1.6, 0.8]
+            abstaende:
+              - art: masskette
+                von: [1.0, 2.0]
+                nach: [7.0, 2.0]
+            spieler:
+              - bei: 3
+                text: Z
+                hervorgehoben: true
+            wege:
+              - art: ballweg
+                von: 3
+                nach: [4.5, 4.5]
+            stellen:
+              - bei: [4.5, 4.5]
+                text: Feldmitte
+        """)
+
+        reihenfolge = list(baum.iter())
+        wort = reihenfolge.index(mit_klasse(baum, "stelle")[0])
+        for klasse in ("zonenname", "marker", "beschriftung", "weg", "teil",
+                       "geraetname", "masslinie", "massbeschriftung", "netz"):
+            with self.subTest(unter=klasse):
+                self.assertGreater(wort, reihenfolge.index(mit_klasse(baum, klasse)[-1]))
+
+    def test_eine_stelle_neben_dem_feld_bleibt_ganz_im_bild(self) -> None:
+        # Rechts neben dem Feld auf Hoehe des Netzes, wo der Pfosten steht.
+        # Ein angeschnittenes Wort ist die stillste aller Fehlermeldungen.
+        def mit(text: str) -> ET.Element:
+            return self.zeichne(f"pfosten-{len(text)}", f"""
+                form: halle
+                stellen:
+                  - bei: [10.0, 9.0]
+                    text: {text}
+            """)
+
+        kurz, lang = mit("Pfosten"), mit("Netzpfosten")
+
+        wort = mit_klasse(lang, "stelle")[0]
+        halb, _ = wortkasten(lang, wort)
+        self.assertLessEqual(float(wort.get("x")) + halb, zahlen(lang.get("viewBox"))[2],
+                             "das Wort steht ganz im Bild")
+        self.assertGreater(zahlen(lang.get("viewBox"))[2],
+                           zahlen(kurz.get("viewBox"))[2],
+                           "das laengere Wort braucht mehr Blatt")
+        self.assertAlmostEqual(Feldmass(kurz, HALLE).breite,
+                               Feldmass(lang, HALLE).breite, places=2,
+                               msg="gewachsen ist das Blatt, nicht das Feld")
+
+    def pruefe_vor_dem_wort(self, baum, punkt: tuple[float, float]) -> None:
+        """Der Punkt liegt ausserhalb des Kastens um das Wort der ersten Stelle."""
+        wort = mit_klasse(baum, "stelle")[0]
+        breit, hoch = wortkasten(baum, wort)
+        dx = abs(punkt[0] - float(wort.get("x")))
+        dy = abs(punkt[1] - float(wort.get("y")))
+        self.assertTrue(dx >= breit or dy >= hoch,
+                        f"der Weg reicht ins Wort: {dx:.1f} von {breit:.1f} "
+                        f"waagerecht, {dy:.1f} von {hoch:.1f} senkrecht")
+
+    def test_ein_gerader_weg_an_einer_stelle_hoert_vor_dem_wort_auf(self) -> None:
+        # Sonst liefe die Pfeilspitze durch das Wort, und beide waeren
+        # schlecht zu lesen. Das gilt am Ende eines Weges wie an seinem
+        # Anfang.
+        baum = self.zeichne("zur-mitte", """
+            form: halle
+            stellen:
+              - bei: [5.0, 5.0]
+                text: Feldmitte
+            wege:
+              - art: ballweg
+                von: [0.5, 5.0]
+                nach: [5.0, 5.0]
+              - art: laufweg
+                von: [5.0, 5.0]
+                nach: [5.0, 1.0]
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        ball, lauf = (zahlen(mit_klasse(baum, art)[0].get("d"))
+                      for art in ("ballweg", "laufweg"))
+        self.pruefe_vor_dem_wort(baum, (ball[2], ball[3]))
+        self.pruefe_vor_dem_wort(baum, (lauf[0], lauf[1]))
+        # Das andere Ende bleibt, wo es angesagt ist.
+        self.assertEqual(tuple(round(w, 2) for w in feld.meter(ball[0], ball[1])),
+                         (0.5, 5.0))
+        self.assertEqual(tuple(round(w, 2) for w in feld.meter(lauf[2], lauf[3])),
+                         (5.0, 1.0))
+        # Und gekuerzt wird um einen Kasten und nicht um einen Kreis: das Wort
+        # ist breiter als hoch, also bleibt waagerecht mehr Weg weg.
+        waagerecht = feld.strecke(abs(ball[2] - ball[0]))
+        senkrecht = feld.strecke(abs(lauf[3] - lauf[1]))
+        self.assertLess(waagerecht, senkrecht,
+                        "beide Wege sind ungekuerzt 4,5 und 4 m lang")
+
+    def test_ein_gekruemmter_weg_an_einer_stelle_hoert_vor_dem_wort_auf(self) -> None:
+        # `bogen` soll keine Ausnahme sein: gekuerzt wird wie am Marker, und
+        # die Pfeilhoehe bleibt dabei die angesagte.
+        baum = self.zeichne("bogen-zur-mitte", """
+            form: halle
+            stellen:
+              - bei: [5.0, 5.0]
+                text: Feldmitte
+            wege:
+              - art: ballweg
+                von: [1.0, 1.0]
+                nach: [5.0, 5.0]
+                bogen: 1.5
+              - art: laufweg
+                von: [5.0, 5.0]
+                nach: [8.0, 1.0]
+                bogen: -1.0
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        ball, lauf = (mit_klasse(baum, art)[0].get("d")
+                      for art in ("ballweg", "laufweg"))
+        self.assertIn("Q", ball)
+        self.assertIn("Q", lauf)
+        self.pruefe_vor_dem_wort(baum, tuple(zahlen(ball)[4:]))
+        self.pruefe_vor_dem_wort(baum, tuple(zahlen(lauf)[:2]))
+        self.assertAlmostEqual(pfeilhoehe(feld, ball), 1.5, places=2)
+        self.assertAlmostEqual(pfeilhoehe(feld, lauf), 1.0, places=2)
+
+    def test_auch_ein_kurzer_weg_hoert_vor_dem_wort_auf(self) -> None:
+        # Ein Wort reicht waagerecht weiter als ein Marker. Ein Weg von zweieinhalb
+        # Metern ist kurz, aber nicht so kurz, dass er vor "Feldmitte" nicht mehr
+        # Platz haette.
+        baum = self.zeichne("kurz-zur-mitte", """
+            form: halle
+            stellen:
+              - bei: [5.0, 5.0]
+                text: Feldmitte
+            wege:
+              - art: ballweg
+                von: [2.5, 5.0]
+                nach: [5.0, 5.0]
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        d = zahlen(mit_klasse(baum, "weg")[0].get("d"))
+        self.pruefe_vor_dem_wort(baum, (d[2], d[3]))
+        self.assertEqual(tuple(round(w, 2) for w in feld.meter(d[0], d[1])),
+                         (2.5, 5.0), "der Anfang bleibt, wo er angesagt ist")
 
     # -- Abstandsangaben ---------------------------------------------------
 
@@ -1805,13 +2090,21 @@ wege:
     von: [2.0, 2.0]
     nach: {wo}
     bogen: -1.0
+  - art: ballweg
+    von: {wo}
+    nach: [4.5, 1.0]
+stellen:
+  - bei: [4.5, 1.0]
+    text: Mitte & Ziel
 """)
                 self.assertTrue(baum.tag.endswith("svg"))
                 self.assertEqual(len(mit_klasse(baum, "marker")), 2)
                 self.assertEqual(
                     [text for text, (kreis, _) in marker_nach_beschriftung(baum).items()
                      if farbvariable(baum, kreis, "fill") == "strich"], ["Z & A"])
-                self.assertEqual(len(mit_klasse(baum, "weg")), 2)
+                self.assertEqual(len(mit_klasse(baum, "weg")), 3)
+                self.assertEqual([e.text for e in mit_klasse(baum, "stelle")],
+                                 ["Mitte & Ziel"])
                 self.assertEqual(len(mit_klasse(baum, "geraet")), 1)
                 self.assertEqual(len(mit_klasse(baum, "zonenflaeche")), 1)
                 self.assertEqual(len(mit_klasse(baum, "zonenname")), 1)

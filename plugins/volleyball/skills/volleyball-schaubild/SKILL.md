@@ -20,7 +20,7 @@ nimm den anderen.
    alles, was in der Bibliothek gerade nicht stimmt. Findet es keine
    `trainingsplanung-root.yml`, fragen wo der Ordner liegt.
 2. `${CLAUDE_PLUGIN_ROOT}/referenzen/SCHAUBILDER.md` lesen. Dort steht, wie
-   eine Szene aufgebaut ist: die elf Schlüssel, die drei Grundformen, wie ein
+   eine Szene aufgebaut ist: die zwölf Schlüssel, die drei Grundformen, wie ein
    Ort angegeben wird. Was dort nicht steht, gibt es nicht.
 3. Aus `${CLAUDE_PLUGIN_ROOT}/referenzen/DATENMODELL.md` den Abschnitt über
    Schaubild und Szene lesen. Dort steht, was am Ende auf der Karte landet.
@@ -72,7 +72,7 @@ Der Trainer wählt aus, womit angefangen wird.
 ## Die Szene entwerfen
 
 Die Szene kommt aus der Karte. Was dort nicht steht, wird gefragt. Ein Spieler
-an einer geratenen Stelle steht in der Halle falsch.
+an einem geratenen Platz steht in der Halle falsch.
 
 | Auf der Karte | In der Szene |
 |---|---|
@@ -81,6 +81,7 @@ an einer geratenen Stelle steht in der Halle falsch.
 | im Ablauf: wer eine Sonderrolle hat, etwa die Bälle bringt oder nicht mitrotiert | `hervorgehoben` am Spieler, worin die Rolle besteht in die `legende` |
 | im Ablauf: wer wohin läuft, wohin der Ball geht | `wege` |
 | im Ablauf: wohin gezielt wird | `zonen` |
+| im Ablauf: ein Ort ohne Spieler oder Gerät, der einen Namen braucht, etwa die Feldmitte, zu der gespielt wird | `stellen` |
 | im Ablauf: Abstände, die in der Halle abgeschritten werden | `abstaende` |
 | `material` | `geraete` |
 | `titel` der Karte | `titel`, wo das Bild für sich steht |
@@ -156,8 +157,8 @@ liegt sie da.
 
 Gibt es keine Szene, ist das Bild älter als die Szenen oder aus einer Quelle
 ausgeschnitten. Es bleibt liegen, solange der Trainer es nicht ausdrücklich
-neu haben will. Will er es, sag vorher, dass ein neues Bild an seine Stelle
-tritt und dabei auf der Karte der Dateiname wechselt.
+neu haben will. Will er es, sag vorher, dass ein neues Bild das alte ersetzt
+und dabei auf der Karte der Dateiname wechselt.
 
 ## Mehrere Bilder
 

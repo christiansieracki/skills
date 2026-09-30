@@ -337,9 +337,10 @@ FLAECHENFORMEN = ("rechteck", "kreis")
 class Flaeche:
     """Eine Grundform in Metern: Mittelpunkt und Masse.
 
-    Die gemeinsame Geometrie von Geraeteteil und Zone. Was eine Flaeche
-    bedeutet, entscheidet, wer sie traegt; wie gross sie ist und wo sie liegt,
-    steht hier und nur hier.
+    Die gemeinsame Geometrie von Geraeteteil und Zone, und beim Zeichnen die
+    des Platzes, den ein Marker oder ein Wort am Ende eines Weges einnimmt.
+    Was eine Flaeche bedeutet, entscheidet, wer sie traegt; wie gross sie ist
+    und wo sie liegt, steht hier und nur hier.
 
     Ein Kreis traegt seinen Durchmesser in beiden Massen. Das spart die zweite
     Sorte Flaeche und kostet nichts: wer `breite` liest, bekommt bei beiden
@@ -358,6 +359,19 @@ class Flaeche:
         return (x - self.breite / 2, y - self.laenge / 2,
                 x + self.breite / 2, y + self.laenge / 2)
 
+    def rand(self, richtung: Ort) -> float:
+        """Wie weit es von der Mitte in diese Richtung bis zum Rand ist, in Metern.
+
+        `richtung` hat die Laenge eins. Ein Rechteck verlaesst ein Strahl von
+        der Mitte aus an der Seite, die er zuerst trifft: ein Wort ist
+        waagerecht weit und senkrecht nur eine Schrifthoehe.
+        """
+        if self.form == "kreis":
+            return self.breite / 2
+        dx, dy = abs(richtung[0]), abs(richtung[1])
+        return min(self.breite / 2 / dx if dx else float("inf"),
+                   self.laenge / 2 / dy if dy else float("inf"))
+
 
 @dataclass
 class Zone(Flaeche):
@@ -368,9 +382,8 @@ class Zone(Flaeche):
 
     **Eine Zone ist kein Geraet.** Ein Geraet ist ein Gegenstand, den jemand in
     die Halle stellt; eine Zone ist eine Absprache ueber ein Stueck Boden. Wer
-    den Unterschied im Bild nicht sieht, raeumt in der Halle einen Kasten von
-    einer Stelle weg, an der nie einer stand. Beide sehen deshalb verschieden
-    aus.
+    den Unterschied im Bild nicht sieht, raeumt in der Halle einen Kasten weg,
+    wo nie einer stand. Beide sehen deshalb verschieden aus.
 
     Die Beschriftung ist Pflicht und nicht wie beim Geraet freiwillig. Eine
     Flaeche ohne Wort sagt nicht, was auf ihr gilt, und bleibt damit ein
@@ -401,6 +414,24 @@ class Zone(Flaeche):
         if self.form == "kreis":
             return mitte
         return (mitte[0], max(oben - ZONENNAMENSABSTAND, mitte[1]))
+
+
+@dataclass
+class Stelle:
+    """Ein Ort mit Namen, an dem nichts steht: nur ein Wort, zentriert darauf.
+
+    Die Feldmitte, zu der gespielt wird, der Startpunkt eines Laufwegs, das
+    Netz. Es gibt keinen Punkt, keinen Rand und keine Flaeche.
+
+    **Eine Stelle ist keine Zone ohne Fuellung** (ADR-0007). Eine Zone ist
+    eine Absprache ueber ein Stueck Boden und hat ein Mass; eine Linie des
+    Feldes oder die Feldmitte hat keins, das stimmt. Steht an dem Ort schon
+    jemand oder etwas, traegt dessen Marker oder Geraet den Namen, und die
+    Stelle entfaellt. Geprueft wird das nicht.
+    """
+
+    bei: Ort
+    text: str
 
 
 @dataclass
@@ -547,6 +578,7 @@ class Szene:
     zonen: list[Zone] = field(default_factory=list)
     geraete: list[Geraet] = field(default_factory=list)
     abstaende: list[Abstand] = field(default_factory=list)
+    stellen: list[Stelle] = field(default_factory=list)
 
     def punkte(self) -> list[Ort]:
         """Alles, was auf dem Blatt Platz braucht, in Metern.
@@ -566,7 +598,7 @@ class Szene:
             gesammelt += [(links, unten), (rechts, oben)]
         for abstand in self.abstaende:
             gesammelt.extend(abstand.punkte())
-        return gesammelt
+        return gesammelt + [stelle.bei for stelle in self.stellen]
 
     def beschriftungen(self) -> list[tuple[str, Ort]]:
         """Die Texte neben dem Aufbau, je mit dem Ort, an dem sie stehen.
@@ -577,6 +609,7 @@ class Szene:
         """
         texte = [(z.text, z.name_bei) for z in self.zonen]
         texte += [(g.text, g.name_bei) for g in self.geraete if g.text]
+        texte += [(s.text, s.bei) for s in self.stellen]
         return texte + [(a.text, a.text_bei) for a in self.abstaende if a.text]
 
 
@@ -611,7 +644,7 @@ def normale(von: Ort, nach: Ort) -> Ort:
 
 SZENE_SCHLUESSEL = {"form", "groesse", "titel", "untertitel", "legende",
                     "fusszeile", "spieler", "wege", "zonen", "geraete",
-                    "abstaende"}
+                    "abstaende", "stellen"}
 SPIELER_SCHLUESSEL = {"bei", "text", "hervorgehoben"}
 LEGENDEN_SCHLUESSEL = {"ueberschrift", "zeilen"}
 WEG_SCHLUESSEL = {"art", "von", "nach", "bogen"}
@@ -619,6 +652,7 @@ WEGARTEN = ("laufweg", "ballweg")
 GERAET_SCHLUESSEL = {"text", "teile"}
 TEIL_SCHLUESSEL = {"form", "bei", "groesse"}
 ZONEN_SCHLUESSEL = {"text", "form", "bei", "groesse"}
+STELLEN_SCHLUESSEL = {"bei", "text"}
 ABSTAND_SCHLUESSEL = {"art", "von", "nach", "versatz", "text"}
 ABSTANDSARTEN = ("masskette", "pfeil")
 
@@ -914,7 +948,7 @@ def _lies_zone(eintrag, grundform: Grundform, wo: str) -> Zone:
     """Eine Zone: eine Flaeche mit einem Wort darauf.
 
     Anders als ein Geraet besteht sie aus einer einzigen Grundform. Zwei
-    Flaechen unter einem Wort waeren eine Absprache an zwei Stellen, und die
+    Flaechen unter einem Wort waeren eine Absprache an zwei Orten, und die
     schreibt man als zwei Zonen hin.
     """
     eintrag = _als_abbildung(eintrag, wo)
@@ -932,6 +966,20 @@ def _lies_zone(eintrag, grundform: Grundform, wo: str) -> Zone:
     grund = _lies_flaeche(eintrag, grundform, wo, "eine Zone")
     return Zone(form=grund.form, bei=grund.bei, breite=grund.breite,
                 laenge=grund.laenge, text=text)
+
+
+def _lies_stelle(eintrag, grundform: Grundform, wo: str) -> Stelle:
+    """Eine Stelle: ein Ort und ein Wort, beides Pflicht."""
+    eintrag = _als_abbildung(eintrag, wo)
+    _pruefe_schluessel(eintrag, STELLEN_SCHLUESSEL, wo)
+    text = _als_zeile(eintrag.get("text"), f"{wo}, text")
+    if not text:
+        raise SzeneFehler(
+            f"{wo}: es fehlt das Wort. Eine Stelle ist nur ein Wort, und ohne "
+            f"es bleibt von ihr nichts uebrig, was im Bild stuende. `text:` "
+            f"nennt sie."
+        )
+    return Stelle(bei=ort(eintrag.get("bei"), grundform, f"{wo}, bei"), text=text)
 
 
 def _lies_textwerk(roh: dict) -> Textwerk:
@@ -1090,5 +1138,10 @@ def lies_szene(text: str) -> Szene:
                  for nummer, eintrag
                  in enumerate(_als_liste(roh.get("abstaende"), "abstaende"), 1)]
 
+    stellen = [_lies_stelle(eintrag, form, f"Stelle {nummer}")
+               for nummer, eintrag
+               in enumerate(_als_liste(roh.get("stellen"), "stellen"), 1)]
+
     return Szene(grundform=form, textwerk=werk, spieler=spieler, wege=wege,
-                 zonen=zonen, geraete=geraete, abstaende=abstaende)
+                 zonen=zonen, geraete=geraete, abstaende=abstaende,
+                 stellen=stellen)
