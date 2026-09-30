@@ -137,6 +137,20 @@ neues Verhalten und keine Lücke im Vokabular. Zu entscheiden wäre, ob die
 selbst gesetzte Zeile eine geschriebene ersetzt oder nur einspringt, wenn keine
 dasteht.
 
+### Ein Weg quer durch das Wort einer Stelle
+
+Aufgefallen am 30.09.2026 bei #26. Das Wort einer Stelle steht über allem,
+aber ohne Hof. Beginnt oder endet ein Weg an der Stelle, hört er vor dem Wort
+auf. Läuft er nur hindurch, scheint er zwischen den Buchstaben durch. Dasselbe
+passiert, wenn eine Stelle direkt auf einer Linie des Feldes sitzt; die
+Referenz rät deshalb, eine Linie neben dem Feld zu benennen.
+
+Das Zonenwort hat für den ähnlichen Fall seit 2.3.0 einen Hof in Zonenfarbe.
+Für die Stelle ginge er in Feldfarbe. Neben dem Feld stünde er dann auf dem
+Papier, und im dunklen Schema sähe man ihn als Schimmer um die Buchstaben. #26
+schließt Rand und Fläche aus, einen Hof hat es nicht erwogen. Ob es ihn
+braucht, zeigt die Abnahme (#28) am Referenzbild mit „Netz" und „3-m-Linie".
+
 ## Aus Welle 1b bewusst ausgelassen
 
 Steht so in #10 unter *Out of Scope* und gilt weiter.
