@@ -42,18 +42,37 @@ Frage gehört deshalb vor den Massenimport, nicht erst in die Wissenskarte.
 
 ## Im Arbeitsordner, nicht im Plugin
 
-Betrifft `Nextcloud/_Training/trainingsplanung` und keinen Code. Der Import
-der Magazinseiten 28 und 29 ist inzwischen Teil der Abnahme von Welle 1c (#28).
+Betrifft `Nextcloud/_Training/trainingsplanung` und keinen Code.
 
-### `schaubilder/2026-09-15-annahme-zielzone.png` ist veraltet
+### `schaubilder/2026-09-15-annahme-zielzone.png` ist überschrieben
 
-Die PNG ist die Ansicht des handgezeichneten SVG von vor der Abnahme. Seit der
-Abnahme entsteht das SVG daneben aus einer Szene und sieht an drei Stellen
-anders aus. Keine Karte verweist auf die PNG, der Linter schaut sie nicht an.
+Die PNG war die Ansicht des handgezeichneten SVG von vor der Abnahme von Welle
+1b und damit das Einzige, was zeigte, wie diese Fassung aussah. Bei der
+Abnahme von Welle 1c (#28) hat der Agent sie am 30.09.2026 überschrieben. Er
+wollte das erzeugte SVG ansehen, und sein Hilfsskript legte die Ansicht als
+PNG neben das SVG, also genau auf diese Datei. Jetzt zeigt sie das erzeugte
+Bild vor den Stellen.
 
-Sie ist damit zugleich das Einzige, was zeigt, wie die handgezeichnete Fassung
-aussah. Entweder bleibt sie als dieser Beleg liegen, oder sie wird neu erzeugt,
-oder sie wird weggeräumt. Eine Entscheidung steht aus.
+Eine lokale Kopie gibt es nicht. Nextcloud hält die Vorversion auf dem Server,
+im Webinterface lässt sie sich unter „Versionen" wiederherstellen.
+
+Keine Karte verweist auf die PNG, der Linter schaut sie nicht an. Offen bleibt
+wie vorher, was mit ihr geschieht. Sie kann wiederhergestellt als Beleg liegen
+bleiben, neu erzeugt werden oder wegkommen.
+
+### Aus dem Warm-up Teil 4 fehlen Übung 3 und 4
+
+Die Praxiseinheit auf den Magazinseiten 28 und 29 fängt mit dem Warm-up aus
+Teil 4 der Reihe „Warm-up mit Plan" im selben Heft an. Das hat vier Übungen.
+In der Bibliothek stehen davon Übung 1 und 2 (`ue-0019`, `ue-0020`). Es
+fehlen Übung 3, Steigerungsläufe und kurze Sprints, und Übung 4, Zwei gegen
+Zwei mit höchstens drei Armkontakten. Beide stehen auf den Seiten 24 und 25
+(`vm_09_2026/20260918_130305.jpg` und `20260918_130310.jpg`). Ob sie damals
+bewusst weggelassen wurden, ist nicht vermerkt.
+
+Übung 4 ist die Spielform, mit der das Warm-up endet, und liegt nah an
+`ue-0041` „Ein Arm erlaubt". Beim Import wäre zu prüfen, ob sie eine eigene
+Karte wird oder unter die Variationen von `ue-0041` kommt.
 
 ## Neu seit der Abnahme
 
@@ -137,6 +156,10 @@ neues Verhalten und keine Lücke im Vokabular. Zu entscheiden wäre, ob die
 selbst gesetzte Zeile eine geschriebene ersetzt oder nur einspringt, wenn keine
 dasteht.
 
+Bei der Abnahme (#28) ist die Zeile zweimal von Hand entstanden, für
+`ue-0037` mit Laufweg und Ballweg, für `ue-0039` nur mit Ballweg. Beim zweiten
+Bild musste man darauf achten, den Laufweg wegzulassen.
+
 ### Ein Weg quer durch das Wort einer Stelle
 
 Aufgefallen am 30.09.2026 bei #26. Das Wort einer Stelle steht über allem,
@@ -148,8 +171,88 @@ Referenz rät deshalb, eine Linie neben dem Feld zu benennen.
 Das Zonenwort hat für den ähnlichen Fall seit 2.3.0 einen Hof in Zonenfarbe.
 Für die Stelle ginge er in Feldfarbe. Neben dem Feld stünde er dann auf dem
 Papier, und im dunklen Schema sähe man ihn als Schimmer um die Buchstaben. #26
-schließt Rand und Fläche aus, einen Hof hat es nicht erwogen. Ob es ihn
-braucht, zeigt die Abnahme (#28) am Referenzbild mit „Netz" und „3-m-Linie".
+schließt Rand und Fläche aus, einen Hof hat es nicht erwogen.
+
+Die Abnahme (#28) sollte zeigen, ob es ihn braucht. Im Referenzbild stehen
+„Netz" und „3-m-Linie" neben dem Feld, dort läuft nichts hindurch. In
+`ue-0037` lief im ersten Entwurf der Laufweg des Verteidigers quer durch
+„Feldmitte", weil die Stelle genau dort lag, wo er nach vorn startet.
+Freigegeben ist das Bild mit der Stelle 0,4 m zur Seite gerückt. Der Fall
+kommt also vor, sobald eine Stelle mitten im Feld steht und jemand an ihr
+vorbei nach vorn läuft. In der Szene lässt er sich umgehen. Ob der Hof
+trotzdem kommt, ist zu entscheiden.
+
+## Aus der Abnahme von Welle 1c (#28)
+
+Aufgefallen am 30.09.2026 beim Zeichnen des Referenzbilds und der beiden
+Bilder auf `beach`, `ue-0037` und `ue-0039`. Alle betreffen den Zeichner, also
+`schaubild.py` und `szene.py`. Bei den ersten vier weichen die freigegebenen
+Bilder in der Szene aus oder nehmen die Schwäche hin.
+
+### Das Wort einer Stelle neben dem Feld stößt an die Legendenspalte
+
+Die Legendenspalte fängt am rechten Rand des Bildblocks an. Laut Kommentar
+in `Satzspiegel.__init__` liegt der „einen Feldrand weit neben allem, was
+gezeichnet ist". Für Marker stimmt das, sie bekommen `LUFT`. Das Wort einer
+Stelle rückt den Rand aber genau bis an seine geschätzte Breite und keinen
+Millimeter weiter. Im Referenzbild steht „3-m-Linie" bei `[10.4, 6.0]` mit
+rund 7 Zeicheneinheiten Luft vor „Der Ball muss von oben hineinfallen." und
+liest sich wie deren Anfang.
+
+Der Trainer hat das Bild trotzdem so freigegeben. Abhilfe wäre eine Gasse vor
+der Spalte, die unabhängig davon gilt, was am weitesten rechts steht. Das gilt
+dann auch für Zonen- und Gerätenamen am Rand.
+
+### Die Beschriftung eines senkrechten Abstands liegt auf ihrer Linie
+
+`Abstand.text_bei` rückt die Zahl `TEXTABSTAND`, also 0,45 m, von der Linie
+weg, quer zu ihr und gleich, wie breit das Wort ist. Bei einer waagerechten
+Linie reicht das, das Wort steht darüber oder darunter. Bei einer
+senkrechten Linie steht es daneben und ist breiter als 0,45 m, also läuft die
+Linie hindurch. In `ue-0039` sollte ein Pfeil vom Angreifer zum Verteidiger
+„5 bis 6 m" zeigen, und die Linie strich „bis" durch. Freigegeben ist das Bild
+ohne Pfeil, die Entfernung steht in der Legende.
+
+Abhilfe wäre, den Abstand nach der halben Wortbreite zu bemessen, sobald die
+Linie eher senkrecht als waagerecht verläuft.
+
+### Ein Gerät unter einem Spieler verschwindet
+
+Der Angreifer auf der Kiste ist in allen vier Übungen der Praxiseinheit, die
+eine Kiste brauchen, die Hauptfigur. Als Gerät unter seinem Marker ist die
+Kiste nicht zu sehen, denn der Marker misst knapp einen Meter und die Kiste
+weniger. Ihr Name steht unter dem Gerät, also zum Netz hin, und landet am Netz
+auf dem Netzband. Freigegeben ist beides ohne Kiste. Dass er darauf steht,
+sagt die Legende.
+
+Ob ein Spieler auf einem Gerät eine eigene Darstellung braucht, etwa das
+Gerät als Rahmen um den Marker, oder ob die Legende dafür reicht, ist offen.
+
+### Ein Pfeil endet auf dem Namen eines Geräts
+
+Im Referenzbild endet der Annahmepfeil von 6 an der Unterkante der Zielmatte,
+und dort steht ihr Name. Die Pfeilspitze sitzt auf „Zielmatte". Das war im
+erzeugten Bild vor der Abnahme schon so und ist so freigegeben.
+
+Ein Weg hört am Rand eines Markers und am Wort einer Stelle auf, am Namen
+eines Geräts aber nicht. Ob er das auch soll, oder ob der Name eines Geräts
+einem Pfeil ausweicht, ist offen. In der Szene hilft nur ein anderes Ende des
+Pfeils. Hier ist dafür wenig Platz: Das Wort ist fast so breit wie die Matte,
+und rechts daneben steht Z.
+
+### Ein SVG ansehen, wenn die Umgebung es nicht zeigt
+
+Der Skill `volleyball-schaubild` verlangt, dass das Bild im Dialog beurteilt
+wird, und sagt, im Markup stehe nicht, ob ein Marker ein Wort verdeckt. Das
+Lesewerkzeug des Agenten zeigt PNG und JPG als Bild, bei einem SVG gibt es nur
+das Markup zurück. Bei der Abnahme hat der Agent deshalb jedes Bild über Edge
+im Headless-Modus zu PNG gemacht, mit einem Hilfsskript im Temp-Verzeichnis
+der Sitzung. Beim ersten Aufruf lag die PNG neben dem SVG im Arbeitsordner und
+hat die alte Ansicht überschrieben, siehe oben.
+
+`export_pdf.py` ruft Edge schon genauso auf. Ein `schaubild.py --png`, das die
+Ansicht immer ins Temp-Verzeichnis legt, nähme dem Agenten das Basteln ab und
+schlösse aus, dass sie im Arbeitsordner landet.
 
 ## Aus Welle 1b bewusst ausgelassen
 
@@ -167,8 +270,7 @@ Steht so in #10 unter *Out of Scope* und gilt weiter.
 
 Die Reihenfolge stammt aus #10 und ist dort begründet. Den PlayDrill-Import
 kannte #10 noch nicht. Wo er sich einreiht, ist nicht entschieden. Die Welle
-zum Szenen-Vokabular steht inzwischen als Welle 1c im Tracker (#23, Slices #24
-bis #28) und hängt nicht am PlayDrill-Import.
+zum Szenen-Vokabular ist als Welle 1c (#23) mit der Abnahme (#28) durch.
 
 ### Der PlayDrill-Import als Lauf
 
