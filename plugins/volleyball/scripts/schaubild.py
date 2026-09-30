@@ -330,11 +330,25 @@ def stil() -> str:
         + "text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,"
           "sans-serif;font-weight:600;text-anchor:middle;dominant-baseline:central}"
         + ".beschriftung{fill:var(--strich)}"
+        # Ein hervorgehobener Spieler ist gefuellt, die anderen bleiben Umriss.
+        # Das faellt auf einen Blick auf und haengt nicht an der Farbe: Strich-
+        # und Feldfarbe liegen auch im Graustufendruck weit auseinander. Das
+        # Kuerzel tauscht dafuer die Farbe mit der Flaeche. Beides sind Farben,
+        # die es schon gibt; eine eigene braeuchte ein zweites Paar, das in
+        # beiden Schemata lesbar bleiben muesste.
+        + ".hervorgehoben .marker{fill:var(--strich)}"
+        + ".hervorgehoben .beschriftung{fill:var(--feld)}"
         + f".geraetname{{fill:var(--gedaempft);font-size:{KLEINSCHRIFT}}}"
         # Der Name der Zone steht voll da, der des Geraetes gedaempft. Was ein
         # Kasten ist, sieht man ihm an; was auf einer Flaeche gilt, sagt allein
         # ihr Wort.
-        + f".zonenname{{fill:var(--strich);font-size:{KLEINSCHRIFT}}}"
+        #
+        # Jeder Buchstabe bringt einen Hof in Zonenfarbe mit, hinter sich
+        # gemalt. Auf der Zone faellt er nicht auf; ueber einem hervorgehobenen
+        # Marker, der in Strichfarbe gefuellt ist, traegt er das Wort.
+        + f".zonenname{{fill:var(--strich);font-size:{KLEINSCHRIFT};"
+          "stroke:var(--zone);stroke-width:3;stroke-linejoin:round;"
+          "paint-order:stroke}"
         + ".weg{fill:none;stroke-width:2.6;stroke-linecap:round}"
         + ".laufweg{stroke:var(--laufweg)}"
         + ".ballweg{stroke:var(--ballweg);stroke-dasharray:9 6}"
@@ -646,7 +660,8 @@ def marker(s: Szene, blatt: Blatt) -> str:
     teile = []
     for spieler in s.spieler:
         mx, my = blatt.x(spieler.x), blatt.y(spieler.y)
-        teile.append('<g class="spieler">')
+        klasse = "spieler hervorgehoben" if spieler.hervorgehoben else "spieler"
+        teile.append(f'<g class="{klasse}">')
         teile.append(f'<circle class="marker" cx="{koord(mx)}" cy="{koord(my)}" '
                      f'r="{koord(blatt.laenge(MARKER))}"/>')
         if spieler.text:

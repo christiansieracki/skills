@@ -78,6 +78,7 @@ an einer geratenen Stelle steht in der Halle falsch.
 |---|---|
 | `disziplin` | `form: halle` oder `form: beach` |
 | im Ablauf: wer wo steht | `spieler` |
+| im Ablauf: wer eine Sonderrolle hat, etwa die Bälle bringt oder nicht mitrotiert | `hervorgehoben` am Spieler, worin die Rolle besteht in die `legende` |
 | im Ablauf: wer wohin läuft, wohin der Ball geht | `wege` |
 | im Ablauf: wohin gezielt wird | `zonen` |
 | im Ablauf: Abstände, die in der Halle abgeschritten werden | `abstaende` |

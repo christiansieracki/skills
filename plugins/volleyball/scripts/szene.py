@@ -300,9 +300,17 @@ Grundform = Feldvorlage | Leinwand
 
 @dataclass
 class Spieler:
+    """Ein Marker auf dem Feld, mit seiner Beschriftung darin.
+
+    `hervorgehoben` heisst, dass dieser Spieler in der Uebung eine Sonderrolle
+    hat; was das ist, steht im Glossar. Wie das aussieht, entscheidet allein
+    der Zeichner, in der Szene steht keine Farbe.
+    """
+
     x: float
     y: float
     text: str
+    hervorgehoben: bool = False
 
 
 @dataclass
@@ -604,7 +612,7 @@ def normale(von: Ort, nach: Ort) -> Ort:
 SZENE_SCHLUESSEL = {"form", "groesse", "titel", "untertitel", "legende",
                     "fusszeile", "spieler", "wege", "zonen", "geraete",
                     "abstaende"}
-SPIELER_SCHLUESSEL = {"bei", "text"}
+SPIELER_SCHLUESSEL = {"bei", "text", "hervorgehoben"}
 LEGENDEN_SCHLUESSEL = {"ueberschrift", "zeilen"}
 WEG_SCHLUESSEL = {"art", "von", "nach", "bogen"}
 WEGARTEN = ("laufweg", "ballweg")
@@ -683,6 +691,23 @@ def _als_zahl(wert, wo: str, was: str) -> float:
     if not isinstance(wert, (int, float)) or isinstance(wert, bool):
         raise SzeneFehler(f"{wo}: {wert!r} ist {was}.")
     return float(wert)
+
+
+def _als_wahrheitswert(wert, wo: str) -> bool:
+    """`true` oder `false`, und ohne Angabe `false`.
+
+    Nichts anderes wird als Wahrheitswert gelesen. `ja` ist hier ein Wort und
+    `1` eine Zahl; still als wahr oder falsch genommen, stuende etwas anders im
+    Bild, als der Trainer meint, und das sieht man dem Bild nicht an.
+    """
+    if wert is None:
+        return False
+    if isinstance(wert, bool):
+        return wert
+    grund = (" In Anfuehrungszeichen ist es ein Wort, also ohne sie schreiben."
+             if wert in ("true", "false") else "")
+    raise SzeneFehler(f"{wo}: {wert!r} ist kein Wahrheitswert. Erlaubt ist "
+                      f"true oder false.{grund}")
 
 
 def _masse(wert, wo: str) -> tuple[float, float]:
@@ -1025,7 +1050,10 @@ def lies_szene(text: str) -> Szene:
         _pruefe_schluessel(eintrag, SPIELER_SCHLUESSEL, wo)
         bei = eintrag.get("bei")
         x, y = ort(bei, form, wo)
-        spieler.append(Spieler(x, y, _beschriftung(eintrag.get("text"), bei)))
+        spieler.append(Spieler(
+            x, y, _beschriftung(eintrag.get("text"), bei),
+            hervorgehoben=_als_wahrheitswert(eintrag.get("hervorgehoben"),
+                                             f"{wo}, hervorgehoben")))
 
     wege = []
     for nummer, eintrag in enumerate(_als_liste(roh.get("wege"), "wege"), 1):

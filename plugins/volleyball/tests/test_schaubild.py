@@ -56,6 +56,21 @@ spieler:
     text: A
 """
 
+# Der Zuspieler mit Sonderrolle, daneben zwei ohne: einer ohne den Schluessel
+# und einer mit `false`. Beide sollen aussehen wie vor der Hervorhebung.
+SONDERROLLE = """
+form: halle
+spieler:
+  - bei: 3
+    text: Z
+    hervorgehoben: true
+  - bei: 4
+    text: AA
+  - bei: 2
+    text: D
+    hervorgehoben: false
+"""
+
 
 # --------------------------------------------------------------------------
 # Das erzeugte Bild lesen
@@ -149,6 +164,88 @@ def kontrast(vorne: str, hinten: str) -> float:
 
     hell, dunkel = sorted((helligkeit(vorne), helligkeit(hinten)), reverse=True)
     return (hell + 0.05) / (dunkel + 0.05)
+
+
+def farbschemata(baum) -> dict[str, dict[str, str]]:
+    """Die Farbvariablen des Bildes, je Schema: {"hell": {...}, "dunkel": {...}}."""
+    stil = baum.find(SVG + "style").text
+
+    def farben(block: str) -> dict[str, str]:
+        return dict(re.findall(r"--([a-z]+):(#[0-9a-f]{6})",
+                               re.search(block, stil).group(1)))
+
+    return {"hell": farben(r"^svg\{([^}]*)\}"),
+            "dunkel": farben(r"prefers-color-scheme:dark\)\{svg\{([^}]*)\}")}
+
+
+def _passt_glied(glied: str, element: ET.Element) -> bool:
+    """Ob ein Glied eines Selektors, etwa `text` oder `.a.b`, auf das Element passt."""
+    name, *klassen = glied.split(".")
+    return ((not name or element.tag == SVG + name)
+            and set(klassen) <= set((element.get("class") or "").split()))
+
+
+def stilwert(baum, element: ET.Element, eigenschaft: str) -> str | None:
+    """Welchen Wert eine Eigenschaft an diesem Element aus dem Stylesheet bekommt.
+
+    Gelesen wird das Stylesheet im Bild, so wie ein Betrachter es anwendet:
+    von allen Regeln, deren Selektor passt, gewinnt die spezifischste, bei
+    Gleichstand die spaetere. Damit prueft ein Test, wie ein Teil aussieht, und
+    nicht, an welcher Klasse oder in welcher Regel das steht.
+
+    Verstanden wird die Teilmenge, die das Skript schreibt: Elementnamen,
+    Klassen und Nachfahren.
+    """
+    eltern = {kind: e for e in baum.iter() for kind in e}
+    kette = [element]
+    while kette[-1] in eltern:
+        kette.append(eltern[kette[-1]])
+
+    wert, bester = None, (-1, -1)
+    for selektor, erklaerungen in re.findall(r"([^{}]+)\{([^{}]*)\}",
+                                             baum.find(SVG + "style").text):
+        werte = dict(teil.split(":", 1) for teil in erklaerungen.split(";")
+                     if ":" in teil)
+        if eigenschaft not in werte:
+            continue
+        glieder = selektor.split()
+        if not glieder or not _passt_glied(glieder[-1], kette[0]):
+            continue
+        vorfahren = iter(kette[1:])
+        if not all(any(_passt_glied(g, e) for e in vorfahren)
+                   for g in reversed(glieder[:-1])):
+            continue
+        gewicht = (sum(g.count(".") for g in glieder),
+                   sum(1 for g in glieder if not g.startswith(".")))
+        if gewicht >= bester:
+            wert, bester = werte[eigenschaft], gewicht
+    return wert
+
+
+def farbvariable(baum, element: ET.Element, eigenschaft: str) -> str:
+    """Welche Farbvariable eine Eigenschaft an diesem Element bekommt, ohne `--`."""
+    wert = stilwert(baum, element, eigenschaft)
+    treffer = re.fullmatch(r"var\(--([a-z]+)\)", wert or "")
+    assert treffer, f"{eigenschaft} ist {wert!r} und keine Farbvariable"
+    return treffer.group(1)
+
+
+def marker_nach_beschriftung(baum) -> dict[str, tuple[ET.Element, ET.Element]]:
+    """Jeder beschriftete Spielermarker samt Beschriftung, nach deren Text.
+
+    Zusammengefunden wird ueber den Ort: die Beschriftung steht in der Mitte
+    ihres Markers. Wie die beiden im Markup beieinanderstehen, spielt keine
+    Rolle. Ein Marker ohne Beschriftung hat keinen Text, unter dem er stuende,
+    und fehlt deshalb.
+    """
+    texte = {(float(t.get("x")), float(t.get("y"))): t
+             for t in mit_klasse(baum, "beschriftung")}
+    paare = {}
+    for kreis in mit_klasse(baum, "marker"):
+        text = texte.get((float(kreis.get("cx")), float(kreis.get("cy"))))
+        if text is not None:
+            paare[text.text] = (kreis, text)
+    return paare
 
 
 # --------------------------------------------------------------------------
@@ -440,6 +537,78 @@ class SchaubildTest(unittest.TestCase):
         """)
 
         self.assertEqual([e.text for e in mit_klasse(baum, "beschriftung")], ["Z"])
+
+    # -- Der hervorgehobene Spieler ------------------------------------------
+
+    def test_ein_hervorgehobener_spieler_ist_gefuellt_die_uebrigen_umriss(self) -> None:
+        # Im Referenzbild ist der Zuspieler gefuellt gezeichnet und alle anderen
+        # als Umriss: auf einen Blick sieht man, wer nicht mitrotiert.
+        baum = self.zeichne("sonderrolle", SONDERROLLE)
+
+        marker = marker_nach_beschriftung(baum)
+        self.assertEqual(sorted(marker), ["AA", "D", "Z"])
+        # Gefuellt in Strichfarbe, das Kuerzel darin in Feldfarbe.
+        kreis, kuerzel = marker["Z"]
+        self.assertEqual(farbvariable(baum, kreis, "fill"), "strich")
+        self.assertEqual(farbvariable(baum, kuerzel, "fill"), "feld")
+        # Ohne den Schluessel und mit `false` wie bisher: Umriss auf Feldfarbe,
+        # das Kuerzel in Strichfarbe.
+        for ohne in ("AA", "D"):
+            with self.subTest(spieler=ohne):
+                kreis, kuerzel = marker[ohne]
+                self.assertEqual(farbvariable(baum, kreis, "fill"), "feld")
+                self.assertEqual(farbvariable(baum, kuerzel, "fill"), "strich")
+        # Der Rand bleibt bei allen, wie er war.
+        self.assertEqual({farbvariable(baum, kreis, "stroke")
+                          for kreis, _ in marker.values()}, {"strich"})
+
+    def test_das_kuerzel_im_gefuellten_marker_ist_in_beiden_farbschemata_lesbar(
+            self) -> None:
+        baum = self.zeichne("sonderrolle", SONDERROLLE)
+
+        kreis, kuerzel = marker_nach_beschriftung(baum)["Z"]
+        for name, farben in farbschemata(baum).items():
+            with self.subTest(schema=name):
+                self.assertGreaterEqual(
+                    kontrast(farben[farbvariable(baum, kuerzel, "fill")],
+                             farben[farbvariable(baum, kreis, "fill")]), 4.5)
+
+    def test_gefuellt_und_umriss_unterscheiden_sich_auch_in_graustufen(self) -> None:
+        # Das Kontrastverhaeltnis rechnet allein mit der Helligkeit, und genau
+        # die bleibt im Graustufendruck uebrig. 3 ist das, was WCAG fuer
+        # Grafik verlangt, die man erkennen muss.
+        baum = self.zeichne("sonderrolle", SONDERROLLE)
+
+        marker = marker_nach_beschriftung(baum)
+        gefuellt = farbvariable(baum, marker["Z"][0], "fill")
+        umriss = farbvariable(baum, marker["AA"][0], "fill")
+        for name, farben in farbschemata(baum).items():
+            with self.subTest(schema=name):
+                self.assertGreaterEqual(kontrast(farben[gefuellt], farben[umriss]), 3)
+
+    def test_hervorgehoben_nimmt_nur_einen_wahrheitswert(self) -> None:
+        # `ja` ist in dieser Szene ein Wort und `1` eine Zahl. Still als wahr
+        # oder falsch gelesen, stuende ein Marker anders im Bild, als der
+        # Trainer meint, und das sieht man ihm nicht an. `"true"` in
+        # Anfuehrungszeichen ist ebenfalls ein Wort; die Meldung sagt dann,
+        # woran es liegt.
+        for name, wert in (("ja", "ja"), ("zahl", "1"), ("zitat", '"true"')):
+            with self.subTest(wert=wert):
+                fertig = self.scheitert(f"sonderrolle-{name}", f"""
+                    form: halle
+                    spieler:
+                      - bei: 4
+                      - bei: 3
+                        text: Z
+                        hervorgehoben: {wert}
+                """)
+
+                self.assertIn("Spieler 2", fertig.stdout)
+                self.assertIn("hervorgehoben", fertig.stdout)
+                self.assertIn("true oder false", fertig.stdout)
+                self.assertFalse(self.bild(f"sonderrolle-{name}").exists())
+                if name == "zitat":
+                    self.assertIn("Anfuehrungszeichen", fertig.stdout)
 
     def test_im_sand_wird_ein_platz_ueber_seine_rolle_benannt(self) -> None:
         baum = self.zeichne("beach", """
@@ -907,6 +1076,39 @@ class SchaubildTest(unittest.TestCase):
         # Und massstaeblich steht das Wort weiter da, wo es hingehoert.
         self.assertAlmostEqual(feld.meter(float(name.get("x")), 0.0)[0], 4.5,
                                places=2)
+
+    def test_das_wort_einer_zone_bleibt_auch_ueber_einem_gefuellten_marker_lesbar(
+            self) -> None:
+        # Ein hervorgehobener Marker ist in Strichfarbe gefuellt, und in der
+        # steht auch das Wort der Zone. Wo beide sich kreuzen, stuende Strich
+        # auf Strich. Lesbar bleibt das Wort, weil jeder Buchstabe einen Hof
+        # in einer Farbe mitbringt, von der er sich abhebt.
+        baum = self.zeichne("beschriftet", """
+            form: halle
+            zonen:
+              - text: Zielzone
+                form: rechteck
+                bei: [4.5, 6.0]
+                groesse: [3.0, 1.2]
+            spieler:
+              - bei: [4.5, 6.0]
+                text: Z
+                hervorgehoben: true
+        """)
+
+        name = mit_klasse(baum, "zonenname")[0]
+        kreis = mit_klasse(baum, "marker")[0]
+        self.assertLess(abs(float(name.get("y")) - float(kreis.get("cy"))),
+                        float(kreis.get("r")), "das Wort liegt auf dem Marker")
+
+        schrift = farbvariable(baum, name, "fill")
+        hof = farbvariable(baum, name, "stroke")
+        self.assertEqual(stilwert(baum, name, "paint-order"), "stroke",
+                         "der Hof liegt hinter den Buchstaben, nicht darauf")
+        self.assertGreater(float(stilwert(baum, name, "stroke-width")), 0)
+        for schema, farben in farbschemata(baum).items():
+            with self.subTest(schema=schema):
+                self.assertGreaterEqual(kontrast(farben[schrift], farben[hof]), 4.5)
 
     def test_eine_zone_laesst_sich_auf_der_freien_leinwand_zeichnen(self) -> None:
         baum = self.zeichne("zone-leinwand", """
@@ -1517,13 +1719,8 @@ class SchaubildTest(unittest.TestCase):
         # falsch, aber ein schwarzer Strich auf schwarzem Grund ist weg.
         baum = self.zeichne("halle", "form: halle")
 
-        stil = baum.find(SVG + "style").text
-        hell = dict(re.findall(r"--([a-z]+):(#[0-9a-f]{6})",
-                               re.search(r"^svg\{([^}]*)\}", stil).group(1)))
-        dunkel = dict(re.findall(
-            r"--([a-z]+):(#[0-9a-f]{6})",
-            re.search(r"prefers-color-scheme:dark\)\{svg\{([^}]*)\}", stil).group(1)))
-
+        schemata = farbschemata(baum)
+        hell, dunkel = schemata["hell"], schemata["dunkel"]
         self.assertEqual(sorted(hell), sorted(dunkel),
                          "beide Schemata setzen dieselben Farben")
         self.assertNotEqual(hell, dunkel, "sonst waere das zweite Schema Zierrat")
@@ -1576,6 +1773,7 @@ legende:
 spieler:
   - bei: {wo}
     text: "Z & A"
+    hervorgehoben: true
   - bei: [2.0, 2.0]
 zonen:
   - text: Zielzone & Rand
@@ -1610,6 +1808,9 @@ wege:
 """)
                 self.assertTrue(baum.tag.endswith("svg"))
                 self.assertEqual(len(mit_klasse(baum, "marker")), 2)
+                self.assertEqual(
+                    [text for text, (kreis, _) in marker_nach_beschriftung(baum).items()
+                     if farbvariable(baum, kreis, "fill") == "strich"], ["Z & A"])
                 self.assertEqual(len(mit_klasse(baum, "weg")), 2)
                 self.assertEqual(len(mit_klasse(baum, "geraet")), 1)
                 self.assertEqual(len(mit_klasse(baum, "zonenflaeche")), 1)

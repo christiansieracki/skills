@@ -199,8 +199,15 @@ Positionsnamen.
 spieler:
   - bei: 3
     text: Z
+    hervorgehoben: true
   - bei: [4.5, 16.5]
 ```
+
+| Schlüssel | Bedeutung |
+|---|---|
+| `bei` | wo der Spieler steht, in den drei Formen von oben |
+| `text` | die Beschriftung im Marker, optional |
+| `hervorgehoben` | `true` für einen Spieler mit Sonderrolle, optional |
 
 `text` ist die Beschriftung im Marker, kurz gehalten: eine Positionsnummer, ein
 Kürzel wie Z, D, AA, MB, L. Fehlt `text`, beschriftet sich eine Position mit
@@ -209,6 +216,20 @@ statt einen Namen zu bekommen, den niemand vergeben hat.
 
 Der Marker ist maßstäblich: knapp ein Meter Durchmesser, so viel wie ein Mensch
 von oben braucht.
+
+**Hervorgehoben** wird ein Spieler, der in der Übung eine Sonderrolle hat: der
+Zuspieler, der nicht mitrotiert, oder der Angreifer auf der Kiste, der die
+Bälle bringt. Sein Marker ist in Strichfarbe gefüllt, das Kürzel darin steht in
+Feldfarbe, und der Rand bleibt, wie er ist. Alle anderen bleiben Umriss. Worin
+die Sonderrolle besteht, sagt die Legende; der gefüllte Marker zeigt nur, wer
+sie hat.
+
+Gefüllt und Umriss unterscheiden sich in der Helligkeit und bleiben damit auch
+im Graustufendruck auseinander. Eine Farbe steht dafür nicht in der Szene:
+`hervorgehoben` nimmt `true` oder `false`, sonst nichts.
+Ohne den Schlüssel gilt `false`. `ja`, eine Zahl oder `"true"` in
+Anführungszeichen brechen mit einer Meldung ab, statt still als wahr oder
+falsch gelesen zu werden.
 
 ### `wege`
 
@@ -300,7 +321,9 @@ Gezeichnet wird sie als Letztes, über allem, was in der Zone steht. Ein Marker
 deckt einen ganzen Meter ab, und mit der Fläche zusammen unten wäre das Wort
 weg, sobald jemand darauf steht. Eine Zone ohne lesbares Wort ist aber nur noch
 ein Farbfleck, der aussieht wie ein Gerät. Aus demselben Grund bricht eine Zone
-ohne `text:` ab.
+ohne `text:` ab. Jeder Buchstabe hat einen schmalen Hof in Zonenfarbe. So
+bleibt das Wort auch über einem hervorgehobenen Marker lesbar, der in
+Strichfarbe gefüllt ist.
 
 Zwei Flächen unter einem Wort gibt es nicht. Das wäre eine Absprache an zwei
 Stellen, und die schreibt man als zwei Zonen hin.
