@@ -29,16 +29,19 @@ einen Pfad, den man kopieren kann. `quelldatei:` ist freier Text und nennt bei
 einer Übung über zwei Seiten beide. Ein Präfix säße dort nur vor der ersten.
 
 Der Preis ist, dass die häufige Angabe mit einer einzigen Datei ihre kopierbare
-Pfadzeile verloren hat. Beides ginge wieder, wenn `quelldatei:` im Schema eine
-Liste würde statt freier Text. Das wäre eine Schemaänderung und bricht
-bestehende Karten, gehört also in eine Welle, die ohnehin am Datenmodell
-arbeitet.
+Pfadzeile verloren hat.
 
-Seit dem PlayDrill-Import (siehe unten) drängt die Frage. Jede PlayDrill-Karte
-hat genau eine Quelldatei und zeigt damit genau die Zeile ohne kopierbaren
-Pfad. Schreibt ein automatischer Lauf die übrigen rund 335 Karten, bevor das
-entschieden ist, geht die Umstellung über rund 370 Karten statt über 34. Die
-Frage gehört deshalb vor den Massenimport, nicht erst in die Wissenskarte.
+Entschieden am 30.09.2026 beim Interview zum Sammelimport: `suche.py` prüft, ob
+der **ganze** Wert eine Datei unter `quellen/` ist. Dann druckt es
+`quellen/<wert>` als Pfad, sonst die Zeile wie bisher. Geraten wird dabei
+nichts, die Datei gibt es oder nicht. Auf einem Rechner, der `quellen/` nicht
+synchronisiert, sieht die Zeile aus wie heute.
+
+Eine Liste in `quelldatei:` braucht es dafür nicht, das Schema bleibt. Die
+frühere Begründung, die Umstellung müsse vor den PlayDrill-Import, trägt auch
+nicht. Eine PlayDrill-Karte nennt genau eine Datei, und aus `"x"` ein `["x"]`
+zu machen geht über 370 Karten so mechanisch wie über 34. Die Prüfung kommt als
+kleiner eigener Punkt in die Welle zum Sammelimport.
 
 ## Im Arbeitsordner, nicht im Plugin
 
@@ -95,53 +98,6 @@ zwei Minuten. `--no-first-run`, `--disable-extensions` und
 `--disable-component-update` haben nichts Messbares gebracht. Naheliegend wäre
 ein Profil für den ganzen Lauf statt eines je Datei. Ob Edge damit schneller
 ist, ist nicht gemessen.
-
-### Den PlayDrill-Import automatisieren
-
-Unter `quellen/playdrill/` liegen 343 PDFs, eine Übung je Datei. Davon sind 8
-Karte. Der Ablauf steht in `PLAYDRILL_IMPORT_LOG.md` im Arbeitsordner: eine
-Übung je Sitzung, die Zeile übernehmen und die Karten-ID mit einer Sperrdatei
-reservieren, damit parallele Sitzungen nicht dieselbe Nummer nehmen. So dauert
-der Rest über dreihundert Sitzungen. Gewünscht ist ein Lauf, der jede Übung in
-einem eigenen Subagenten bearbeitet, wenig Tokens braucht und nichts erfindet.
-
-Was dafür schon feststeht:
-
-- Die PDFs haben eine Textebene, und `pdftotext` ist installiert. Den Text
-  kann ein Skript ziehen, ohne Modell. Nur das Feldbild braucht ein Modell,
-  das Bilder liest.
-- Der größte Posten sind die festen Kosten je Übung. Import-Skill,
-  `DATENMODELL.md`, `SPRACHE.md` und `glossary.md` sind zusammen etwa 33 KB,
-  geschätzt 9 000 bis 10 000 Tokens, bevor die Quelle gelesen ist. Über 335
-  Übungen sind das rund drei Millionen Tokens nur für die Regeln. Der
-  Orchestrator fällt daneben kaum ins Gewicht.
-- Ein Subagent kann nicht nachfragen. Das Log verlangt aber je Übung
-  Rückfragen: die Lesart des Feldbilds, wenn unter „Ausführung" nur der
-  Platzhalter steht, dazu `spieler_min` und einen Vorschlag für `level_max`.
-  Die Rückfragen müssen also gesammelt statt gestellt werden, mit dem
-  ausgeschnittenen Feldbild daneben, wie es die Absprache vom 26.09.2026
-  verlangt.
-- Die 8 fertigen Karten sind ein Maßstab gegen Erfundenes: ein Probelauf über
-  Nr. 1 bis 8, verglichen mit dem, was schon abgenommen ist.
-- Das Szenen-Vokabular spielt keine Rolle. Laut Absprache vom 26.09.2026
-  bekommt jede PlayDrill-Karte das ausgeschnittene PlayDrill-Bild, gezeichnet
-  wird nichts.
-
-Zu entscheiden:
-
-- Das Agent-Tool aus einer Sitzung heraus oder ein Skript, das `claude -p` je
-  PDF startet. Im zweiten Fall sammelt kein Orchestrator Kontext an, und ein
-  abgebrochener Lauf macht bei der ersten offenen Zeile weiter.
-- Welches Modell die Subagenten nehmen.
-- Was als belegt gilt: aus dem Text, aus einer Regel zum Dateinamen, oder es
-  wird eine Rückfrage.
-- Welche Status das Log dazubekommt, etwa `entwurf` oder `rückfrage`.
-- Ob der Ablauf ins Plugin gehört oder in den Arbeitsordner.
-- Ob `quelldatei:` vorher eine Liste wird, siehe oben.
-
-Zwei Fragen beantwortet erst ein Probelauf: was eine Übung wirklich kostet,
-und ob Text und Feldbild reichen, ohne dass etwas erfunden wird. Dafür reicht
-ein `/prototype` über etwa fünf Übungen, eine davon mit Platzhaltertext.
 
 ### Die Zeichenerklärung könnte das Skript selbst setzen
 
@@ -254,6 +210,23 @@ hat die alte Ansicht überschrieben, siehe oben.
 Ansicht immer ins Temp-Verzeichnis legt, nähme dem Agenten das Basteln ab und
 schlösse aus, dass sie im Arbeitsordner landet.
 
+## Aus dem Interview zum Sammelimport
+
+Aufgefallen am 30.09.2026.
+
+### Zwei Rechner vergeben dieselbe ID
+
+Die nächste freie ID ist die höchste in `uebungen/` plus eins, gelesen aus der
+lokalen Kopie. Geben zwei Trainer am selben Abend auf zwei Rechnern Karten frei,
+sehen beide dieselbe höchste Nummer, solange Nextcloud noch nicht abgeglichen
+hat. Dann schreiben beide `ue-0291`. `index.py` meldet die doppelte ID, aber
+erst hinterher, und ein Trainingsplan kann schon auf eine der beiden zeigen.
+
+Die Sperrdatei aus dem PlayDrill-Log half dagegen nicht, sie liegt im
+Temp-Ordner des einen Rechners. Das Risiko hat jeder Import. Mit dem
+Sammelimport, der dreißig Karten auf einmal freigibt, wird es wahrscheinlicher.
+Bewusst nicht in der Welle zum Sammelimport, weil es jeden Import betrifft.
+
 ## Aus Welle 1b bewusst ausgelassen
 
 Steht so in #10 unter *Out of Scope* und gilt weiter.
@@ -268,14 +241,89 @@ Steht so in #10 unter *Out of Scope* und gilt weiter.
 
 ## Was als Nächstes ansteht
 
-Die Reihenfolge stammt aus #10 und ist dort begründet. Den PlayDrill-Import
-kannte #10 noch nicht. Wo er sich einreiht, ist nicht entschieden. Die Welle
-zum Szenen-Vokabular ist als Welle 1c (#23) mit der Abnahme (#28) durch.
+Die Reihenfolge stammt aus #10 und ist dort begründet. Den Sammelimport kannte
+#10 noch nicht. Er kommt als Nächstes, vor der Wissenskarte, entschieden am
+30.09.2026. Die PlayDrill-Bibliothek braucht die Wissenskarte nicht, und die
+Wissenskarte kann danach den Sammelimport um ihre Kartensorte erweitern. Die
+Welle zum Szenen-Vokabular ist als Welle 1c (#23) mit der Abnahme (#28) durch.
 
-### Der PlayDrill-Import als Lauf
+### Der Sammelimport
 
-Siehe oben unter *Neu seit der Abnahme*. Braucht ein Interview, einen
-Probelauf und eine eigene Spec.
+Aus dem PlayDrill-Import ist beim Interview am 30.09.2026 ein allgemeiner
+Sammelimport im Plugin geworden. Er soll auch einen Stapel abfotografierter
+Magazinseiten zusammen verarbeiten und sich wiederholen lassen. Die Begriffe
+stehen im Saat-Glossar unter „Sammelimport", die Gründe für drei Entscheidungen
+in ADR-0008 bis ADR-0010. Als Nächstes kommt die Spec, mit dem Probelauf als
+erstem Schnitt, denn der entscheidet das Modell.
+
+Der Anlass: Unter `quellen/playdrill/` liegen 343 PDFs, eine Übung je Datei.
+10 davon sind Karte, 258 in den Übungsordnern offen, 75 zurückgestellt. Von
+Hand ist das eine Übung je Sitzung, der Rest also über 250 Sitzungen. Import-
+Skill, `DATENMODELL.md`, `SPRACHE.md` und `glossary.md` kosten zusammen rund
+10 000 Tokens je Sitzung, bevor die Quelle gelesen ist.
+
+Entschieden:
+
+- **Aufbau.** Ein fünfter Skill `volleyball-sammelimport`. Er startet je
+  Einheit den Plugin-Agenten `volleyball-kartenentwurf` über das Agent-Tool,
+  vier parallel (ADR-0009). Der Agent hat nur `Read` und `Write`, sein Prompt
+  ist ein knapper Auszug der Regeln. Ein Test im Repo prüft dessen
+  kontrollierte Werte gegen `tpdaten.py`. Der Import-Skill bietet den
+  Sammelimport an, wenn das Material ein Ordner mit mehr als etwa zehn Dateien
+  ist.
+- **Ablauf.** Erst ein Zerlegungsplan über den ganzen Quellenordner, den der
+  Trainer freigibt. Dann ein Kartenentwurf je Einheit. Dann die Freigabe im
+  Chat, eine Sitzung je Unterordner: zuerst die Rückfragen einzeln mit dem
+  Feldbild im Chat, dann die übrigen Entwürfe als eine Tabelle, pauschal oder
+  zeilenweise. `übernehmen` vergibt danach die IDs, schreibt die Karten und
+  lässt `index.py` laufen.
+- **Nichts erfinden.** Jedes Feld ist belegt, ein Vorschlag mit Begründung oder
+  eine Rückfrage. Belegt sind `quelle`, `quelldatei`, `schaubild`, `level_min`
+  aus der Kategorie, `dauer`, `autor` und `angelegt`, dazu Ziel, Ablauf und
+  Variationen, wenn die Quelle sie beschreibt. Vorschläge sind `titel`,
+  `element`, `form`, `spielphase`, `schwerpunkt` (nur vorhandene), `disziplin`,
+  `spieler_min`, `spieler_max`, `level_max`, `material` und `netz`. Eine
+  Rückfrage wird es bei einem Ablauf, der bei weniger als 150 Zeichen Text aus
+  dem Bild gelesen ist, bei einer neuen Kennung, bei einem Duplikatverdacht,
+  bei einem Widerspruch in der Quelle und wenn unklar ist, ob Übung oder
+  Folge. Für PlayDrill werden damit `spieler_min` und `level_max` aus den
+  Absprachen vom 26.09.2026 zu Vorschlägen.
+- **Einheiten.** Der Zerlegungsplan fasst zusammen, was zusammengehört, auch
+  über Ordner hinweg. Ein Zirkel mit Übersichtsblatt wird eine Folge mit dem
+  Bild der Übersicht, die Stationsblätter gehen in den Ablauf. Nummerierte
+  Technikreihen wie UZ1 bis UZ10 werden Einzelübungen. Theorie bekommt
+  `zurückgestellt`, bis es die Wissenskarte gibt.
+- **Ablage.** Je Quellenordner eine `sammelimport.md` mit den Absprachen für
+  alle Karten daraus und der Übersicht mit dem Status je Einheit: `offen`,
+  `bereit`, `rückfrage`, `importiert`, `ergänzt`, `übersprungen`,
+  `zurückgestellt`, dazu eine Spalte Gruppe. Die Kartenentwürfe liegen in
+  `kartenentwuerfe/<ordner>/`, haben keine ID und verschwinden bei der
+  Freigabe (ADR-0010).
+- **Lesen.** `pdftotext` ist optional (ADR-0008). Pillow schneidet das Feldbild
+  aus.
+- **Duplikate.** Kandidaten holt die Vorstufe mit `suche.py`. Ein Verdacht ist
+  immer eine Rückfrage, `ergänzt` entsteht erst bei der Freigabe. Zwei
+  PlayDrill-Entwürfe, die dieselbe Übung sind, fallen bei der Freigabe des
+  Unterordners auf.
+- **PlayDrill.** `PLAYDRILL_IMPORT_LOG.md` wird zu
+  `quellen/playdrill/sammelimport.md`, die zehn fertigen Zeilen behalten ihre
+  IDs, und `pd_nehmen.py` fällt weg. Der Sammelimport nimmt die Übungsordner
+  ohne `Ü_FV-Prüfungsfolien`, das ist ein Trainingsabend, und ohne
+  `Ü_In Bearbeitung`, das ist in PlayDrill selbst unfertig.
+- **Probelauf.** Die zehn fertigen PlayDrill-Übungen blind, dazu der
+  Sprungkraftzirkel. Aus dem Volleyball-Magazin 09/2026 `ue-0019`, `ue-0020`
+  und `ue-0037` bis `ue-0041` als Maßstab und die Seiten 24 und 25, auf denen
+  Übung 3 und 4 fehlen (siehe *Aus dem Warm-up Teil 4 fehlen Übung 3 und 4*).
+  Je einmal mit Haiku 4.5 und Sonnet 5.5. Haiku bekommt den Sammelimport, wenn
+  es nichts erfindet. Der Vergleich kommt als Bericht, der Trainer beurteilt
+  nur die Abweichungen.
+- **Trefferzeile.** Die Pfadzeile für `quelldatei:` aus dem ersten Abschnitt
+  dieser Datei kommt als kleiner eigener Punkt dazu.
+- **Glossar im Arbeitsordner.** Die lebende `glossary.md` bekommt die neuen
+  Begriffe nicht von selbst, `init_struktur.py` kopiert die Saat nur beim
+  Anlegen. Das gehört in die Welle.
+- **Version.** 2.6.0. Alles kommt dazu, nichts bricht einen bestehenden
+  Arbeitsordner.
 
 ### Der zweite Ast von Welle 1b: die Wissenskarte
 
@@ -283,6 +331,10 @@ Die Wissenskarte als eigene Kartensorte mit eigenem Ordner und Schema
 (ADR-0002), und damit der Import der Theorie- und Ratgeberseiten des
 Volleyball-Magazins. Braucht eine eigene Spec. Die Bildaufbereitung aus Welle
 1b war die Vorbedingung dafür und ist erledigt.
+
+Kommt nach dem Sammelimport und erweitert ihn um die Wissenskarte. Was ein
+Sammelimport als Theorie zurückgestellt hat, steht in der Übersicht seiner
+`sammelimport.md` und wird von dort geholt.
 
 ### Welle 2
 

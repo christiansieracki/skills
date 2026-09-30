@@ -16,6 +16,22 @@ Die Grenze beim Importieren: Lässt sich das Teil aus dem Zusammenhang reißen
 und einzeln einsetzen? Dann Übung. Nur als Ganzes sinnvoll? Dann Folge. Ist es
 ein kompletter Trainingsabend? Dann Quelle, aus der Übungen gezogen werden.
 
+## Sammelimport
+
+| Begriff | Was es ist | Wo es liegt |
+|---|---|---|
+| **Quellenordner** | Ein Ordner mit Übungsquellen, die zusammen importiert werden, etwa eine PlayDrill-Bibliothek oder die Fotos eines Magazinhefts. Trägt die Absprachen, die für alle Karten daraus gelten. | `quellen/<ordner>/` mit `sammelimport.md` |
+| **Sammelimport** | Der Import über einen ganzen Quellenordner: erst der Zerlegungsplan, dann die Kartenentwürfe, dann die Freigabe. Läuft über mehrere Sitzungen und macht dort weiter, wo er aufgehört hat. | `sammelimport.md` im Quellenordner |
+| **Zerlegungsplan** | Die Liste, welche Dateien welche Karte ergeben, ob daraus eine Übung oder eine Folge wird und was liegen bleibt. Wird freigegeben, bevor der erste Kartenentwurf entsteht. | in `sammelimport.md` |
+| **Kartenentwurf** | Eine Karte, die noch nicht freigegeben ist. Hat keine ID, liegt nicht in `uebungen/`, und die Suche findet sie nicht. | `kartenentwuerfe/<ordner>/` |
+| **Rückfrage** | Was ein Kartenentwurf vom Trainer wissen muss, bevor er Karte werden kann. Etwa ein Ablauf, der nur aus dem Bild gelesen ist, oder ein Verdacht auf ein Duplikat. | im Kartenentwurf |
+| **Freigabe** | Das Ja des Trainers. Damit wird aus dem Kartenentwurf eine Karte mit ID. | danach `uebungen/` |
+
+Ein Kartenentwurf trägt, was die Quelle belegt. Was er deutet, steht als
+Vorschlag mit kurzer Begründung drin, und der Trainer bestätigt oder kippt es
+bei der Freigabe. Hat die Quelle eine Lücke, wird nichts erfunden. Dann ist es
+eine Rückfrage.
+
 ## Team und Trainingsgruppe
 
 | Begriff | Was es ist |
