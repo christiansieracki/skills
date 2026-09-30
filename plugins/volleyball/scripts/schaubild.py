@@ -311,6 +311,18 @@ class Satzspiegel:
 # Die Teile des Bildes
 # --------------------------------------------------------------------------
 
+def schriftangabe(groesse: float) -> str:
+    """Eine Schriftgroesse als Angabe im Stylesheet, mit Einheit.
+
+    Ohne `px` ist die Zahl dort ungueltig. Der Betrachter verwirft sie und
+    setzt den Text in seine Grundschrift, 16 Pixel: der Titel so gross wie
+    die Fusszeile, und die Schaetzung der Textbreite rechnete mit einer
+    anderen Groesse als der, die im Bild steht. Im Attribut `font-size` am
+    Marker ist die blosse Zahl erlaubt, im Stylesheet nicht.
+    """
+    return f"font-size:{koord(groesse)}px"
+
+
 def farbblock(auswahl: dict[str, str]) -> str:
     return "svg{" + "".join(f"--{k}:{v};" for k, v in auswahl.items()).rstrip(";") + "}"
 
@@ -354,7 +366,7 @@ def stil() -> str:
         # beiden Schemata lesbar bleiben muesste.
         + ".hervorgehoben .marker{fill:var(--strich)}"
         + ".hervorgehoben .beschriftung{fill:var(--feld)}"
-        + f".geraetname{{fill:var(--gedaempft);font-size:{KLEINSCHRIFT}}}"
+        + f".geraetname{{fill:var(--gedaempft);{schriftangabe(KLEINSCHRIFT)}}}"
         # Der Name der Zone steht voll da, der des Geraetes gedaempft. Was ein
         # Kasten ist, sieht man ihm an; was auf einer Flaeche gilt, sagt allein
         # ihr Wort.
@@ -362,14 +374,14 @@ def stil() -> str:
         # Jeder Buchstabe bringt einen Hof in Zonenfarbe mit, hinter sich
         # gemalt. Auf der Zone faellt er nicht auf; ueber einem hervorgehobenen
         # Marker, der in Strichfarbe gefuellt ist, traegt er das Wort.
-        + f".zonenname{{fill:var(--strich);font-size:{KLEINSCHRIFT};"
+        + f".zonenname{{fill:var(--strich);{schriftangabe(KLEINSCHRIFT)};"
           "stroke:var(--zone);stroke-width:3;stroke-linejoin:round;"
           "paint-order:stroke}"
         # Eine Stelle ist nur ihr Wort, voll und so gross wie das einer Zone.
         # Den Hof des Zonenworts braucht sie nicht: er hebt das Wort von einem
         # gefuellten Marker ab, und wo einer steht, traegt er den Namen und
         # die Stelle entfaellt.
-        + f".stelle{{fill:var(--strich);font-size:{KLEINSCHRIFT}}}"
+        + f".stelle{{fill:var(--strich);{schriftangabe(KLEINSCHRIFT)}}}"
         + ".weg{fill:none;stroke-width:2.6;stroke-linecap:round}"
         + ".laufweg{stroke:var(--laufweg)}"
         + ".ballweg{stroke:var(--ballweg);stroke-dasharray:9 6}"
@@ -379,22 +391,22 @@ def stil() -> str:
         + ".massstrich{stroke:var(--gedaempft);stroke-width:1.8}"
         + ".masshilfslinie{stroke:var(--gedaempft);stroke-width:1;"
           "stroke-dasharray:4 4}"
-        + f".massbeschriftung{{fill:var(--strich);font-size:{KLEINSCHRIFT}}}"
+        + f".massbeschriftung{{fill:var(--strich);{schriftangabe(KLEINSCHRIFT)}}}"
         # Das Textwerk steht auf dem Papier und liest sich von links. Eine
         # Beschriftung im Feld steht um ihren Punkt herum und deshalb mittig;
         # eine Legendenzeile faengt an einer Kante an wie jeder andere Satz.
         + ".textwerk text{text-anchor:start}"
-        + f".titel{{fill:var(--strich);font-size:{SCHRIFT['titel']};"
+        + f".titel{{fill:var(--strich);{schriftangabe(SCHRIFT['titel'])};"
           "font-weight:700}"
-        + f".untertitel{{fill:var(--gedaempft);font-size:{SCHRIFT['untertitel']};"
+        + f".untertitel{{fill:var(--gedaempft);{schriftangabe(SCHRIFT['untertitel'])};"
           "font-weight:400}"
-        + f".legendenkopf{{fill:var(--strich);font-size:{SCHRIFT['legendenkopf']}}}"
+        + f".legendenkopf{{fill:var(--strich);{schriftangabe(SCHRIFT['legendenkopf'])}}}"
         # Die Zeilen stehen leichter da als die Ueberschrift darueber. Sonst
         # stuende eine Wand aus Fettschrift neben dem Feld, und die zoege den
         # Blick von dem weg, was sie erklaeren soll.
         + f".legendenzeile{{fill:var(--strich);"
-          f"font-size:{SCHRIFT['legendenzeile']};font-weight:400}}"
-        + f".fusszeile{{fill:var(--gedaempft);font-size:{SCHRIFT['fusszeile']};"
+          f"{schriftangabe(SCHRIFT['legendenzeile'])};font-weight:400}}"
+        + f".fusszeile{{fill:var(--gedaempft);{schriftangabe(SCHRIFT['fusszeile'])};"
           "font-weight:400}"
     )
 

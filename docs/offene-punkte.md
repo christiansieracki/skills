@@ -151,39 +151,6 @@ Papier, und im dunklen Schema sähe man ihn als Schimmer um die Buchstaben. #26
 schließt Rand und Fläche aus, einen Hof hat es nicht erwogen. Ob es ihn
 braucht, zeigt die Abnahme (#28) am Referenzbild mit „Netz" und „3-m-Linie".
 
-### Die Schriftgrößen im Schaubild gelten nicht
-
-Aufgefallen am 30.09.2026 beim Nachstellen für #27. Das Stylesheet in jedem
-Schaubild setzt `font-size:13`, `font-size:22` und so fort, ohne `px`. In einem
-Stylesheet ist eine Länge ohne Einheit ungültig. Chromium verwirft die Angabe,
-und damit auch Edge, die Leseansicht und der PDF-Export. Jede Beschriftung
-steht dann in 16 px da: der Titel so groß wie eine Legendenzeile, die Fußzeile
-ebenso. Die Rangfolge aus `SCHRIFT` in `schaubild.py` kommt im Bild nicht an.
-Nur das Kürzel im Marker hat die gemeinte Größe, weil es sie als Attribut
-trägt, und dort ist eine Zahl ohne Einheit erlaubt.
-
-Die Schätzung der Textbreite rechnet mit 13. Gegen die 16 px im Bild ist sie
-bei manchen Wörtern zu knapp, gemessen in Chromium mit Segoe UI:
-
-| Wort | geschätzt | bei 16 px | bei 13 px |
-|---|---|---|---|
-| Ziel | 31,2 | 26,3 | 21,3 |
-| Zielzone | 62,4 | 61,1 | 49,6 |
-| Wartebereich | 93,6 | 97,2 | 79,0 |
-| Abwehr | 46,8 | 56,2 | 45,6 |
-
-Bei 13 px läge die Schätzung für gewöhnliche Wörter durchweg darüber, so wie
-sie gedacht ist. So aber kann der Hinweis zum Zonenwort (#27) bei „Abwehr" in
-einer Zone von 1,6 m schweigen, obwohl das Wort übersteht. Im Referenzbild ragt
-trotzdem nichts über das Blatt.
-
-Behoben wäre es mit `px` an jeder Größe im Stylesheet. Dann sieht aber jedes
-Bild beim nächsten Rendern anders aus: der Titel größer, Beschriftungen,
-Legende und Fußzeile kleiner. Die Tests lesen die Größe als Zahl aus dem
-Stylesheet (`wortkasten()` in `test_schaubild.py`) und müssten die Einheit
-mitlesen. Zu entscheiden ist, ob das vor der Abnahme (#28) geschieht. Dann
-beurteilt sie die gemeinte Rangfolge und nicht die zufällige.
-
 ## Aus Welle 1b bewusst ausgelassen
 
 Steht so in #10 unter *Out of Scope* und gilt weiter.

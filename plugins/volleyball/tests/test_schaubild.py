@@ -230,6 +230,31 @@ def farbvariable(baum, element: ET.Element, eigenschaft: str) -> str:
     return treffer.group(1)
 
 
+# Die Schriftgroesse eines Betrachters, wenn nichts anderes gilt: `medium` in
+# CSS, und das sind in jedem Browser 16 Pixel.
+GRUNDSCHRIFT = 16.0
+
+
+def schriftgroesse(baum, element: ET.Element) -> float:
+    """Wie gross ein Text im Betrachter steht, in Zeicheneinheiten.
+
+    So, wie ein Betrachter die Groesse findet. Im Stylesheet gilt sie nur mit
+    Einheit: eine blosse Zahl ist dort ungueltig und faellt weg, anders als im
+    Attribut `font-size`, wo sie erlaubt ist. Bleibt nichts, steht der Text in
+    der Grundschrift des Betrachters. Wer die Zahl aus dem Stylesheet einfach
+    liest, sieht eine Rangfolge, die im Bild nicht ankommt.
+
+    Verstanden werden Pixel, die einzige Einheit, die das Skript schreibt.
+    """
+    wert = (stilwert(baum, element, "font-size") or "").strip()
+    treffer = re.fullmatch(r"(\d+(?:\.\d+)?)px", wert)
+    if treffer:
+        return float(treffer.group(1))
+    if element.get("font-size"):
+        return float(element.get("font-size"))
+    return GRUNDSCHRIFT
+
+
 # Wie breit ein Zeichen mindestens ist, als Anteil seiner Schriftgroesse.
 # Knapp geschaetzt: ein Wort aus gewoehnlichen Buchstaben ist in einer
 # serifenlosen Schrift breiter. Ragt ein Weg schon in diesen Kasten hinein,
@@ -242,10 +267,10 @@ MINDESTBREITE = 0.5
 def wortkasten(baum, wort: ET.Element) -> tuple[float, float]:
     """Wie weit ein Wort mindestens von seiner Mitte reicht, in Zeicheneinheiten.
 
-    Halbe Breite und halbe Hoehe. Die Schriftgroesse kommt aus dem Stylesheet
-    des Bildes, so wie der Betrachter sie anwendet.
+    Halbe Breite und halbe Hoehe, in der Schriftgroesse, die der Betrachter
+    anwendet, siehe schriftgroesse().
     """
-    groesse = float(stilwert(baum, wort, "font-size"))
+    groesse = schriftgroesse(baum, wort)
     return len(wort.text) * groesse * MINDESTBREITE / 2, groesse / 2
 
 
@@ -1319,11 +1344,11 @@ class SchaubildTest(unittest.TestCase):
 
         passt, zu_breit = mit_klasse(baum, "zonenname")
         self.assertEqual(zu_breit.text, "Zielzone Position 4")
-        groesse = stilwert(baum, zu_breit, "font-size")
+        groesse = schriftgroesse(baum, zu_breit)
         for andere in (passt, mit_klasse(baum, "geraetname")[0],
                        mit_klasse(baum, "stelle")[0]):
             with self.subTest(klasse=andere.get("class")):
-                self.assertEqual(stilwert(baum, andere, "font-size"), groesse)
+                self.assertEqual(schriftgroesse(baum, andere), groesse)
 
     # -- Stellen -----------------------------------------------------------
 
@@ -1429,8 +1454,8 @@ stellen:
         # In Strichfarbe und so gross wie das Wort einer Zone. Eine Stelle ist
         # eine Beschriftung im Feld wie jede andere, nur ohne etwas darunter.
         self.assertEqual(farbvariable(mit, wort, "fill"), "strich")
-        self.assertEqual(stilwert(mit, wort, "font-size"),
-                         stilwert(mit, mit_klasse(mit, "zonenname")[0], "font-size"))
+        self.assertEqual(schriftgroesse(mit, wort),
+                         schriftgroesse(mit, mit_klasse(mit, "zonenname")[0]))
 
     def test_das_wort_einer_stelle_steht_ueber_allem_im_bild(self) -> None:
         # Auch ueber den Zonenwoertern und den Markern. Eine Stelle hat nichts
@@ -1764,6 +1789,56 @@ stellen:
         """)
 
         self.assertEqual(baum.find(SVG + "title").text, "Annahme-Zielzone")
+
+    def test_die_schrift_steht_im_bild_in_ihrer_rangfolge(self) -> None:
+        # Der Titel vor dem Untertitel, die Ueberschrift eines Legendenblocks
+        # vor seinen Zeilen, die Fusszeile zuletzt, und die Woerter im Feld
+        # klein. Gemessen wird die Groesse, die ein Betrachter anwendet: eine,
+        # die er verwirft, steht in seiner Grundschrift da, und dann sieht
+        # alles gleich aus.
+        baum = self.zeichne("rangfolge", """
+            form: halle
+            titel: Annahme-Zielzone
+            untertitel: Aufschlag von hinten
+            legende:
+              - ueberschrift: Wertung
+                zeilen:
+                  - 3 Punkte in der Zielzone
+            fusszeile: "Quelle: Volleyball-Magazin 09/2026"
+            zonen:
+              - text: Zielzone
+                form: rechteck
+                bei: [4.5, 6.0]
+                groesse: [3.0, 2.0]
+            geraete:
+              - text: Kasten
+                teile:
+                  - form: rechteck
+                    bei: [7.0, 12.0]
+                    groesse: [1.6, 0.8]
+            stellen:
+              - bei: [4.5, 14.0]
+                text: Feldmitte
+            abstaende:
+              - art: masskette
+                von: [1.0, 2.0]
+                nach: [1.0, 5.0]
+        """)
+
+        def groesse(klasse: str) -> float:
+            return schriftgroesse(baum, mit_klasse(baum, klasse)[0])
+
+        stufen = [groesse(klasse) for klasse in
+                  ("titel", "untertitel", "legendenkopf", "legendenzeile",
+                   "fusszeile")]
+        self.assertEqual(stufen, sorted(set(stufen), reverse=True),
+                         "jede Stufe kleiner als die davor")
+
+        im_feld = {klasse: groesse(klasse) for klasse in
+                   ("zonenname", "geraetname", "stelle", "massbeschriftung")}
+        self.assertEqual(len(set(im_feld.values())), 1,
+                         f"die Woerter im Feld stehen in einer Schrift: {im_feld}")
+        self.assertLess(im_feld["zonenname"], groesse("titel"))
 
     def test_titel_und_fusszeile_sitzen_auf_derselben_kante_wie_das_bild(self) -> None:
         # Ein Titel, der zwei Finger neben dem Feld anfaengt, liest sich wie
