@@ -20,6 +20,7 @@ in `scripts/tpdaten.py` macht das.
 ├── trainings/<gruppe>/         JJJJ-MM-TT.md, dazu _vorlage.md
 ├── uebungen/                   flach, eine Datei je Übung
 ├── quellen/                    Originaldokumente
+├── kartenentwuerfe/            Kartenentwürfe eines laufenden Sammelimports
 └── schaubilder/                Schaubilder und die Szenen, aus denen sie entstehen
 ```
 
@@ -151,9 +152,89 @@ auf die Datei auf. **Eine vergebene ID wird nie wieder geändert**, auch nicht
 beim Umbenennen der Datei. Sonst brechen alle Pläne, die auf sie zeigen.
 
 Nächste freie ID: `python3 scripts/suche.py --json` (Windows: `python`) und die
-höchste Nummer plus eins. Format immer vierstellig mit führenden Nullen.
+höchste Nummer plus eins. Format immer vierstellig mit führenden Nullen. Beim
+Sammelimport vergibt `sammelimport.py uebernehmen` sie selbst, erst bei der
+Freigabe (ADR-0010).
 
 Der Dateiname beginnt mit der ID, darf aber sonst geändert werden.
+
+## Der Sammelimport
+
+Ein Quellenordner unter `quellen/` wird als Ganzes importiert. Was die Begriffe
+Quellenordner, Kandidat, Kartenentwurf, Rückfrage und Vermutung heißen, steht
+im Glossar.
+
+### `sammelimport.md`
+
+Liegt im Quellenordner und hat drei Teile:
+
+```markdown
+---
+kandidaten_je_durchgang: 30      # so viele Aufträge je Durchgang
+plan_freigegeben: 2026-09-30     # null, solange der Plan nicht freigegeben ist
+---
+
+# Sammelimport playdrill
+
+## Absprachen
+
+Freitext: wie sich die Quelle liest und welche Feldregeln für jede Karte
+daraus gelten. Geht unverändert in jeden Auftrag.
+
+## Übersicht
+
+| Kandidat | Dateien | Was es ist | Ergebnis | Status | Karte | Notiz |
+|---|---|---|---|---|---|---|
+| 1 | `Ü_Abwehr/Abwehr vom Kasten.pdf` | Abwehr gegen Angriffe vom Kasten | uebung | importiert | ue-0291 | spieler_min auf 6 |
+| 2 | `seite-24.jpg`, `seite-25.jpg` | Übung über zwei Seiten | uebung | offen | | kein Entwurf |
+```
+
+- Die Spalte **Kandidat** trägt die Nummer des Kandidaten, fortlaufend je
+  Quellenordner. Sie bleibt und benennt Entwurf und Auftrag.
+- **Dateien** stehen relativ zum Quellenordner, jede in Backticks.
+- **Ergebnis** ist eins von `uebung`, `folge`, `zurückgestellt`, `übersprungen`.
+  Aus `uebung` und `folge` wird eine Karte mit diesem `typ`.
+- **Status** ist eins von `offen`, `bereit`, `rückfrage`, `importiert`,
+  `ergänzt`, `übersprungen`, `zurückgestellt`. Die ersten drei warten noch auf
+  ihre Karte. `rückfrage` heißt: Der Entwurf hat eine Rückfrage ohne
+  Vermutung, hier muss einzeln gefragt werden.
+
+Die Übersicht ist der freigegebene Zerlegungsplan. Bis zur Freigabe schreibt
+ihn der Skill im Gespräch mit dem Trainer. Danach schreibt nur noch
+`sammelimport.py` hinein, auch wenn mehrere Agenten parallel entwerfen. Den
+Status setzt das Skript aus den Dateien auf der Platte. Die Rückmeldung eines
+Agenten zählt dabei nicht.
+
+### `kartenentwuerfe/<ordner>/`
+
+Alles, was ein laufender Sammelimport erzeugt, liegt hier, benannt nach der
+Nummer des Kandidaten: `17.auftrag.md` ist der Auftrag für den Agenten, `17.md`
+der Kartenentwurf.
+
+Ein Kartenentwurf hat das Frontmatter der Karte ohne `id` (ADR-0010), die
+Abschnitte der Karte und am Ende `## Freigabe` mit beiden Listen:
+
+```markdown
+## Freigabe
+
+Vorschläge:
+- `level_max`: Technikübung, die Schwierigkeit steuert der Ball.
+
+Rückfragen:
+1. Wohin kommen die gefangenen Bälle zurück? Vermutung im Entwurf: keine
+```
+
+Jede Rückfrage endet auf `Vermutung im Entwurf: …` oder auf
+`Vermutung im Entwurf: keine`. Eine leere Liste heißt `Vorschläge: keine`.
+
+Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
+mit `angelegt` von heute und ohne `## Freigabe`. Entwurf und Auftrag
+verschwinden dann. Ist im Quellenordner nichts mehr offen, verschwindet auch
+`kartenentwuerfe/<ordner>/`.
+
+Den Ordner `kartenentwuerfe/` legt `init_struktur.py` nicht an. Er entsteht mit
+dem ersten Sammelimport. `index.py` und `suche.py` lesen ihn nicht, ein
+Kartenentwurf taucht also in keiner Suche auf.
 
 ## Das Schaubild ist ein Erzeugnis, die Szene ist die Quelle
 
@@ -242,6 +323,7 @@ das Pillow braucht und ohne es mit einem Installationshinweis abbricht
 | `export_pdf.py` | PDF zum Ausdrucken |
 | `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen |
 | `bilder_aufbereiten.py` | Quellbilder verkleinern und nach EXIF geradedrehen |
+| `sammelimport.py` | Sammelimport über einen Quellenordner: `vorbereiten` legt die Aufträge an, `pruefen` setzt den Status aus den Entwürfen, `uebernehmen` macht freigegebene Entwürfe zu Karten |
 
 `index.py` ohne Argumente ist auch der Linter: doppelte IDs, fehlende oder
 unbekannte `disziplin`, unbekannte Schwerpunkte, fehlende Level, ins Leere

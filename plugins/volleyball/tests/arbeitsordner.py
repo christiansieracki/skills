@@ -210,6 +210,17 @@ OHNE = object()
 UMLAUTE = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
 
 
+def auffaelligkeiten(ausgabe: str) -> list[str]:
+    """Zieht die gemeldeten Zeilen aus der Ausgabe von index.py.
+
+    Jede Auffaelligkeit steht in einer eigenen Zeile mit fuehrendem "  - ".
+    Mehr Struktur hat die Ausgabe des Linters heute nicht. Die Funktion steht
+    hier, weil nicht nur der Test des Linters nach ihm fragt: auch nach einem
+    Sammelimport soll er nichts melden.
+    """
+    return [zeile[4:] for zeile in ausgabe.splitlines() if zeile.startswith("  - ")]
+
+
 def _slug(titel: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", titel.lower().translate(UMLAUTE)).strip("-")
 
@@ -239,6 +250,56 @@ def _yaml(wert) -> str:
 def _als_karte(felder: dict) -> str:
     frontmatter = "\n".join(f"{k}: {_yaml(v)}" for k, v in felder.items())
     return f"---\n{frontmatter}\n---\n" + RUMPF.format(titel=felder["titel"])
+
+
+# Die Spalten der Uebersicht in sammelimport.md, in der Reihenfolge aus #29.
+UEBERSICHT_SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "Notiz"]
+
+ABSPRACHEN = """\
+Absprache aus dem kuenstlichen Arbeitsordner: `quelle` nennt das Heft und die
+Seite. Steht hier, damit der Test sie im Auftrag wiederfindet.
+"""
+
+
+def _als_sammelimport(kandidaten: list[dict], freigegeben: str | None,
+                      je_durchgang: int, absprachen: str) -> str:
+    zeilen = ["| " + " | ".join(UEBERSICHT_SPALTEN) + " |",
+              "|" + "---|" * len(UEBERSICHT_SPALTEN)]
+    for k in kandidaten:
+        dateien = ", ".join(f"`{d}`" for d in k["dateien"])
+        zellen = [str(k["kandidat"]), dateien, k.get("was", "Übung aus dem Test"),
+                  k.get("ergebnis", "uebung"), k.get("status", "offen"),
+                  k.get("karte", ""), k.get("notiz", "")]
+        zeilen.append("| " + " | ".join(zellen) + " |")
+    return (
+        "---\n"
+        f"kandidaten_je_durchgang: {je_durchgang}\n"
+        f"plan_freigegeben: {_yaml(freigegeben)}\n"
+        "---\n\n"
+        "# Sammelimport\n\n"
+        "## Absprachen\n\n"
+        f"{absprachen}\n"
+        "## Übersicht\n\n"
+        + "\n".join(zeilen) + "\n"
+    )
+
+
+def _als_freigabe(vorschlaege: list[str], rueckfragen: list[str]) -> str:
+    """Der Abschnitt `## Freigabe` am Ende eines Kartenentwurfs, Form aus #29.
+
+    Eine leere Liste heisst dort "keine", beide Listen stehen immer da.
+    """
+    teile = ["## Freigabe", ""]
+    if vorschlaege:
+        teile += ["Vorschläge:", *(f"- {v}" for v in vorschlaege)]
+    else:
+        teile += ["Vorschläge: keine"]
+    teile.append("")
+    if rueckfragen:
+        teile += ["Rückfragen:", *(f"{i}. {r}" for i, r in enumerate(rueckfragen, 1))]
+    else:
+        teile += ["Rückfragen: keine"]
+    return "\n".join(teile) + "\n"
 
 
 class Arbeitsordner:
@@ -342,6 +403,72 @@ class Arbeitsordner:
         datei.parent.mkdir(parents=True, exist_ok=True)
         datei.write_bytes(inhalt)
         return datei
+
+    def lege_quellenordner_an(self, ordner: str, kandidaten: list[dict],
+                              freigegeben: str | None = "2026-09-30",
+                              je_durchgang: int = 30,
+                              absprachen: str = ABSPRACHEN) -> Path:
+        """Legt einen Quellenordner mit `sammelimport.md` und Quelldateien an.
+
+        `kandidaten` sind die Zeilen der Uebersicht. Jede nennt `kandidat` und
+        `dateien`, relativ zum Quellenordner. Die uebrigen Spalten haben einen
+        Standard: eine offene Uebung ohne Karte und Notiz. Jede genannte Datei
+        entsteht leer unter `quellen/<ordner>/`. Der Sammelimport liest sie
+        in diesem Zuschnitt nicht, er muss nur wissen, dass es sie gibt.
+
+        `freigegeben=None` ist der Plan, den der Trainer noch nicht
+        freigegeben hat.
+        """
+        for k in kandidaten:
+            for datei in k["dateien"]:
+                self.lege_quelldatei_an(f"{ordner}/{datei}", b"")
+        datei = self.pfad / "quellen" / ordner / "sammelimport.md"
+        datei.parent.mkdir(parents=True, exist_ok=True)
+        datei.write_text(
+            _als_sammelimport(kandidaten, freigegeben, je_durchgang, absprachen),
+            encoding="utf-8",
+        )
+        return datei
+
+    def lege_kartenentwurf_an(self, ordner: str, kandidat: int,
+                              vorschlaege: list[str] | None = None,
+                              rueckfragen: list[str] | None = None,
+                              freigabe: str | None = None,
+                              **felder) -> Path:
+        """Legt einen Kartenentwurf so ab, wie der Agent ihn schreibt.
+
+        Das Frontmatter ist das der Karte ohne `id`, mit den Standardwerten
+        aus KARTE. Am Ende steht `## Freigabe` mit beiden Listen. `freigabe` ersetzt diesen Abschnitt woertlich, fuer die
+        Entwuerfe, deren Form nicht stimmen soll. `freigabe=""` laesst ihn weg.
+        """
+        karte = {k: v for k, v in {**KARTE, **felder}.items()
+                 if k != "id" and v is not OHNE}
+        text = _als_karte(karte)
+        if freigabe is None:
+            freigabe = _als_freigabe(vorschlaege or [], rueckfragen or [])
+        if freigabe:
+            text += "\n" + freigabe
+        datei = self.pfad / "kartenentwuerfe" / ordner / f"{kandidat}.md"
+        datei.parent.mkdir(parents=True, exist_ok=True)
+        datei.write_text(text, encoding="utf-8")
+        return datei
+
+    def uebersicht(self, ordner: str) -> dict[str, dict[str, str]]:
+        """Liest die Uebersicht aus `sammelimport.md`, je Kandidat eine Zeile.
+
+        Der Schluessel ist die Nummer des Kandidaten als Text, so wie sie in
+        der Tabelle steht. Die Zellen kommen ohne Rand-Leerzeichen zurueck.
+        """
+        text = (self.pfad / "quellen" / ordner / "sammelimport.md").read_text(encoding="utf-8")
+        zeilen = {}
+        for zeile in text.split("## Übersicht", 1)[1].splitlines():
+            if not zeile.startswith("|") or zeile.startswith("|---"):
+                continue
+            zellen = [z.strip() for z in zeile.strip().strip("|").split("|")]
+            if zellen[0] == UEBERSICHT_SPALTEN[0]:
+                continue
+            zeilen[zellen[0]] = dict(zip(UEBERSICHT_SPALTEN, zellen))
+        return zeilen
 
     def lege_quellbild_an(self, name: str, groesse: tuple[int, int],
                           orientierung: int | None = None) -> Path:

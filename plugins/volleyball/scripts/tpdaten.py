@@ -186,20 +186,9 @@ def lies_schwerpunkte(wurzel: Path) -> tuple[dict[str, set[str]], list[str]]:
     schaltete ein Tippfehler in der von Hand gepflegten Datei still genau die
     Pruefung ab, fuer die die Spalte da ist.
     """
-    datei = wurzel / "schwerpunkte.md"
-    if not datei.is_file():
-        return {}, []
     gefunden: dict[str, set[str]] = {}
     warnungen: list[str] = []
-    for zeile in datei.read_text(encoding="utf-8").splitlines():
-        if not zeile.strip().startswith("|"):
-            continue
-        spalten = [s.strip() for s in zeile.strip().strip("|").split("|")]
-        m = _KENNUNG.fullmatch(spalten[0])
-        if not m:
-            continue
-        kennung = m.group(1)
-        disziplin_angabe = spalten[2] if len(spalten) > 2 else ""
+    for kennung, _klartext, disziplin_angabe in lies_schwerpunkt_zeilen(wurzel):
         if disziplin_angabe and disziplin_angabe not in DISZIPLIN_SPALTE:
             warnungen.append(
                 f"schwerpunkte.md: {kennung} traegt die Disziplin "
@@ -207,6 +196,31 @@ def lies_schwerpunkte(wurzel: Path) -> tuple[dict[str, set[str]], list[str]]:
             )
         gefunden[kennung] = DISZIPLIN_SPALTE.get(disziplin_angabe, set(DISZIPLINEN))
     return gefunden, warnungen
+
+
+def lies_schwerpunkt_zeilen(wurzel: Path) -> list[tuple[str, str, str]]:
+    """Die Zeilen aus schwerpunkte.md: Kennung, Klartext, Disziplinspalte.
+
+    Die Spalten kommen so, wie sie in der Datei stehen, die Disziplin also noch
+    nicht aufgeloest und auch leer. Was sie bedeutet, sagt `lies_schwerpunkte`.
+    Der Klartext ist fuer den, der eine Kennung waehlen muss, ohne die Datei
+    vor sich zu haben: den Agenten im Sammelimport.
+    """
+    datei = wurzel / "schwerpunkte.md"
+    if not datei.is_file():
+        return []
+    zeilen: list[tuple[str, str, str]] = []
+    for zeile in datei.read_text(encoding="utf-8").splitlines():
+        if not zeile.strip().startswith("|"):
+            continue
+        spalten = [s.strip() for s in zeile.strip().strip("|").split("|")]
+        m = _KENNUNG.fullmatch(spalten[0])
+        if not m:
+            continue
+        klartext = spalten[1] if len(spalten) > 1 else ""
+        disziplin_angabe = spalten[2] if len(spalten) > 2 else ""
+        zeilen.append((m.group(1), klartext, disziplin_angabe))
+    return zeilen
 
 
 def lies_uebungen(wurzel: Path) -> list[dict]:

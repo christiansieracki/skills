@@ -15,16 +15,7 @@ from __future__ import annotations
 
 import unittest
 
-from arbeitsordner import OHNE, Arbeitsordner
-
-
-def auffaelligkeiten(ausgabe: str) -> list[str]:
-    """Zieht die gemeldeten Zeilen aus der Ausgabe von index.py.
-
-    Jede Auffaelligkeit steht in einer eigenen Zeile mit fuehrendem "  - ".
-    Mehr Struktur hat die Ausgabe des Linters heute nicht.
-    """
-    return [zeile[4:] for zeile in ausgabe.splitlines() if zeile.startswith("  - ")]
+from arbeitsordner import OHNE, Arbeitsordner, auffaelligkeiten
 
 
 def disziplin_zu(index_md: str, uebung_id: str) -> set[str]:
