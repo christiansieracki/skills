@@ -178,27 +178,27 @@ def zeige(e, lang: bool, wurzel: Path, anwesend=None):
         print(f"    Quelle       {e['quelle']}")
     if e.get("quelldatei"):
         # Ist der ganze Wert eine Datei unter quellen/, steht dort
-        # `quellen/<wert>`, ein Pfad, den man kopieren kann, so wie
-        # `schaubilder/<datei>` in der Zeile darüber. Das ist der häufigste
-        # Fall: jede PlayDrill-Karte nennt genau eine Datei.
+        # `quellen/<wert>`, ein Pfad zum Kopieren wie `schaubilder/<datei>` in
+        # der Zeile darüber. So ist es bei jeder PlayDrill-Karte.
         #
-        # Sonst steht der Ordner einmal davor und die Angabe dahinter so, wie
-        # sie auf der Karte steht. Das Feld ist freier Text und nennt bei
-        # einer Übung, die über zwei Seiten läuft, beide (DATENMODELL.md). Ein
-        # vorangestelltes `quellen/` säße dann nur vor der ersten.
+        # Sonst steht der Ordner einmal davor und die Angabe dahinter, wie sie
+        # auf der Karte steht. Das Feld ist freier Text und nennt bei einer
+        # Übung über zwei Seiten beide (DATENMODELL.md). Ein `quellen/` davor
+        # säße nur vor der ersten.
         #
-        # Die Regel rät nichts. Die Angabe in Dateinamen zu zerlegen hieße
-        # raten: mal trennt ein Komma die beiden Seiten, mal ein „und", hinter
-        # dem Namen steht oft eine Seitenzahl, und ein Dateiname darf Komma
-        # und Leerzeichen enthalten. Ob der ganze Wert eine Datei ist, sagt
-        # dagegen die Platte. Auf einem Rechner, dessen Nextcloud quellen/
-        # nicht synchronisiert, gibt es sie nicht, und die Zeile sieht aus wie
-        # bisher, statt einen Pfad zu zeigen, unter dem nichts liegt.
+        # Ob es die Datei gibt, sagt die Platte, geraten wird dabei nichts.
+        # Die Angabe in Dateinamen zu zerlegen müsste raten: mal trennt ein
+        # Komma die Seiten, mal ein „und", hinter dem Namen steht oft eine
+        # Seitenzahl, und ein Dateiname darf Komma und Leerzeichen enthalten.
+        # Synchronisiert die Nextcloud quellen/ nicht, fehlt die Datei, und
+        # die Zeile bleibt wie bisher.
         #
-        # Der Wert muss dafür relativ zu quellen/ stehen, so wie er auf jedem
-        # Rechner stimmt. Ein absoluter Pfad trifft auch eine Datei, aber mit
-        # `quellen/` davor wird daraus kein Pfad. Eine Liste in eckigen
-        # Klammern ist gar keiner.
+        # Der Wert muss relativ zu quellen/ stehen. Ein absoluter Pfad trifft
+        # auch eine Datei, mit `quellen/` davor wird daraus aber kein Pfad.
+        # Geprüft wird `anchor` und nicht `is_absolute()`: unter Windows gilt
+        # `/Users/...` ohne Laufwerk nicht als absolut, pathlib setzt es beim
+        # Anhängen trotzdem an die Stelle der Wurzel. Zwei Seiten in eckigen
+        # Klammern liefert der Parser als Liste, auch die bleibt, wie sie ist.
         wert = e["quelldatei"]
         if (isinstance(wert, str) and not Path(wert).anchor
                 and (wurzel / "quellen" / wert).is_file()):

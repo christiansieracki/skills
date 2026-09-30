@@ -34,7 +34,8 @@ class SucheTest(unittest.TestCase):
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
         return json.loads(fertig.stdout)
 
-    def quelldateizeile(self, uid: str, *vorhanden: str, **felder) -> str:
+    def quelldateizeile(self, uid: str, vorhanden: tuple[str, ...] = (),
+                        **felder) -> str:
         """Legt eine Karte an und gibt ihre Quelldatei-Zeile zurueck.
 
         Die Faelle weiter unten unterscheiden sich darin, wie die
@@ -144,7 +145,7 @@ class SucheTest(unittest.TestCase):
         # Liegt sie unter quellen/, steht dort ein Pfad, den man kopieren
         # kann, so wie `schaubilder/<datei>` in der Zeile darueber.
         zeile = self.quelldateizeile(
-            "ue-0013", "playdrill/Annahme Diagonal.pdf",
+            "ue-0013", vorhanden=("playdrill/Annahme Diagonal.pdf",),
             titel="Annahme diagonal",
             quelldatei="playdrill/Annahme Diagonal.pdf")
 
@@ -166,20 +167,26 @@ class SucheTest(unittest.TestCase):
         # `quelldatei:` steht relativ zu quellen/, damit sie auf jedem Rechner
         # stimmt. Steht dort doch ein absoluter Pfad, zeigt er auf eine Datei,
         # die es gibt, und `quellen/` davor ergaebe trotzdem keinen Pfad.
+        # Unter Windows gilt das auch fuer `/Users/...` ohne Laufwerk, obwohl
+        # `is_absolute()` dazu nein sagt. Auf den anderen Systemen sind beide
+        # Schreibweisen dieselbe.
         datei = self.ordner.lege_quelldatei_an("playdrill/Annahme Diagonal.pdf", b"")
-        zeile = self.quelldateizeile(
-            "ue-0016", titel="Annahme diagonal, absolut verwiesen",
-            quelldatei=datei.as_posix())
+        mit_laufwerk = datei.as_posix()
+        ohne_laufwerk = "/" + datei.relative_to(datei.anchor).as_posix()
+        for uid, wert in (("ue-0015", mit_laufwerk), ("ue-0016", ohne_laufwerk)):
+            with self.subTest(wert=wert):
+                zeile = self.quelldateizeile(
+                    uid, titel=f"Annahme diagonal, absolut verwiesen ({uid})",
+                    quelldatei=wert)
 
-        self.assertEqual(
-            f"    Quelldatei   in quellen/ · {datei.as_posix()}", zeile)
+                self.assertEqual(f"    Quelldatei   in quellen/ · {wert}", zeile)
 
     def test_eine_liste_statt_freiem_text_laesst_die_suche_nicht_abbrechen(self) -> None:
         # Das Feld ist freier Text, aber wer zwei Seiten in eckige Klammern
         # setzt, bekommt vom Parser eine Liste. Die ist kein Pfad, und die
         # Suche darf an ihr nicht scheitern.
         zeile = self.quelldateizeile(
-            "ue-0015", "magazin/seite-04.jpg", "magazin/seite-05.jpg",
+            "ue-0017", vorhanden=("magazin/seite-04.jpg", "magazin/seite-05.jpg"),
             titel="Abwehr über zwei Seiten, als Liste",
             quelldatei=["magazin/seite-04.jpg", "magazin/seite-05.jpg"])
 
@@ -192,7 +199,7 @@ class SucheTest(unittest.TestCase):
         # beide liegen unter quellen/. Ein Praefix am Anfang der Angabe saesse
         # nur vor der ersten.
         zeile = self.quelldateizeile(
-            "ue-0010", "magazin/seite-04.jpg", "magazin/seite-05.jpg",
+            "ue-0010", vorhanden=("magazin/seite-04.jpg", "magazin/seite-05.jpg"),
             titel="Abwehr über zwei Seiten",
             quelldatei="magazin/seite-04.jpg, magazin/seite-05.jpg")
 
@@ -206,7 +213,7 @@ class SucheTest(unittest.TestCase):
         # die Ausgabe nicht haengen: die zweite Seite soll in beiden Faellen
         # genauso dastehen wie die erste.
         zeile = self.quelldateizeile(
-            "ue-0011", "magazin/seite-04.jpg", "magazin/seite-05.jpg",
+            "ue-0011", vorhanden=("magazin/seite-04.jpg", "magazin/seite-05.jpg"),
             titel="Abwehr über zwei Seiten, anders geschrieben",
             quelldatei="magazin/seite-04.jpg und magazin/seite-05.jpg")
 
@@ -220,7 +227,7 @@ class SucheTest(unittest.TestCase):
         # Pfad: `quellen/S. 1` gibt es nicht. Die Datei selbst liegt da, aber
         # der Wert ist mehr als ihr Name.
         zeile = self.quelldateizeile(
-            "ue-0012", "unsortiert/Vorschlag Dienstag 14.09.23 _ H1.pdf",
+            "ue-0012", vorhanden=("unsortiert/Vorschlag Dienstag 14.09.23 _ H1.pdf",),
             titel="Vorschlag aus der Sammlung",
             quelldatei="unsortiert/Vorschlag Dienstag 14.09.23 _ H1.pdf, S. 1")
 
