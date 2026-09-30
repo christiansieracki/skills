@@ -11,49 +11,7 @@ Ein Punkt verschwindet hier, sobald er ein Ticket hat oder erledigt ist.
 ## Aus der Abnahme am Volleyball-Magazin (#18)
 
 Die Abnahme von Welle 1b ist durch. Fünf Dinge sind dabei liegen geblieben.
-
-### Das Szenen-Vokabular kennt keine Beschriftung am Feld
-
-Das handgezeichnete `2026-09-15-annahme-zielzone.svg` beschriftete zwei Linien
-mit „Netz" und „3-m-Linie". Die Nachbildung aus einer Szene kann das nicht:
-Text trägt nur, wer eine Fläche hat (eine Zone) oder ein Gegenstand ist (ein
-Gerät). Ein Wort an eine Stelle des Feldes zu setzen geht nicht.
-
-Für die beiden genannten Linien ist das verschmerzbar, das Netzband und die
-Angriffslinie erkennt ein Trainer. Es fehlt aber überall dort, wo eine Stelle
-einen Namen braucht, ohne dass dort etwas steht: der Punkt, an dem der Trainer
-anwirft, die Ecke, in die aufgeschlagen wird.
-
-Zu entscheiden wäre, ob es dafür einen zwölften Schlüssel gibt oder ob eine
-Zone ohne Füllung reicht.
-
-### `fusszeile` trägt eine Zeile, das Original hatte drei
-
-Die Fußzeile des Referenzbildes bestand aus drei Sätzen: der Zeichenerklärung
-und zwei Zeilen zur Besetzung. In der Szene ist `fusszeile` eine einzelne
-Zeile. Bei der Nachbildung ist die Zeichenerklärung Fußzeile geblieben, die
-beiden Besetzungszeilen sind ein sechster Legendenblock geworden.
-
-Das Ergebnis liest sich gut, verschiebt aber Inhalt von unten nach rechts. Zu
-entscheiden wäre, ob `fusszeile` eine Liste von Zeilen annimmt, so wie
-`legende` es mit `zeilen` schon tut.
-
-### Ein Marker lässt sich nicht hervorheben
-
-Im Referenzbild ist der Zuspieler als gefüllter dunkler Kreis gezeichnet, alle
-anderen Spieler als Umriss. Auf einen Blick sieht man damit, wer die Sonderrolle
-hat. Die Szene zeichnet jeden Marker gleich, der Unterschied liegt allein in der
-Beschriftung.
-
-### Die Zonenbeschriftung kann aus einer schmalen Zone herausragen
-
-`textbreite()` in `schaubild.py` schätzt die Breite eines Wortes aus der
-Zeichenzahl. Die Schätzung ist bewusst großzügig, trifft bei kurzen Wörtern in
-schmalen Zonen aber trotzdem daneben: „Ziel" in einer Zone von 1,28 m Breite
-ragt im fertigen Bild ein Stück über den gestrichelten Rand hinaus.
-
-Kosmetisch, und die Zone bleibt lesbar. Auffallen würde es bei einer Zone, die
-ein längeres Wort trägt.
+Die vier zum Schaubild sind inzwischen Welle 1c (#23), übrig ist eins.
 
 ### Die Trefferzeile zeigt Schaubild und Quelldatei verschieden
 
@@ -84,7 +42,8 @@ Frage gehört deshalb vor den Massenimport, nicht erst in die Wissenskarte.
 
 ## Im Arbeitsordner, nicht im Plugin
 
-Zwei Dinge betreffen `Nextcloud/_Training/trainingsplanung` und keinen Code.
+Betrifft `Nextcloud/_Training/trainingsplanung` und keinen Code. Der Import
+der Magazinseiten 28 und 29 ist inzwischen Teil der Abnahme von Welle 1c (#28).
 
 ### `schaubilder/2026-09-15-annahme-zielzone.png` ist veraltet
 
@@ -95,24 +54,6 @@ anders aus. Keine Karte verweist auf die PNG, der Linter schaut sie nicht an.
 Sie ist damit zugleich das Einzige, was zeigt, wie die handgezeichnete Fassung
 aussah. Entweder bleibt sie als dieser Beleg liegen, oder sie wird neu erzeugt,
 oder sie wird weggeräumt. Eine Entscheidung steht aus.
-
-### Die Seiten 28 und 29 des Magazins sind noch nicht importiert
-
-Das Volleyball-Magazin 09/2026 trägt auf diesen beiden Seiten eine
-Praxiseinheit „Grundfertigkeiten der einarmigen Abwehr" mit sechs nummerierten
-Übungen. Mehrere davon sind räumlich und damit Kandidaten für ein Schaubild:
-ein Angreifer steht auf einer Kiste am Netz und spielt Shots in vorher
-festgelegte Zonen.
-
-Die beiden Seiten sind aufbereitet und lesbar. Aus dem Artikel auf den Seiten
-22 bis 25 sind bisher zwei von vier Übungen importiert; die Seiten 30 bis 36
-sind Theorie und Diagnostik ohne Übungen.
-
-Die Übungen auf den Seiten 28 und 29 brauchen genau das, was dem
-Szenen-Vokabular oben fehlt: eine benannte Stelle am Feld für den Anwurf, die
-Zonen für die Shots, den Angreifer auf der Kiste als hervorgehobenen Marker.
-Sie taugen deshalb als Abnahme für die Welle, die diese Lücken schließt, so wie
-das Magazin die Abnahme von Welle 1b war.
 
 ## Neu seit der Abnahme
 
@@ -210,17 +151,10 @@ Steht so in #10 unter *Out of Scope* und gilt weiter.
 
 ## Was als Nächstes ansteht
 
-Die Reihenfolge stammt aus #10 und ist dort begründet. Zwei Vorhaben kannte
-#10 noch nicht: die Welle zum Szenen-Vokabular und den PlayDrill-Import. Wo sie
-sich einreihen, ist nicht entschieden.
-
-### Eine kleine Welle für das Szenen-Vokabular
-
-Die vier Punkte zum Schaubild aus der Abnahme: Beschriftung am Feld, Fußzeile
-mit mehreren Zeilen, hervorgehobener Marker, Zonenbeschriftung. Die ersten drei
-erweitern das Vokabular aus ADR-0004 und brauchen vorher eine Entscheidung, der
-vierte ist eine Reparatur. Abnahme an den Magazinseiten 28 und 29. Hängt nicht
-am PlayDrill-Import.
+Die Reihenfolge stammt aus #10 und ist dort begründet. Den PlayDrill-Import
+kannte #10 noch nicht. Wo er sich einreiht, ist nicht entschieden. Die Welle
+zum Szenen-Vokabular steht inzwischen als Welle 1c im Tracker (#23, Slices #24
+bis #28) und hängt nicht am PlayDrill-Import.
 
 ### Der PlayDrill-Import als Lauf
 
