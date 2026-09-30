@@ -207,9 +207,12 @@ Agenten zählt dabei nicht.
 
 ### `kartenentwuerfe/<ordner>/`
 
-Alles, was ein laufender Sammelimport erzeugt, liegt hier, benannt nach der
-Nummer des Kandidaten: `17.auftrag.md` ist der Auftrag für den Agenten, `17.md`
-der Kartenentwurf.
+Alles, was ein laufender Sammelimport erzeugt, liegt hier. `planeingabe.md` ist
+die Eingabe für den Zerlegungsplan: jede Datei des Quellenordners, die noch in
+keiner Zeile der Übersicht steht, bei PDFs ihr Text, und die Bibliotheksliste,
+in der die Karten aus diesem Quellenordner markiert sind. Der Rest ist nach der
+Nummer des Kandidaten benannt: `17.auftrag.md` ist der Auftrag für den Agenten,
+`17.md` der Kartenentwurf.
 
 Ein Kartenentwurf hat das Frontmatter der Karte ohne `id` (ADR-0010), die
 Abschnitte der Karte und am Ende `## Freigabe` mit beiden Listen:
@@ -311,9 +314,16 @@ nur auf ausdrückliche Ansage neu gebaut (`index.py --md`).
 ## Skripte
 
 Alle liegen unter `${CLAUDE_PLUGIN_ROOT}/scripts/` und brauchen nur Python 3
-aus der Standardbibliothek. Die einzige Ausnahme ist `bilder_aufbereiten.py`,
-das Pillow braucht und ohne es mit einem Installationshinweis abbricht
-(ADR-0005). Kein anderes Skript ändert sich dadurch.
+aus der Standardbibliothek. Es gibt zwei Ausnahmen:
+
+- **Pillow:** `bilder_aufbereiten.py` braucht es und bricht ohne es mit einem
+  Installationshinweis ab (ADR-0005).
+- **`pdftotext`:** `sammelimport.py vorbereiten` liest damit den Text von PDFs.
+  Gesucht wird erst im PATH, unter Windows danach neben `git.exe`, denn Git für
+  Windows bringt es mit. Fehlt es, sagt das Skript das einmal mit
+  Installationshinweis und macht ohne Text weiter (ADR-0008).
+
+Kein anderes Skript ändert sich dadurch.
 
 | Skript | Wofür |
 |---|---|
@@ -323,7 +333,7 @@ das Pillow braucht und ohne es mit einem Installationshinweis abbricht
 | `export_pdf.py` | PDF zum Ausdrucken |
 | `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen |
 | `bilder_aufbereiten.py` | Quellbilder verkleinern und nach EXIF geradedrehen |
-| `sammelimport.py` | Sammelimport über einen Quellenordner: `vorbereiten` legt die Aufträge an, `pruefen` setzt den Status aus den Entwürfen, `uebernehmen` macht freigegebene Entwürfe zu Karten |
+| `sammelimport.py` | Sammelimport über einen Quellenordner: `vorbereiten --plan` legt die Eingabe für den Zerlegungsplan an, `vorbereiten` die Aufträge, `pruefen` setzt den Status aus den Entwürfen, `uebernehmen` macht freigegebene Entwürfe zu Karten |
 
 `index.py` ohne Argumente ist auch der Linter: doppelte IDs, fehlende oder
 unbekannte `disziplin`, unbekannte Schwerpunkte, fehlende Level, ins Leere

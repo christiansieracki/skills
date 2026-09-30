@@ -302,6 +302,66 @@ def _als_freigabe(vorschlaege: list[str], rueckfragen: list[str]) -> str:
     return "\n".join(teile) + "\n"
 
 
+def _pdf_zeichenkette(text: str) -> bytes:
+    """Ein Text als PDF-Zeichenkette in runden Klammern, kodiert wie die Schrift."""
+    roh = text.encode("cp1252")
+    return b"(" + roh.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)") + b")"
+
+
+def _pdf_strom(daten: bytes) -> bytes:
+    return f"<< /Length {len(daten)} >>\nstream\n".encode() + daten + b"\nendstream"
+
+
+def _pdf_datei(objekte: list[bytes]) -> bytes:
+    """Setzt eine PDF-Datei aus ihren Objekten zusammen. Objekt 1 ist der Katalog.
+
+    Dazu gehoert die Querverweistabelle mit der Lage jedes Objekts in Bytes.
+    Ein Leser, der sie nicht findet, repariert die Datei still, und ein Test,
+    der erst an der reparierten Datei gruen wird, prueft zu wenig.
+    """
+    datei = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    lagen = []
+    for nummer, objekt in enumerate(objekte, 1):
+        lagen.append(len(datei))
+        datei += f"{nummer} 0 obj\n".encode() + objekt + b"\nendobj\n"
+    tabelle = len(datei)
+    datei += f"xref\n0 {len(objekte) + 1}\n0000000000 65535 f \n".encode()
+    datei += b"".join(f"{lage:010d} 00000 n \n".encode() for lage in lagen)
+    datei += (f"trailer\n<< /Size {len(objekte) + 1} /Root 1 0 R >>\n"
+              f"startxref\n{tabelle}\n%%EOF\n").encode()
+    return bytes(datei)
+
+
+def pdf_mit_text(seiten: list[list[str]]) -> bytes:
+    """Ein PDF mit Textebene, je Seite eine Liste von Zeilen.
+
+    Die Schrift ist Helvetica, eine der vierzehn, die jeder PDF-Leser ohne
+    Einbettung kennt. Mit WinAnsiEncoding kommen Umlaute durch, und nur dann
+    zeigt der Test, dass pdftotext sie als UTF-8 herausgibt.
+
+    Die Objekte stehen in fester Folge: 1 Katalog, 2 Seitenbaum, 3 Schrift,
+    dann je Seite ihr Inhalt und die Seite selbst. Was eine Seite sonst noch
+    braucht, etwa ein eingebettetes Bild, kommt als weiteres Objekt dazu und
+    in ihre Ressourcen.
+    """
+    objekte = [b"", b"",
+               b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
+               b"/Encoding /WinAnsiEncoding >>"]
+    kinder = []
+    for zeilen in seiten:
+        inhalt = (b"BT /F1 10 Tf 12 TL 50 800 Td\n"
+                  + b"".join(_pdf_zeichenkette(z) + b" Tj T*\n" for z in zeilen)
+                  + b"ET")
+        objekte.append(_pdf_strom(inhalt))
+        objekte.append(f"<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 3 0 R >> >> "
+                       f"/Contents {len(objekte)} 0 R >>".encode())
+        kinder.append(f"{len(objekte)} 0 R")
+    objekte[0] = b"<< /Type /Catalog /Pages 2 0 R >>"
+    objekte[1] = (f"<< /Type /Pages /Kids [{' '.join(kinder)}] /Count {len(kinder)} "
+                  f"/MediaBox [0 0 595 842] >>").encode()
+    return _pdf_datei(objekte)
+
+
 class Arbeitsordner:
     """Ein kuenstlicher Arbeitsordner, der sich wieder wegraeumen laesst."""
 
@@ -403,6 +463,15 @@ class Arbeitsordner:
         datei.parent.mkdir(parents=True, exist_ok=True)
         datei.write_bytes(inhalt)
         return datei
+
+    def lege_quell_pdf_an(self, name: str, *seiten: list[str]) -> Path:
+        """Legt ein PDF mit Textebene in `quellen/` ab, je Seite eine Liste von Zeilen.
+
+        Gebaut wird es zur Laufzeit mit der Standardbibliothek, so wie
+        `lege_quellbild_an` sein Foto baut. Kein Binaermaterial im Repo, und
+        was im PDF steht, steht hier im Test.
+        """
+        return self.lege_quelldatei_an(name, pdf_mit_text(list(seiten)))
 
     def lege_quellenordner_an(self, ordner: str, kandidaten: list[dict],
                               freigegeben: str | None = "2026-09-30",

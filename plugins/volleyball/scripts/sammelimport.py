@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Führt einen Sammelimport über einen Quellenordner, Kandidat für Kandidat.
 
+    <python> sammelimport.py vorbereiten --plan <ordner>
     <python> sammelimport.py vorbereiten <ordner>
     <python> sammelimport.py pruefen <ordner>
     <python> sammelimport.py uebernehmen <ordner> --kandidat 3 "Notiz" ...
@@ -8,6 +9,11 @@
 `<ordner>` ist der Quellenordner, relativ zu `quellen/`. In ihm liegt die
 `sammelimport.md` mit den Einstellungen im Frontmatter, den Absprachen und der
 Übersicht, dem freigegebenen Zerlegungsplan mit dem Stand je Kandidat.
+
+`vorbereiten --plan` legt vor dem Zerlegungsplan die Planeingabe an: jede
+Datei, die noch in keiner Zeile der Übersicht steht, bei PDFs ihr Text, dazu
+die Bibliotheksliste. Ein zweiter Lauf über denselben Ordner nimmt so nur, was
+neu ist. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
 
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
 nächsten offenen Kandidaten an. `pruefen` setzt den Status aus den
@@ -24,20 +30,33 @@ import argparse
 import os
 import re
 import shutil
+import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bilder_aufbereiten import SCHWELLE, bilder, kandidaten, menschenmass  # noqa: E402
 from tpdaten import (  # noqa: E402
-    DISZIPLIN_SPALTE, ID_MUSTER, TYPEN, finde_wurzel, hole_index,
-    konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen,
+    DISZIPLIN_SPALTE, ID_MUSTER, TYPEN, finde_wurzel, hole_index, interpreter,
+    konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_uebungen,
 )
 
 SAMMELIMPORT = "sammelimport.md"
 ENTWUERFE = "kartenentwuerfe"
+PLANEINGABE = "planeingabe.md"
 JE_DURCHGANG = 30
+
+# Bis hierhin kommt der Text aller PDFs ganz in die Planeingabe, gezählt in
+# Zeichen, rund 100 000 Tokens. So viel liest der Agent für den Zerlegungsplan
+# in einem Aufruf, neben Bibliotheksliste und Regeln. Der ganze Ordner
+# quellen/playdrill hat 310 000 Zeichen in 343 PDFs, gemessen am 30.09.2026,
+# und passt. Darüber bekommt jede Datei nur ihre ersten Zeilen, bis ANFANG
+# Zeichen. 400 Zeichen haben im Probelauf für die Gruppierung gereicht.
+GANZER_TEXT_BIS = 400_000
+ANFANG = 400
 
 SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "Notiz"]
 ERGEBNISSE = {"uebung", "folge", "zurückgestellt", "übersprungen"}
@@ -345,6 +364,229 @@ def pruefe_entwurf(datei: Path) -> Befund:
 
 
 # --------------------------------------------------------------------------
+# vorbereiten --plan
+# --------------------------------------------------------------------------
+
+def neue_dateien(wurzel: Path, ordner: str) -> dict[str, Path]:
+    """Die Dateien des Quellenordners, die noch in keiner Zeile der Übersicht stehen.
+
+    Der Schlüssel ist der Name relativ zum Quellenordner, so wie in der Spalte
+    Dateien, samt Unterordnern. Beim ersten Lauf gibt es noch keine
+    Übersicht, vielleicht nicht einmal die `sammelimport.md`, dann ist jede
+    Datei neu. Die `sammelimport.md` selbst ist nie eine Quelle.
+
+    Verglichen wird in einer Unicode-Form. macOS schreibt ein Ü im Dateinamen
+    als U mit zwei Punkten, Windows und die Übersicht als ein Zeichen, und
+    jeder Übungsordner von PlayDrill heißt `Ü_…`. Geöffnet wird die Datei
+    über ihren Pfad, wie er auf der Platte steht.
+    """
+    quellordner = wurzel / "quellen" / ordner
+    if not quellordner.is_dir():
+        raise Abbruch(f"Keinen Ordner quellen/{ordner}/.")
+    im_plan: set[str] = set()
+    if (quellordner / SAMMELIMPORT).is_file():
+        im_plan = {_nfc(d) for k in Sammelimport(wurzel, ordner).kandidaten for d in k.dateien}
+    alle = {_nfc(p.relative_to(quellordner).as_posix()): p for p in quellordner.rglob("*")
+            if p.is_file() and p.name != SAMMELIMPORT}
+    return {name: alle[name] for name in sorted(alle) if name not in im_plan}
+
+
+def _nfc(text: str) -> str:
+    return unicodedata.normalize("NFC", text)
+
+
+def finde_pdftotext() -> str | None:
+    """Wo `pdftotext` liegt, oder None (ADR-0008).
+
+    Erst im PATH. Unter Windows danach neben `git.exe`: Git für Windows bringt
+    Xpdf mit, in `…\\Git\\mingw64\\bin`, legt aber nur `…\\Git\\cmd` in den
+    PATH von Windows. Je nach Installation steht dort `cmd\\git.exe`,
+    `bin\\git.exe` oder `mingw64\\bin\\git.exe`, deshalb wird von `git.exe`
+    aus drei Ebenen aufwärts nach `mingw64\\bin` geschaut.
+    """
+    gefunden = shutil.which("pdftotext")
+    if gefunden or sys.platform != "win32":
+        return gefunden
+    git = shutil.which("git")
+    if not git:
+        return None
+    for ordner in list(Path(git).resolve().parents)[:3]:
+        kandidat = ordner / "mingw64" / "bin" / "pdftotext.exe"
+        if kandidat.is_file():
+            return str(kandidat)
+    return None
+
+
+def pdf_text(pdftotext: str, pdf: Path) -> str | None:
+    """Der Text eines PDF, oder None, wenn pdftotext es nicht lesen kann.
+
+    `-enc UTF-8`, weil Xpdf sonst Latin-1 schreibt und aus „Ausführung"
+    „Ausf�hrung" wird. `-raw`, weil Xpdf ohne es die Zeilen eines Absatzes zu
+    einer zusammenzieht: Aus den Kopfzeilen „Trainer/Ersteller", „ZEIT" und
+    „Werkzeuge" eines PlayDrill-Blatts würde eine. Poppler zieht nichts
+    zusammen, mit `-raw` lesen beide gleich. Leere Zeilen und Seitenwechsel
+    fallen weg, sie kosten nur Platz.
+    """
+    try:
+        lauf = subprocess.run([pdftotext, "-raw", "-enc", "UTF-8", str(pdf), "-"],
+                              capture_output=True, timeout=60, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if lauf.returncode != 0:
+        return None
+    zeilen = lauf.stdout.decode("utf-8", errors="replace").replace("\f", "\n").splitlines()
+    return "\n".join(z.strip() for z in zeilen if z.strip())
+
+
+def anfang(text: str) -> str:
+    """Die ersten Zeilen eines Textes, ganze Zeilen, bis ANFANG Zeichen erreicht sind."""
+    zeilen: list[str] = []
+    for zeile in text.splitlines():
+        if sum(len(z) + 1 for z in zeilen) >= ANFANG:
+            break
+        zeilen.append(zeile)
+    return "\n".join(zeilen)
+
+
+def _eingezaeunt(text: str) -> list[str]:
+    """Ein Text als Codeblock, dessen Zaun länger ist als jede Backtick-Folge darin."""
+    laengste = max((len(folge) for folge in re.findall(r"`+", text)), default=0)
+    zaun = "`" * max(3, laengste + 1)
+    return [f"{zaun}text", text, zaun]
+
+
+def melde_ohne_pdftotext() -> None:
+    """Sagt einmal, dass pdftotext fehlt und wie es dazukommt.
+
+    Abgebrochen wird nicht (ADR-0008). Ohne Text liest der Agent die PDFs
+    selbst. Das kostet mehr, geht aber.
+    """
+    print("pdftotext fehlt, die PDFs kommen ohne Text in die Planeingabe.")
+    print("Der Zerlegungsplan liest sie dann selbst, das kostet mehr.\n")
+    print("Installieren:")
+    print("  Windows: kommt mit Git für Windows, …\\Git\\mingw64\\bin\\pdftotext.exe")
+    print("  macOS:   brew install poppler")
+    print("  Linux:   das Paket poppler-utils\n")
+
+
+def aus_diesem_ordner(quelldatei: object, ordner: str) -> bool:
+    """Liegt eine der Dateien in `quelldatei` in diesem Quellenordner?
+
+    Bei zwei Seiten nennt `quelldatei` beide, durch Komma getrennt, und es
+    reicht, wenn eine davon hier liegt. Verglichen wird mit dem Schrägstrich
+    dahinter, sonst gälte `stapel-alt/…` als Datei aus `stapel`.
+    """
+    if not quelldatei:
+        return False
+    praefix = _nfc(ordner) + "/"
+    return any(_nfc(teil.strip().replace("\\", "/")).startswith(praefix)
+               for teil in str(quelldatei).split(","))
+
+
+def bibliotheksliste(wurzel: Path, ordner: str) -> list[str]:
+    """Jede Karte der Bibliothek als Tabelle, die aus diesem Quellenordner markiert.
+
+    Daran erkennt der Plan, was schon importiert ist, und führt es als
+    `importiert` mit seiner ID. Titel und Element braucht er, um einen
+    Verdacht auf ein Duplikat zu äußern.
+    """
+    zeilen = ["| ID | Titel | Element | quelldatei | Aus diesem Ordner |",
+              "|---|---|---|---|---|"]
+    for karte in sorted(lies_uebungen(wurzel), key=lambda k: str(k["id"])):
+        element = karte.get("element") or []
+        element = ", ".join(map(str, element)) if isinstance(element, list) else str(element)
+        zellen = [karte["id"], karte.get("titel") or "", element, karte.get("quelldatei") or "",
+                  "ja" if aus_diesem_ordner(karte.get("quelldatei"), ordner) else ""]
+        zeilen.append("| " + " | ".join(_zelle(z) for z in zellen) + " |")
+    return zeilen
+
+
+def melde_schwere_fotos(ordner: str, quellordner: Path) -> None:
+    """Nennt die Fotos im Quellenordner, die zu schwer zum Lesen sind.
+
+    Schwelle und Endungen kommen aus `bilder_aufbereiten.py`, damit „zu
+    schwer" hier dasselbe heißt wie dort, wo es behoben wird. Genannt werden
+    alle Fotos des Ordners, nicht nur die neuen: Auch ein Foto, das schon im
+    Plan steht, muss der Agent für den Entwurf öffnen können.
+    """
+    schwer, _leicht = kandidaten(quellordner)
+    if not schwer:
+        return
+    print(f"{bilder(len(schwer))} über {menschenmass(SCHWELLE)}, zu schwer zum Lesen:")
+    for pfad in schwer:
+        print(f"  {_nfc(pfad.relative_to(quellordner).as_posix())}  "
+              f"{menschenmass(pfad.stat().st_size)}")
+    print(f"Vorher verkleinern, mit Rückfrage: "
+          f"'{interpreter()} bilder_aufbereiten.py quellen/{ordner}'\n")
+
+
+def _text_oder_grund(text: str | None, pdftotext: str | None) -> list[str]:
+    """Was unter einem PDF steht: sein Text, oder warum keiner da ist.
+
+    Ohne Text muss der Agent das PDF selbst lesen, und das soll er nicht aus
+    einer leeren Stelle schließen müssen.
+    """
+    if text:
+        return _eingezaeunt(text)
+    if not pdftotext:
+        grund = "Ohne Text, pdftotext fehlt."
+    elif text is None:
+        grund = "pdftotext konnte die Datei nicht lesen."
+    else:
+        grund = "Keine Textebene."
+    return [f"{grund} Das PDF selbst lesen."]
+
+
+def planeingabe(wurzel: Path, ordner: str) -> int:
+    """Legt die Eingabe für den Zerlegungsplan an.
+
+    Der Agent liest sie in einem Aufruf: jede Datei, die noch in keiner Zeile
+    der Übersicht steht, bei PDFs mit ihrem Text, und die Bibliotheksliste.
+    """
+    dateien = neue_dateien(wurzel, ordner)
+    melde_schwere_fotos(ordner, wurzel / "quellen" / ordner)
+    if not dateien:
+        print(f"Keine neuen Dateien in quellen/{ordner}/, jede steht schon in der Übersicht.")
+        return 0
+    pdfs = {name for name, pfad in dateien.items() if pfad.suffix.lower() == ".pdf"}
+    pdftotext = finde_pdftotext() if pdfs else None
+    if pdfs and not pdftotext:
+        melde_ohne_pdftotext()
+    texte = {name: pdf_text(pdftotext, dateien[name]) for name in pdfs} if pdftotext else {}
+
+    zeichen = sum(len(t) for t in texte.values() if t)
+    if not pdfs:
+        textlage = []
+    elif not pdftotext:
+        textlage = ["Die PDFs stehen ohne Text da, pdftotext fehlt."]
+    elif zeichen > GANZER_TEXT_BIS:
+        texte = {name: anfang(t) if t else t for name, t in texte.items()}
+        textlage = [f"Der Text aller PDFs hätte {zeichen} Zeichen, zu viel für einen Aufruf. "
+                    f"Je PDF stehen die ersten Zeilen da, der ganze Text steht im PDF."]
+        print(f"Der Text der PDFs hat {zeichen} Zeichen, mehr als {GANZER_TEXT_BIS}. "
+              f"Die Planeingabe nennt je PDF die ersten Zeilen.")
+    else:
+        textlage = ["Je PDF steht sein ganzer Text da."]
+
+    teile = [f"# Planeingabe für quellen/{ordner}/", "",
+             f"{len(dateien)} Dateien, die noch in keiner Zeile der Übersicht stehen, "
+             f"relativ zum Quellenordner.", *textlage, "", "## Dateien", ""]
+    for datei in dateien:
+        teile += [f"### `{datei}`", ""]
+        if datei in pdfs:
+            teile += [*_text_oder_grund(texte.get(datei), pdftotext), ""]
+    teile += ["## Bibliothek", "",
+              "Jede Karte der Bibliothek. „ja“ heißt: Ihre `quelldatei` liegt in "
+              "diesem Quellenordner, sie ist schon importiert.", "",
+              *bibliotheksliste(wurzel, ordner), ""]
+    ziel = wurzel / ENTWUERFE / ordner / PLANEINGABE
+    ziel.parent.mkdir(parents=True, exist_ok=True)
+    ziel.write_text("\n".join(teile), encoding="utf-8")
+    print(f"Planeingabe für {len(dateien)} Dateien: {ziel.as_posix()}")
+    return 0
+
+
+# --------------------------------------------------------------------------
 # vorbereiten
 # --------------------------------------------------------------------------
 
@@ -626,6 +868,8 @@ def main() -> int:
     hilfe = "der Quellenordner, relativ zu quellen/"
     vor = befehle.add_parser("vorbereiten", help="Aufträge für die nächsten Kandidaten anlegen")
     vor.add_argument("ordner", type=quellenordner, help=hilfe)
+    vor.add_argument("--plan", action="store_true",
+                     help="statt der Aufträge die Eingabe für den Zerlegungsplan anlegen")
     pr = befehle.add_parser("pruefen", help="den Status aus den Entwürfen auf der Platte setzen")
     pr.add_argument("ordner", type=quellenordner, help=hilfe)
     ue = befehle.add_parser("uebernehmen", help="freigegebene Kandidaten als Karte übernehmen")
@@ -641,6 +885,8 @@ def main() -> int:
             return pruefen(wurzel, a.ordner)
         if a.befehl == "uebernehmen":
             return uebernehmen(wurzel, a.ordner, [tuple(p) for p in a.kandidat])
+        if a.plan:
+            return planeingabe(wurzel, a.ordner)
         return vorbereiten(wurzel, a.ordner)
     except Abbruch as fehler:
         print(fehler)
