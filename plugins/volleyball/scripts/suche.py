@@ -138,7 +138,7 @@ def filtere(eintraege, a):
     return treffer
 
 
-def zeige(e, lang: bool, anwesend=None):
+def zeige(e, lang: bool, wurzel: Path, anwesend=None):
     warn = " ⚠" if e.get("erwachsenenbelastung") else ""
     art = " (Folge)" if e.get("typ") == "folge" else ""
     g = gruppen(e.get("spieler_max"), anwesend)
@@ -177,21 +177,34 @@ def zeige(e, lang: bool, anwesend=None):
     if e.get("quelle"):
         print(f"    Quelle       {e['quelle']}")
     if e.get("quelldatei"):
-        # Das Feld ist freier Text und nennt bei einer Übung, die über zwei
-        # Seiten läuft, beide (DATENMODELL.md). Ein vorangestelltes `quellen/`
-        # säße dann nur vor der ersten und ließe die zweite aussehen, als läge
-        # sie woanders. Deshalb steht der Ordner einmal davor und die Angabe
-        # dahinter so, wie sie auf der Karte steht.
+        # Ist der ganze Wert eine Datei unter quellen/, steht dort
+        # `quellen/<wert>`, ein Pfad, den man kopieren kann, so wie
+        # `schaubilder/<datei>` in der Zeile darüber. Das ist der häufigste
+        # Fall: jede PlayDrill-Karte nennt genau eine Datei.
         #
-        # Sie in Dateinamen zu zerlegen hieße raten: mal trennt ein Komma die
-        # beiden Seiten, mal ein „und", hinter dem Namen steht oft noch eine
-        # Seitenzahl, und ein Dateiname darf Komma und Leerzeichen enthalten.
-        # Jede Regel dafür trifft irgendeine Schreibweise still falsch.
+        # Sonst steht der Ordner einmal davor und die Angabe dahinter so, wie
+        # sie auf der Karte steht. Das Feld ist freier Text und nennt bei
+        # einer Übung, die über zwei Seiten läuft, beide (DATENMODELL.md). Ein
+        # vorangestelltes `quellen/` säße dann nur vor der ersten.
         #
-        # Die Zeile darüber nennt `schaubilder/` dagegen als Teil des Pfades.
-        # Dort steht laut DATENMODELL.md ein einzelner Dateiname, und der
-        # ergibt mit dem Ordner davor einen Pfad, den man kopieren kann.
-        print(f"    Quelldatei   in quellen/ · {e['quelldatei']}")
+        # Die Regel rät nichts. Die Angabe in Dateinamen zu zerlegen hieße
+        # raten: mal trennt ein Komma die beiden Seiten, mal ein „und", hinter
+        # dem Namen steht oft eine Seitenzahl, und ein Dateiname darf Komma
+        # und Leerzeichen enthalten. Ob der ganze Wert eine Datei ist, sagt
+        # dagegen die Platte. Auf einem Rechner, dessen Nextcloud quellen/
+        # nicht synchronisiert, gibt es sie nicht, und die Zeile sieht aus wie
+        # bisher, statt einen Pfad zu zeigen, unter dem nichts liegt.
+        #
+        # Der Wert muss dafür relativ zu quellen/ stehen, so wie er auf jedem
+        # Rechner stimmt. Ein absoluter Pfad trifft auch eine Datei, aber mit
+        # `quellen/` davor wird daraus kein Pfad. Eine Liste in eckigen
+        # Klammern ist gar keiner.
+        wert = e["quelldatei"]
+        if (isinstance(wert, str) and not Path(wert).anchor
+                and (wurzel / "quellen" / wert).is_file()):
+            print(f"    Quelldatei   quellen/{wert}")
+        else:
+            print(f"    Quelldatei   in quellen/ · {wert}")
     d = tage_her(e.get("zuletzt"))
     hist = f"{e.get('zuletzt')} ({d} Tage her)" if d is not None else (e.get("zuletzt") or "noch nie")
     print(f"    Zuletzt      {hist} · insgesamt {e.get('anzahl_einsaetze', 0)}x")
@@ -242,7 +255,7 @@ def main() -> int:
 
     print(f"{len(treffer)} von {daten['anzahl']} Übungen:\n")
     for e in sorted(treffer, key=lambda x: x["id"]):
-        zeige(e, a.lang or len(treffer) <= 3, a.spieler)
+        zeige(e, a.lang or len(treffer) <= 3, wurzel, a.spieler)
 
     if a.jugend:
         heikel = [e for e in treffer if e.get("erwachsenenbelastung")]

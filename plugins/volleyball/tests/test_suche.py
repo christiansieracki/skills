@@ -34,13 +34,17 @@ class SucheTest(unittest.TestCase):
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
         return json.loads(fertig.stdout)
 
-    def quelldateizeile(self, uid: str, **felder) -> str:
+    def quelldateizeile(self, uid: str, *vorhanden: str, **felder) -> str:
         """Legt eine Karte an und gibt ihre Quelldatei-Zeile zurueck.
 
-        Die drei Faelle weiter unten unterscheiden sich allein darin, wie die
-        `quelldatei:` auf der Karte geschrieben ist, und pruefen alle dieselbe
-        eine Zeile.
+        Die Faelle weiter unten unterscheiden sich darin, wie die
+        `quelldatei:` auf der Karte geschrieben ist und welche Dateien unter
+        `quellen/` liegen, und pruefen alle dieselbe eine Zeile. `vorhanden`
+        nennt diese Dateien relativ zu `quellen/`. Ihr Inhalt zaehlt nicht,
+        nur dass es sie gibt.
         """
+        for name in vorhanden:
+            self.ordner.lege_quelldatei_an(name, b"")
         self.ordner.lege_karte_an(id=uid, **felder)
         fertig = self.ordner.starte("suche.py", "--id", uid, "--lang")
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
@@ -135,13 +139,61 @@ class SucheTest(unittest.TestCase):
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
         self.assertIn("Disziplin    halle, beach", fertig.stdout)
 
+    def test_eine_vorhandene_einzelne_datei_wird_zu_einem_pfad(self) -> None:
+        # Der haeufigste Fall: jede PlayDrill-Karte nennt genau eine Datei.
+        # Liegt sie unter quellen/, steht dort ein Pfad, den man kopieren
+        # kann, so wie `schaubilder/<datei>` in der Zeile darueber.
+        zeile = self.quelldateizeile(
+            "ue-0013", "playdrill/Annahme Diagonal.pdf",
+            titel="Annahme diagonal",
+            quelldatei="playdrill/Annahme Diagonal.pdf")
+
+        self.assertEqual(
+            "    Quelldatei   quellen/playdrill/Annahme Diagonal.pdf", zeile)
+
+    def test_eine_fehlende_datei_wird_nicht_zu_einem_pfad(self) -> None:
+        # Ein Mittrainer, dessen Nextcloud quellen/ nicht synchronisiert, hat
+        # die Datei nicht. Die Zeile sieht bei ihm aus wie bisher, statt ihm
+        # einen Pfad zu zeigen, unter dem nichts liegt.
+        zeile = self.quelldateizeile(
+            "ue-0014", titel="Annahme diagonal, ohne Quellen",
+            quelldatei="playdrill/Annahme Diagonal.pdf")
+
+        self.assertEqual(
+            "    Quelldatei   in quellen/ · playdrill/Annahme Diagonal.pdf", zeile)
+
+    def test_ein_absoluter_pfad_bekommt_kein_quellen_davor(self) -> None:
+        # `quelldatei:` steht relativ zu quellen/, damit sie auf jedem Rechner
+        # stimmt. Steht dort doch ein absoluter Pfad, zeigt er auf eine Datei,
+        # die es gibt, und `quellen/` davor ergaebe trotzdem keinen Pfad.
+        datei = self.ordner.lege_quelldatei_an("playdrill/Annahme Diagonal.pdf", b"")
+        zeile = self.quelldateizeile(
+            "ue-0016", titel="Annahme diagonal, absolut verwiesen",
+            quelldatei=datei.as_posix())
+
+        self.assertEqual(
+            f"    Quelldatei   in quellen/ · {datei.as_posix()}", zeile)
+
+    def test_eine_liste_statt_freiem_text_laesst_die_suche_nicht_abbrechen(self) -> None:
+        # Das Feld ist freier Text, aber wer zwei Seiten in eckige Klammern
+        # setzt, bekommt vom Parser eine Liste. Die ist kein Pfad, und die
+        # Suche darf an ihr nicht scheitern.
+        zeile = self.quelldateizeile(
+            "ue-0015", "magazin/seite-04.jpg", "magazin/seite-05.jpg",
+            titel="Abwehr über zwei Seiten, als Liste",
+            quelldatei=["magazin/seite-04.jpg", "magazin/seite-05.jpg"])
+
+        self.assertIn("in quellen/", zeile)
+        self.assertEqual(1, zeile.count("quellen/"))
+
     def test_eine_uebung_ueber_zwei_seiten_nennt_beide_seiten(self) -> None:
         # Eine Uebung hoert selten da auf, wo die Seite aufhoert. Laeuft sie
         # ueber zwei Fotos, nennt `quelldatei:` laut DATENMODELL.md beide, und
         # beide liegen unter quellen/. Ein Praefix am Anfang der Angabe saesse
         # nur vor der ersten.
         zeile = self.quelldateizeile(
-            "ue-0010", titel="Abwehr über zwei Seiten",
+            "ue-0010", "magazin/seite-04.jpg", "magazin/seite-05.jpg",
+            titel="Abwehr über zwei Seiten",
             quelldatei="magazin/seite-04.jpg, magazin/seite-05.jpg")
 
         self.assertIn("in quellen/", zeile)
@@ -154,7 +206,8 @@ class SucheTest(unittest.TestCase):
         # die Ausgabe nicht haengen: die zweite Seite soll in beiden Faellen
         # genauso dastehen wie die erste.
         zeile = self.quelldateizeile(
-            "ue-0011", titel="Abwehr über zwei Seiten, anders geschrieben",
+            "ue-0011", "magazin/seite-04.jpg", "magazin/seite-05.jpg",
+            titel="Abwehr über zwei Seiten, anders geschrieben",
             quelldatei="magazin/seite-04.jpg und magazin/seite-05.jpg")
 
         self.assertIn("in quellen/", zeile)
@@ -164,9 +217,11 @@ class SucheTest(unittest.TestCase):
     def test_was_keine_datei_ist_wird_nicht_zu_einem_pfad(self) -> None:
         # Hinter dem Dateinamen steht oft eine Seitenzahl, und der Bestand
         # fuehrt Namen mit Leerzeichen darin. Nichts davon ist ein eigener
-        # Pfad: `quellen/S. 1` gibt es nicht.
+        # Pfad: `quellen/S. 1` gibt es nicht. Die Datei selbst liegt da, aber
+        # der Wert ist mehr als ihr Name.
         zeile = self.quelldateizeile(
-            "ue-0012", titel="Vorschlag aus der Sammlung",
+            "ue-0012", "unsortiert/Vorschlag Dienstag 14.09.23 _ H1.pdf",
+            titel="Vorschlag aus der Sammlung",
             quelldatei="unsortiert/Vorschlag Dienstag 14.09.23 _ H1.pdf, S. 1")
 
         self.assertIn(
