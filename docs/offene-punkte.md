@@ -219,6 +219,48 @@ muss den Wert wieder in Dateien zerlegen und kann bei so einem Namen nicht
 sagen, wo eine Datei aufhört. Betrifft PlayDrill, sobald ein Dateiname dort ein
 Komma trägt. `quelldatei:` als Liste ist in #29 ausdrücklich draußen.
 
+Aufgefallen am 01.10.2026 bei #32.
+
+### Die Planeingabe heißt `vorbereiten --plan`
+
+#29 und #36 nennen für die Eingabe des Zerlegungsplans nur `vorbereiten`.
+Umgesetzt ist sie als `vorbereiten --plan`. Nach der Freigabe lässt sich ein
+zweiter Lauf über neue Dateien am Stand nicht von einem Durchgang
+unterscheiden, `plan_freigegeben` ist in beiden Fällen gesetzt. Ohne `--plan`
+legt `vorbereiten` wie bisher Aufträge an.
+
+Der Skill (#36) ruft beim Einstieg `--plan` und im Durchgang `vorbereiten`
+ohne. Der Agent (#35) liest `kartenentwuerfe/<ordner>/planeingabe.md`. Gibt es
+keine neuen Dateien, schreibt `--plan` nichts und sagt „Keine neuen Dateien".
+Eine ältere Planeingabe bleibt dann liegen. Der Skill richtet sich nach der
+Ausgabe und startet keinen Agenten.
+
+### Eine Datei ohne Zeile in der Übersicht kommt bei jedem Lauf wieder
+
+`--plan` nimmt jede Datei, die in keiner Zeile der Übersicht steht. Macht der
+Plan aus einer Datei keinen Kandidaten, steht sie beim nächsten Lauf wieder als
+neu da. Das betrifft einen bloßen Verweis, einen Ordner, den der Trainer aus
+dem Plan streicht, und die `.DS_Store` eines Mac. Naheliegend wäre, dass jede
+Datei eine Zeile bekommt, notfalls `übersprungen` mit Grund. Das gehört in die
+Regeln des Agenten (#35) und in die Freigabe im Skill (#36).
+
+### Beim zweiten Lauf zählt der Plan die Kandidaten weiter
+
+Kandidaten sind je Quellenordner fortlaufend nummeriert, und die Nummer bleibt.
+Die Planeingabe nennt die höchste schon vergebene Nummer nicht. Beim zweiten
+Lauf finge der Agent sonst wieder bei 1 an. Entweder nennt die Planeingabe die
+nächste freie Nummer, oder der Skill (#36) nummeriert beim Schreiben der
+Übersicht.
+
+### Der Zerlegungsplan über PlayDrill kostet mehr als geschätzt
+
+#29 rechnet für PlayDrill mit rund 40 000 Tokens Text. Gemessen hat der ganze
+Ordner `quellen/playdrill` 310 000 Zeichen in 343 PDFs, eher 80 000 bis 100 000
+Tokens. Die Planeingabe ist 350 KB groß. Der Agent liest sie in mehreren
+Stücken, weil `Read` je Aufruf begrenzt ist. Ob die Schwelle von 400 000
+Zeichen trägt, zeigt die Abnahme (#37). Liegt sie zu hoch, bekommt jede Datei
+nur ihre ersten Zeilen, und Übersichtsblätter verlieren ihre Stationsliste.
+
 ## Aus Welle 1b bewusst ausgelassen
 
 Steht so in #10 unter *Out of Scope* und gilt weiter.
