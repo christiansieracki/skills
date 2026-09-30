@@ -253,8 +253,9 @@ Aus dem PlayDrill-Import ist beim Interview am 30.09.2026 ein allgemeiner
 Sammelimport im Plugin geworden. Er soll auch einen Stapel abfotografierter
 Magazinseiten zusammen verarbeiten und sich wiederholen lassen. Die Begriffe
 stehen im Saat-Glossar unter „Sammelimport", die Gründe für drei Entscheidungen
-in ADR-0008 bis ADR-0010. Als Nächstes kommt die Spec, mit dem Probelauf als
-erstem Schnitt, denn der entscheidet das Modell.
+in ADR-0008 bis ADR-0010. Der Probelauf ist am 30.09.2026 als Prototyp vor
+der Spec gelaufen und hat das Modell entschieden, siehe unten. Als Nächstes
+kommt die Spec.
 
 Der Anlass: Unter `quellen/playdrill/` liegen 343 PDFs, eine Übung je Datei.
 10 davon sind Karte, 258 in den Übungsordnern offen, 75 zurückgestellt. Von
@@ -273,9 +274,12 @@ Entschieden:
   ist.
 - **Ablauf.** Erst ein Zerlegungsplan über den ganzen Quellenordner, den der
   Trainer freigibt. Dann ein Kartenentwurf je Einheit. Dann die Freigabe im
-  Chat, eine Sitzung je Unterordner: zuerst die Rückfragen einzeln mit dem
-  Feldbild im Chat, dann die übrigen Entwürfe als eine Tabelle, pauschal oder
-  zeilenweise. `übernehmen` vergibt danach die IDs, schreibt die Karten und
+  Chat: zuerst die Rückfragen ohne Lesart einzeln mit dem Feldbild, dann die
+  übrigen Entwürfe als eine Tabelle, pauschal oder zeilenweise. Eine Rückfrage
+  mit Lesart wird in der Tabelle bestätigt wie ein Vorschlag. Gearbeitet wird
+  in Portionen von etwa 30 Einheiten je Sitzung. Beides kommt aus dem
+  Probelauf, vorher hieß es: alle Rückfragen einzeln, eine Sitzung je
+  Unterordner. `übernehmen` vergibt danach die IDs, schreibt die Karten und
   lässt `index.py` laufen.
 - **Nichts erfinden.** Jedes Feld ist belegt, ein Vorschlag mit Begründung oder
   eine Rückfrage. Belegt sind `quelle`, `quelldatei`, `schaubild`, `level_min`
@@ -310,13 +314,42 @@ Entschieden:
   IDs, und `pd_nehmen.py` fällt weg. Der Sammelimport nimmt die Übungsordner
   ohne `Ü_FV-Prüfungsfolien`, das ist ein Trainingsabend, und ohne
   `Ü_In Bearbeitung`, das ist in PlayDrill selbst unfertig.
-- **Probelauf.** Die zehn fertigen PlayDrill-Übungen blind, dazu der
-  Sprungkraftzirkel. Aus dem Volleyball-Magazin 09/2026 `ue-0019`, `ue-0020`
-  und `ue-0037` bis `ue-0041` als Maßstab und die Seiten 24 und 25, auf denen
-  Übung 3 und 4 fehlen (siehe *Aus dem Warm-up Teil 4 fehlen Übung 3 und 4*).
-  Je einmal mit Haiku 4.5 und Sonnet 5.5. Haiku bekommt den Sammelimport, wenn
-  es nichts erfindet. Der Vergleich kommt als Bericht, der Trainer beurteilt
-  nur die Abweichungen.
+- **Probelauf.** Gelaufen am 30.09.2026 als Wegwerf-Prototyp vor der Spec,
+  ohne Plugin-Code und ohne etwas im Arbeitsordner zu schreiben. Die zehn
+  fertigen PlayDrill-Übungen blind, dazu der Sprungkraftzirkel, aus dem
+  Volleyball-Magazin 09/2026 die sieben Übungen mit Karte und Übung 3 und 4
+  des Warm-ups (siehe *Aus dem Warm-up Teil 4 fehlen Übung 3 und 4*). Je
+  einmal mit Haiku 4.5 und Sonnet 5.5 über das Agent-Tool, dazu Zerlegungspläne
+  über `vm_09_2026` und `Ü_Zirkelübung`. Bericht, Regelauszug, Aufträge und
+  die 40 Entwürfe liegen auf dem lokalen Branch `prototyp/sammelimport-probelauf`
+  unter `plugins/volleyball/prototyp-sammelimport/`. Der Branch wird nicht
+  gepusht, die Entwürfe geben Vereins- und Magazinmaterial wieder.
+  - **Modell: Sonnet 5.5.** Die Regel war: Haiku, wenn es nichts erfindet.
+    Haiku erfindet. In 13 von 20 Entwürfen steht etwas, das die Quelle nicht
+    sagt oder verdreht, 14 haben keine Rückfrage. Sonnet hält sich an die
+    Quelle, und seine Rückfragen treffen die Stellen, die beim Import von Hand
+    abgestimmt wurden, meist mit derselben Lesart.
+  - **Zerlegungsplan.** Sonnet zerlegt die 15 Fotos von `vm_09_2026` in einem
+    Aufruf richtig, samt Übungen über zwei Seiten, Verweis und Theorie. Die
+    Form des Plans bleibt. Haiku zerlegt falsch.
+  - **Kosten.** Das Agent-Tool meldet je Aufruf die Tokens. Ein Kartenentwurf
+    kostet mit Sonnet im Median 91 000, mit Haiku 54 000. Das ist eine
+    Obergrenze, gelaufen ist ein allgemeiner Subagent statt des Plugin-Agenten.
+    Nach 44 Aufrufen war das Sitzungslimit des Abos erreicht. Daher die
+    Portionen oben. ADR-0009 nennt noch eine Sitzung je Unterordner, der
+    größte hat 59 Einheiten.
+  - **Freigabe.** Ein Sonnet-Entwurf trägt im Schnitt 16 Vorschläge und 3,6
+    Rückfragen, 2,5 davon mit Lesart. Über 258 Einheiten wären das rund 930
+    Rückfragen einzeln. Daher die Form oben: Einzeln kommt etwa eine je
+    Einheit.
+  - **Vorstufe.** Übersichtsblätter bekommen den vollen Text. Die ersten
+    Zeilen schneiden die Stationsliste ab.
+  - **Regelauszug.** Der Entwurf aus dem Probelauf ist die Vorlage für die
+    Agentendefinition. „In eigenen Worten" braucht dort mehr Gewicht, bei
+    Magazintexten bleibt Sonnet stellenweise nah am Wortlaut.
+  - **Nicht geprüft:** Duplikate, der Plugin-Agent mit nur `Read` und
+    `Write`, `übernehmen` und die Freigabe im Chat. Das prüft der erste Schnitt
+    der Spec.
 - **Trefferzeile.** Die Pfadzeile für `quelldatei:` aus dem ersten Abschnitt
   dieser Datei kommt als kleiner eigener Punkt dazu.
 - **Glossar im Arbeitsordner.** Die lebende `glossary.md` bekommt die neuen
