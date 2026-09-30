@@ -38,7 +38,8 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bilder_aufbereiten import SCHWELLE, bilder, kandidaten, menschenmass  # noqa: E402
+from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
+from bilder_aufbereiten import kandidaten as bilder_nach_gewicht  # noqa: E402
 from tpdaten import (  # noqa: E402
     DISZIPLIN_SPALTE, ID_MUSTER, TYPEN, finde_wurzel, hole_index, interpreter,
     konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_uebungen,
@@ -53,10 +54,11 @@ JE_DURCHGANG = 30
 # Zeichen, rund 100 000 Tokens. So viel liest der Agent für den Zerlegungsplan
 # in einem Aufruf, neben Bibliotheksliste und Regeln. Der ganze Ordner
 # quellen/playdrill hat 310 000 Zeichen in 343 PDFs, gemessen am 30.09.2026,
-# und passt. Darüber bekommt jede Datei nur ihre ersten Zeilen, bis ANFANG
-# Zeichen. 400 Zeichen haben im Probelauf für die Gruppierung gereicht.
+# und passt. Darüber bekommt jede Datei nur ihre ersten Zeilen, bis
+# ERSTE_ZEILEN_BIS Zeichen. 400 Zeichen haben im Probelauf für die Gruppierung
+# gereicht. Warum mehr als die ersten Zeilen: Nachtrag zu ADR-0008.
 GANZER_TEXT_BIS = 400_000
-ANFANG = 400
+ERSTE_ZEILEN_BIS = 400
 
 SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "Notiz"]
 ERGEBNISSE = {"uebung", "folge", "zurückgestellt", "übersprungen"}
@@ -411,9 +413,9 @@ def finde_pdftotext() -> str | None:
     if not git:
         return None
     for ordner in list(Path(git).resolve().parents)[:3]:
-        kandidat = ordner / "mingw64" / "bin" / "pdftotext.exe"
-        if kandidat.is_file():
-            return str(kandidat)
+        exe = ordner / "mingw64" / "bin" / "pdftotext.exe"
+        if exe.is_file():
+            return str(exe)
     return None
 
 
@@ -438,11 +440,11 @@ def pdf_text(pdftotext: str, pdf: Path) -> str | None:
     return "\n".join(z.strip() for z in zeilen if z.strip())
 
 
-def anfang(text: str) -> str:
-    """Die ersten Zeilen eines Textes, ganze Zeilen, bis ANFANG Zeichen erreicht sind."""
+def erste_zeilen(text: str) -> str:
+    """Die ersten Zeilen eines Textes, ganze Zeilen, bis ERSTE_ZEILEN_BIS Zeichen erreicht sind."""
     zeilen: list[str] = []
     for zeile in text.splitlines():
-        if sum(len(z) + 1 for z in zeilen) >= ANFANG:
+        if sum(len(z) + 1 for z in zeilen) >= ERSTE_ZEILEN_BIS:
             break
         zeilen.append(zeile)
     return "\n".join(zeilen)
@@ -462,7 +464,7 @@ def melde_ohne_pdftotext() -> None:
     selbst. Das kostet mehr, geht aber.
     """
     print("pdftotext fehlt, die PDFs kommen ohne Text in die Planeingabe.")
-    print("Der Zerlegungsplan liest sie dann selbst, das kostet mehr.\n")
+    print("Der Agent für den Zerlegungsplan liest sie dann selbst, das kostet mehr.\n")
     print("Installieren:")
     print("  Windows: kommt mit Git für Windows, …\\Git\\mingw64\\bin\\pdftotext.exe")
     print("  macOS:   brew install poppler")
@@ -486,9 +488,9 @@ def aus_diesem_ordner(quelldatei: object, ordner: str) -> bool:
 def bibliotheksliste(wurzel: Path, ordner: str) -> list[str]:
     """Jede Karte der Bibliothek als Tabelle, die aus diesem Quellenordner markiert.
 
-    Daran erkennt der Plan, was schon importiert ist, und führt es als
-    `importiert` mit seiner ID. Titel und Element braucht er, um einen
-    Verdacht auf ein Duplikat zu äußern.
+    Daran erkennt der Agent für den Zerlegungsplan, was schon importiert ist,
+    und führt es als `importiert` mit seiner ID. Titel und Element braucht er,
+    um einen Verdacht auf ein Duplikat zu äußern.
     """
     zeilen = ["| ID | Titel | Element | quelldatei | Aus diesem Ordner |",
               "|---|---|---|---|---|"]
@@ -509,7 +511,7 @@ def melde_schwere_fotos(ordner: str, quellordner: Path) -> None:
     alle Fotos des Ordners, nicht nur die neuen: Auch ein Foto, das schon im
     Plan steht, muss der Agent für den Entwurf öffnen können.
     """
-    schwer, _leicht = kandidaten(quellordner)
+    schwer, _leicht = bilder_nach_gewicht(quellordner)
     if not schwer:
         return
     print(f"{bilder(len(schwer))} über {menschenmass(SCHWELLE)}, zu schwer zum Lesen:")
@@ -537,14 +539,17 @@ def _text_oder_grund(text: str | None, pdftotext: str | None) -> list[str]:
     return [f"{grund} Das PDF selbst lesen."]
 
 
-def planeingabe(wurzel: Path, ordner: str) -> int:
+def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     """Legt die Eingabe für den Zerlegungsplan an.
 
     Der Agent liest sie in einem Aufruf: jede Datei, die noch in keiner Zeile
     der Übersicht steht, bei PDFs mit ihrem Text, und die Bibliotheksliste.
+    Der Quellenordner steht einmal absolut im Kopf, denn Fotos und PDFs ohne
+    Text öffnet der Agent selbst.
     """
     dateien = neue_dateien(wurzel, ordner)
-    melde_schwere_fotos(ordner, wurzel / "quellen" / ordner)
+    quellordner = wurzel / "quellen" / ordner
+    melde_schwere_fotos(ordner, quellordner)
     if not dateien:
         print(f"Keine neuen Dateien in quellen/{ordner}/, jede steht schon in der Übersicht.")
         return 0
@@ -560,7 +565,7 @@ def planeingabe(wurzel: Path, ordner: str) -> int:
     elif not pdftotext:
         textlage = ["Die PDFs stehen ohne Text da, pdftotext fehlt."]
     elif zeichen > GANZER_TEXT_BIS:
-        texte = {name: anfang(t) if t else t for name, t in texte.items()}
+        texte = {name: erste_zeilen(t) if t else t for name, t in texte.items()}
         textlage = [f"Der Text aller PDFs hätte {zeichen} Zeichen, zu viel für einen Aufruf. "
                     f"Je PDF stehen die ersten Zeilen da, der ganze Text steht im PDF."]
         print(f"Der Text der PDFs hat {zeichen} Zeichen, mehr als {GANZER_TEXT_BIS}. "
@@ -569,6 +574,7 @@ def planeingabe(wurzel: Path, ordner: str) -> int:
         textlage = ["Je PDF steht sein ganzer Text da."]
 
     teile = [f"# Planeingabe für quellen/{ordner}/", "",
+             f"Quellenordner: `{quellordner.as_posix()}/`", "",
              f"{len(dateien)} Dateien, die noch in keiner Zeile der Übersicht stehen, "
              f"relativ zum Quellenordner.", *textlage, "", "## Dateien", ""]
     for datei in dateien:
@@ -886,7 +892,7 @@ def main() -> int:
         if a.befehl == "uebernehmen":
             return uebernehmen(wurzel, a.ordner, [tuple(p) for p in a.kandidat])
         if a.plan:
-            return planeingabe(wurzel, a.ordner)
+            return lege_planeingabe_an(wurzel, a.ordner)
         return vorbereiten(wurzel, a.ordner)
     except Abbruch as fehler:
         print(fehler)

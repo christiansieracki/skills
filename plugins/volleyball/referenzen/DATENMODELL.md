@@ -318,12 +318,12 @@ aus der Standardbibliothek. Es gibt zwei Ausnahmen:
 
 - **Pillow:** `bilder_aufbereiten.py` braucht es und bricht ohne es mit einem
   Installationshinweis ab (ADR-0005).
-- **`pdftotext`:** `sammelimport.py vorbereiten` liest damit den Text von PDFs.
-  Gesucht wird erst im PATH, unter Windows danach neben `git.exe`, denn Git für
-  Windows bringt es mit. Fehlt es, sagt das Skript das einmal mit
+- **`pdftotext`:** `sammelimport.py vorbereiten --plan` liest damit den Text
+  von PDFs. Gesucht wird erst im PATH, unter Windows danach neben `git.exe`,
+  denn Git für Windows bringt es mit. Fehlt es, sagt das Skript das einmal mit
   Installationshinweis und macht ohne Text weiter (ADR-0008).
 
-Kein anderes Skript ändert sich dadurch.
+Die übrigen Skripte brauchen weder Pillow noch `pdftotext`.
 
 | Skript | Wofür |
 |---|---|

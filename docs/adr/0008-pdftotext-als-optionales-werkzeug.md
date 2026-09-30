@@ -51,3 +51,20 @@ sagt der Sammelimport das einmal, samt Installationshinweis, und macht weiter.
 
 Tests, die `pdftotext` brauchen, werden übersprungen, wo es fehlt.
 `DATENMODELL.md` nennt im Abschnitt zu den Skripten künftig zwei Ausnahmen.
+
+## Nachtrag bei der Umsetzung, 01.10.2026
+
+Umgesetzt in `sammelimport.py vorbereiten --plan` (#32). Zwei Stellen oben
+gelten so nicht mehr.
+
+- **Aufruf:** `-raw -enc UTF-8`. Ohne `-raw` zieht Xpdf 4.00 die Zeilen eines
+  Absatzes zu einer zusammen. Aus den Kopfzeilen eines PlayDrill-Blatts,
+  „Trainer/Ersteller", „ZEIT" und „Werkzeuge", wird dann eine Zeile. Poppler
+  zieht nichts zusammen, mit `-raw` lesen beide gleich.
+- **Wie viel Text:** Der Zerlegungsplan bekommt den ganzen Text, solange der
+  Text aller PDFs in einen Aufruf passt, sonst je PDF die ersten Zeilen bis 400
+  Zeichen. Die 25 000 Tokens oben galten für die ersten Zeilen allein. Im
+  Probelauf hat die Kappung auf 400 Zeichen bei Übersichtsblättern die
+  Stationsliste abgeschnitten. Die Schwelle liegt bei 400 000 Zeichen, rund
+  100 000 Tokens. Gemessen: `quellen/playdrill` hat 310 000 Zeichen in 343 PDFs
+  und kommt ganz, die 260 PDFs aus den Übungsordnern haben 190 000.

@@ -308,8 +308,11 @@ def _pdf_zeichenkette(text: str) -> bytes:
     return b"(" + roh.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)") + b")"
 
 
-def _pdf_strom(daten: bytes) -> bytes:
-    return f"<< /Length {len(daten)} >>\nstream\n".encode() + daten + b"\nendstream"
+def _pdf_strom(daten: bytes, eintraege: str = "") -> bytes:
+    """Ein Strom-Objekt. `eintraege` kommen zu `/Length` ins Woerterbuch, fuer ein Bild etwa
+    `/Type /XObject /Subtype /Image` mit Breite, Hoehe und Maske."""
+    return (f"<< /Length {len(daten)} {eintraege}>>\nstream\n".encode()
+            + daten + b"\nendstream")
 
 
 def _pdf_datei(objekte: list[bytes]) -> bytes:
@@ -332,7 +335,7 @@ def _pdf_datei(objekte: list[bytes]) -> bytes:
     return bytes(datei)
 
 
-def pdf_mit_text(seiten: list[list[str]]) -> bytes:
+def _pdf_mit_text(seiten: list[list[str]]) -> bytes:
     """Ein PDF mit Textebene, je Seite eine Liste von Zeilen.
 
     Die Schrift ist Helvetica, eine der vierzehn, die jeder PDF-Leser ohne
@@ -471,7 +474,7 @@ class Arbeitsordner:
         `lege_quellbild_an` sein Foto baut. Kein Binaermaterial im Repo, und
         was im PDF steht, steht hier im Test.
         """
-        return self.lege_quelldatei_an(name, pdf_mit_text(list(seiten)))
+        return self.lege_quelldatei_an(name, _pdf_mit_text(list(seiten)))
 
     def lege_quellenordner_an(self, ordner: str, kandidaten: list[dict],
                               freigegeben: str | None = "2026-09-30",

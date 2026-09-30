@@ -29,8 +29,8 @@ from arbeitsordner import Arbeitsordner, auffaelligkeiten
 ORDNER = "stapel"
 
 # Gesucht wird hier nur im PATH. Das Skript sucht unter Windows auch neben
-# git.exe. Steht pdftotext nur dort, werden diese Tests übersprungen, obwohl
-# das Skript es fände. Die Suche neben git.exe prüft die Abnahme (#29).
+# git.exe. Steht pdftotext nur dort, werden diese Tests uebersprungen, obwohl
+# das Skript es faende. Die Suche neben git.exe prueft die Abnahme (#29).
 BRAUCHT_PDFTOTEXT = unittest.skipUnless(
     shutil.which("pdftotext"), "pdftotext ist nicht im PATH")
 
@@ -186,18 +186,75 @@ class PlaneingabeTest(unittest.TestCase):
             encoding="utf-8")
 
     def genannte_dateien(self) -> list[str]:
-        """Die Dateien, die die Planeingabe aufführt, je eine Überschrift."""
+        """Die Dateien, die die Planeingabe auffuehrt, je eine Ueberschrift."""
         return re.findall(r"^### `(.+)`$", self.planeingabe(), re.MULTILINE)
 
     def zu_datei(self, name: str) -> str:
-        """Was die Planeingabe unter der Überschrift einer Datei sagt."""
+        """Was die Planeingabe unter der Ueberschrift einer Datei sagt."""
         return self.planeingabe().split(f"### `{name}`\n", 1)[1].split("\n#", 1)[0]
+
+    def test_die_planeingabe_nennt_jede_datei_auch_aus_unterordnern(self) -> None:
+        # PlayDrill sortiert seine Uebungen in Unterordner, und eine Folge kann
+        # ueber zwei davon verteilt sein. Der Agent muss sie alle sehen.
+        namen = ["seite-01.jpg", "Ü_Abwehr/seite-02.jpg", "Ü_Abwehr/tiefer/notiz.txt"]
+        for name in namen:
+            self.ordner.lege_quelldatei_an(f"{ORDNER}/{name}", b"")
+
+        self.plane()
+
+        self.assertEqual(sorted(self.genannte_dateien()), sorted(namen))
+        # Die Namen stehen relativ zum Quellenordner. Oeffnen muss der Agent
+        # die Dateien trotzdem, jedes Foto und jedes PDF ohne Text, also
+        # steht der Quellenordner einmal absolut im Kopf.
+        kopf = self.planeingabe().split("## Dateien", 1)[0]
+        self.assertIn((self.ordner.pfad / "quellen" / ORDNER).resolve().as_posix(), kopf)
+
+    def test_ein_zweiter_lauf_nimmt_nur_dateien_die_in_keiner_zeile_stehen(self) -> None:
+        # Nach dem ersten Durchgang sind neue Seiten dazugekommen. Nur sie
+        # brauchen einen Plan, die anderen haben schon einen, auch der noch
+        # offene Kandidat 2. Die sammelimport.md selbst ist keine Quelle.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-01.jpg"], "status": "importiert",
+             "karte": "ue-0001"},
+            {"kandidat": 2, "dateien": ["unter/seite-02.jpg", "unter/seite-03.jpg"]},
+        ])
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/unter/seite-04.jpg", b"")
+
+        self.plane()
+
+        self.assertEqual(self.genannte_dateien(), ["unter/seite-04.jpg"])
+
+    def test_ohne_neue_dateien_entsteht_keine_planeingabe(self) -> None:
+        # Dann gibt es nichts zu planen, und der Skill soll keinen Agenten
+        # fuer eine leere Liste starten.
+        self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["seite-01.jpg"]}])
+
+        fertig = self.plane()
+
+        self.assertIn("Keine neuen Dateien", fertig.stdout)
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
+
+    def test_ein_umlaut_im_pfad_zaehlt_gleich_wie_das_dateisystem_ihn_auch_schreibt(self) -> None:
+        # Jeder Uebungsordner von PlayDrill beginnt mit einem grossen U mit
+        # Umlaut. macOS legt ihn als U und zwei Punkte ab, zwei Zeichen,
+        # Windows als eines. Kommt der Ordner ueber Nextcloud von einem Mac,
+        # stuende sonst jede Datei darin beim zweiten Lauf als neu da, obwohl
+        # der Plan sie schon hat.
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 1, "dateien": ["Ü_Abwehr/seite-01.jpg"]}])
+        quellordner = self.ordner.pfad / "quellen" / ORDNER
+        (quellordner / "Ü_Abwehr").rename(
+            quellordner / unicodedata.normalize("NFD", "Ü_Abwehr"))
+
+        fertig = self.plane()
+
+        self.assertIn("Keine neuen Dateien", fertig.stdout)
 
     @BRAUCHT_PDFTOTEXT
     def test_bei_pdfs_steht_ihr_text_in_der_planeingabe(self) -> None:
-        # Der Text steht unter seiner Datei, sonst lässt sich kein Übersichtsblatt
-        # seinen Stationsblättern zuordnen. Das „ü" zeigt, dass pdftotext UTF-8
-        # schreibt: Xpdf aus Git für Windows schreibt sonst Latin-1.
+        # Der Text steht unter seiner Datei, sonst laesst sich kein Uebersichtsblatt
+        # seinen Stationsblaettern zuordnen. Der Umlaut zeigt, dass pdftotext UTF-8
+        # schreibt: Xpdf aus Git fuer Windows schreibt sonst Latin-1.
         self.ordner.lege_quell_pdf_an(
             f"{ORDNER}/Ü_Abwehr/kasten.pdf",
             ["Abwehr vom Kasten", "Ausführung: Der Trainer schlägt vom Kasten."])
@@ -214,7 +271,7 @@ class PlaneingabeTest(unittest.TestCase):
     @BRAUCHT_PDFTOTEXT
     def test_ein_pdf_ohne_text_sagt_dem_agenten_dass_er_es_selbst_lesen_muss(self) -> None:
         # Ein eingescanntes Blatt hat keine Textebene, eine kaputte Datei
-        # liest pdftotext gar nicht. Eine leere Überschrift hieße für den
+        # liest pdftotext gar nicht. Eine leere Ueberschrift hiesse fuer den
         # Agenten nur, dass nichts dasteht, und er plante nach dem Dateinamen.
         self.ordner.lege_quell_pdf_an(f"{ORDNER}/scan.pdf", [])
         self.ordner.lege_quelldatei_an(f"{ORDNER}/kaputt.pdf", b"kein PDF")
@@ -225,7 +282,7 @@ class PlaneingabeTest(unittest.TestCase):
             self.assertIn("selbst lesen", self.zu_datei(name))
 
     def lege_stationsuebersicht_an(self) -> None:
-        """Ein Übersichtsblatt, dessen Stationsliste weit über die ersten Zeilen reicht."""
+        """Ein Uebersichtsblatt, dessen Stationsliste weit ueber die ersten Zeilen reicht."""
         self.ordner.lege_quell_pdf_an(
             f"{ORDNER}/zirkel.pdf",
             ["Stationsübersicht Sprungkraftzirkel",
@@ -234,8 +291,8 @@ class PlaneingabeTest(unittest.TestCase):
 
     @BRAUCHT_PDFTOTEXT
     def test_passt_der_text_in_einen_aufruf_kommt_er_ganz(self) -> None:
-        # So bekommt ein Übersichtsblatt seine ganze Stationsliste, und der
-        # Plan erkennt die Stationsblätter, die zu ihm gehören.
+        # So bekommt ein Uebersichtsblatt seine ganze Stationsliste, und der
+        # Agent erkennt die Stationsblaetter, die zu ihm gehoeren.
         self.lege_stationsuebersicht_an()
 
         self.plane()
@@ -244,10 +301,10 @@ class PlaneingabeTest(unittest.TestCase):
 
     @BRAUCHT_PDFTOTEXT
     def test_liegt_der_text_ueber_der_schwelle_stehen_nur_die_ersten_zeilen_da(self) -> None:
-        # Das dicke PDF bringt den Ordner deutlich über die Schwelle im
+        # Das dicke PDF bringt den Ordner deutlich ueber die Schwelle im
         # Skript, gut 500 000 Zeichen gegen 400 000. Ganz passte der Text
         # nicht mehr in den Aufruf des Agenten. Dann bekommt jede Datei ihre
-        # ersten Zeilen, das dicke PDF genauso wie das Übersichtsblatt.
+        # ersten Zeilen, das dicke PDF genauso wie das Uebersichtsblatt.
         self.lege_stationsuebersicht_an()
         zeile = "Aufbau und Ablauf der Übung, dazu die Dosierung. " * 2
         self.ordner.lege_quell_pdf_an(
@@ -263,7 +320,7 @@ class PlaneingabeTest(unittest.TestCase):
         self.assertIn("Zeile 0000", dick)
         self.assertNotIn("Zeile 5999", dick)
         self.assertIn("ersten Zeilen", fertig.stdout)
-        # Auch der Agent muss es wissen, sonst hält er den Anfang für alles.
+        # Auch der Agent muss es wissen, sonst haelt er den Anfang fuer alles.
         self.assertIn("ersten Zeilen", self.planeingabe().split("## Dateien", 1)[0])
 
     def bibliothek(self) -> dict[str, dict[str, str]]:
@@ -275,10 +332,10 @@ class PlaneingabeTest(unittest.TestCase):
         return {z[0]: dict(zip(kopf, z)) for z in rest}
 
     def test_die_bibliotheksliste_nennt_jede_karte_und_markiert_die_aus_diesem_ordner(self) -> None:
-        # Daran erkennt der Plan, was schon importiert ist, und führt es mit
+        # Daran erkennt der Agent, was schon importiert ist, und fuehrt es mit
         # seiner ID, statt es ein zweites Mal entwerfen zu lassen. Eine Karte
-        # über zwei Seiten nennt beide Dateien. Ein Ordner, der nur genauso
-        # anfängt, ist ein anderer.
+        # ueber zwei Seiten nennt beide Dateien. Ein Ordner, der nur genauso
+        # anfaengt, ist ein anderer.
         self.ordner.lege_karte_an(id="ue-0006", titel="Abwehr vom Kasten", element=["abwehr"],
                                   quelldatei=f"{ORDNER}/Ü_Abwehr/kasten.pdf")
         self.ordner.lege_karte_an(id="ue-0007", titel="Über zwei Seiten",
@@ -300,9 +357,9 @@ class PlaneingabeTest(unittest.TestCase):
 
     def test_ein_foto_ueber_2_mb_ergibt_den_hinweis_auf_die_bildaufbereitung(self) -> None:
         # So schwer ist eine abfotografierte Magazinseite mit 50 Megapixeln.
-        # Der Agent kann sie nicht öffnen, weder für den Plan noch für den
-        # Entwurf. Zufallsbytes reichen, der Hinweis richtet sich nach der
-        # Dateigröße, und so läuft der Test auch ohne Pillow.
+        # Der Agent kann sie nicht oeffnen, weder fuer den Zerlegungsplan noch
+        # fuer den Entwurf. Zufallsbytes reichen, der Hinweis richtet sich nach der
+        # Dateigroesse, und so laeuft der Test auch ohne Pillow.
         self.ordner.lege_quelldatei_an(f"{ORDNER}/unter/seite-01.jpg", os.urandom(3 * 1024 * 1024))
         self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-02.jpg", b"klein genug")
 
@@ -313,8 +370,8 @@ class PlaneingabeTest(unittest.TestCase):
         self.assertNotIn("seite-02.jpg", fertig.stdout)
 
     def test_ohne_pdftotext_gibt_es_einen_hinweis_und_die_eingabe_ohne_text(self) -> None:
-        # Ein Mittrainer auf dem Mac ohne Poppler. Der Sammelimport wird für
-        # ihn teurer, weil der Agent die PDFs selbst liest, aber er läuft
+        # Ein Mittrainer auf dem Mac ohne Poppler. Der Sammelimport wird fuer
+        # ihn teurer, weil der Agent die PDFs selbst liest, aber er laeuft
         # (ADR-0008). Der PATH zeigt auf einen leeren Ordner: Dort gibt es
         # weder pdftotext noch git.exe, neben dem das Skript sonst sucht.
         leer = Path(tempfile.mkdtemp(prefix="ohne-pdftotext-"))
@@ -329,57 +386,6 @@ class PlaneingabeTest(unittest.TestCase):
         self.assertEqual(self.genannte_dateien(), ["a.pdf", "b.pdf"])
         self.assertNotIn("Abwehr vom Kasten", self.planeingabe())
         self.assertIn("selbst lesen", self.zu_datei("a.pdf"))
-
-    def test_die_planeingabe_nennt_jede_datei_auch_aus_unterordnern(self) -> None:
-        # PlayDrill sortiert seine Übungen in Unterordner, und eine Folge kann
-        # über zwei davon verteilt sein. Der Plan muss sie alle sehen.
-        namen = ["seite-01.jpg", "Ü_Abwehr/seite-02.jpg", "Ü_Abwehr/tiefer/notiz.txt"]
-        for name in namen:
-            self.ordner.lege_quelldatei_an(f"{ORDNER}/{name}", b"")
-
-        self.plane()
-
-        self.assertEqual(sorted(self.genannte_dateien()), sorted(namen))
-
-    def test_ein_zweiter_lauf_nimmt_nur_dateien_die_in_keiner_zeile_stehen(self) -> None:
-        # Nach dem ersten Durchgang sind neue Seiten dazugekommen. Nur sie
-        # brauchen einen Plan, die anderen haben schon einen, auch der noch
-        # offene Kandidat 2. Die sammelimport.md selbst ist keine Quelle.
-        self.ordner.lege_quellenordner_an(ORDNER, [
-            {"kandidat": 1, "dateien": ["seite-01.jpg"], "status": "importiert",
-             "karte": "ue-0001"},
-            {"kandidat": 2, "dateien": ["unter/seite-02.jpg", "unter/seite-03.jpg"]},
-        ])
-        self.ordner.lege_quelldatei_an(f"{ORDNER}/unter/seite-04.jpg", b"")
-
-        self.plane()
-
-        self.assertEqual(self.genannte_dateien(), ["unter/seite-04.jpg"])
-
-    def test_ohne_neue_dateien_entsteht_keine_planeingabe(self) -> None:
-        # Dann gibt es nichts zu planen, und der Skill soll keinen Agenten
-        # für eine leere Liste starten.
-        self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["seite-01.jpg"]}])
-
-        fertig = self.plane()
-
-        self.assertIn("Keine neuen Dateien", fertig.stdout)
-        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
-
-    def test_ein_umlaut_im_pfad_zaehlt_gleich_wie_das_dateisystem_ihn_auch_schreibt(self) -> None:
-        # Jeder Übungsordner von PlayDrill beginnt mit „Ü_". macOS legt das Ü
-        # als U mit zwei Punkten ab, zwei Zeichen, Windows als eines. Kommt
-        # der Ordner über Nextcloud von einem Mac, stünde sonst jede Datei
-        # darin beim zweiten Lauf als neu da, obwohl der Plan sie schon hat.
-        self.ordner.lege_quellenordner_an(
-            ORDNER, [{"kandidat": 1, "dateien": ["Ü_Abwehr/seite-01.jpg"]}])
-        quellordner = self.ordner.pfad / "quellen" / ORDNER
-        (quellordner / "Ü_Abwehr").rename(
-            quellordner / unicodedata.normalize("NFD", "Ü_Abwehr"))
-
-        fertig = self.plane()
-
-        self.assertIn("Keine neuen Dateien", fertig.stdout)
 
 
 class PruefenTest(unittest.TestCase):
