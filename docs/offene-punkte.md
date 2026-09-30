@@ -8,41 +8,6 @@ daraus ein Ticket zu machen.
 
 Ein Punkt verschwindet hier, sobald er ein Ticket hat oder erledigt ist.
 
-## Aus der Abnahme am Volleyball-Magazin (#18)
-
-Die Abnahme von Welle 1b ist durch. Fünf Dinge sind dabei liegen geblieben.
-Die vier zum Schaubild sind inzwischen Welle 1c (#23), übrig ist eins.
-
-### Die Trefferzeile zeigt Schaubild und Quelldatei verschieden
-
-`suche.py --lang` druckt zwei benachbarte Zeilen für zwei Dateien im
-Arbeitsordner, und sie sehen verschieden aus:
-
-```
-    Schaubild    schaubilder/ue-0020.svg
-    Quelldatei   in quellen/ · volleyballmagazin/vm_09_2026/20260918_130257.jpg
-```
-
-Der Grund steht im Kommentar an der Stelle: `schaubild:` trägt laut
-`DATENMODELL.md` einen einzelnen Dateinamen und ergibt mit dem Ordner davor
-einen Pfad, den man kopieren kann. `quelldatei:` ist freier Text und nennt bei
-einer Übung über zwei Seiten beide. Ein Präfix säße dort nur vor der ersten.
-
-Der Preis ist, dass die häufige Angabe mit einer einzigen Datei ihre kopierbare
-Pfadzeile verloren hat.
-
-Entschieden am 30.09.2026 beim Interview zum Sammelimport: `suche.py` prüft, ob
-der **ganze** Wert eine Datei unter `quellen/` ist. Dann druckt es
-`quellen/<wert>` als Pfad, sonst die Zeile wie bisher. Geraten wird dabei
-nichts, die Datei gibt es oder nicht. Auf einem Rechner, der `quellen/` nicht
-synchronisiert, sieht die Zeile aus wie heute.
-
-Eine Liste in `quelldatei:` braucht es dafür nicht, das Schema bleibt. Die
-frühere Begründung, die Umstellung müsse vor den PlayDrill-Import, trägt auch
-nicht. Eine PlayDrill-Karte nennt genau eine Datei, und aus `"x"` ein `["x"]`
-zu machen geht über 370 Karten so mechanisch wie über 34. Die Prüfung kommt als
-kleiner eigener Punkt in die Welle zum Sammelimport.
-
 ## Im Arbeitsordner, nicht im Plugin
 
 Betrifft `Nextcloud/_Training/trainingsplanung` und keinen Code.
@@ -243,150 +208,10 @@ Steht so in #10 unter *Out of Scope* und gilt weiter.
 
 Die Reihenfolge stammt aus #10 und ist dort begründet. Den Sammelimport kannte
 #10 noch nicht. Er kommt als Nächstes, vor der Wissenskarte, entschieden am
-30.09.2026. Die PlayDrill-Bibliothek braucht die Wissenskarte nicht, und die
-Wissenskarte kann danach den Sammelimport um ihre Kartensorte erweitern. Die
-Welle zum Szenen-Vokabular ist als Welle 1c (#23) mit der Abnahme (#28) durch.
-
-### Der Sammelimport
-
-Aus dem PlayDrill-Import ist beim Interview am 30.09.2026 ein allgemeiner
-Sammelimport im Plugin geworden. Er soll auch einen Stapel abfotografierter
-Magazinseiten zusammen verarbeiten und sich wiederholen lassen. Die Begriffe
-stehen im Saat-Glossar unter „Sammelimport", die Gründe für drei Entscheidungen
-in ADR-0008 bis ADR-0010. Der Probelauf ist am 30.09.2026 als Prototyp vor
-der Spec gelaufen und hat das Modell entschieden, siehe unten. Als Nächstes
-kommt die Spec.
-
-Der Anlass: Unter `quellen/playdrill/` liegen 343 PDFs, eine Übung je Datei.
-10 davon sind Karte, 258 in den Übungsordnern offen, 75 zurückgestellt. Von
-Hand ist das eine Übung je Sitzung, der Rest also über 250 Sitzungen. Import-
-Skill, `DATENMODELL.md`, `SPRACHE.md` und `glossary.md` kosten zusammen rund
-10 000 Tokens je Sitzung, bevor die Quelle gelesen ist.
-
-Entschieden:
-
-- **Aufbau.** Ein fünfter Skill `volleyball-sammelimport`. Er startet je
-  Kandidat den Plugin-Agenten `volleyball-kartenentwurf` über das Agent-Tool,
-  vier parallel, mit Sonnet 5.5 (ADR-0009). Der Agent hat nur `Read` und `Write`, sein Prompt
-  ist ein knapper Auszug der Regeln. Ein Test im Repo prüft dessen
-  kontrollierte Werte gegen `tpdaten.py`. Der Import-Skill bietet den
-  Sammelimport an, wenn das Material ein Ordner mit mehr als etwa zehn Dateien
-  ist.
-- **Ablauf.** Erst ein Zerlegungsplan über den ganzen Quellenordner, den der
-  Trainer freigibt. Dann ein Kartenentwurf je Kandidat, etwa 30 Kandidaten auf
-  einmal. Die Zahl steht in `sammelimport.md` und lässt sich ändern. Dann die
-  Freigabe im Chat. Einzeln, mit dem Feldbild, kommen die Rückfragen ohne
-  Vermutung und die Rückfrage, ob ein aus dem Bild gelesener Ablauf stimmt,
-  auch wenn sie eine Vermutung hat. Das sind etwa 1,3 je Kandidat. Alles
-  andere steht in einer Tabelle, pauschal oder zeilenweise freizugeben: die
-  Vorschläge zu Feldern in ihren Spalten, die Rückfragen mit Vermutung wie ein
-  Vorschlag, und eine Spalte „aus dem Bild", die nur nennt, welche Stellen im
-  Text aus dem Bild gelesen sind. Wer sie prüfen will, öffnet den Entwurf.
-  `übernehmen` vergibt danach die IDs, schreibt die Karten, benennt das
-  Feldbild nach der Karte, setzt `angelegt` auf den Tag der Freigabe und lässt
-  `index.py` laufen. Freigabeform und die 30 auf einmal kommen aus dem
-  Probelauf, vorher hieß es: alle Rückfragen einzeln, eine Sitzung je
-  Unterordner.
-- **Kartenentwurf.** Markdown, damit man ihn auch in Nextcloud lesen kann. Am
-  Ende steht `## Freigabe` mit den Listen `Vorschläge:` und `Rückfragen:`. Jede
-  Rückfrage stellt genau eine Frage und endet auf `Vermutung im Entwurf: …`
-  oder `Vermutung im Entwurf: keine`. Das Prüfskript weist einen Entwurf ab,
-  der das nicht einhält. `übernehmen` nimmt `## Freigabe` aus der Karte, was
-  der Trainer geändert hat, kommt in die Notiz der Übersicht.
-- **Status aus den Dateien.** Das Prüfskript setzt den Status in der Übersicht
-  aus den Entwürfen auf der Platte: kein oder ein fehlerhafter Entwurf bleibt
-  `offen`, einer mit mindestens einer Rückfrage ohne Vermutung wird
-  `rückfrage`, der Rest `bereit`. Die Rückmeldung des Agenten zeigt nur den
-  Fortschritt. Weitermachen nach einem Abbruch heißt: prüfen, dann beim
-  ersten offenen Kandidaten weiter. Im Probelauf hatten sechs Aufrufe ihren
-  Entwurf geschrieben und brachen erst bei der Rückmeldung ab.
-- **Nichts erfinden.** Jedes Feld ist belegt, ein Vorschlag mit Begründung oder
-  eine Rückfrage. Belegt sind `quelle`, `quelldatei`, `schaubild`, `level_min`
-  aus der Kategorie, `dauer`, `autor` und `angelegt`, dazu Ziel, Ablauf und
-  Variationen, wenn die Quelle sie beschreibt. Vorschläge sind `titel`,
-  `element`, `form`, `spielphase`, `schwerpunkt` (nur vorhandene), `disziplin`,
-  `spieler_min`, `spieler_max`, `level_max`, `material` und `netz`. Eine
-  Rückfrage wird es bei einem Ablauf, der bei weniger als 150 Zeichen Text aus
-  dem Bild gelesen ist, bei einer neuen Kennung, bei einem Duplikatverdacht,
-  bei einem Widerspruch in der Quelle und wenn unklar ist, ob Übung oder
-  Folge. Für PlayDrill werden damit `spieler_min` und `level_max` aus den
-  Absprachen vom 26.09.2026 zu Vorschlägen.
-- **Kandidaten.** Der Zerlegungsplan fasst zusammen, was zusammengehört, auch
-  über Ordner hinweg. Ein Zirkel mit Übersichtsblatt wird eine Folge mit dem
-  Bild der Übersicht, die Stationsblätter gehen in den Ablauf. Nummerierte
-  Technikreihen wie UZ1 bis UZ10 werden Einzelübungen. Theorie bekommt
-  `zurückgestellt`, bis es die Wissenskarte gibt. Der Plan bekommt den vollen
-  Text jeder Datei, wenn alles in einen Aufruf passt, bei PlayDrill rund
-  40 000 Tokens, sonst die ersten Zeilen.
-- **Ablage.** Je Quellenordner eine `sammelimport.md` mit den Absprachen für
-  alle Karten daraus und der Übersicht mit dem Status je Kandidat: `offen`,
-  `bereit`, `rückfrage`, `importiert`, `ergänzt`, `übersprungen`,
-  `zurückgestellt`, dazu eine Spalte Gruppe. Die Kartenentwürfe liegen in
-  `kartenentwuerfe/<ordner>/`, haben keine ID und verschwinden bei der
-  Freigabe (ADR-0010).
-- **Lesen.** `pdftotext` ist optional (ADR-0008). Pillow schneidet das Feldbild
-  aus.
-- **Bibliothek im Zerlegungsplan.** Die Vorstufe gibt dem Zerlegungsplan eine
-  knappe Liste der Bibliothek mit, je Karte ID, Titel, Element und
-  `quelldatei`. Was mit seiner `quelldatei` schon in diesem Quellenordner
-  liegt, steht im Plan gleich als `importiert` mit ID. So läuft ein
-  Sammelimport ein zweites Mal über denselben Ordner, und bei `vm_09_2026`
-  werden Übung 1 und 2 des Warm-ups nicht noch einmal Kandidat. Einen
-  Duplikatverdacht gegen die Bibliothek oder innerhalb des Ordners schreibt
-  der Plan als Rückfrage, etwa Nr. 254 in `Ü_Zirkelübung` gegen `ue-0027`.
-  `ergänzt` entsteht erst bei der Freigabe. Der Agent für die Entwürfe
-  bekommt die Liste nicht. Ersetzt die frühere Absicht, je Kandidat mit
-  `suche.py` zu suchen: Die Suche filtert nach `element`, das erst der Entwurf
-  vorschlägt, und der Agent kann mit `Read` und `Write` kein Skript starten.
-- **PlayDrill.** `PLAYDRILL_IMPORT_LOG.md` wird zu
-  `quellen/playdrill/sammelimport.md`, die zehn fertigen Zeilen behalten ihre
-  IDs, und `pd_nehmen.py` fällt weg. Der Sammelimport nimmt die Übungsordner
-  ohne `Ü_FV-Prüfungsfolien`, das ist ein Trainingsabend, und ohne
-  `Ü_In Bearbeitung`, das ist in PlayDrill selbst unfertig.
-- **Probelauf.** Gelaufen am 30.09.2026 als Wegwerf-Prototyp vor der Spec,
-  ohne Plugin-Code und ohne etwas im Arbeitsordner zu schreiben. Die zehn
-  fertigen PlayDrill-Übungen blind, dazu der Sprungkraftzirkel, aus dem
-  Volleyball-Magazin 09/2026 die sieben Übungen mit Karte und Übung 3 und 4
-  des Warm-ups (siehe *Aus dem Warm-up Teil 4 fehlen Übung 3 und 4*). Je
-  einmal mit Haiku 4.5 und Sonnet 5.5 über das Agent-Tool, dazu Zerlegungspläne
-  über `vm_09_2026` und `Ü_Zirkelübung`. Bericht, Regelauszug, Aufträge und
-  die 40 Entwürfe liegen auf dem lokalen Branch `prototyp/sammelimport-probelauf`
-  unter `plugins/volleyball/prototyp-sammelimport/`. Der Branch wird nicht
-  gepusht, die Entwürfe geben Vereins- und Magazinmaterial wieder.
-  - **Modell: Sonnet 5.5.** Die Regel war: Haiku, wenn es nichts erfindet.
-    Haiku erfindet. In 13 von 20 Entwürfen steht etwas, das die Quelle nicht
-    sagt oder verdreht, 14 haben keine Rückfrage. Sonnet hält sich an die
-    Quelle, und seine Rückfragen treffen die Stellen, die beim Import von Hand
-    abgestimmt wurden, meist mit derselben Vermutung.
-  - **Zerlegungsplan.** Sonnet zerlegt die 15 Fotos von `vm_09_2026` in einem
-    Aufruf richtig, samt Übungen über zwei Seiten, Verweis und Theorie. Die
-    Form des Plans bleibt. Haiku zerlegt falsch.
-  - **Kosten.** Das Agent-Tool meldet je Aufruf die Tokens. Ein Kartenentwurf
-    kostet mit Sonnet im Median 91 000, mit Haiku 54 000. Das ist eine
-    Obergrenze, gelaufen ist ein allgemeiner Subagent statt des Plugin-Agenten.
-    Nach 44 Aufrufen war das Sitzungslimit des Abos erreicht. Daher die 30
-    Kandidaten auf einmal. Der Nachtrag in ADR-0009 hält das fest, der größte
-    Unterordner hat 59 Kandidaten.
-  - **Freigabe.** Ein Sonnet-Entwurf trägt im Schnitt 16 Vorschläge und 3,6
-    Rückfragen, 2,5 davon mit Vermutung. Über 258 Kandidaten wären das rund
-    930 Rückfragen einzeln. Daher die Form oben.
-  - **Vorstufe.** Übersichtsblätter bekommen den vollen Text. Die ersten
-    Zeilen schneiden die Stationsliste ab.
-  - **Regelauszug.** Der Entwurf aus dem Probelauf ist die Vorlage für die
-    Agentendefinition. „In eigenen Worten" braucht dort mehr Gewicht, bei
-    Magazintexten bleibt Sonnet stellenweise nah am Wortlaut.
-  - **Nicht geprüft:** Duplikate, der Plugin-Agent mit nur `Read` und
-    `Write`, `übernehmen` und die Freigabe im Chat. Das prüft der erste Schnitt
-    der Spec.
-- **Trefferzeile.** Die Pfadzeile für `quelldatei:` aus dem ersten Abschnitt
-  dieser Datei kommt als kleiner eigener Punkt dazu.
-- **Glossar im Arbeitsordner.** Die lebende `glossary.md` bekommt die neuen
-  Begriffe nicht von selbst, `init_struktur.py` kopiert die Saat nur beim
-  Anlegen. Beim ersten Start in einem Arbeitsordner schaut der Skill, ob der
-  Abschnitt „Sammelimport" dasteht. Fehlt er, bietet er an, ihn aus der Saat
-  einzufügen, und wartet auf das Ja.
-- **Version.** 2.6.0. Alles kommt dazu, nichts bricht einen bestehenden
-  Arbeitsordner.
+30.09.2026, und ist jetzt Welle 1d (#29) mit den Slices #30 bis #37. Die
+PlayDrill-Bibliothek braucht die Wissenskarte nicht, und die Wissenskarte kann
+danach den Sammelimport um ihre Kartensorte erweitern. Die Welle zum
+Szenen-Vokabular ist als Welle 1c (#23) mit der Abnahme (#28) durch.
 
 ### Der zweite Ast von Welle 1b: die Wissenskarte
 
@@ -395,7 +220,7 @@ Die Wissenskarte als eigene Kartensorte mit eigenem Ordner und Schema
 Volleyball-Magazins. Braucht eine eigene Spec. Die Bildaufbereitung aus Welle
 1b war die Vorbedingung dafür und ist erledigt.
 
-Kommt nach dem Sammelimport und erweitert ihn um die Wissenskarte. Was ein
+Kommt nach dem Sammelimport (#29) und erweitert ihn um die Wissenskarte. Was ein
 Sammelimport als Theorie zurückgestellt hat, steht in der Übersicht seiner
 `sammelimport.md` und wird von dort geholt.
 
