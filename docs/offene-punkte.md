@@ -266,21 +266,40 @@ Skill, `DATENMODELL.md`, `SPRACHE.md` und `glossary.md` kosten zusammen rund
 Entschieden:
 
 - **Aufbau.** Ein fünfter Skill `volleyball-sammelimport`. Er startet je
-  Einheit den Plugin-Agenten `volleyball-kartenentwurf` über das Agent-Tool,
-  vier parallel (ADR-0009). Der Agent hat nur `Read` und `Write`, sein Prompt
+  Kandidat den Plugin-Agenten `volleyball-kartenentwurf` über das Agent-Tool,
+  vier parallel, mit Sonnet 5.5 (ADR-0009). Der Agent hat nur `Read` und `Write`, sein Prompt
   ist ein knapper Auszug der Regeln. Ein Test im Repo prüft dessen
   kontrollierte Werte gegen `tpdaten.py`. Der Import-Skill bietet den
   Sammelimport an, wenn das Material ein Ordner mit mehr als etwa zehn Dateien
   ist.
 - **Ablauf.** Erst ein Zerlegungsplan über den ganzen Quellenordner, den der
-  Trainer freigibt. Dann ein Kartenentwurf je Einheit. Dann die Freigabe im
-  Chat: zuerst die Rückfragen ohne Lesart einzeln mit dem Feldbild, dann die
-  übrigen Entwürfe als eine Tabelle, pauschal oder zeilenweise. Eine Rückfrage
-  mit Lesart wird in der Tabelle bestätigt wie ein Vorschlag. Gearbeitet wird
-  in Portionen von etwa 30 Einheiten je Sitzung. Beides kommt aus dem
+  Trainer freigibt. Dann ein Kartenentwurf je Kandidat, etwa 30 Kandidaten auf
+  einmal. Die Zahl steht in `sammelimport.md` und lässt sich ändern. Dann die
+  Freigabe im Chat. Einzeln, mit dem Feldbild, kommen die Rückfragen ohne
+  Vermutung und die Rückfrage, ob ein aus dem Bild gelesener Ablauf stimmt,
+  auch wenn sie eine Vermutung hat. Das sind etwa 1,3 je Kandidat. Alles
+  andere steht in einer Tabelle, pauschal oder zeilenweise freizugeben: die
+  Vorschläge zu Feldern in ihren Spalten, die Rückfragen mit Vermutung wie ein
+  Vorschlag, und eine Spalte „aus dem Bild", die nur nennt, welche Stellen im
+  Text aus dem Bild gelesen sind. Wer sie prüfen will, öffnet den Entwurf.
+  `übernehmen` vergibt danach die IDs, schreibt die Karten, benennt das
+  Feldbild nach der Karte, setzt `angelegt` auf den Tag der Freigabe und lässt
+  `index.py` laufen. Freigabeform und die 30 auf einmal kommen aus dem
   Probelauf, vorher hieß es: alle Rückfragen einzeln, eine Sitzung je
-  Unterordner. `übernehmen` vergibt danach die IDs, schreibt die Karten und
-  lässt `index.py` laufen.
+  Unterordner.
+- **Kartenentwurf.** Markdown, damit man ihn auch in Nextcloud lesen kann. Am
+  Ende steht `## Freigabe` mit den Listen `Vorschläge:` und `Rückfragen:`. Jede
+  Rückfrage stellt genau eine Frage und endet auf `Vermutung im Entwurf: …`
+  oder `Vermutung im Entwurf: keine`. Das Prüfskript weist einen Entwurf ab,
+  der das nicht einhält. `übernehmen` nimmt `## Freigabe` aus der Karte, was
+  der Trainer geändert hat, kommt in die Notiz der Übersicht.
+- **Status aus den Dateien.** Das Prüfskript setzt den Status in der Übersicht
+  aus den Entwürfen auf der Platte: kein oder ein fehlerhafter Entwurf bleibt
+  `offen`, einer mit mindestens einer Rückfrage ohne Vermutung wird
+  `rückfrage`, der Rest `bereit`. Die Rückmeldung des Agenten zeigt nur den
+  Fortschritt. Weitermachen nach einem Abbruch heißt: prüfen, dann beim
+  ersten offenen Kandidaten weiter. Im Probelauf hatten sechs Aufrufe ihren
+  Entwurf geschrieben und brachen erst bei der Rückmeldung ab.
 - **Nichts erfinden.** Jedes Feld ist belegt, ein Vorschlag mit Begründung oder
   eine Rückfrage. Belegt sind `quelle`, `quelldatei`, `schaubild`, `level_min`
   aus der Kategorie, `dauer`, `autor` und `angelegt`, dazu Ziel, Ablauf und
@@ -292,23 +311,33 @@ Entschieden:
   bei einem Widerspruch in der Quelle und wenn unklar ist, ob Übung oder
   Folge. Für PlayDrill werden damit `spieler_min` und `level_max` aus den
   Absprachen vom 26.09.2026 zu Vorschlägen.
-- **Einheiten.** Der Zerlegungsplan fasst zusammen, was zusammengehört, auch
+- **Kandidaten.** Der Zerlegungsplan fasst zusammen, was zusammengehört, auch
   über Ordner hinweg. Ein Zirkel mit Übersichtsblatt wird eine Folge mit dem
   Bild der Übersicht, die Stationsblätter gehen in den Ablauf. Nummerierte
   Technikreihen wie UZ1 bis UZ10 werden Einzelübungen. Theorie bekommt
-  `zurückgestellt`, bis es die Wissenskarte gibt.
+  `zurückgestellt`, bis es die Wissenskarte gibt. Der Plan bekommt den vollen
+  Text jeder Datei, wenn alles in einen Aufruf passt, bei PlayDrill rund
+  40 000 Tokens, sonst die ersten Zeilen.
 - **Ablage.** Je Quellenordner eine `sammelimport.md` mit den Absprachen für
-  alle Karten daraus und der Übersicht mit dem Status je Einheit: `offen`,
+  alle Karten daraus und der Übersicht mit dem Status je Kandidat: `offen`,
   `bereit`, `rückfrage`, `importiert`, `ergänzt`, `übersprungen`,
   `zurückgestellt`, dazu eine Spalte Gruppe. Die Kartenentwürfe liegen in
   `kartenentwuerfe/<ordner>/`, haben keine ID und verschwinden bei der
   Freigabe (ADR-0010).
 - **Lesen.** `pdftotext` ist optional (ADR-0008). Pillow schneidet das Feldbild
   aus.
-- **Duplikate.** Kandidaten holt die Vorstufe mit `suche.py`. Ein Verdacht ist
-  immer eine Rückfrage, `ergänzt` entsteht erst bei der Freigabe. Zwei
-  PlayDrill-Entwürfe, die dieselbe Übung sind, fallen bei der Freigabe des
-  Unterordners auf.
+- **Bibliothek im Zerlegungsplan.** Die Vorstufe gibt dem Zerlegungsplan eine
+  knappe Liste der Bibliothek mit, je Karte ID, Titel, Element und
+  `quelldatei`. Was mit seiner `quelldatei` schon in diesem Quellenordner
+  liegt, steht im Plan gleich als `importiert` mit ID. So läuft ein
+  Sammelimport ein zweites Mal über denselben Ordner, und bei `vm_09_2026`
+  werden Übung 1 und 2 des Warm-ups nicht noch einmal Kandidat. Einen
+  Duplikatverdacht gegen die Bibliothek oder innerhalb des Ordners schreibt
+  der Plan als Rückfrage, etwa Nr. 254 in `Ü_Zirkelübung` gegen `ue-0027`.
+  `ergänzt` entsteht erst bei der Freigabe. Der Agent für die Entwürfe
+  bekommt die Liste nicht. Ersetzt die frühere Absicht, je Kandidat mit
+  `suche.py` zu suchen: Die Suche filtert nach `element`, das erst der Entwurf
+  vorschlägt, und der Agent kann mit `Read` und `Write` kein Skript starten.
 - **PlayDrill.** `PLAYDRILL_IMPORT_LOG.md` wird zu
   `quellen/playdrill/sammelimport.md`, die zehn fertigen Zeilen behalten ihre
   IDs, und `pd_nehmen.py` fällt weg. Der Sammelimport nimmt die Übungsordner
@@ -328,20 +357,19 @@ Entschieden:
     Haiku erfindet. In 13 von 20 Entwürfen steht etwas, das die Quelle nicht
     sagt oder verdreht, 14 haben keine Rückfrage. Sonnet hält sich an die
     Quelle, und seine Rückfragen treffen die Stellen, die beim Import von Hand
-    abgestimmt wurden, meist mit derselben Lesart.
+    abgestimmt wurden, meist mit derselben Vermutung.
   - **Zerlegungsplan.** Sonnet zerlegt die 15 Fotos von `vm_09_2026` in einem
     Aufruf richtig, samt Übungen über zwei Seiten, Verweis und Theorie. Die
     Form des Plans bleibt. Haiku zerlegt falsch.
   - **Kosten.** Das Agent-Tool meldet je Aufruf die Tokens. Ein Kartenentwurf
     kostet mit Sonnet im Median 91 000, mit Haiku 54 000. Das ist eine
     Obergrenze, gelaufen ist ein allgemeiner Subagent statt des Plugin-Agenten.
-    Nach 44 Aufrufen war das Sitzungslimit des Abos erreicht. Daher die
-    Portionen oben. ADR-0009 nennt noch eine Sitzung je Unterordner, der
-    größte hat 59 Einheiten.
+    Nach 44 Aufrufen war das Sitzungslimit des Abos erreicht. Daher die 30
+    Kandidaten auf einmal. Der Nachtrag in ADR-0009 hält das fest, der größte
+    Unterordner hat 59 Kandidaten.
   - **Freigabe.** Ein Sonnet-Entwurf trägt im Schnitt 16 Vorschläge und 3,6
-    Rückfragen, 2,5 davon mit Lesart. Über 258 Einheiten wären das rund 930
-    Rückfragen einzeln. Daher die Form oben: Einzeln kommt etwa eine je
-    Einheit.
+    Rückfragen, 2,5 davon mit Vermutung. Über 258 Kandidaten wären das rund
+    930 Rückfragen einzeln. Daher die Form oben.
   - **Vorstufe.** Übersichtsblätter bekommen den vollen Text. Die ersten
     Zeilen schneiden die Stationsliste ab.
   - **Regelauszug.** Der Entwurf aus dem Probelauf ist die Vorlage für die
@@ -354,7 +382,9 @@ Entschieden:
   dieser Datei kommt als kleiner eigener Punkt dazu.
 - **Glossar im Arbeitsordner.** Die lebende `glossary.md` bekommt die neuen
   Begriffe nicht von selbst, `init_struktur.py` kopiert die Saat nur beim
-  Anlegen. Das gehört in die Welle.
+  Anlegen. Beim ersten Start in einem Arbeitsordner schaut der Skill, ob der
+  Abschnitt „Sammelimport" dasteht. Fehlt er, bietet er an, ihn aus der Saat
+  einzufügen, und wartet auf das Ja.
 - **Version.** 2.6.0. Alles kommt dazu, nichts bricht einen bestehenden
   Arbeitsordner.
 

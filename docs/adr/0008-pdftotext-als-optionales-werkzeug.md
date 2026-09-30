@@ -15,7 +15,7 @@ ersten Modellaufruf vorliegt:
   oder 258 einzelne Lesevorgänge.
 - Welche Quelle zu wenig Text hat, steht vorher fest. Bei PlayDrill sind das 40
   von 258, bei 27 davon steht unter „Ausführung" nur der Platzhalter. Solche
-  Einheiten bekommen ihre Rückfrage nach Regel und nicht nach dem Urteil des
+  Kandidaten bekommen ihre Rückfrage nach Regel und nicht nach dem Urteil des
   Modells.
 - Der Agent bekommt den Text wortgenau und dazu das ausgeschnittene Feldbild,
   das später auch auf der Karte steht.

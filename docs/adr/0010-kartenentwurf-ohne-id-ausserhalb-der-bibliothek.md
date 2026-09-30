@@ -9,10 +9,10 @@ Karte nach `uebungen/`. Der Entwurf verschwindet dann. Eine Karte in
 Beim PlayDrill-Import von Hand hat jede Sitzung ihre ID gleich zu Beginn mit
 einer Sperrdatei reserviert. Vorher hatten zwei parallele Sitzungen beide
 `ue-0028` geschrieben. Eine reservierte Nummer, aus der keine Karte wurde, blieb
-als Lücke stehen. Beim Sammelimport laufen rund 250 Einheiten, mehrere parallel,
-und die Freigabe kommt Tage später. Reservieren am Anfang hieße Hunderte
-Reservierungen und eine Lücke für jede Einheit, die übersprungen oder in eine
-bestehende Karte ergänzt wird.
+als Lücke stehen. Beim Sammelimport laufen rund 250 Kandidaten, mehrere
+parallel, und die Freigabe kommt Tage später. Reservieren am Anfang hieße
+Hunderte Reservierungen und eine Lücke für jeden Kandidaten, der übersprungen
+oder in eine bestehende Karte ergänzt wird.
 
 ## Considered Options
 
@@ -34,13 +34,13 @@ bestehende Karte ergänzt wird.
 ## Consequences
 
 Es gibt kein Reservieren, keine Sperrdatei und keine Lücke für übersprungene
-Einheiten. `pd_nehmen.py` aus dem PlayDrill-Log fällt weg.
+Kandidaten. `pd_nehmen.py` aus dem PlayDrill-Log fällt weg.
 
 `kartenentwuerfe/` kommt als neuer Ordner in die Ordnerübersicht von
 `DATENMODELL.md`. Er ist leer, solange kein Sammelimport läuft, und wird wie
 alles andere über Nextcloud geteilt. `index.py` liest ihn nicht.
 
-Was aus einer Einheit geworden ist, steht nach der Freigabe nur noch in der
+Was aus einem Kandidaten geworden ist, steht nach der Freigabe nur noch in der
 Übersicht der `sammelimport.md`: Status, ID und Notiz.
 
 Die ID entsteht erst bei der Freigabe. Die Gefahr, dass zwei Rechner dieselbe
