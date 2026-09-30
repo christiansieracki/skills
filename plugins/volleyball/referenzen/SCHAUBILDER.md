@@ -273,7 +273,7 @@ zonen:
     form: rechteck
     bei: [4.5, 7.5]
     groesse: [3.0, 3.0]
-  - text: Aufschlagziel
+  - text: Ziel
     form: kreis
     bei: [2.0, 3.0]
     groesse: 2.0
@@ -326,6 +326,27 @@ ein Farbfleck, der aussieht wie ein Gerät. Aus demselben Grund bricht eine Zone
 ohne `text:` ab. Jeder Buchstabe hat einen schmalen Hof in Zonenfarbe. So
 bleibt das Wort auch über einem hervorgehobenen Marker lesbar, der in
 Strichfarbe gefüllt ist.
+
+**Passt das Wort nicht hinein, sagt das Skript es.** Es vergleicht beim
+Schreiben die geschätzte Breite des Wortes mit der Breite der Zone, beim Kreis
+mit dem Durchmesser. Ist das Wort breiter, bricht das Skript nicht ab. Es
+schreibt das Bild und sagt darunter, welche Zone es ist und was hilft. Hieße
+der Kreis im Beispiel oben „Aufschlagziel" statt „Ziel", stünde da:
+
+```
+Zone 2 "Aufschlagziel": das Wort ist breiter als die Zone.
+Ein kuerzeres Wort hilft, oder eine breitere Zone.
+```
+
+Die Schrift bleibt dabei so groß wie bei allen anderen Beschriftungen. Ein
+einzelnes kleiner gesetztes Wort machte das Bild uneinheitlich. Meist ist das
+kürzere Wort der bessere Ausweg: Die Zone ist maßstäblich, und wer sie
+verbreitert, ändert die Absprache in der Halle.
+
+Die Breite des Wortes ist eine Schätzung. Die Schrift steht erst im Betrachter
+fest, und erst dort ließe sie sich messen. Passt ein Wort nur knapp oder knapp
+nicht, zählt deshalb, was die Vorschau zeigt. Aus demselben Grund nennt der
+Hinweis kein Maß, das reichen würde.
 
 Zwei Flächen unter einem Wort gibt es nicht. Das wäre eine Absprache an zwei
 Orten, und die schreibt man als zwei Zonen hin.

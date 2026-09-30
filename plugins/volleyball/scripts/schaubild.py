@@ -176,9 +176,10 @@ def wortflaeche(text: str, bei: Ort) -> Flaeche:
     """Der Platz, den eine Beschriftung im Feld um ihren Ort einnimmt, in Metern.
 
     Geschaetzt, siehe textbreite(). Dieselbe Rechnung laesst das Blatt um ein
-    Wort wachsen und einen Weg vor dem Wort einer Stelle aufhoeren. Zwei
-    Schaetzungen liefen auseinander, und dann stuende ein Wort im Bild, das
-    der Weg fuer kleiner haelt.
+    Wort wachsen, einen Weg vor dem Wort einer Stelle aufhoeren und sagt, ob
+    das Wort einer Zone in die Zone passt. Zwei Schaetzungen liefen
+    auseinander, und dann stuende ein Wort im Bild, das der Weg fuer kleiner
+    haelt.
     """
     return Flaeche("rechteck", bei, textbreite(text, KLEINSCHRIFT) / MASSSTAB,
                    KLEINSCHRIFT / MASSSTAB)
@@ -628,6 +629,34 @@ def zonennamen(s: Szene, blatt: Blatt) -> str:
                    for zone in s.zonen)
 
 
+def zonenhinweise(s: Szene) -> list[str]:
+    """Je Zone, deren Wort breiter ist als sie selbst, ein Hinweis samt Ausweg.
+
+    Gezeichnet wird trotzdem, in derselben Schrift wie alle anderen
+    Beschriftungen. Ein kleiner gesetztes Wort machte das Bild uneinheitlich,
+    und ein Abbruch kostete eine Runde der Schleife fuer eine Kleinigkeit.
+    Aendern kann es nur der Trainer: mit einem kuerzeren Wort oder einer
+    breiteren Zone.
+
+    Verglichen wird mit der Breite der Zone, beim Kreis mit dem Durchmesser:
+    dort steht sein Wort, in der Mitte. Ein Mass, das reichen wuerde, nennt
+    der Hinweis nicht. Die Breite des Wortes ist geschaetzt, und eine Zahl
+    auf zehn Zentimeter taete so, als waere sie gemessen.
+
+    Genannt wird die Zone mit ihrer Nummer, wie in den Meldungen beim Lesen
+    der Szene, und mit ihrem Wort, an dem der Trainer sie im Bild findet.
+    """
+    hinweise = []
+    for nummer, zone in enumerate(s.zonen, 1):
+        wortbreite = wortflaeche(zone.text, zone.name_bei).breite
+        if wortbreite <= zone.breite:
+            continue
+        hinweise.append(
+            f'Zone {nummer} "{zone.text}": das Wort ist breiter als die Zone.\n'
+            "Ein kuerzeres Wort hilft, oder eine breitere Zone.")
+    return hinweise
+
+
 def stellen(s: Szene, blatt: Blatt) -> str:
     """Die Woerter der Stellen, jedes zentriert auf seinen Ort.
 
@@ -927,6 +956,10 @@ def main() -> int:
             # Kommentar. Der Vorschlag soll eine Zeile sein, die der Trainer
             # uebernehmen kann, ohne sie nachzubessern.
             print(f'Auf der Uebungskarte steht dazu: titel: "{vorschlag}"')
+    # Ebenso ein Zonenwort, das nicht in seine Zone passt: das Bild steht,
+    # und der Trainer erfaehrt es in der Vorschau statt erst in der Halle.
+    for hinweis in zonenhinweise(s):
+        print(hinweis)
     return 0
 
 

@@ -117,6 +117,12 @@ entstanden ist.
 Werkzeug, das Dateien anzeigt, ein Fenster. Dazu zwei, drei Zeilen, was in
 dieser Runde drinsteht oder sich geändert hat.
 
+Hat das Skript beim Rendern mehr gesagt als `Geschrieben:`, gehört das in
+diese Zeilen, samt dem Ausweg, den es nennt. Der Trainer liest die Konsole
+nicht. Das gilt etwa für den vorgeschlagenen `titel:` und für ein Zonenwort,
+das breiter ist als seine Zone. Welcher Ausweg beim Zonenwort meist der
+bessere ist, steht in `SCHAUBILDER.md` unter `zonen`.
+
 Zeigt die Umgebung nichts an, den Pfad zur SVG-Datei nennen und weitermachen.
 Der Trainer öffnet sie selbst, die Schleife läuft genauso.
 

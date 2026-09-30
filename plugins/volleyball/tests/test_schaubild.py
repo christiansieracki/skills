@@ -301,6 +301,19 @@ class SchaubildTest(unittest.TestCase):
                             "eine Szene, die nicht aufgeht, darf nicht gruen sein")
         return fertig
 
+    def zonenwort_mindestens(self, name: str, text: str) -> float:
+        """Wie breit das Wort einer Zone im gezeichneten Hallenbild mindestens ist, in Metern.
+
+        Geschaetzt mit dem knappen Wortkasten und umgerechnet ueber das Feld,
+        nicht mit der Schaetzung des Skripts. So steht fest, dass das Wort
+        wirklich breiter ist als seine Zone, bevor ein Test den Hinweis
+        darauf verlangt.
+        """
+        baum = ET.fromstring(self.bild(name).read_text(encoding="utf-8"))
+        wort = next(w for w in mit_klasse(baum, "zonenname") if w.text == text)
+        halbe_breite, _ = wortkasten(baum, wort)
+        return Feldmass(baum, HALLE).strecke(2 * halbe_breite)
+
     # -- Szene und Bild ---------------------------------------------------
 
     def test_szene_und_bild_liegen_unter_demselben_basisnamen(self) -> None:
@@ -1203,6 +1216,114 @@ class SchaubildTest(unittest.TestCase):
         rechts = float(flaeche.get("x")) + float(flaeche.get("width"))
         self.assertLess(rechts, breite, "die Zone liegt ganz im Bild")
         self.assertGreater(hoehe, 0)
+
+    def test_ein_zonenwort_breiter_als_die_zone_wird_gemeldet(self) -> None:
+        # Die erste Zone passt und bleibt ungenannt. Genannt wird die, um die
+        # es geht, und mit ihr der Ausweg.
+        fertig = self.laufe("schmal", """
+            form: halle
+            zonen:
+              - text: Ziel
+                form: rechteck
+                bei: [4.5, 3.0]
+                groesse: [3.0, 2.0]
+              - text: Zielzone Position 4
+                form: rechteck
+                bei: [1.5, 6.0]
+                groesse: [1.5, 2.0]
+        """)
+
+        self.assertGreater(self.zonenwort_mindestens("schmal", "Zielzone Position 4"),
+                           1.5, "das Wort ragt im Bild wirklich ueber die Zone")
+        self.assertIn("Zone 2", fertig.stdout)
+        self.assertIn("Zielzone Position 4", fertig.stdout)
+        self.assertNotIn("Zone 1", fertig.stdout)
+        self.assertIn("kuerzeres Wort", fertig.stdout)
+        self.assertIn("breitere Zone", fertig.stdout)
+        # Eine Kleinigkeit kostet keine Runde der Schleife: das Bild steht da.
+        self.assertTrue(self.bild("schmal").exists())
+
+    def test_ein_zonenwort_das_passt_bleibt_ohne_hinweis(self) -> None:
+        # Die Zielzone des Referenzbildes, 1,28 m breit: „Ziel" steht dort im
+        # Bild innerhalb des Randes. Daneben eine flache Zone, in der das Wort
+        # zwar hoeher ist als die Zone, aber schmaler, und ein Kreis. Ein
+        # Hinweis, der hier anschluege, lehrte den Trainer, ihn zu ueberlesen.
+        fertig = self.laufe("passt", """
+            form: halle
+            zonen:
+              - text: Ziel
+                form: rechteck
+                bei: [0.79, 7.43]
+                groesse: [1.28, 2.85]
+              - text: Zielzone
+                form: rechteck
+                bei: [4.5, 3.0]
+                groesse: [4.0, 0.3]
+              - text: Ziel
+                form: kreis
+                bei: [6.0, 6.0]
+                groesse: 1.5
+        """)
+
+        self.assertEqual(len(fertig.stdout.strip().splitlines()), 1,
+                         f"gesagt wird nur, dass geschrieben ist:\n{fertig.stdout}")
+
+    def test_ein_kreis_misst_sein_wort_am_durchmesser(self) -> None:
+        # Beim Kreis steht das Wort in der Mitte, wo er am breitesten ist.
+        # Derselbe Kreis mit doppeltem Durchmesser traegt das Wort.
+        szene = """
+            form: halle
+            zonen:
+              - text: Aufschlagziel
+                form: kreis
+                bei: [4.5, 3.0]
+                groesse: {groesse}
+        """
+        eng = self.laufe("eng", szene.format(groesse=2.0))
+
+        self.assertGreater(self.zonenwort_mindestens("eng", "Aufschlagziel"), 2.0,
+                           "das Wort ragt im Bild wirklich ueber den Kreis")
+        self.assertIn("Zone 1", eng.stdout)
+        self.assertIn("Aufschlagziel", eng.stdout)
+        self.assertTrue(self.bild("eng").exists())
+
+        weit = self.laufe("weit", szene.format(groesse=4.0))
+        self.assertEqual(len(weit.stdout.strip().splitlines()), 1,
+                         f"gesagt wird nur, dass geschrieben ist:\n{weit.stdout}")
+
+    def test_ein_zu_breites_zonenwort_bleibt_so_gross_wie_die_uebrigen(self) -> None:
+        # Gemeldet wird, verkleinert nicht. Ein Wort in kleinerer Schrift
+        # machte das Bild uneinheitlich, und ueber den Hinweis haette der
+        # Trainer nichts mehr, was er aendern koennte.
+        baum = self.zeichne("gleich", """
+            form: halle
+            zonen:
+              - text: Ziel
+                form: rechteck
+                bei: [4.5, 3.0]
+                groesse: [3.0, 2.0]
+              - text: Zielzone Position 4
+                form: rechteck
+                bei: [1.5, 6.0]
+                groesse: [1.5, 2.0]
+            geraete:
+              - text: Kasten
+                teile:
+                  - form: rechteck
+                    bei: [7.0, 12.0]
+                    groesse: [1.6, 0.8]
+            stellen:
+              - bei: [4.5, 14.0]
+                text: Feldmitte
+        """)
+
+        passt, zu_breit = mit_klasse(baum, "zonenname")
+        self.assertEqual(zu_breit.text, "Zielzone Position 4")
+        groesse = stilwert(baum, zu_breit, "font-size")
+        for andere in (passt, mit_klasse(baum, "geraetname")[0],
+                       mit_klasse(baum, "stelle")[0]):
+            with self.subTest(klasse=andere.get("class")):
+                self.assertEqual(stilwert(baum, andere, "font-size"), groesse)
 
     # -- Stellen -----------------------------------------------------------
 
