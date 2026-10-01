@@ -196,28 +196,20 @@ Bewusst nicht in der Welle zum Sammelimport, weil es jeden Import betrifft.
 
 Aufgefallen am 30.09.2026 bei #31.
 
-### Ein Kartenentwurf mit unvollständigem Frontmatter oder mit `id`
-
-Die Spec in #29 verlangt unter „Prüfen" auch „Frontmatter vollständig, ohne
-`id`". #31 hatte nur „kein lesbares Frontmatter", und die Liste der Prüfungen in
-#34 nennt den Punkt nicht. Damit gehört er keinem Ticket.
-
-Heute gilt: `sammelimport.py pruefen` verlangt nur ein lesbares Frontmatter mit
-`titel`, weil ohne Titel kein Dateiname entsteht. Trägt ein Entwurf eine `id`,
-besteht er die Prüfung, und `uebernehmen` ersetzt sie still durch die neu
-vergebene. Ein fehlendes Pflichtfeld fällt erst dem Linter auf, nach der
-Übernahme. Naheliegend wäre, beides in #34 mitzunehmen: Pflichtfelder laut
-`DATENMODELL.md` und eine `id` im Entwurf als Grund für `offen`.
-
-### Eine Quelldatei mit Komma im Namen
+### Zwei Quelldateien, von denen eine ein Komma im Namen trägt
 
 `quelldatei:` nennt bei zwei Seiten beide Dateien, getrennt durch Komma, so
 steht es im Datenmodell. Die Übersicht in `sammelimport.md` setzt jede Datei in
 Backticks und kommt deshalb mit Kommas im Dateinamen klar. `quelldatei:` auf
-der Karte nicht. Die Prüfung „`quelldatei` existiert unter `quellen/`" aus #34
-muss den Wert wieder in Dateien zerlegen und kann bei so einem Namen nicht
-sagen, wo eine Datei aufhört. Betrifft PlayDrill, sobald ein Dateiname dort ein
-Komma trägt. `quelldatei:` als Liste ist in #29 ausdrücklich draußen.
+der Karte nicht.
+
+Seit #34 nimmt `sammelimport.py pruefen` zuerst den ganzen Wert als eine Datei
+und trennt erst sonst am Komma. Eine einzelne Datei mit Komma im Namen besteht
+damit, und das ist der Fall bei PlayDrill, eine Übung je Datei. Nennt ein
+Kandidat zwei Dateien und eine davon trägt ein Komma, etwa
+`stapel/a, b.pdf, stapel/c.pdf`, weist `pruefen` den Entwurf mit „quelldatei
+stapel/a gibt es unter quellen/ nicht" ab, und jeder neue Entwurf scheitert
+genauso. `quelldatei:` als Liste ist in #29 ausdrücklich draußen.
 
 Aufgefallen am 01.10.2026 bei #32.
 
@@ -295,6 +287,43 @@ Das Feldbild kommt aus dem ersten PDF eines Kandidaten, das ein Bild
 einbettet, in der Reihenfolge der Spalte Dateien. Entschieden am 01.10.2026.
 Bei einem Zirkel soll das das Übersichtsblatt sein. Die Regeln des
 Zerlegungsplans (#35) müssen es deshalb an die erste Stelle setzen.
+
+Aufgefallen am 01.10.2026 bei #34.
+
+### Was `pruefen` vom Kartenentwurf wörtlich verlangt
+
+Ein abgewiesener Entwurf kostet einen neuen Aufruf des Agenten, im Probelauf
+rund 91 000 Tokens. Die Regeln des Kartenentwurfs (#35) sollten deshalb die
+Formen ausschreiben, an denen `pruefen` hängt:
+
+- Eine Rückfrage ohne Vermutung endet genau auf `Vermutung im Entwurf: keine`.
+  „keine Vermutung“ oder „keine, weil …“ gilt als Vermutung, und die Rückfrage
+  landet in der Tabelle statt in der Einzelfrage. Abweisen lässt sich das
+  nicht, „keine Pause“ kann eine echte Vermutung sein.
+- Ein Fragezeichen steht nur in der Frage, nicht in der Vermutung.
+- Ein Vorschlag zu einer Textstelle nennt den Abschnitt mit `##`, also
+  `` `## Ablauf` ``. `` `Ablauf` `` gilt als Feld, das es nicht gibt.
+- Das Frontmatter trägt jedes Feld der Karte außer `id` und `angelegt`, auch
+  die mit `null`.
+
+Der Test der Agentendefinitionen gegen `tpdaten.py` (#35) könnte neben den
+kontrollierten Werten auch die Felder gegen `KARTENFELDER` prüfen. Die Liste
+steht sonst dreimal da, in `DATENMODELL.md`, in `tpdaten.py` und im Agenten.
+
+### Eine Freigabe geht verloren, wenn die Prüfung beim Übernehmen scheitert
+
+`uebernehmen` prüft jeden freigegebenen Entwurf noch einmal. Besteht er nicht,
+geht der Kandidat auf `offen`, und der nächste Durchgang lässt ihn neu
+entwerfen. Der neue Entwurf überschreibt den alten, samt dem, was der Skill
+aus den Antworten des Trainers eingearbeitet hat. Der Trainer gibt denselben
+Kandidaten dann ein zweites Mal frei.
+
+Treffen kann das vor allem `quelldatei`: Auf einem Rechner, dessen Nextcloud
+`quellen/` nicht synchronisiert, fehlt jede Quelldatei, und jeder Kandidat
+fiele beim Übernehmen durch. Solange der Sammelimport auf dem Rechner läuft,
+der die Quellen hat, kommt das nicht vor. Offen ist, ob ein freigegebener
+Entwurf vor dem Neuentwerfen geschützt sein soll. Den Stand „freigegeben“
+kennt die Übersicht bisher nicht.
 
 ## Aus Welle 1b bewusst ausgelassen
 
