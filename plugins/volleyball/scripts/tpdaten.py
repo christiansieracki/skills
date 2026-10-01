@@ -35,6 +35,17 @@ FORMEN = {"erwaermung", "technik", "komplex", "spielform", "station", "abschluss
 LEVEL = ["einsteiger", "fortgeschritten", "ambitioniert"]
 TYPEN = {"uebung", "folge"}
 
+# Die Felder im Frontmatter einer Uebungskarte, in der Reihenfolge aus
+# DATENMODELL.md. Der Linter verlangt sie nicht alle, der Sammelimport von
+# jedem Kartenentwurf schon, ausser `id` und `angelegt`: die setzt erst die
+# Freigabe.
+KARTENFELDER = [
+    "id", "titel", "typ", "disziplin", "element", "spielphase", "form", "schwerpunkt",
+    "level_min", "level_max", "spieler_min", "spieler_max", "dauer_min", "dauer_max",
+    "spielflaechen", "netz", "erwachsenenbelastung", "belastungshinweis", "material",
+    "schaubild", "quelle", "quelldatei", "variante_von", "autor", "angelegt",
+]
+
 # Das Muster einer Uebungs-ID, wie DATENMODELL.md es festlegt. Es steht einmal
 # da, weil drei Stellen danach fragen: der Linter, die Suche nach Verweisen im
 # Text und das Schaubild, das zu einem Basisnamen die Karte sucht.
@@ -315,65 +326,7 @@ def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
             w.append(f"{datei}: id {kid} passt nicht zum Muster ue-####")
         if not str(Path(datei).name).startswith(str(kid)):
             w.append(f"{datei}: Dateiname beginnt nicht mit der id {kid}")
-        if k.get("typ") not in TYPEN:
-            w.append(f"{datei}: typ {k.get('typ')!r} ist weder uebung noch folge")
-
-        # Pflichtfeld ohne stillen Default: faellt es weg, muss es auffallen.
-        # Ein Default legte eine beim Import vergessene Beachuebung wortlos
-        # unter Halle ab, und dort findet sie nie wieder jemand.
-        disziplin = k.get("disziplin")
-        gueltige_disziplinen: set[str] = set()
-        if not disziplin:
-            w.append(f"{datei}: disziplin fehlt oder ist leer")
-        elif not isinstance(disziplin, list):
-            w.append(f"{datei}: disziplin {disziplin!r} steht nicht in eckigen Klammern")
-        else:
-            for d in disziplin:
-                if d not in DISZIPLINEN:
-                    w.append(f"{datei}: disziplin {d!r} steht nicht in der Liste")
-                else:
-                    gueltige_disziplinen.add(d)
-
-        for el in k.get("element") or []:
-            if el not in ELEMENTE:
-                w.append(f"{datei}: element {el!r} steht nicht in der Liste")
-        if k.get("spielphase") not in SPIELPHASEN:
-            w.append(f"{datei}: spielphase {k.get('spielphase')!r} ist unbekannt")
-        if k.get("form") not in FORMEN:
-            w.append(f"{datei}: form {k.get('form')!r} ist unbekannt")
-
-        if schwerpunkte:
-            for s in k.get("schwerpunkt") or []:
-                if s not in schwerpunkte:
-                    w.append(f"{datei}: schwerpunkt {s!r} steht nicht in schwerpunkte.md")
-                    continue
-                # Eine Disziplin der Karte reicht: eine Karte fuer beides darf
-                # einen Schwerpunkt tragen, den es nur in einer Disziplin gibt.
-                # Traegt die Karte gar keine gueltige Disziplin, steht das
-                # schon oben, und zweimal dasselbe zu melden hilft niemandem.
-                if gueltige_disziplinen and not (schwerpunkte[s] & gueltige_disziplinen):
-                    w.append(
-                        f"{datei}: schwerpunkt {s!r} gilt nur fuer "
-                        f"{', '.join(sorted(schwerpunkte[s]))}, die Karte fuer "
-                        f"{', '.join(sorted(gueltige_disziplinen))}"
-                    )
-
-        for feld in ("level_min", "level_max"):
-            v = k.get(feld)
-            if v is None:
-                w.append(f"{datei}: {feld} ist leer")
-            elif v not in LEVEL:
-                w.append(f"{datei}: {feld} {v!r} ist kein gueltiges Level")
-
-        lo, hi = k.get("spieler_min"), k.get("spieler_max")
-        if isinstance(lo, int) and isinstance(hi, int) and lo > hi:
-            w.append(f"{datei}: spieler_min {lo} ist groesser als spieler_max {hi}")
-        lo, hi = k.get("dauer_min"), k.get("dauer_max")
-        if isinstance(lo, int) and isinstance(hi, int) and lo > hi:
-            w.append(f"{datei}: dauer_min {lo} ist groesser als dauer_max {hi}")
-
-        if k.get("erwachsenenbelastung") and not (k.get("belastungshinweis") or "").strip():
-            w.append(f"{datei}: erwachsenenbelastung ist gesetzt, aber belastungshinweis ist leer")
+        w += [f"{datei}: {befund}" for befund in pruefe_felder(k, schwerpunkte, bekannt)]
 
         # Ein toter Bildverweis faellt sonst nirgends auf: die Leseansicht
         # laesst das Bild still weg, und gemerkt wird es erst in der Halle am
@@ -382,17 +335,92 @@ def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
         if bild and not (wurzel / "schaubilder" / str(bild)).is_file():
             w.append(f"{datei}: schaubild zeigt auf {bild}, das es unter schaubilder/ nicht gibt")
 
-        vv = k.get("variante_von")
-        if vv and vv not in bekannt:
-            w.append(f"{datei}: variante_von zeigt auf {vv}, das es nicht gibt")
-        if not k.get("quelle"):
-            w.append(f"{datei}: quelle fehlt")
-
     for t in trainings:
         for uid in t.get("verwendet", []):
             if uid not in bekannt:
                 w.append(f"{t['datei']}: verweist auf {uid}, das es in uebungen/ nicht gibt")
 
+    return w
+
+
+def pruefe_felder(k: dict, schwerpunkte: dict[str, set[str]], bekannt: set[str]) -> list[str]:
+    """Was an den Feldern einer Karte nicht stimmt, ohne die Datei davor.
+
+    Die kontrollierten Werte aus DATENMODELL.md und was sich sonst an den
+    Feldern einer einzelnen Karte ablesen laesst. Was den Ort der Karte
+    braucht, ihren Dateinamen oder ihr Schaubild in schaubilder/, prueft
+    `pruefe` selbst.
+
+    Der Linter setzt die Datei davor. `sammelimport.py pruefen` prueft damit
+    einen Kartenentwurf, bevor er Karte wird, mit denselben Regeln. Was die
+    Pruefung dort besteht, hat dem Linter an seinen Feldern nichts zu melden.
+    """
+    w: list[str] = []
+    if k.get("typ") not in TYPEN:
+        w.append(f"typ {k.get('typ')!r} ist weder uebung noch folge")
+
+    # Pflichtfeld ohne stillen Default: faellt es weg, muss es auffallen.
+    # Ein Default legte eine beim Import vergessene Beachuebung wortlos
+    # unter Halle ab, und dort findet sie nie wieder jemand.
+    disziplin = k.get("disziplin")
+    gueltige_disziplinen: set[str] = set()
+    if not disziplin:
+        w.append("disziplin fehlt oder ist leer")
+    elif not isinstance(disziplin, list):
+        w.append(f"disziplin {disziplin!r} steht nicht in eckigen Klammern")
+    else:
+        for d in disziplin:
+            if d not in DISZIPLINEN:
+                w.append(f"disziplin {d!r} steht nicht in der Liste")
+            else:
+                gueltige_disziplinen.add(d)
+
+    for el in k.get("element") or []:
+        if el not in ELEMENTE:
+            w.append(f"element {el!r} steht nicht in der Liste")
+    if k.get("spielphase") not in SPIELPHASEN:
+        w.append(f"spielphase {k.get('spielphase')!r} ist unbekannt")
+    if k.get("form") not in FORMEN:
+        w.append(f"form {k.get('form')!r} ist unbekannt")
+
+    if schwerpunkte:
+        for s in k.get("schwerpunkt") or []:
+            if s not in schwerpunkte:
+                w.append(f"schwerpunkt {s!r} steht nicht in schwerpunkte.md")
+                continue
+            # Eine Disziplin der Karte reicht: eine Karte fuer beides darf
+            # einen Schwerpunkt tragen, den es nur in einer Disziplin gibt.
+            # Traegt die Karte gar keine gueltige Disziplin, steht das
+            # schon oben, und zweimal dasselbe zu melden hilft niemandem.
+            if gueltige_disziplinen and not (schwerpunkte[s] & gueltige_disziplinen):
+                w.append(
+                    f"schwerpunkt {s!r} gilt nur fuer "
+                    f"{', '.join(sorted(schwerpunkte[s]))}, die Karte fuer "
+                    f"{', '.join(sorted(gueltige_disziplinen))}"
+                )
+
+    for feld in ("level_min", "level_max"):
+        v = k.get(feld)
+        if v is None:
+            w.append(f"{feld} ist leer")
+        elif v not in LEVEL:
+            w.append(f"{feld} {v!r} ist kein gueltiges Level")
+
+    lo, hi = k.get("spieler_min"), k.get("spieler_max")
+    if isinstance(lo, int) and isinstance(hi, int) and lo > hi:
+        w.append(f"spieler_min {lo} ist groesser als spieler_max {hi}")
+    lo, hi = k.get("dauer_min"), k.get("dauer_max")
+    if isinstance(lo, int) and isinstance(hi, int) and lo > hi:
+        w.append(f"dauer_min {lo} ist groesser als dauer_max {hi}")
+
+    if k.get("erwachsenenbelastung") and not (k.get("belastungshinweis") or "").strip():
+        w.append("erwachsenenbelastung ist gesetzt, aber belastungshinweis ist leer")
+
+    vv = k.get("variante_von")
+    if vv and vv not in bekannt:
+        w.append(f"variante_von zeigt auf {vv}, das es nicht gibt")
+    if not k.get("quelle"):
+        w.append("quelle fehlt")
     return w
 
 

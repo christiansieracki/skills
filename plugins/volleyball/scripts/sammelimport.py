@@ -3,8 +3,9 @@
 
     <python> sammelimport.py vorbereiten --plan <ordner>
     <python> sammelimport.py vorbereiten <ordner>
-    <python> sammelimport.py pruefen <ordner>
+    <python> sammelimport.py pruefen <ordner> [--json]
     <python> sammelimport.py uebernehmen <ordner> --kandidat 3 "Notiz" ...
+                 --uebersprungen 4 "Grund" ... --ergaenzt 5 ue-0027 ...
 
 `<ordner>` ist der Quellenordner, relativ zu `quellen/`. In ihm liegt die
 `sammelimport.md` mit den Einstellungen im Frontmatter, den Absprachen und der
@@ -19,9 +20,12 @@ neu ist. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
 nächsten offenen Kandidaten an, mit dem Text jedes PDF und der Angabe, ob der
 Ablauf aus dem Bild kommt. Wenn die Einstellungen es wollen, schneidet es
 daneben das Feldbild aus dem PDF, dafür braucht es Pillow (ADR-0005). `pruefen`
-setzt den Status aus den Kartenentwürfen, die dort auf der Platte liegen.
-`uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`, erst
-jetzt mit ID (ADR-0010), und legt das Feldbild als ihr Schaubild ab.
+setzt den Status aus den Kartenentwürfen, die dort auf der Platte liegen, und
+weist ab, was das Datenmodell bricht oder die Form der Freigabe nicht einhält.
+Mit `--json` gibt es aus, was die Freigabe im Chat braucht. `uebernehmen` macht
+aus freigegebenen Entwürfen Karten in `uebungen/`, erst jetzt mit ID
+(ADR-0010), und legt das Feldbild als ihr Schaubild ab. Gestrichene und
+ergänzende Kandidaten bekommen nur ihren Status.
 
 Nach der Freigabe des Plans schreibt nur noch dieses Skript in die Übersicht.
 Mehrere Agenten entwerfen parallel, und keiner von ihnen fasst sie an.
@@ -31,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import os
 import re
 import shutil
@@ -38,16 +43,18 @@ import subprocess
 import sys
 import unicodedata
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
+from functools import cached_property
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_nach_gewicht  # noqa: E402
 from tpdaten import (  # noqa: E402
-    DISZIPLIN_SPALTE, ID_MUSTER, TYPEN, finde_wurzel, hole_index, interpreter,
-    konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_uebungen,
+    DISZIPLIN_SPALTE, ID_MUSTER, KARTENFELDER, TYPEN, finde_wurzel, hole_index, interpreter,
+    konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_schwerpunkte,
+    lies_uebungen, pruefe_felder,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -343,21 +350,86 @@ class Sammelimport:
     def feldbild(self, k: Kandidat) -> Path:
         return self.entwurfsordner / f"{k.nummer}.feldbild.png"
 
+    # Was die Prüfung eines Entwurfs aus dem Arbeitsordner braucht. Gelesen
+    # wird einmal je Aufruf, nicht je Entwurf: Ein Durchgang hat 30, die
+    # Bibliothek bei PlayDrill über 300 Karten.
+
+    @cached_property
+    def schwerpunkte(self) -> dict[str, set[str]]:
+        """Je Kennung aus `schwerpunkte.md` die Disziplinen, für die sie gilt."""
+        return lies_schwerpunkte(self.wurzel)[0]
+
+    @cached_property
+    def bekannt(self) -> set[str]:
+        """Die IDs der Karten in `uebungen/`, für `variante_von`."""
+        return {str(karte["id"]) for karte in lies_uebungen(self.wurzel)}
+
 
 # --------------------------------------------------------------------------
 # Der Kartenentwurf
 # --------------------------------------------------------------------------
 
+class Formfehler(Exception):
+    """Ein Kartenentwurf, der nicht Karte werden kann. Der Text ist der Grund in der Notiz."""
+
+
+# Damit endet jede Rückfrage, dahinter die Vermutung oder `keine`.
+VERMUTUNG = "Vermutung im Entwurf:"
+
+# Was ein Kartenentwurf im Frontmatter tragen muss: alles von der Karte, nur
+# `id` und `angelegt` nicht. Die setzt `uebernehmen` bei der Freigabe.
+ENTWURFSFELDER = [f for f in KARTENFELDER if f not in ("id", "angelegt")]
+
+
+@dataclass
+class Rueckfrage:
+    """Eine Rückfrage aus `## Freigabe`. Ohne Vermutung ist `vermutung` None."""
+
+    nr: int
+    frage: str
+    vermutung: str | None
+
+
+@dataclass
+class Vorschlag:
+    """Ein Vorschlag aus `## Freigabe`: zu einem Feld oder zu einer Stelle im Text.
+
+    `ziel` ist das Feld, oder bei einer Textstelle die Überschrift ihres
+    Abschnitts samt `##`. `stelle` sagt, wo im Abschnitt, und ist bei einem
+    Feld leer. `text` ist die Begründung.
+    """
+
+    ziel: str
+    stelle: str
+    text: str
+
+    @property
+    def zur_textstelle(self) -> bool:
+        return self.ziel.startswith("#")
+
+
 @dataclass
 class Befund:
+    """Was die Prüfung eines Kartenentwurfs ergeben hat.
+
+    Besteht er nicht, steht in `fehler` der Grund, und der Rest bleibt leer.
+    Sonst trägt der Befund, was die Freigabe im Chat braucht.
+    """
+
     fehler: str | None = None
-    ohne_vermutung: int = 0
+    felder: dict = field(default_factory=dict)
+    vorschlaege: list[Vorschlag] = field(default_factory=list)
+    rueckfragen: list[Rueckfrage] = field(default_factory=list)
     aus_dem_bild: bool = False
+
+    @property
+    def ohne_vermutung(self) -> list[Rueckfrage]:
+        return [r for r in self.rueckfragen if r.vermutung is None]
 
 
 _LISTENKOPF = re.compile(r"^(Vorschläge|Rückfragen):\s*(.*)$")
 _PUNKT = re.compile(r"^(?:-|\d+\.)\s+(.*)$")
-_OHNE_VERMUTUNG = re.compile(r"Vermutung im Entwurf:\s*keine\.?\s*$")
+_ZIEL = re.compile(r"`([^`]+)`(.*)")
 
 
 def _listen(freigabe: list[str]) -> dict[str, list[str]]:
@@ -401,8 +473,136 @@ def laut_auftrag_aus_dem_bild(auftrag: Path) -> bool:
         return False
 
 
+def _unter_quellen(quellen: Path, wert: str) -> bool:
+    """Ist `wert` eine Datei unter `quellen/`, auch nach dem Auflösen von `..`?"""
+    pfad = quellen / wert
+    return pfad.is_file() and pfad.resolve().is_relative_to(quellen.resolve())
+
+
+def pruefe_quelldatei(wurzel: Path, wert: object) -> None:
+    """Bricht mit Formfehler ab, wenn `quelldatei:` nicht auf Dateien unter quellen/ zeigt.
+
+    Der Wert steht relativ zu quellen/, damit er auf jedem Rechner stimmt,
+    egal wo dort der Arbeitsordner liegt. Ein absoluter Pfad wird abgewiesen,
+    auch wenn er hier eine Datei trifft. Geprüft wird `anchor` und nicht
+    `is_absolute()`, aus demselben Grund wie in `suche.py`.
+
+    Bei zwei Seiten nennt der Wert beide, durch Komma getrennt. Zuerst gilt
+    der ganze Wert als eine Datei, so besteht ein Dateiname mit Komma,
+    solange er allein steht. Erst sonst wird am Komma getrennt.
+    """
+    if not wert:
+        raise Formfehler("quelldatei fehlt")
+    if not isinstance(wert, str):
+        raise Formfehler(f"quelldatei {wert!r} ist kein Text, zwei Dateien stehen durch "
+                         f"Komma getrennt")
+    quellen = wurzel / "quellen"
+    teile = [wert] if _unter_quellen(quellen, wert) else [
+        t.strip() for t in wert.split(",") if t.strip()]
+    for teil in teile:
+        if Path(teil).anchor:
+            raise Formfehler(f"quelldatei {teil} ist absolut, erwartet ist ein Pfad "
+                             f"relativ zu quellen/")
+        if not _unter_quellen(quellen, teil):
+            raise Formfehler(f"quelldatei {teil} gibt es unter quellen/ nicht")
+
+
+def pruefe_frontmatter(sammelimport: Sammelimport, k: Kandidat, felder: dict) -> None:
+    """Bricht mit Formfehler ab, wenn das Frontmatter eines Entwurfs keine Karte ergibt.
+
+    Die Felder prüft `pruefe_felder` aus tpdaten.py, dieselben Regeln wie
+    der Linter. Eine Karte aus einem Entwurf, der hier besteht, hat dem
+    Linter an ihren Feldern nichts zu melden. Gemeldet wird der erste
+    Fehler, denn neu entworfen wird ohnehin der ganze Entwurf.
+    """
+    if "id" in felder:
+        raise Formfehler(f"Entwurf trägt id: {felder['id']}, die ID vergibt erst uebernehmen")
+    fehlend = [f for f in ENTWURFSFELDER if f not in felder]
+    if fehlend:
+        raise Formfehler(f"Frontmatter ohne {', '.join(fehlend)}")
+    if not felder.get("titel"):
+        raise Formfehler("titel ist leer")
+    befunde = pruefe_felder(felder, sammelimport.schwerpunkte, sammelimport.bekannt)
+    if befunde:
+        raise Formfehler(befunde[0])
+    pruefe_quelldatei(sammelimport.wurzel, felder.get("quelldatei"))
+    # Im Entwurf nennt `schaubild:` das Feldbild neben ihm, und nur das
+    # eigene: `uebernehmen` trägt es nach schaubilder/, unter den Namen der
+    # Karte. Ein fremdes fehlte danach seinem Kandidaten.
+    schaubild = str(felder.get("schaubild") or "")
+    feldbild = sammelimport.feldbild(k)
+    if schaubild and schaubild != feldbild.name:
+        raise Formfehler(f"schaubild: nennt {schaubild}, das Feldbild dieses Kandidaten "
+                         f"heißt {feldbild.name}")
+    if schaubild and not feldbild.is_file():
+        raise Formfehler(f"Feldbild {schaubild} liegt nicht neben dem Entwurf")
+
+
+def lies_vorschlag(nr: int, text: str, felder: dict) -> Vorschlag:
+    """Ein Vorschlag, getrennt nach Feld oder Textstelle, an seinem Ziel in Backticks.
+
+    Die Form steht in DATENMODELL.md: `` `level_max`: Begründung `` oder
+    `` `## Ablauf`, Schritt 2: Begründung ``. Ohne Ziel vorn fände der
+    Vorschlag keine Spalte in der Tabelle. Ein Feld, das nicht im
+    Frontmatter steht, auch nicht.
+    """
+    treffer = _ZIEL.fullmatch(text)
+    if not treffer:
+        raise Formfehler(f"Vorschlag {nr} beginnt nicht mit einem Feld oder einer "
+                         f"Überschrift in Backticks")
+    ziel, rest = treffer.group(1).strip(), treffer.group(2).strip()
+    if not ziel.startswith("#"):
+        if ziel not in felder:
+            raise Formfehler(f"Vorschlag {nr} nennt `{ziel}`, das steht nicht im Frontmatter")
+        return Vorschlag(ziel, "", rest.lstrip(":,").strip())
+    rest = rest.lstrip(",").strip()
+    stelle, doppelpunkt, begruendung = rest.partition(":")
+    if not doppelpunkt:
+        stelle, begruendung = "", rest
+    return Vorschlag(ziel, stelle.strip(), begruendung.strip())
+
+
+def lies_rueckfrage(nr: int, text: str) -> Rueckfrage:
+    """Eine Rückfrage, mit ihrer Vermutung oder ohne.
+
+    Sie stellt genau eine Frage und endet auf `Vermutung im Entwurf: …`,
+    oder auf `… keine`, wenn der Agent keine hat. Zwei Fragen in einer
+    ließen sich in der Tabelle nicht mit einem Ja beantworten. Gezählt wird
+    das Fragezeichen über die ganze Rückfrage, und es muss vor der Vermutung
+    stehen.
+    """
+    frage, marke, vermutung = text.rpartition(VERMUTUNG)
+    if not marke or not vermutung.strip():
+        raise Formfehler(f"Rückfrage {nr} endet nicht auf „{VERMUTUNG} …“")
+    fragezeichen = text.count("?")
+    if fragezeichen != 1 or "?" not in frage:
+        raise Formfehler(f"Rückfrage {nr} hat {fragezeichen} Fragezeichen, erlaubt ist "
+                         f"genau eins, vor „{VERMUTUNG}“")
+    vermutung = vermutung.strip()
+    keine = re.fullmatch(r"keine\.?", vermutung, re.IGNORECASE)
+    return Rueckfrage(nr, frage.strip(), None if keine else vermutung)
+
+
+def lies_freigabe(rumpf: str, felder: dict) -> tuple[list[Vorschlag], list[Rueckfrage]]:
+    """Die Listen unter `## Freigabe`, oder Formfehler, wenn ihre Form nicht stimmt."""
+    freigabe = _abschnitt(rumpf.splitlines(), "Freigabe")
+    if freigabe is None:
+        raise Formfehler("## Freigabe fehlt")
+    listen = _listen(freigabe)
+    for liste in ("Vorschläge", "Rückfragen"):
+        if liste not in listen:
+            raise Formfehler(f"## Freigabe ohne {liste}:")
+    return ([lies_vorschlag(nr, v, felder) for nr, v in enumerate(listen["Vorschläge"], 1)],
+            [lies_rueckfrage(nr, r) for nr, r in enumerate(listen["Rückfragen"], 1)])
+
+
 def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
-    """Sagt, ob ein Kartenentwurf Karte werden kann, und wenn nicht, warum."""
+    """Sagt, ob ein Kartenentwurf Karte werden kann, und wenn nicht, warum.
+
+    Abgewiesen wird ein Entwurf, der das Datenmodell bricht oder die Form der
+    Freigabe nicht einhält. Der Agent hat nicht nachfragen können, und was
+    hier durchkäme, stünde nach der Freigabe so auf der Karte.
+    """
     datei = sammelimport.entwurf(k)
     if not datei.is_file():
         return Befund("kein Entwurf")
@@ -415,27 +615,12 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
     # also auf einer eigenen Zeile `---` enden, nicht nur irgendwo.
     if not felder or _frontmatter_ende(zeilen) is None:
         return Befund("kein lesbares Frontmatter")
-    if not felder.get("titel"):
-        return Befund("Frontmatter ohne titel")
-    # Im Entwurf nennt `schaubild:` das Feldbild neben ihm, und nur das
-    # eigene: `uebernehmen` trägt es nach schaubilder/, unter den Namen der
-    # Karte. Ein fremdes fehlte danach seinem Kandidaten.
-    schaubild = str(felder.get("schaubild") or "")
-    feldbild = sammelimport.feldbild(k)
-    if schaubild and schaubild != feldbild.name:
-        return Befund(f"schaubild: nennt {schaubild}, das Feldbild dieses Kandidaten "
-                      f"heißt {feldbild.name}")
-    if schaubild and not feldbild.is_file():
-        return Befund(f"Feldbild {schaubild} liegt nicht neben dem Entwurf")
-    freigabe = _abschnitt(rumpf.splitlines(), "Freigabe")
-    if freigabe is None:
-        return Befund("## Freigabe fehlt")
-    listen = _listen(freigabe)
-    for liste in ("Vorschläge", "Rückfragen"):
-        if liste not in listen:
-            return Befund(f"## Freigabe ohne {liste}:")
-    ohne = [r for r in listen["Rückfragen"] if _OHNE_VERMUTUNG.search(r)]
-    return Befund(ohne_vermutung=len(ohne),
+    try:
+        pruefe_frontmatter(sammelimport, k, felder)
+        vorschlaege, rueckfragen = lies_freigabe(rumpf, felder)
+    except Formfehler as fehler:
+        return Befund(str(fehler))
+    return Befund(felder=felder, vorschlaege=vorschlaege, rueckfragen=rueckfragen,
                   aus_dem_bild=laut_auftrag_aus_dem_bild(sammelimport.auftrag(k)))
 
 
@@ -1081,23 +1266,71 @@ def setze_befund(k: Kandidat, befund: Befund) -> None:
         return
     gruende = [AUS_DEM_BILD] if befund.aus_dem_bild else []
     if befund.ohne_vermutung:
-        anzahl = befund.ohne_vermutung
+        anzahl = len(befund.ohne_vermutung)
         gruende.append(f"{anzahl} Rückfrage{'n' if anzahl > 1 else ''} ohne Vermutung")
     k.setze("rückfrage" if gruende else "bereit", ", ".join(gruende))
 
 
-def pruefen(wurzel: Path, ordner: str) -> int:
+def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -> dict:
+    """Was der Skill für die Freigabe im Chat über einen Kandidaten braucht (#29).
+
+    Einzeln fragt er die Rückfragen ohne Vermutung, mit dem Feldbild, und
+    bei `ablauf_aus_dem_bild` den Ablauf. Alles andere kommt in eine Tabelle:
+    die Felder in ihren Spalten, die Vorschläge zu Feldern daran, die
+    Rückfragen mit Vermutung zum Bestätigen, und eine Spalte „aus dem
+    Bild“ aus den Vorschlägen zu Textstellen. Ein abgewiesener Entwurf kommt
+    nicht in die Freigabe, von ihm stehen nur Status und Notiz da.
+    """
+    entwurf, feldbild = sammelimport.entwurf(k), sammelimport.feldbild(k)
+    return {
+        "kandidat": k.nummer,
+        "was": k.was,
+        "ergebnis": k.ergebnis,
+        "dateien": k.dateien,
+        "status": k.status,
+        "notiz": k.notiz,
+        "entwurf": entwurf.as_posix() if entwurf.is_file() else None,
+        "feldbild": feldbild.as_posix() if befund.felder.get("schaubild") else None,
+        "ablauf_aus_dem_bild": befund.aus_dem_bild,
+        "felder": befund.felder,
+        "vorschlaege": {
+            "felder": [{"feld": v.ziel, "text": v.text}
+                       for v in befund.vorschlaege if not v.zur_textstelle],
+            "textstellen": [{"abschnitt": v.ziel, "stelle": v.stelle, "text": v.text}
+                            for v in befund.vorschlaege if v.zur_textstelle],
+        },
+        "rueckfragen": {
+            "mit_vermutung": [{"nr": r.nr, "frage": r.frage, "vermutung": r.vermutung}
+                              for r in befund.rueckfragen if r.vermutung is not None],
+            "ohne_vermutung": [{"nr": r.nr, "frage": r.frage} for r in befund.ohne_vermutung],
+        },
+    }
+
+
+def pruefen(wurzel: Path, ordner: str, als_json: bool = False) -> int:
+    """Setzt den Status jedes wartenden Kandidaten aus seinem Entwurf auf der Platte.
+
+    Mit `als_json` kommt statt der Zeilen für den Trainer, was der Skill für
+    die Freigabe braucht. Die Übersicht wird in beiden Fällen geschrieben.
+    """
     sammelimport = Sammelimport(wurzel, ordner)
     sammelimport.verlange_freigabe()
     stand: dict[str, int] = {}
+    freigabe = []
     for k in sammelimport.kandidaten:
         if not k.wartet:
             continue
-        setze_befund(k, pruefe_entwurf(sammelimport, k))
+        befund = pruefe_entwurf(sammelimport, k)
+        setze_befund(k, befund)
         stand[k.status] = stand.get(k.status, 0) + 1
-        print(f"  {k.nummer}  {k.status}{': ' + k.notiz if k.notiz else ''}")
+        freigabe.append(fuer_die_freigabe(sammelimport, k, befund))
+        if not als_json:
+            print(f"  {k.nummer}  {k.status}{': ' + k.notiz if k.notiz else ''}")
     sammelimport.speichere()
-    print(", ".join(f"{s} {stand.get(s, 0)}" for s in ("bereit", "rückfrage", "offen")))
+    if als_json:
+        print(json.dumps({"ordner": ordner, "kandidaten": freigabe}, ensure_ascii=False, indent=1))
+    else:
+        print(", ".join(f"{s} {stand.get(s, 0)}" for s in ("bereit", "rückfrage", "offen")))
     return 0
 
 
@@ -1204,9 +1437,7 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     if feldbild:
         schaubild.parent.mkdir(exist_ok=True)
         shutil.move(feldbild, schaubild)
-    k.setze("importiert", notiz, karte=uid)
-    sammelimport.speichere()
-    raeume_kandidat_weg(sammelimport, k)
+    schliesse_ab(sammelimport, k, "importiert", notiz, karte=uid)
     return uid
 
 
@@ -1214,14 +1445,30 @@ class NichtUebernommen(Exception):
     """Ein Kandidat, dessen Karte nicht geschrieben wurde. Der Text sagt, warum."""
 
 
-def raeume_kandidat_weg(sammelimport: Sammelimport, k: Kandidat) -> None:
-    """Löscht, was der Sammelimport für einen erledigten Kandidaten angelegt hat.
+def schliesse_ab(sammelimport: Sammelimport, k: Kandidat, status: str, notiz: str,
+                 karte: str | None = None) -> None:
+    """Trägt den Kandidaten als erledigt ein und löscht, was für ihn angelegt war.
 
-    Das Feldbild auch dann, wenn der Entwurf es nicht eingetragen hat. Es
-    ließe sich jederzeit neu aus dem PDF schneiden.
+    Erst die Übersicht, dann aufräumen. Bricht der Lauf dazwischen ab, liegt
+    höchstens ein Entwurf zu viel herum, und kein erledigter Kandidat sieht
+    wieder offen aus.
+
+    Das Feldbild verschwindet auch dann, wenn der Entwurf es nicht
+    eingetragen hat. Es ließe sich jederzeit neu aus dem PDF schneiden.
     """
+    k.setze(status, notiz, karte=karte)
+    sammelimport.speichere()
     for datei in (sammelimport.entwurf(k), sammelimport.auftrag(k), sammelimport.feldbild(k)):
         datei.unlink(missing_ok=True)
+
+
+def warum_nicht_offen(k: Kandidat | None) -> str | None:
+    """Warum ein genannter Kandidat nicht mehr auf seine Karte wartet, oder None."""
+    if k is None:
+        return "steht nicht in der Übersicht"
+    if not k.wartet:
+        return f"ist {k.status}, nicht offen"
+    return None
 
 
 def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> str | None:
@@ -1231,10 +1478,9 @@ def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> st
     Prüfung nicht mehr besteht, geht zurück auf `offen`, mit dem Grund in der
     Notiz. Dann entwirft ihn der nächste Durchgang neu.
     """
-    if k is None:
-        return "steht nicht in der Übersicht"
-    if not k.wartet:
-        return f"ist {k.status}, nicht offen"
+    grund = warum_nicht_offen(k)
+    if grund or k is None:
+        return grund
     befund = pruefe_entwurf(sammelimport, k)
     if befund.fehler:
         setze_befund(k, befund)
@@ -1242,11 +1488,20 @@ def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> st
     return befund.fehler
 
 
-def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]]) -> int:
+def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
+                uebersprungen: list[tuple[str, str]], ergaenzt: list[tuple[str, str]]) -> int:
+    """Erledigt die Kandidaten, über die der Trainer bei der Freigabe entschieden hat.
+
+    Freigegebene werden Karte. Gestrichene werden `übersprungen`, der Grund
+    steht in der Notiz. Ein bestätigtes Duplikat hat der Skill schon in die
+    bestehende Karte eingearbeitet, der Kandidat wird `ergänzt` und zeigt auf
+    sie. Aus den beiden letzten entsteht keine Karte.
+    """
     sammelimport = Sammelimport(wurzel, ordner)
     sammelimport.verlange_freigabe()
-    if not freigegeben:
-        raise Abbruch("Kein Kandidat genannt. Je Kandidat: --kandidat <nr> \"<notiz>\"")
+    if not (freigegeben or uebersprungen or ergaenzt):
+        raise Abbruch("Kein Kandidat genannt. Je Kandidat: --kandidat <nr> \"<notiz>\", "
+                      "--uebersprungen <nr> \"<grund>\" oder --ergaenzt <nr> <id>")
     nach_nummer = {k.nummer: k for k in sammelimport.kandidaten}
 
     nicht_uebernommen = 0
@@ -1261,6 +1516,33 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]]) -
                 grund = str(fehler)
         print(f"  {nummer}  nicht übernommen: {grund}")
         nicht_uebernommen += 1
+
+    for nummer, grund in uebersprungen:
+        k = nach_nummer.get(nummer)
+        warum = warum_nicht_offen(k)
+        if not warum and not grund.strip():
+            warum = "ohne Grund"
+        if warum or k is None:
+            print(f"  {nummer}  nicht übersprungen: {warum}")
+            nicht_uebernommen += 1
+            continue
+        schliesse_ab(sammelimport, k, "übersprungen", grund.strip())
+        print(f"  {nummer}  übersprungen: {grund.strip()}")
+
+    # Erst jetzt gelesen: Auch eine Karte, die dieser Aufruf eben
+    # geschrieben hat, kann die ergänzte sein.
+    karten = {str(karte["id"]) for karte in lies_uebungen(wurzel)}
+    for nummer, uid in ergaenzt:
+        k = nach_nummer.get(nummer)
+        warum = warum_nicht_offen(k)
+        if not warum and uid not in karten:
+            warum = f"{uid} gibt es nicht in uebungen/"
+        if warum or k is None:
+            print(f"  {nummer}  nicht ergänzt: {warum}")
+            nicht_uebernommen += 1
+            continue
+        schliesse_ab(sammelimport, k, "ergänzt", "", karte=uid)
+        print(f"  {nummer}  ergänzt in {uid}")
 
     # Der Linter prüft die ganze Bibliothek, nicht nur die neuen Karten. Was
     # er meldet, steht damit vor dem Trainer, solange der Durchgang frisch ist.
@@ -1316,19 +1598,29 @@ def main() -> int:
                      help="statt der Aufträge die Eingabe für den Zerlegungsplan anlegen")
     pr = befehle.add_parser("pruefen", help="den Status aus den Entwürfen auf der Platte setzen")
     pr.add_argument("ordner", type=quellenordner, help=hilfe)
+    pr.add_argument("--json", action="store_true",
+                    help="je Kandidat ausgeben, was die Freigabe im Chat braucht")
     ue = befehle.add_parser("uebernehmen", help="freigegebene Kandidaten als Karte übernehmen")
     ue.add_argument("ordner", type=quellenordner, help=hilfe)
     ue.add_argument("--kandidat", nargs=2, action="append", default=[],
                     metavar=("NR", "NOTIZ"),
                     help="ein freigegebener Kandidat und was der Trainer geändert hat")
+    ue.add_argument("--uebersprungen", nargs=2, action="append", default=[],
+                    metavar=("NR", "GRUND"),
+                    help="ein Kandidat, den der Trainer gestrichen hat, und warum")
+    ue.add_argument("--ergaenzt", nargs=2, action="append", default=[],
+                    metavar=("NR", "ID"),
+                    help="ein Kandidat, der als Duplikat eine bestehende Karte ergänzt hat")
     a = ap.parse_args()
 
     wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
     try:
         if a.befehl == "pruefen":
-            return pruefen(wurzel, a.ordner)
+            return pruefen(wurzel, a.ordner, als_json=a.json)
         if a.befehl == "uebernehmen":
-            return uebernehmen(wurzel, a.ordner, [tuple(p) for p in a.kandidat])
+            return uebernehmen(wurzel, a.ordner, [tuple(p) for p in a.kandidat],
+                               [tuple(p) for p in a.uebersprungen],
+                               [tuple(p) for p in a.ergaenzt])
         if a.plan:
             return lege_planeingabe_an(wurzel, a.ordner)
         return vorbereiten(wurzel, a.ordner)

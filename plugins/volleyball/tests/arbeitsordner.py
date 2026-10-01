@@ -569,11 +569,19 @@ class Arbeitsordner:
         """Legt einen Kartenentwurf so ab, wie der Agent ihn schreibt.
 
         Das Frontmatter ist das der Karte ohne `id`, mit den Standardwerten
-        aus KARTE. Am Ende steht `## Freigabe` mit beiden Listen. `freigabe` ersetzt diesen Abschnitt woertlich, fuer die
-        Entwuerfe, deren Form nicht stimmen soll. `freigabe=""` laesst ihn weg.
+        aus KARTE. Eine `id` steht nur darin, wenn der Test sie nennt.
+        `quelldatei` nennt ohne Angabe die Dateien des Kandidaten
+        laut Uebersicht, so wie der Auftrag sie vorgibt. Die Uebersicht muss
+        dafuer schon da sein, wie im Betrieb: Der Agent entwirft nach dem
+        freigegebenen Plan.
+
+        Am Ende steht `## Freigabe` mit beiden Listen. `freigabe` ersetzt
+        diesen Abschnitt woertlich, fuer die Entwuerfe, deren Form nicht
+        stimmen soll. `freigabe=""` laesst ihn weg.
         """
-        karte = {k: v for k, v in {**KARTE, **felder}.items()
-                 if k != "id" and v is not OHNE}
+        if "quelldatei" not in felder:
+            felder["quelldatei"] = self._quelldatei_laut_plan(ordner, kandidat)
+        karte = {k: v for k, v in {**KARTE, "id": OHNE, **felder}.items() if v is not OHNE}
         text = _als_karte(karte)
         if freigabe is None:
             freigabe = _als_freigabe(vorschlaege or [], rueckfragen or [])
@@ -583,6 +591,19 @@ class Arbeitsordner:
         datei.parent.mkdir(parents=True, exist_ok=True)
         datei.write_text(text, encoding="utf-8")
         return datei
+
+    def _quelldatei_laut_plan(self, ordner: str, kandidat: int) -> str | None:
+        """Die Dateien eines Kandidaten als Wert fuer `quelldatei:`, relativ zu quellen/.
+
+        Ohne Uebersicht oder ohne Zeile fuer den Kandidaten None. Dann
+        steht `quelldatei: null` im Entwurf, und `pruefen` weist ihn ab.
+        """
+        if not (self.pfad / "quellen" / ordner / "sammelimport.md").is_file():
+            return None
+        zeile = self.uebersicht(ordner).get(str(kandidat))
+        if zeile is None:
+            return None
+        return ", ".join(f"{ordner}/{d}" for d in re.findall(r"`([^`]+)`", zeile["Dateien"]))
 
     def uebersicht(self, ordner: str) -> dict[str, dict[str, str]]:
         """Liest die Uebersicht aus `sammelimport.md`, je Kandidat eine Zeile.

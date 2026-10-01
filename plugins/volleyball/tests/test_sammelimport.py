@@ -15,6 +15,7 @@ die Agenten.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -24,7 +25,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from arbeitsordner import Arbeitsordner, PdfBild, auffaelligkeiten
+from arbeitsordner import OHNE, Arbeitsordner, PdfBild, auffaelligkeiten
 
 ORDNER = "stapel"
 
@@ -765,8 +766,12 @@ class PruefenTest(unittest.TestCase):
         self.ordner = Arbeitsordner()
         self.addCleanup(self.ordner.raeume_auf)
 
-    def pruefe(self, *kandidaten: dict) -> dict[str, dict[str, str]]:
-        self.ordner.lege_quellenordner_an(ORDNER, list(kandidaten))
+    def plane(self, *kandidaten: dict) -> None:
+        """Der freigegebene Plan. Ohne Angabe ein offener Kandidat 1 mit `a.pdf`."""
+        self.ordner.lege_quellenordner_an(
+            ORDNER, list(kandidaten) or [{"kandidat": 1, "dateien": ["a.pdf"]}])
+
+    def pruefe(self) -> dict[str, dict[str, str]]:
         fertig = self.ordner.starte("sammelimport.py", "pruefen", ORDNER)
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         return self.ordner.uebersicht(ORDNER)
@@ -774,17 +779,20 @@ class PruefenTest(unittest.TestCase):
     def test_ohne_entwurf_bleibt_der_kandidat_offen_mit_grund(self) -> None:
         # Ein Kandidat, der als bereit gefuehrt wird, dessen Entwurf aber
         # nicht mehr da ist. Die Zeile folgt der Platte, nicht ihrem Stand.
-        zeile = self.pruefe({"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"})["1"]
+        self.plane({"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"})
+
+        zeile = self.pruefe()["1"]
 
         self.assertEqual(zeile["Status"], "offen")
         self.assertIn("kein Entwurf", zeile["Notiz"])
 
     def test_ein_entwurf_ohne_rueckfrage_ist_bereit(self) -> None:
+        self.plane()
         self.ordner.lege_kartenentwurf_an(
             ORDNER, 1, titel="Ohne Rückfrage",
             vorschlaege=["`level_max`: Technikübung, die Schwierigkeit steuert der Ball."])
 
-        zeile = self.pruefe({"kandidat": 1, "dateien": ["a.pdf"]})["1"]
+        zeile = self.pruefe()["1"]
 
         self.assertEqual(zeile["Status"], "bereit")
         self.assertEqual(zeile["Notiz"], "")
@@ -792,16 +800,18 @@ class PruefenTest(unittest.TestCase):
     def test_eine_rueckfrage_mit_vermutung_ist_bereit(self) -> None:
         # Die Vermutung steht schon im Text des Entwurfs. Der Trainer bestaetigt
         # sie in der Tabelle wie einen Vorschlag, einzeln gefragt wird nicht.
+        self.plane()
         self.ordner.lege_kartenentwurf_an(
             ORDNER, 1, titel="Mit Vermutung",
             rueckfragen=["Wie viele Spieler braucht die Übung? "
                          "Vermutung im Entwurf: mindestens 8, aus den Rollen."])
 
-        zeile = self.pruefe({"kandidat": 1, "dateien": ["a.pdf"]})["1"]
+        zeile = self.pruefe()["1"]
 
         self.assertEqual(zeile["Status"], "bereit")
 
     def test_eine_rueckfrage_ohne_vermutung_ergibt_rueckfrage(self) -> None:
+        self.plane()
         self.ordner.lege_kartenentwurf_an(
             ORDNER, 1, titel="Ohne Vermutung",
             rueckfragen=["Wie viele Spieler braucht die Übung? "
@@ -809,9 +819,146 @@ class PruefenTest(unittest.TestCase):
                          "Wohin kommen die gefangenen Bälle zurück? "
                          "Vermutung im Entwurf: keine"])
 
-        zeile = self.pruefe({"kandidat": 1, "dateien": ["a.pdf"]})["1"]
+        zeile = self.pruefe()["1"]
 
         self.assertEqual(zeile["Status"], "rückfrage")
+
+    def test_ein_fehlerhafter_entwurf_geht_zurueck_auf_offen_mit_grund(self) -> None:
+        # Je Kandidat ein Fehler, sonst ist der Entwurf heil. Der Agent hat
+        # nicht nachfragen koennen, und was hier durchkaeme, stuende nach der
+        # Freigabe so auf der Karte. Die Notiz nennt, woran es lag, damit der
+        # Trainer es sieht, bevor der naechste Durchgang neu entwirft.
+        quellen = self.ordner.pfad / "quellen"
+        faelle = {
+            "unbekanntes Element": ({"element": ["aufwaermen"]}, "aufwaermen"),
+            "unbekannte Kennung": ({"schwerpunkt": ["gibt-es-nicht"]}, "gibt-es-nicht"),
+            "Kennung mit falscher Disziplin": (
+                {"disziplin": ["halle"], "schwerpunkt": ["nur-beach"]}, "nur-beach"),
+            "quelldatei ohne Datei dahinter": (
+                {"quelldatei": f"{ORDNER}/fehlt.pdf"}, "fehlt.pdf"),
+            "quelldatei leer": ({"quelldatei": None}, "quelldatei"),
+            # Die Datei gibt es, aber der Pfad stimmt nur auf diesem Rechner.
+            "absolute quelldatei": (
+                {"quelldatei": (quellen / ORDNER / "a.pdf").resolve().as_posix()}, "absolut"),
+            "Rückfrage ohne Vermutungsmarke": (
+                {"rueckfragen": ["Wie viele Spieler braucht die Übung?"]},
+                "Vermutung im Entwurf"),
+            "Rückfrage mit zwei Fragen": (
+                {"rueckfragen": ["Wie viele Spieler? Und wie viele Bälle? "
+                                 "Vermutung im Entwurf: keine"]}, "Fragezeichen"),
+            # Die ID vergibt erst uebernehmen (ADR-0010).
+            "Entwurf mit id": ({"id": "ue-0099"}, "ue-0099"),
+            "fehlendes Feld": ({"spieler_min": OHNE}, "spieler_min"),
+            # Ohne Feld oder Ueberschrift vorn laesst sich der Vorschlag
+            # keiner Spalte der Tabelle zuordnen.
+            "Vorschlag ohne Ziel": (
+                {"vorschlaege": ["Die Schwierigkeit steuert der Ball."]}, "Backticks"),
+            "Vorschlag zu einem Feld, das es nicht gibt": (
+                {"vorschlaege": ["`spielerzahl`: aus den Rollen."]}, "spielerzahl"),
+        }
+        self.plane(*({"kandidat": nr, "dateien": ["a.pdf"]} for nr in range(len(faelle) + 1)))
+        self.ordner.lege_kartenentwurf_an(ORDNER, 0, titel="Heil")
+        for nr, (fall, (felder, _)) in enumerate(faelle.items(), 1):
+            self.ordner.lege_kartenentwurf_an(ORDNER, nr, titel=fall, **felder)
+
+        uebersicht = self.pruefe()
+
+        self.assertEqual(uebersicht["0"]["Status"], "bereit", uebersicht["0"]["Notiz"])
+        for nr, (fall, (_, stichwort)) in enumerate(faelle.items(), 1):
+            with self.subTest(fall):
+                self.assertEqual(uebersicht[str(nr)]["Status"], "offen")
+                self.assertIn(stichwort, uebersicht[str(nr)]["Notiz"])
+
+    def test_zwei_seiten_in_quelldatei_bestehen_wenn_es_beide_gibt(self) -> None:
+        # Eine Uebung ueber zwei Magazinseiten nennt beide, durch Komma
+        # getrennt (DATENMODELL.md). Fehlt eine davon, faellt der Entwurf durch.
+        self.plane({"kandidat": 1, "dateien": ["seite-24.jpg", "seite-25.jpg"]},
+                   {"kandidat": 2, "dateien": ["seite-26.jpg"]})
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Beide da")
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 2, titel="Eine fehlt",
+            quelldatei=f"{ORDNER}/seite-26.jpg, {ORDNER}/seite-27.jpg")
+
+        uebersicht = self.pruefe()
+
+        self.assertEqual(uebersicht["1"]["Status"], "bereit", uebersicht["1"]["Notiz"])
+        self.assertEqual(uebersicht["2"]["Status"], "offen")
+        self.assertIn("seite-27.jpg", uebersicht["2"]["Notiz"])
+
+    def freigabe(self) -> dict[str, dict]:
+        """`pruefen --json`, je Kandidat, was die Freigabe im Chat braucht."""
+        fertig = self.ordner.starte("sammelimport.py", "pruefen", "--json", ORDNER)
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        return {k["kandidat"]: k for k in json.loads(fertig.stdout)["kandidaten"]}
+
+    def test_json_trennt_vorschlaege_zu_feldern_von_vorschlaegen_zu_textstellen(self) -> None:
+        # Die Vorschlaege zu Feldern stehen in der Tabelle in ihrer Spalte, die
+        # zu Textstellen ergeben die Spalte "aus dem Bild". Getrennt wird am
+        # Ziel in Backticks vorn: ein Feld oder die Ueberschrift eines
+        # Abschnitts.
+        self.plane()
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Mit Vorschlägen", spieler_min=8,
+                                          vorschlaege=[
+            "`level_max`: Technikübung, die Schwierigkeit steuert der Ball.",
+            "`## Ablauf`, Schritt 2: Die Wege kommen aus den gelben Pfeilen im Bild.",
+            "`spieler_min`: aus den Rollen im Bild gezählt.",
+        ])
+
+        kandidat = self.freigabe()["1"]
+
+        self.assertEqual(kandidat["status"], "bereit")
+        self.assertEqual(kandidat["vorschlaege"]["felder"], [
+            {"feld": "level_max", "text": "Technikübung, die Schwierigkeit steuert der Ball."},
+            {"feld": "spieler_min", "text": "aus den Rollen im Bild gezählt."},
+        ])
+        self.assertEqual(kandidat["vorschlaege"]["textstellen"], [
+            {"abschnitt": "## Ablauf", "stelle": "Schritt 2",
+             "text": "Die Wege kommen aus den gelben Pfeilen im Bild."},
+        ])
+        # Die Felder fuer die Tabelle, so wie sie im Entwurf stehen. Der
+        # Trainer korrigiert dort etwa die Spielerzahl direkt.
+        self.assertEqual(kandidat["felder"]["titel"], "Mit Vorschlägen")
+        self.assertEqual(kandidat["felder"]["spieler_min"], 8)
+        self.assertEqual(kandidat["felder"]["disziplin"], ["halle"])
+
+    def test_json_trennt_rueckfragen_mit_vermutung_von_denen_ohne(self) -> None:
+        # Die ohne Vermutung fragt der Skill einzeln, mit dem Feldbild. Die mit
+        # Vermutung bestaetigt der Trainer in der Tabelle wie einen Vorschlag.
+        self.plane()
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Mit Rückfragen", rueckfragen=[
+            "Wie viele Spieler braucht die Übung? "
+            "Vermutung im Entwurf: mindestens 8, aus den Rollen.",
+            "Wohin kommen die gefangenen Bälle zurück? Vermutung im Entwurf: keine",
+        ])
+
+        kandidat = self.freigabe()["1"]
+
+        self.assertEqual(kandidat["status"], "rückfrage")
+        self.assertEqual(kandidat["rueckfragen"]["mit_vermutung"], [
+            {"nr": 1, "frage": "Wie viele Spieler braucht die Übung?",
+             "vermutung": "mindestens 8, aus den Rollen."},
+        ])
+        self.assertEqual(kandidat["rueckfragen"]["ohne_vermutung"], [
+            {"nr": 2, "frage": "Wohin kommen die gefangenen Bälle zurück?"},
+        ])
+        self.assertFalse(kandidat["ablauf_aus_dem_bild"])
+        self.assertEqual(kandidat["entwurf"], (
+            self.ordner.pfad / "kartenentwuerfe" / ORDNER / "1.md").resolve().as_posix())
+
+    def test_json_setzt_den_status_wie_ohne_json(self) -> None:
+        # Der Skill ruft nach einem Durchgang nur `pruefen --json` auf. Auch
+        # dann muss die Uebersicht stimmen, und ein abgewiesener Entwurf
+        # traegt seinen Grund, statt Felder fuer die Tabelle.
+        self.plane()
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Abgewiesen", element=["aufwaermen"])
+
+        kandidat = self.freigabe()["1"]
+
+        self.assertEqual(kandidat["status"], "offen")
+        self.assertIn("aufwaermen", kandidat["notiz"])
+        self.assertEqual(kandidat["felder"], {})
+        zeile = self.ordner.uebersicht(ORDNER)["1"]
+        self.assertEqual((zeile["Status"], zeile["Notiz"]), ("offen", kandidat["notiz"]))
 
     @BRAUCHT_PDFTOTEXT
     def test_ein_ablauf_aus_dem_bild_ergibt_rueckfrage_auch_mit_vermutung(self) -> None:
@@ -839,9 +986,10 @@ class PruefenTest(unittest.TestCase):
     def test_ohne_abschnitt_freigabe_bleibt_der_kandidat_offen(self) -> None:
         # Ohne den Abschnitt weiss niemand, was der Entwurf gedeutet und wo er
         # eine Luecke gefunden hat. Er wird neu entworfen.
+        self.plane()
         self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Ohne Freigabe", freigabe="")
 
-        zeile = self.pruefe({"kandidat": 1, "dateien": ["a.pdf"]})["1"]
+        zeile = self.pruefe()["1"]
 
         self.assertEqual(zeile["Status"], "offen")
         self.assertIn("## Freigabe", zeile["Notiz"])
@@ -850,20 +998,22 @@ class PruefenTest(unittest.TestCase):
         # Beide Listen stehen immer da, eine leere heisst "keine". Fehlt eine,
         # ist nicht zu unterscheiden, ob der Agent nichts gefunden oder den
         # Entwurf nicht fertig geschrieben hat.
+        self.plane()
         self.ordner.lege_kartenentwurf_an(
             ORDNER, 1, titel="Nur Vorschläge", freigabe="## Freigabe\n\nVorschläge: keine\n")
 
-        zeile = self.pruefe({"kandidat": 1, "dateien": ["a.pdf"]})["1"]
+        zeile = self.pruefe()["1"]
 
         self.assertEqual(zeile["Status"], "offen")
         self.assertIn("Rückfragen", zeile["Notiz"])
 
     def test_ohne_lesbares_frontmatter_bleibt_der_kandidat_offen(self) -> None:
+        self.plane()
         entwurf = self.ordner.pfad / "kartenentwuerfe" / ORDNER / "1.md"
         entwurf.parent.mkdir(parents=True)
         entwurf.write_text("# Abgebrochen\n\nDer Agent kam nur bis hier.\n", encoding="utf-8")
 
-        zeile = self.pruefe({"kandidat": 1, "dateien": ["a.pdf"]})["1"]
+        zeile = self.pruefe()["1"]
 
         self.assertEqual(zeile["Status"], "offen")
         self.assertIn("Frontmatter", zeile["Notiz"])
@@ -872,9 +1022,10 @@ class PruefenTest(unittest.TestCase):
         # Eine uebernommene Karte hat keinen Entwurf mehr. Faende pruefen sie
         # "offen", entwuerfe der naechste Durchgang dieselbe Uebung ein
         # zweites Mal.
-        uebersicht = self.pruefe({
-            "kandidat": 1, "dateien": ["a.pdf"], "status": "importiert",
-            "karte": "ue-0001", "notiz": "spieler_min auf 6"})
+        self.plane({"kandidat": 1, "dateien": ["a.pdf"], "status": "importiert",
+                    "karte": "ue-0001", "notiz": "spieler_min auf 6"})
+
+        uebersicht = self.pruefe()
 
         self.assertEqual(uebersicht["1"]["Status"], "importiert")
         self.assertEqual(uebersicht["1"]["Karte"], "ue-0001")
@@ -1019,6 +1170,61 @@ class UebernehmenTest(unittest.TestCase):
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         self.assertFalse((self.ordner.pfad / "kartenentwuerfe" / ORDNER).exists())
+
+    def test_uebersprungen_und_ergaenzt_setzen_nur_den_status(self) -> None:
+        # Kandidat 1 hat der Trainer bei der Freigabe gestrichen, Kandidat 2
+        # war ein Duplikat von ue-0003, und der Skill hat diese Karte schon
+        # ergaenzt. Keiner von beiden wird Karte. Kandidat 3 ist noch offen
+        # und haelt den Entwurfsordner fest, so zeigt sich, dass Entwurf,
+        # Auftrag und Feldbild einzeln verschwinden.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
+            {"kandidat": 2, "dateien": ["b.pdf"], "status": "rückfrage"},
+            {"kandidat": 3, "dateien": ["c.pdf"]},
+        ])
+        entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
+        for nr in (1, 2):
+            self.ordner.lege_kartenentwurf_an(ORDNER, nr, titel=f"Kandidat {nr}",
+                                              schaubild=f"{nr}.feldbild.png")
+            (entwuerfe / f"{nr}.auftrag.md").write_text("# Auftrag\n", encoding="utf-8")
+            (entwuerfe / f"{nr}.feldbild.png").write_bytes(b"ein Bild")
+        vorher = sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir())
+
+        fertig = self.uebernimm("--uebersprungen", "1", "Vorlage ohne Übung",
+                                "--ergaenzt", "2", "ue-0003")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual(
+            (uebersicht["1"]["Status"], uebersicht["1"]["Karte"], uebersicht["1"]["Notiz"]),
+            ("übersprungen", "", "Vorlage ohne Übung"))
+        self.assertEqual((uebersicht["2"]["Status"], uebersicht["2"]["Karte"]),
+                         ("ergänzt", "ue-0003"))
+        self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir()),
+                         vorher)
+        self.assertFalse((self.ordner.pfad / "schaubilder").exists())
+        self.assertEqual(sorted(p.name for p in entwuerfe.iterdir()), [])
+        self.assertEqual(uebersicht["3"]["Status"], "offen")
+
+    def test_ergaenzt_mit_einer_id_die_es_nicht_gibt_bleibt_offen(self) -> None:
+        # Vertippt. Die Uebersicht zeigte sonst auf eine Karte, die es nicht
+        # gibt, und niemand faende, wohin das Duplikat gegangen ist. Ein
+        # Streichen ohne Grund ginge genauso verloren.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
+            {"kandidat": 2, "dateien": ["b.pdf"], "status": "bereit"},
+        ])
+        entwurf = self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Duplikat")
+
+        fertig = self.uebernimm("--ergaenzt", "1", "ue-0300", "--uebersprungen", "2", " ")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("ue-0300", zeile_mit(fertig.stdout, "  1  "))
+        self.assertIn("Grund", zeile_mit(fertig.stdout, "  2  "))
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual((uebersicht["1"]["Status"], uebersicht["2"]["Status"]),
+                         ("bereit", "bereit"))
+        self.assertTrue(entwurf.exists())
 
     def test_solange_etwas_offen_ist_bleibt_der_entwurfsordner(self) -> None:
         # Die Gegenprobe: Ein Durchgang ist fertig, der naechste nicht.

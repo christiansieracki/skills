@@ -244,15 +244,43 @@ Rückfragen:
 1. Wohin kommen die gefangenen Bälle zurück? Vermutung im Entwurf: keine
 ```
 
-Jede Rückfrage endet auf `Vermutung im Entwurf: …` oder auf
-`Vermutung im Entwurf: keine`. Eine leere Liste heißt `Vorschläge: keine`.
+Jede Rückfrage stellt genau eine Frage, mit genau einem Fragezeichen, und
+endet auf `Vermutung im Entwurf: …` oder auf `Vermutung im Entwurf: keine`.
+Ein Vorschlag beginnt mit seinem Ziel in Backticks: dem Feld, oder der
+Überschrift des Abschnitts samt `##`, dann die Stelle. Eine leere Liste heißt
+`Vorschläge: keine`.
+
+`sammelimport.py pruefen` weist einen Entwurf ab, wenn er das Datenmodell
+bricht oder die Form der Freigabe nicht einhält. Der Kandidat geht dann auf
+`offen`, der Grund steht in der Notiz, und der nächste Durchgang entwirft ihn
+neu. Geprüft wird:
+
+- das Frontmatter: jedes Feld der Karte außer `id` und `angelegt`, und keine
+  `id`;
+- die Felder mit denselben Regeln wie im Linter, darunter die kontrollierten
+  Werte und `schwerpunkt` nur mit Kennungen aus `schwerpunkte.md`, die zur
+  Disziplin der Karte passen;
+- `quelldatei`: relativ zu `quellen/`, und jede genannte Datei liegt dort;
+- das Feldbild: nur das eigene, und es liegt neben dem Entwurf;
+- `## Freigabe` mit beiden Listen, jede Rückfrage und jeder Vorschlag in der
+  Form oben, und ein Vorschlag zu einem Feld nennt eins aus dem Frontmatter.
+
+Mit `--json` gibt `pruefen` je Kandidat aus, was die Freigabe im Chat braucht:
+die Felder des Entwurfs, die Vorschläge getrennt nach Feldern und Textstellen,
+die Rückfragen getrennt nach mit und ohne Vermutung, ob der Ablauf aus dem Bild
+kommt, und die Pfade von Entwurf und Feldbild. Die Textstellen ergeben in der
+Tabelle die Spalte „aus dem Bild“.
 
 Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
 mit `angelegt` von heute und ohne `## Freigabe`. Das Feldbild kommt unter dem
 Namen der Karte nach `schaubilder/`, etwa `ue-0291-abwehr-vom-kasten.png`, und
 `schaubild:` zeigt darauf. Liegt dort schon eine Datei unter diesem Namen, wird
-der Kandidat nicht übernommen. Entwurf und Auftrag verschwinden dann. Ist im
-Quellenordner nichts mehr offen, verschwindet auch `kartenentwuerfe/<ordner>/`.
+der Kandidat nicht übernommen. Entwurf und Auftrag verschwinden dann. Streicht
+der Trainer einen Kandidaten, wird er `übersprungen`, mit dem Grund in der
+Notiz. Ergänzt er als Duplikat eine bestehende Karte, wird er `ergänzt`, mit
+deren ID in der Spalte Karte. Aus beiden entsteht keine Karte, aber auch ihr
+Entwurf und Auftrag verschwinden. Ist im Quellenordner nichts mehr offen,
+verschwindet auch `kartenentwuerfe/<ordner>/`.
 
 Den Ordner `kartenentwuerfe/` legt `init_struktur.py` nicht an. Er entsteht mit
 dem ersten Sammelimport. `index.py` und `suche.py` lesen ihn nicht, ein
@@ -354,7 +382,7 @@ Die übrigen Skripte brauchen weder Pillow noch `pdftotext`.
 | `export_pdf.py` | PDF zum Ausdrucken |
 | `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen |
 | `bilder_aufbereiten.py` | Quellbilder verkleinern und nach EXIF geradedrehen |
-| `sammelimport.py` | Sammelimport über einen Quellenordner: `vorbereiten --plan` legt die Eingabe für den Zerlegungsplan an, `vorbereiten` die Aufträge, `pruefen` setzt den Status aus den Entwürfen, `uebernehmen` macht freigegebene Entwürfe zu Karten |
+| `sammelimport.py` | Sammelimport über einen Quellenordner: `vorbereiten --plan` legt die Eingabe für den Zerlegungsplan an, `vorbereiten` die Aufträge, `pruefen` setzt den Status aus den Entwürfen und gibt mit `--json` aus, was die Freigabe braucht, `uebernehmen` macht freigegebene Entwürfe zu Karten und trägt gestrichene und ergänzende Kandidaten ein |
 
 `index.py` ohne Argumente ist auch der Linter: doppelte IDs, fehlende oder
 unbekannte `disziplin`, unbekannte Schwerpunkte, fehlende Level, ins Leere
