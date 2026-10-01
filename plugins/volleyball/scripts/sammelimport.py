@@ -197,7 +197,7 @@ class Sammelimport:
     def __init__(self, wurzel: Path, ordner: str) -> None:
         self.wurzel = wurzel
         self.ordner = ordner
-        self.datei = wurzel / "quellen" / ordner / SAMMELIMPORT
+        self.datei = self.quellordner / SAMMELIMPORT
         if not self.datei.is_file():
             raise Abbruch(f"Keine {SAMMELIMPORT} in quellen/{ordner}/.")
         self.einstellungen, _ = lies_frontmatter(self.datei)
@@ -327,6 +327,10 @@ class Sammelimport:
         return "\n".join(_abschnitt(self.zeilen, "Absprachen") or []).strip()
 
     @property
+    def quellordner(self) -> Path:
+        return self.wurzel / "quellen" / self.ordner
+
+    @property
     def entwurfsordner(self) -> Path:
         return self.wurzel / ENTWUERFE / self.ordner
 
@@ -413,10 +417,15 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
         return Befund("kein lesbares Frontmatter")
     if not felder.get("titel"):
         return Befund("Frontmatter ohne titel")
-    # Im Entwurf nennt `schaubild:` das Feldbild neben ihm. Erst `uebernehmen`
-    # legt es nach schaubilder/, unter den Namen der Karte.
+    # Im Entwurf nennt `schaubild:` das Feldbild neben ihm, und nur das
+    # eigene: `uebernehmen` trägt es nach schaubilder/, unter den Namen der
+    # Karte. Ein fremdes fehlte danach seinem Kandidaten.
     schaubild = str(felder.get("schaubild") or "")
-    if schaubild and (Path(schaubild).name != schaubild or not (datei.parent / schaubild).is_file()):
+    feldbild = sammelimport.feldbild(k)
+    if schaubild and schaubild != feldbild.name:
+        return Befund(f"schaubild: nennt {schaubild}, das Feldbild dieses Kandidaten "
+                      f"heißt {feldbild.name}")
+    if schaubild and not feldbild.is_file():
         return Befund(f"Feldbild {schaubild} liegt nicht neben dem Entwurf")
     freigabe = _abschnitt(rumpf.splitlines(), "Freigabe")
     if freigabe is None:
@@ -482,6 +491,10 @@ def finde_pdftotext() -> str | None:
         if exe.is_file():
             return str(exe)
     return None
+
+
+def _ist_pdf(datei: str | Path) -> bool:
+    return Path(datei).suffix.lower() == ".pdf"
 
 
 def pdf_text(pdftotext: str, pdf: Path) -> str | None:
@@ -618,7 +631,7 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     if not dateien:
         print(f"Keine neuen Dateien in quellen/{ordner}/, jede steht schon in der Übersicht.")
         return 0
-    pdfs = {name for name, pfad in dateien.items() if pfad.suffix.lower() == ".pdf"}
+    pdfs = {name for name in dateien if _ist_pdf(name)}
     pdftotext = finde_pdftotext() if pdfs else None
     if pdfs and not pdftotext:
         melde_ohne_pdftotext("die Planeingabe", "den Zerlegungsplan")
@@ -669,6 +682,9 @@ class OhneBild(KeinFeldbild):
     """Das PDF bettet gar kein Bild ein. Dann kommt das nächste PDF des Kandidaten dran."""
 
 
+# Je Nummer das Wörterbuch eines Objekts und, wenn es einen hat, sein Strom.
+PdfObjekte = dict[int, tuple[bytes, bytes | None]]
+
 _OBJEKT = re.compile(rb"(?<!\d)(\d+)\s+\d+\s+obj\b\s*")
 _STROM = re.compile(rb"\s*stream\r?\n")
 
@@ -709,7 +725,7 @@ def _woerterbuch_ende(daten: bytes, anfang: int) -> int | None:
     return None
 
 
-def pdf_objekte(daten: bytes) -> dict[int, tuple[bytes, bytes | None]]:
+def pdf_objekte(daten: bytes) -> PdfObjekte:
     """Die Objekte eines PDF, die ein Wörterbuch sind: je Nummer das Wörterbuch und der Strom.
 
     Gelesen wird der Reihe nach durch die Datei, ohne die Querverweistabelle.
@@ -723,7 +739,7 @@ def pdf_objekte(daten: bytes) -> dict[int, tuple[bytes, bytes | None]]:
     nächsten `stream` und griff bei einem Objekt ohne Strom in das nächste
     Objekt hinein.
     """
-    objekte: dict[int, tuple[bytes, bytes | None]] = {}
+    objekte: PdfObjekte = {}
     pos = 0
     while (objekt := _OBJEKT.search(daten, pos)):
         pos = objekt.end()
@@ -761,7 +777,7 @@ def _verweis(woerterbuch: bytes, name: bytes) -> int | None:
     return int(treffer.group(1)) if treffer else None
 
 
-def _farbmodus(objekte: dict[int, tuple[bytes, bytes | None]], woerterbuch: bytes) -> str:
+def _farbmodus(objekte: PdfObjekte, woerterbuch: bytes) -> str:
     """Der Modus für Pillow aus dem Farbraum des Bildes.
 
     PlayDrill nennt den Farbraum über ein ICC-Profil, `[/ICCBased 6 0 R]`.
@@ -775,13 +791,13 @@ def _farbmodus(objekte: dict[int, tuple[bytes, bytes | None]], woerterbuch: byte
         if farben in modi:
             return modi[farben]
     elif treffer:
-        name = {b"/DeviceGray": 1, b"/DeviceRGB": 3, b"/DeviceCMYK": 4}.get(treffer.group(1))
-        if name:
-            return modi[name]
+        farben = {b"/DeviceGray": 1, b"/DeviceRGB": 3, b"/DeviceCMYK": 4}.get(treffer.group(1))
+        if farben:
+            return modi[farben]
     raise KeinFeldbild("den Farbraum des Bildes liest das Skript nicht")
 
 
-def _bild(objekte: dict[int, tuple[bytes, bytes | None]], nummer: int, maske: bool = False):
+def _bild(objekte: PdfObjekte, nummer: int, als_maske: bool = False):
     """Ein eingebettetes Bild als Bild von Pillow, eine Maske als Graustufen.
 
     Gelesen werden die Bilder, wie PlayDrill sie einbettet: entpackt mit
@@ -799,15 +815,15 @@ def _bild(objekte: dict[int, tuple[bytes, bytes | None]], nummer: int, maske: bo
     if filter_ == "/DCTDecode":
         bild = Image.open(io.BytesIO(strom))
         bild.load()
-        return bild.convert("L" if maske else "RGB")
+        return bild.convert("L" if als_maske else "RGB")
     if filter_ not in ("", "/FlateDecode") or re.search(rb"/Filter\s*\[[^\]]*/\w+[^\]]*/\w+",
                                                         woerterbuch):
         raise KeinFeldbild(f"das Bild ist mit {filter_} gepackt, das liest das Skript nicht")
     if (_zahl(woerterbuch, b"Predictor") or 1) > 1 or _zahl(woerterbuch, b"BitsPerComponent") != 8:
         raise KeinFeldbild("das Bild ist anders gepackt, als das Skript es liest")
-    modus = "L" if maske else _farbmodus(objekte, woerterbuch)
+    modus = "L" if als_maske else _farbmodus(objekte, woerterbuch)
     pixel = zlib.decompress(strom) if filter_ else strom
-    return Image.frombytes(modus, (breite, hoehe), pixel).convert("L" if maske else "RGB")
+    return Image.frombytes(modus, (breite, hoehe), pixel).convert("L" if als_maske else "RGB")
 
 
 def schneide_feldbild_aus(pdf: Path, ziel: Path) -> None:
@@ -835,7 +851,7 @@ def schneide_feldbild_aus(pdf: Path, ziel: Path) -> None:
         bild = _bild(objekte, nummer)
         maske = _verweis(bilder[nummer], b"SMask")
         if maske in bilder:
-            alpha = _bild(objekte, maske, maske=True).resize(bild.size)
+            alpha = _bild(objekte, maske, als_maske=True).resize(bild.size)
             rahmen = alpha.getbbox()
             if rahmen is None:
                 raise KeinFeldbild("das Bild ist ganz durchsichtig")
@@ -879,11 +895,10 @@ def lege_feldbild_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[str, str 
     pdfs = [d for d in k.dateien if _ist_pdf(d)]
     if not pdfs:
         return "- Feldbild: keins, der Kandidat hat kein PDF.", None
-    quellordner = sammelimport.wurzel / "quellen" / sammelimport.ordner
     grund = "kein PDF des Kandidaten bettet ein Bild ein"
     for datei in pdfs:
         try:
-            schneide_feldbild_aus(quellordner / datei, ziel)
+            schneide_feldbild_aus(sammelimport.quellordner / datei, ziel)
         except OhneBild:
             continue
         except KeinFeldbild as fehler:
@@ -916,10 +931,6 @@ def kennungstabelle(wurzel: Path) -> list[str]:
         spalte = angabe if angabe in DISZIPLIN_SPALTE else "beide"
         zeilen.append(f"| `{kennung}` | {klartext} | {spalte} |")
     return zeilen
-
-
-def _ist_pdf(datei: str | Path) -> bool:
-    return Path(datei).suffix.lower() == ".pdf"
 
 
 def _muster(text: str) -> re.Pattern[str]:
@@ -963,14 +974,14 @@ def ablauf_aus_dem_bild(sammelimport: Sammelimport, texte: list[str | None]) -> 
     """
     marke, platzhalter = sammelimport.textmarke, sammelimport.platzhalter
     zeichen = sum(len(ablauftext(t, marke, platzhalter)) for t in texte if t)
-    gezaehlt = f"nach „{marke}“" if marke else "im ganzen Text"
-    ohne = ", ohne den Platzhalter," if platzhalter else ""
+    gezaehlt = f"Nach „{marke}“" if marke else "Im ganzen Text"
+    ohne_platzhalter = ", ohne den Platzhalter," if platzhalter else ""
     if zeichen >= WENIG_TEXT:
-        return f"- {AUS_DEM_BILD}: nein. {gezaehlt.capitalize()} stehen{ohne} {zeichen} Zeichen."
+        return f"- {AUS_DEM_BILD}: nein. {gezaehlt} stehen{ohne_platzhalter} {zeichen} Zeichen."
     if not texte or not all(texte):
         return (f"- {AUS_DEM_BILD}: entscheidest du. Nicht jede Datei hat Text, die Regel "
                 f"kann es nicht sagen.")
-    return (f"- {AUS_DEM_BILD}: ja. {gezaehlt.capitalize()} stehen{ohne} nur {zeichen} Zeichen. "
+    return (f"- {AUS_DEM_BILD}: ja. {gezaehlt} stehen{ohne_platzhalter} nur {zeichen} Zeichen. "
             f"Den Ablauf liest du aus dem Bild, der Trainer prüft ihn einzeln.")
 
 
@@ -986,12 +997,11 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
     gekappt: Der Agent schreibt aus ihm die Karte. Ohne Text steht da, warum,
     und dass er das PDF selbst lesen muss.
     """
-    quellordner = sammelimport.wurzel / "quellen" / sammelimport.ordner
     relativ = [f"{sammelimport.ordner}/{d}" for d in k.dateien]
     dateien: list[str] = []
     texte: list[str | None] = []
     for d in k.dateien:
-        pfad = quellordner / d
+        pfad = sammelimport.quellordner / d
         dateien += [f"### `{d}`", "", f"`{pfad.as_posix()}`", ""]
         text = pdf_text(pdftotext, pfad) if pdftotext and _ist_pdf(d) else None
         texte.append(text)
@@ -1180,8 +1190,9 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     uid = naechste_id(sammelimport.wurzel)
     name = f"{uid}-{slug(str(felder['titel']))}"
     ziel = sammelimport.wurzel / "uebungen" / f"{name}.md"
-    feldbild = str(felder.get("schaubild") or "")
-    schaubild = sammelimport.wurzel / "schaubilder" / f"{name}{Path(feldbild).suffix}"
+    # Welches Feldbild, hat `pruefe_entwurf` sichergestellt: nur das eigene.
+    feldbild = sammelimport.feldbild(k) if felder.get("schaubild") else None
+    schaubild = sammelimport.wurzel / "schaubilder" / f"{name}{sammelimport.feldbild(k).suffix}"
     if feldbild and schaubild.exists():
         raise NichtUebernommen(f"schaubilder/{schaubild.name} gibt es schon")
     text = als_karte(entwurf.read_text(encoding="utf-8"), uid, date.today().isoformat(),
@@ -1192,7 +1203,7 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
         datei.write(text)
     if feldbild:
         schaubild.parent.mkdir(exist_ok=True)
-        shutil.move(entwurf.parent / feldbild, schaubild)
+        shutil.move(feldbild, schaubild)
     k.setze("importiert", notiz, karte=uid)
     sammelimport.speichere()
     raeume_kandidat_weg(sammelimport, k)

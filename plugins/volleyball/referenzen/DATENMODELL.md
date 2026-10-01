@@ -228,7 +228,8 @@ Der Auftrag trägt unter jedem PDF des Kandidaten dessen ganzen Text, oder den
 Hinweis, dass der Agent das PDF selbst lesen muss. Er sagt, ob der Ablauf aus
 dem Bild kommt. Ist `feldbild_ausschneiden` an, schneidet `vorbereiten` aus dem
 ersten PDF des Kandidaten, das ein Bild einbettet, das größte Bild aus. Der
-durchsichtige Rand fällt weg. Im Entwurf steht es als `schaubild: 17.feldbild.png`.
+durchsichtige Rand fällt weg. Im Entwurf steht es als `schaubild: 17.feldbild.png`,
+ein anderes Feldbild darf er nicht nennen.
 
 Ein Kartenentwurf hat das Frontmatter der Karte ohne `id` (ADR-0010), die
 Abschnitte der Karte und am Ende `## Freigabe` mit beiden Listen:
