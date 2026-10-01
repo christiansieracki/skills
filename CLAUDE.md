@@ -26,4 +26,7 @@ See `docs/agents/domain.md`.
 ### Open points
 
 `docs/offene-punkte.md` holds what came up during work and has no ticket yet.
-Read it before planning a wave; add to it when something falls out of scope.
+Read it before planning a wave; add to it when something falls out of scope,
+always with a `Ziel:` line naming a later wave or "bewusst nicht" plus the
+trigger that would reopen it. Before a wave ends, every point gets a ticket or a
+Ziel, so nothing drifts into the next wave.
