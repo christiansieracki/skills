@@ -158,9 +158,13 @@ class IdsUmstellenTest(unittest.TestCase):
         self.ordner.setze_trainer({"anna": {"nummer": "00", "rechner": ["ANNAS-RECHNER"]}})
         vorher = self.lies("trainingsplanung-root.yml")
 
-        self.stelle_um("--schreiben")
+        fertig = self.stelle_um("--schreiben")
 
         self.assertEqual(self.lies("trainingsplanung-root.yml"), vorher)
+        # Still uebergangen waere --trainer aber auch nicht recht: Danach
+        # bekaeme dieser Rechner keine ID, ohne dass es jemand gesagt hat.
+        self.assertIn("bleibt, wie er ist", fertig.stdout)
+        self.assertIn(socket.gethostname(), fertig.stdout)
 
 
 class VorlageTest(unittest.TestCase):

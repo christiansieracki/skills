@@ -61,7 +61,7 @@ ID_MUSTER = r"ue-\d{6}"
 ALTE_ID_MUSTER = r"ue-\d{4}"
 
 # Was in jeder Meldung zu einer vierstelligen ID steht.
-UMSTELLEN = "ids_umstellen.py stellt den Arbeitsordner auf sechs Stellen um"
+HINWEIS_UMSTELLEN = "ids_umstellen.py stellt den Arbeitsordner auf sechs Stellen um"
 
 
 def disziplin_text(eintrag: dict) -> str:
@@ -281,7 +281,12 @@ def rechnername() -> str:
     return socket.gethostname()
 
 
-_TRAINERNAME = re.compile(r"(?P<name>[^\s:#]+):\s*(#.*)?$")
+# Der Name eines Trainers unter `trainer:`, und die Zeile, mit der der
+# Abschnitt beginnt. ids_umstellen.py schreibt beides, deshalb stehen die
+# Muster einmal hier.
+TRAINERNAME = r"[^\s:#]+"
+TRAINER_ABSCHNITT = re.compile(r"trainer:\s*(#.*)?$")
+_TRAINERZEILE = re.compile(rf"(?P<name>{TRAINERNAME}):\s*(#.*)?$")
 
 
 def lies_trainer(wurzel: Path) -> dict[str, dict] | None:
@@ -300,7 +305,7 @@ def lies_trainer(wurzel: Path) -> dict[str, dict] | None:
     if not datei.is_file():
         return None
     zeilen = datei.read_text(encoding="utf-8").splitlines()
-    anfang = next((i for i, z in enumerate(zeilen) if re.match(r"trainer:\s*(#.*)?$", z)), None)
+    anfang = next((i for i, z in enumerate(zeilen) if TRAINER_ABSCHNITT.match(z)), None)
     if anfang is None:
         return None
     trainer: dict[str, dict] = {}
@@ -316,7 +321,7 @@ def lies_trainer(wurzel: Path) -> dict[str, dict] | None:
             break
         einzug_der_namen = einzug_der_namen or einzug
         if einzug == einzug_der_namen:
-            m = _TRAINERNAME.match(inhalt)
+            m = _TRAINERZEILE.match(inhalt)
             eintrag = trainer.setdefault(m.group("name"), {}) if m else None
             continue
         if eintrag is None:
@@ -390,7 +395,8 @@ def trainernummer(wurzel: Path) -> str:
     if nummer is None:
         raise KeineId(f"Die Nummer von {name} unter trainer: in {MARKER} ist keine "
                       f"zweistellige Zahl: {trainer[name].get('nummer')!r}.")
-    gleiche = [n for n, x in nummern.items() if x == nummer and n != name]
+    gleiche = [anderer for anderer, seine in nummern.items()
+               if seine == nummer and anderer != name]
     if gleiche:
         raise KeineId(f"Die Nummer {nummer} tragen unter trainer: in {MARKER} "
                       f"{name} und {', '.join(gleiche)}. Jeder Trainer braucht seine eigene.")
@@ -431,7 +437,8 @@ def naechste_id(wurzel: Path) -> str:
                 vergeben.add(m.group())
     if vierstellig:
         raise KeineId(f"uebungen/ hat noch vierstellige IDs, etwa {vierstellig[0]}. "
-                      f"Erst umstellen: {UMSTELLEN}.")
+                      f"Erst umstellen: {HINWEIS_UMSTELLEN}. Steht unter trainer: "
+                      f"noch niemand, traegt es dabei diesen Rechner ein, {rechnername()}.")
     nummer = trainernummer(wurzel)
     laufend = [int(uid[-4:]) for uid in vergeben if uid[len("ue-"):len("ue-00")] == nummer]
     hoechste = max(laufend, default=0)
@@ -513,7 +520,7 @@ def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
         gesehen[kid] = datei
 
         if re.fullmatch(ALTE_ID_MUSTER, str(kid)):
-            w.append(f"{datei}: id {kid} ist noch vierstellig, {UMSTELLEN}")
+            w.append(f"{datei}: id {kid} ist noch vierstellig, {HINWEIS_UMSTELLEN}")
         elif not re.fullmatch(ID_MUSTER, str(kid)):
             w.append(f"{datei}: id {kid} passt nicht zum Muster ue-######")
         if not str(Path(datei).name).startswith(str(kid)):
@@ -535,7 +542,7 @@ def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
         # Plan mehrere, und alle haben dieselbe Ursache.
         if t.get("vierstellig"):
             w.append(f"{t['datei']}: nennt noch vierstellige IDs "
-                     f"({', '.join(t['vierstellig'])}), {UMSTELLEN}")
+                     f"({', '.join(t['vierstellig'])}), {HINWEIS_UMSTELLEN}")
 
     return w
 

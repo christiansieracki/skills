@@ -19,6 +19,10 @@ import unittest
 
 from arbeitsordner import Arbeitsordner
 
+# Ein Trainer, der an einem anderen Rechner sitzt als dem, auf dem der Test
+# laeuft.
+TRAINER_ANDERER_RECHNER = {"anderer": {"nummer": "00", "rechner": ["ANDERER-RECHNER"]}}
+
 
 class SucheTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -276,7 +280,7 @@ class NaechsteIdTest(unittest.TestCase):
         self.assertEqual(self.naechste_id(), "ue-010001")
 
     def test_karten_eines_anderen_trainers_zaehlen_nicht(self) -> None:
-        # Der Fixture traegt die Karten 00…05 von Trainer 00. Dazu eine hoehere
+        # Der Fixture traegt die Karten 000001 bis 000005 von Trainer 00. Dazu eine hoehere
         # von Trainer 02. Fuer Trainer 01 zaehlt nur seine eigene.
         self.ordner.setze_trainer({**TRAINER_ANDERER_RECHNER,
                                    "neu": {"nummer": "01", "rechner": [socket.gethostname()]}})
@@ -350,10 +354,18 @@ class NaechsteIdTest(unittest.TestCase):
 
         self.assertIn("ids_umstellen.py", meldung)
 
+    def test_vor_der_umstellung_nennt_die_meldung_auch_den_rechner(self) -> None:
+        # So sieht jeder Ordner aus, den 2.5.1 hinterlassen hat: vierstellige
+        # Karten und kein Abschnitt trainer:. Dieser Rechner steht also in
+        # keinem Eintrag, und die Meldung nennt ihn.
+        self.ordner = Arbeitsordner(vor_der_umstellung=True)
+        self.addCleanup(self.ordner.raeume_auf)
 
-# Ein Trainer, der an einem anderen Rechner sitzt als dem, auf dem der Test
-# laeuft.
-TRAINER_ANDERER_RECHNER = {"anderer": {"nummer": "00", "rechner": ["ANDERER-RECHNER"]}}
+        meldung = self.keine_id()
+
+        self.assertIn("ids_umstellen.py", meldung)
+        self.assertIn(socket.gethostname(), meldung)
+
 
 
 if __name__ == "__main__":

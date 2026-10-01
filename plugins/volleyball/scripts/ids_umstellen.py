@@ -18,7 +18,8 @@ Leere zeigt.
   vierstelligen ID beginnt, werden umbenannt: die Karte, ihr Bild, ihre Szene.
 - Hat die Wurzeldatei unter `trainer:` noch niemanden, kommt der genannte
   Trainer hinein, mit der Nummer 00 und diesem Rechner. Ist dort schon jemand
-  eingetragen, bleibt der Abschnitt, wie er ist.
+  eingetragen, bleibt der Abschnitt, wie er ist. Gehört dieser Rechner dann
+  zu keinem Trainer, sagt das Skript es.
 
 Erzeugtes schreibt das Skript nicht um. `index.md` und die Leseansichten
 entstehen danach neu aus den umgestellten Dateien, das Skript sagt am Ende,
@@ -41,8 +42,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    ALTE_ID_MUSTER, MARKER, finde_wurzel, interpreter, konsole_vorbereiten,
-    lies_trainer, rechnername,
+    ALTE_ID_MUSTER, MARKER, TRAINER_ABSCHNITT, TRAINERNAME, KeineId, finde_wurzel,
+    interpreter, konsole_vorbereiten, lies_trainer, rechnername, trainernummer,
 )
 
 VIERSTELLIG = re.compile(rf"\b{ALTE_ID_MUSTER}\b")
@@ -74,6 +75,7 @@ class Plan:
     belegt: list[str] = field(default_factory=list)
     nicht_lesbar: list[str] = field(default_factory=list)
     trainer: str | None = None
+    hinweis: str | None = None
 
     @property
     def leer(self) -> bool:
@@ -107,7 +109,7 @@ def mit_trainer(text: str, name: str) -> str | None:
     eintrag = [f"  {name}:", '    nummer: "00"', f"    rechner: [{rechnername()}]"]
     zeilen = text.splitlines(keepends=True)
     for i, zeile in enumerate(zeilen):
-        if re.match(r"trainer:\s*(#.*)?$", zeile.rstrip("\r\n")):
+        if TRAINER_ABSCHNITT.match(zeile.rstrip("\r\n")):
             if not zeile.endswith("\n"):
                 zeilen[i] += nl
             zeilen[i + 1:i + 1] = [z + nl for z in eintrag]
@@ -148,6 +150,16 @@ def plane(wurzel: Path, trainer: str) -> Plan:
 
     if not lies_trainer(wurzel):
         plan.trainer = trainer
+    else:
+        # Den Abschnitt pflegt der Import-Skill nach Rückfrage, hier wird
+        # keiner umgeschrieben. Still übergangen wäre --trainer aber auch
+        # nicht recht: Danach bekäme dieser Rechner keine ID, und niemand
+        # hätte es gesagt.
+        try:
+            trainernummer(wurzel)
+        except KeineId as fehler:
+            plan.hinweis = (f"Unter trainer: steht schon jemand. Der Abschnitt bleibt, wie er "
+                            f"ist, und {trainer} bekommt dort keinen Eintrag.\n{fehler}")
     return plan
 
 
@@ -171,6 +183,9 @@ def zeige(plan: Plan) -> None:
         print("Nicht als UTF-8 lesbar, mit vierstelliger ID darin. Bitte von Hand umstellen:")
         for name in plan.nicht_lesbar:
             print(f"  {name}")
+        print()
+    if plan.hinweis:
+        print(plan.hinweis)
         print()
 
 
@@ -215,7 +230,7 @@ def main() -> int:
                     help="umstellen, statt nur zu zeigen, was sich ändert")
     a = ap.parse_args()
 
-    if not re.fullmatch(r"[^\s:#]+", a.trainer):
+    if not re.fullmatch(TRAINERNAME, a.trainer):
         print(f"--trainer {a.trainer!r}: ein Name ohne Leerzeichen, Doppelpunkt und #, "
               f"so wie unter gruppen.<gruppe>.trainer.")
         return 1
@@ -224,6 +239,8 @@ def main() -> int:
     print(f"Arbeitsordner: {wurzel}\n")
     if plan.leer:
         print("Nichts zu tun: Keine vierstellige ID mehr, und unter trainer: steht schon jemand.")
+        if plan.hinweis:
+            print(f"\n{plan.hinweis}")
         return 0
 
     zeige(plan)

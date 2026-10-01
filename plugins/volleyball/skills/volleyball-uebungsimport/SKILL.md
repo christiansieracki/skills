@@ -204,10 +204,12 @@ warum:
   umgestellt. Das macht
   `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/ids_umstellen.py --trainer <name>`.
   Die bisherigen Karten bekommen `00` vorn, und `<name>` vergibt als Trainer
-  `00` danach weiter, in aller Regel der, der bisher importiert hat. Ohne
-  `--schreiben` zeigt das Skript nur, was sich ändert. Es benennt Karten im
+  `00` danach weiter, in aller Regel der, der bisher importiert hat. Steht
+  unter `trainer:` noch niemand, trägt das Skript ihn mit diesem Rechner ein.
+  Ohne `--schreiben` zeigt es nur, was sich ändert. Es benennt Karten im
   ganzen Ordner um, also für alle Trainer. Zeig, was es ändern würde, und
-  schreib erst nach dem Ja. Bis dahin wird nichts importiert.
+  schreib erst nach dem Ja. Bis dahin wird nichts importiert. Danach
+  `--naechste-id` noch einmal.
 
 ## Prüfen
 
@@ -258,8 +260,9 @@ ihnen trägt. Dazu die bestehenden Karten, die eine Disziplin dazubekommen
 haben, und was du beim Zerlegen entschieden hast, wo es nicht eindeutig war.
 Neue Schwerpunkt-Kennungen, die du nach Freigabe eingetragen hast, stehen mit
 dabei, und ebenso die, für die es kein Ja gab. Hast du unter `trainer:` einen
-Rechner oder einen Trainer eingetragen, gehört das auch dazu. Fragen, die du unterwegs gestellt und selbst
-beantwortet hast, gehören ebenfalls hinein, damit er sie kippen kann.
+Rechner oder einen Trainer eingetragen, gehört das auch dazu. Fragen, die du
+unterwegs gestellt und selbst beantwortet hast, gehören ebenfalls hinein,
+damit er sie kippen kann.
 
 Zum Schluss die Kandidaten für ein Schaubild, die offen geblieben sind, mit
 ihren IDs. Aus dieser Zeile kopiert er sie in die nächste Sitzung.

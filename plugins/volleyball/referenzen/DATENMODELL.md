@@ -199,6 +199,10 @@ den Rechner dazu, ein neuer Trainer die nächste freie Nummer, der erste
 überhaupt `00`. Eingetragen wird erst nach dem Ja des Trainers.
 `init_struktur.py` legt den Abschnitt leer an.
 
+Die nächste freie Nummer ist die höchste vergebene plus eins, die Meldung von
+`--naechste-id` nennt sie. Eine Lücke wird nicht gefüllt: Ist ein Trainer
+ausgetragen, steht seine Nummer noch vorn in seinen Karten.
+
 ### Vierstellige IDs
 
 Bis 2.5.1 waren IDs vierstellig, etwa `ue-0042`. Seitdem gilt nur das neue
@@ -212,7 +216,9 @@ Trainingsplan, der noch eine nennt, jeweils mit Hinweis auf
 - Karten in `uebungen/` und Dateien in `schaubilder/`, deren Name mit einer ID
   beginnt, werden umbenannt.
 - Steht unter `trainer:` noch niemand, kommt der mit `--trainer` genannte
-  Trainer hinein, als `00` und mit diesem Rechner.
+  Trainer hinein, als `00` und mit diesem Rechner. Steht dort schon jemand,
+  bleibt der Abschnitt, wie er ist. Gehört dieser Rechner dann zu keinem
+  Trainer, sagt das Skript es.
 - `index.md` und die Leseansichten sind erzeugt und bleiben. Das Skript sagt
   am Ende, womit sie neu entstehen.
 - Ist ein neuer Dateiname schon belegt, schreibt es nichts. Ein zweiter Lauf
