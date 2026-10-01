@@ -834,6 +834,9 @@ class PruefenTest(unittest.TestCase):
             "unbekannte Kennung": ({"schwerpunkt": ["gibt-es-nicht"]}, "gibt-es-nicht"),
             "Kennung mit falscher Disziplin": (
                 {"disziplin": ["halle"], "schwerpunkt": ["nur-beach"]}, "nur-beach"),
+            # Ohne Klammern liest der Parser einen Text, keine Liste. Der
+            # Grund soll das sagen und nicht jeden Buchstaben als Kennung melden.
+            "Kennung ohne eckige Klammern": ({"schwerpunkt": "annahme"}, "eckigen Klammern"),
             "quelldatei ohne Datei dahinter": (
                 {"quelldatei": f"{ORDNER}/fehlt.pdf"}, "fehlt.pdf"),
             "quelldatei leer": ({"quelldatei": None}, "quelldatei"),
@@ -855,6 +858,10 @@ class PruefenTest(unittest.TestCase):
                 {"vorschlaege": ["Die Schwierigkeit steuert der Ball."]}, "Backticks"),
             "Vorschlag zu einem Feld, das es nicht gibt": (
                 {"vorschlaege": ["`spielerzahl`: aus den Rollen."]}, "spielerzahl"),
+            # Die Spalte "aus dem Bild" nennt den Abschnitt, damit der Trainer
+            # ihn im Entwurf findet. Vertippt faende er ihn nicht.
+            "Vorschlag zu einem Abschnitt, den es nicht gibt": (
+                {"vorschlaege": ["`## Ablaf`, Schritt 2: aus den Pfeilen im Bild."]}, "Ablaf"),
         }
         self.plane(*({"kandidat": nr, "dateien": ["a.pdf"]} for nr in range(len(faelle) + 1)))
         self.ordner.lege_kartenentwurf_an(ORDNER, 0, titel="Heil")
@@ -912,7 +919,7 @@ class PruefenTest(unittest.TestCase):
             {"feld": "spieler_min", "text": "aus den Rollen im Bild gezählt."},
         ])
         self.assertEqual(kandidat["vorschlaege"]["textstellen"], [
-            {"abschnitt": "## Ablauf", "stelle": "Schritt 2",
+            {"abschnitt": "## Ablauf", "wo": "Schritt 2",
              "text": "Die Wege kommen aus den gelben Pfeilen im Bild."},
         ])
         # Die Felder fuer die Tabelle, so wie sie im Entwurf stehen. Der
@@ -1206,7 +1213,7 @@ class UebernehmenTest(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in entwuerfe.iterdir()), [])
         self.assertEqual(uebersicht["3"]["Status"], "offen")
 
-    def test_ergaenzt_mit_einer_id_die_es_nicht_gibt_bleibt_offen(self) -> None:
+    def test_ergaenzt_mit_unbekannter_id_und_gestrichen_ohne_grund_aendern_nichts(self) -> None:
         # Vertippt. Die Uebersicht zeigte sonst auf eine Karte, die es nicht
         # gibt, und niemand faende, wohin das Duplikat gegangen ist. Ein
         # Streichen ohne Grund ginge genauso verloren.

@@ -247,8 +247,8 @@ Rückfragen:
 Jede Rückfrage stellt genau eine Frage, mit genau einem Fragezeichen, und
 endet auf `Vermutung im Entwurf: …` oder auf `Vermutung im Entwurf: keine`.
 Ein Vorschlag beginnt mit seinem Ziel in Backticks: dem Feld, oder der
-Überschrift des Abschnitts samt `##`, dann die Stelle. Eine leere Liste heißt
-`Vorschläge: keine`.
+Überschrift des Abschnitts samt `##`, dahinter, wo im Abschnitt, etwa
+`` `## Ablauf`, Schritt 2: … ``. Eine leere Liste heißt `Vorschläge: keine`.
 
 `sammelimport.py pruefen` weist einen Entwurf ab, wenn er das Datenmodell
 bricht oder die Form der Freigabe nicht einhält. Der Kandidat geht dann auf
@@ -260,10 +260,14 @@ neu. Geprüft wird:
 - die Felder mit denselben Regeln wie im Linter, darunter die kontrollierten
   Werte und `schwerpunkt` nur mit Kennungen aus `schwerpunkte.md`, die zur
   Disziplin der Karte passen;
-- `quelldatei`: relativ zu `quellen/`, und jede genannte Datei liegt dort;
+- `quelldatei`: relativ zu `quellen/`, und jede genannte Datei liegt dort.
+  Anders als auf einer Karte von Hand ist das hier kein freier Text: Der
+  Auftrag gibt den Wert vor, mit den Dateien des Kandidaten, bei mehreren
+  durch Komma getrennt;
 - das Feldbild: nur das eigene, und es liegt neben dem Entwurf;
 - `## Freigabe` mit beiden Listen, jede Rückfrage und jeder Vorschlag in der
-  Form oben, und ein Vorschlag zu einem Feld nennt eins aus dem Frontmatter.
+  Form oben. Ein Vorschlag nennt ein Feld aus dem Frontmatter oder einen
+  Abschnitt, den der Entwurf hat.
 
 Mit `--json` gibt `pruefen` je Kandidat aus, was die Freigabe im Chat braucht:
 die Felder des Entwurfs, die Vorschläge getrennt nach Feldern und Textstellen,

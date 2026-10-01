@@ -361,7 +361,10 @@ class Sammelimport:
 
     @cached_property
     def bekannt(self) -> set[str]:
-        """Die IDs der Karten in `uebungen/`, für `variante_von`."""
+        """Die IDs der Karten in `uebungen/`, für `variante_von` und `--ergaenzt`.
+
+        Eine Karte, die `uebernehmen` schreibt, trägt `uebernimm` hier nach.
+        """
         return {str(karte["id"]) for karte in lies_uebungen(self.wurzel)}
 
 
@@ -395,12 +398,12 @@ class Vorschlag:
     """Ein Vorschlag aus `## Freigabe`: zu einem Feld oder zu einer Stelle im Text.
 
     `ziel` ist das Feld, oder bei einer Textstelle die Überschrift ihres
-    Abschnitts samt `##`. `stelle` sagt, wo im Abschnitt, und ist bei einem
-    Feld leer. `text` ist die Begründung.
+    Abschnitts samt `##`. `wo` sagt, wo im Abschnitt, etwa „Schritt 2“, und
+    ist bei einem Feld leer. `text` ist die Begründung.
     """
 
     ziel: str
-    stelle: str
+    wo: str
     text: str
 
     @property
@@ -421,6 +424,10 @@ class Befund:
     vorschlaege: list[Vorschlag] = field(default_factory=list)
     rueckfragen: list[Rueckfrage] = field(default_factory=list)
     aus_dem_bild: bool = False
+
+    @property
+    def mit_vermutung(self) -> list[Rueckfrage]:
+        return [r for r in self.rueckfragen if r.vermutung is not None]
 
     @property
     def ohne_vermutung(self) -> list[Rueckfrage]:
@@ -538,13 +545,14 @@ def pruefe_frontmatter(sammelimport: Sammelimport, k: Kandidat, felder: dict) ->
         raise Formfehler(f"Feldbild {schaubild} liegt nicht neben dem Entwurf")
 
 
-def lies_vorschlag(nr: int, text: str, felder: dict) -> Vorschlag:
+def lies_vorschlag(nr: int, text: str, felder: dict, ueberschriften: set[str]) -> Vorschlag:
     """Ein Vorschlag, getrennt nach Feld oder Textstelle, an seinem Ziel in Backticks.
 
     Die Form steht in DATENMODELL.md: `` `level_max`: Begründung `` oder
     `` `## Ablauf`, Schritt 2: Begründung ``. Ohne Ziel vorn fände der
     Vorschlag keine Spalte in der Tabelle. Ein Feld, das nicht im
-    Frontmatter steht, auch nicht.
+    Frontmatter steht, auch nicht, und einen Abschnitt, den der Entwurf
+    nicht hat, fände der Trainer nicht, wenn er nachsehen will.
     """
     treffer = _ZIEL.fullmatch(text)
     if not treffer:
@@ -555,11 +563,13 @@ def lies_vorschlag(nr: int, text: str, felder: dict) -> Vorschlag:
         if ziel not in felder:
             raise Formfehler(f"Vorschlag {nr} nennt `{ziel}`, das steht nicht im Frontmatter")
         return Vorschlag(ziel, "", rest.lstrip(":,").strip())
+    if ziel not in ueberschriften:
+        raise Formfehler(f"Vorschlag {nr} nennt `{ziel}`, den Abschnitt hat der Entwurf nicht")
     rest = rest.lstrip(",").strip()
-    stelle, doppelpunkt, begruendung = rest.partition(":")
+    wo, doppelpunkt, begruendung = rest.partition(":")
     if not doppelpunkt:
-        stelle, begruendung = "", rest
-    return Vorschlag(ziel, stelle.strip(), begruendung.strip())
+        wo, begruendung = "", rest
+    return Vorschlag(ziel, wo.strip(), begruendung.strip())
 
 
 def lies_rueckfrage(nr: int, text: str) -> Rueckfrage:
@@ -585,14 +595,17 @@ def lies_rueckfrage(nr: int, text: str) -> Rueckfrage:
 
 def lies_freigabe(rumpf: str, felder: dict) -> tuple[list[Vorschlag], list[Rueckfrage]]:
     """Die Listen unter `## Freigabe`, oder Formfehler, wenn ihre Form nicht stimmt."""
-    freigabe = _abschnitt(rumpf.splitlines(), "Freigabe")
+    zeilen = rumpf.splitlines()
+    freigabe = _abschnitt(zeilen, "Freigabe")
     if freigabe is None:
         raise Formfehler("## Freigabe fehlt")
     listen = _listen(freigabe)
     for liste in ("Vorschläge", "Rückfragen"):
         if liste not in listen:
             raise Formfehler(f"## Freigabe ohne {liste}:")
-    return ([lies_vorschlag(nr, v, felder) for nr, v in enumerate(listen["Vorschläge"], 1)],
+    ueberschriften = {z.strip() for z in zeilen if z.startswith("#")}
+    return ([lies_vorschlag(nr, v, felder, ueberschriften)
+             for nr, v in enumerate(listen["Vorschläge"], 1)],
             [lies_rueckfrage(nr, r) for nr, r in enumerate(listen["Rückfragen"], 1)])
 
 
@@ -1296,12 +1309,12 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
         "vorschlaege": {
             "felder": [{"feld": v.ziel, "text": v.text}
                        for v in befund.vorschlaege if not v.zur_textstelle],
-            "textstellen": [{"abschnitt": v.ziel, "stelle": v.stelle, "text": v.text}
+            "textstellen": [{"abschnitt": v.ziel, "wo": v.wo, "text": v.text}
                             for v in befund.vorschlaege if v.zur_textstelle],
         },
         "rueckfragen": {
             "mit_vermutung": [{"nr": r.nr, "frage": r.frage, "vermutung": r.vermutung}
-                              for r in befund.rueckfragen if r.vermutung is not None],
+                              for r in befund.mit_vermutung],
             "ohne_vermutung": [{"nr": r.nr, "frage": r.frage} for r in befund.ohne_vermutung],
         },
     }
@@ -1437,6 +1450,7 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     if feldbild:
         schaubild.parent.mkdir(exist_ok=True)
         shutil.move(feldbild, schaubild)
+    sammelimport.bekannt.add(uid)
     schliesse_ab(sammelimport, k, "importiert", notiz, karte=uid)
     return uid
 
@@ -1462,8 +1476,12 @@ def schliesse_ab(sammelimport: Sammelimport, k: Kandidat, status: str, notiz: st
         datei.unlink(missing_ok=True)
 
 
-def warum_nicht_offen(k: Kandidat | None) -> str | None:
-    """Warum ein genannter Kandidat nicht mehr auf seine Karte wartet, oder None."""
+def warum_nicht_wartend(k: Kandidat | None) -> str | None:
+    """Warum ein genannter Kandidat nicht auf seine Karte wartet, oder None.
+
+    Bei None, einer Nummer ohne Zeile in der Übersicht, gibt es immer einen
+    Grund. Wer keinen bekommt, hat also einen Kandidaten in der Hand.
+    """
     if k is None:
         return "steht nicht in der Übersicht"
     if not k.wartet:
@@ -1478,7 +1496,7 @@ def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> st
     Prüfung nicht mehr besteht, geht zurück auf `offen`, mit dem Grund in der
     Notiz. Dann entwirft ihn der nächste Durchgang neu.
     """
-    grund = warum_nicht_offen(k)
+    grund = warum_nicht_wartend(k)
     if grund or k is None:
         return grund
     befund = pruefe_entwurf(sammelimport, k)
@@ -1504,7 +1522,7 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
                       "--uebersprungen <nr> \"<grund>\" oder --ergaenzt <nr> <id>")
     nach_nummer = {k.nummer: k for k in sammelimport.kandidaten}
 
-    nicht_uebernommen = 0
+    abgewiesen = 0
     for nummer, notiz in freigegeben:
         k = nach_nummer.get(nummer)
         grund = pruefe_fuer_uebernahme(sammelimport, k)
@@ -1515,34 +1533,28 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
             except NichtUebernommen as fehler:
                 grund = str(fehler)
         print(f"  {nummer}  nicht übernommen: {grund}")
-        nicht_uebernommen += 1
+        abgewiesen += 1
 
-    for nummer, grund in uebersprungen:
+    # Je Kandidat ohne Karte: Status, Notiz, Karte, und was dagegen spricht.
+    # `bekannt` kennt auch die Karten, die dieser Aufruf eben geschrieben
+    # hat. Auch eine davon kann die ergänzte sein.
+    ohne_karte = [
+        (nummer, "übersprungen", grund.strip(), None, "" if grund.strip() else "ohne Grund")
+        for nummer, grund in uebersprungen
+    ] + [
+        (nummer, "ergänzt", "", uid,
+         "" if uid in sammelimport.bekannt else f"{uid} gibt es nicht in uebungen/")
+        for nummer, uid in ergaenzt
+    ]
+    for nummer, status, notiz, karte, einwand in ohne_karte:
         k = nach_nummer.get(nummer)
-        warum = warum_nicht_offen(k)
-        if not warum and not grund.strip():
-            warum = "ohne Grund"
-        if warum or k is None:
-            print(f"  {nummer}  nicht übersprungen: {warum}")
-            nicht_uebernommen += 1
+        einwand = warum_nicht_wartend(k) or einwand
+        if einwand:
+            print(f"  {nummer}  nicht {status}: {einwand}")
+            abgewiesen += 1
             continue
-        schliesse_ab(sammelimport, k, "übersprungen", grund.strip())
-        print(f"  {nummer}  übersprungen: {grund.strip()}")
-
-    # Erst jetzt gelesen: Auch eine Karte, die dieser Aufruf eben
-    # geschrieben hat, kann die ergänzte sein.
-    karten = {str(karte["id"]) for karte in lies_uebungen(wurzel)}
-    for nummer, uid in ergaenzt:
-        k = nach_nummer.get(nummer)
-        warum = warum_nicht_offen(k)
-        if not warum and uid not in karten:
-            warum = f"{uid} gibt es nicht in uebungen/"
-        if warum or k is None:
-            print(f"  {nummer}  nicht ergänzt: {warum}")
-            nicht_uebernommen += 1
-            continue
-        schliesse_ab(sammelimport, k, "ergänzt", "", karte=uid)
-        print(f"  {nummer}  ergänzt in {uid}")
+        schliesse_ab(sammelimport, k, status, notiz, karte=karte)
+        print(f"  {nummer}  {status}: {notiz or karte}")
 
     # Der Linter prüft die ganze Bibliothek, nicht nur die neuen Karten. Was
     # er meldet, steht damit vor dem Trainer, solange der Durchgang frisch ist.
@@ -1558,7 +1570,7 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
     if not any(k.wartet for k in sammelimport.kandidaten):
         raeume_entwurfsordner_weg(sammelimport)
         print(f"Nichts mehr offen, {ENTWUERFE}/{ordner}/ ist weg.")
-    return 1 if nicht_uebernommen else 0
+    return 1 if abgewiesen else 0
 
 
 def raeume_entwurfsordner_weg(sammelimport: Sammelimport) -> None:

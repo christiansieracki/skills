@@ -375,7 +375,14 @@ def pruefe_felder(k: dict, schwerpunkte: dict[str, set[str]], bekannt: set[str])
             else:
                 gueltige_disziplinen.add(d)
 
-    for el in k.get("element") or []:
+    # Ohne eckige Klammern liest der Parser einen Text. Darueber zu laufen
+    # hiesse, jeden Buchstaben als Element oder Kennung zu melden.
+    for feld in ("element", "schwerpunkt"):
+        wert = k.get(feld)
+        if wert and not isinstance(wert, list):
+            w.append(f"{feld} {wert!r} steht nicht in eckigen Klammern")
+    element = k.get("element")
+    for el in element if isinstance(element, list) else []:
         if el not in ELEMENTE:
             w.append(f"element {el!r} steht nicht in der Liste")
     if k.get("spielphase") not in SPIELPHASEN:
@@ -383,8 +390,9 @@ def pruefe_felder(k: dict, schwerpunkte: dict[str, set[str]], bekannt: set[str])
     if k.get("form") not in FORMEN:
         w.append(f"form {k.get('form')!r} ist unbekannt")
 
-    if schwerpunkte:
-        for s in k.get("schwerpunkt") or []:
+    schwerpunkt = k.get("schwerpunkt")
+    if schwerpunkte and isinstance(schwerpunkt, list):
+        for s in schwerpunkt:
             if s not in schwerpunkte:
                 w.append(f"schwerpunkt {s!r} steht nicht in schwerpunkte.md")
                 continue
