@@ -172,6 +172,9 @@ Liegt im Quellenordner und hat drei Teile:
 ---
 kandidaten_je_durchgang: 30      # so viele Aufträge je Durchgang
 plan_freigegeben: 2026-09-30     # null, solange der Plan nicht freigegeben ist
+textmarke: "Ausführung:"         # optional: ab hier beschreibt die Quelle ihren Ablauf
+platzhalter: "hier könnte ihr Text stehen"   # optional: was dort steht, wenn nichts dasteht
+feldbild_ausschneiden: true      # optional: das Feldbild aus dem PDF ausschneiden
 ---
 
 # Sammelimport playdrill
@@ -196,8 +199,15 @@ daraus gelten. Geht unverändert in jeden Auftrag.
   Aus `uebung` und `folge` wird eine Karte mit diesem `typ`.
 - **Status** ist eins von `offen`, `bereit`, `rückfrage`, `importiert`,
   `ergänzt`, `übersprungen`, `zurückgestellt`. Die ersten drei warten noch auf
-  ihre Karte. `rückfrage` heißt: Der Entwurf hat eine Rückfrage ohne
-  Vermutung, hier muss einzeln gefragt werden.
+  ihre Karte. `rückfrage` heißt: Hier muss einzeln gefragt werden. Entweder
+  hat der Entwurf eine Rückfrage ohne Vermutung, oder sein Ablauf kommt laut
+  Auftrag aus dem Bild.
+
+`textmarke` und `platzhalter` sind für die Regel „wenig Text“. Stehen nach der
+Textmarke, ohne den Platzhalter, weniger als 150 Zeichen, sagt der Auftrag
+„Ablauf aus dem Bild“. Groß- und Kleinschreibung und Zeilenumbrüche zählen
+dabei nicht. Ohne Textmarke, oder wenn eine Datei sie nicht trägt, zählt ihr
+ganzer Text. Hat eine Datei gar keinen Text, entscheidet der Agent.
 
 Die Übersicht ist der freigegebene Zerlegungsplan. Bis zur Freigabe schreibt
 ihn der Skill im Gespräch mit dem Trainer. Danach schreibt nur noch
@@ -212,7 +222,13 @@ die Eingabe für den Zerlegungsplan: jede Datei des Quellenordners, die noch in
 keiner Zeile der Übersicht steht, bei PDFs ihr Text, und die Bibliotheksliste,
 in der die Karten aus diesem Quellenordner markiert sind. Der Rest ist nach der
 Nummer des Kandidaten benannt: `17.auftrag.md` ist der Auftrag für den Agenten,
-`17.md` der Kartenentwurf.
+`17.md` der Kartenentwurf, `17.feldbild.png` das Feldbild.
+
+Der Auftrag trägt unter jedem PDF des Kandidaten dessen ganzen Text, oder den
+Hinweis, dass der Agent das PDF selbst lesen muss. Er sagt, ob der Ablauf aus
+dem Bild kommt. Ist `feldbild_ausschneiden` an, schneidet `vorbereiten` aus dem
+ersten PDF des Kandidaten, das ein Bild einbettet, das größte Bild aus. Der
+durchsichtige Rand fällt weg. Im Entwurf steht es als `schaubild: 17.feldbild.png`.
 
 Ein Kartenentwurf hat das Frontmatter der Karte ohne `id` (ADR-0010), die
 Abschnitte der Karte und am Ende `## Freigabe` mit beiden Listen:
@@ -231,9 +247,11 @@ Jede Rückfrage endet auf `Vermutung im Entwurf: …` oder auf
 `Vermutung im Entwurf: keine`. Eine leere Liste heißt `Vorschläge: keine`.
 
 Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
-mit `angelegt` von heute und ohne `## Freigabe`. Entwurf und Auftrag
-verschwinden dann. Ist im Quellenordner nichts mehr offen, verschwindet auch
-`kartenentwuerfe/<ordner>/`.
+mit `angelegt` von heute und ohne `## Freigabe`. Das Feldbild kommt unter dem
+Namen der Karte nach `schaubilder/`, etwa `ue-0291-abwehr-vom-kasten.png`, und
+`schaubild:` zeigt darauf. Liegt dort schon eine Datei unter diesem Namen, wird
+der Kandidat nicht übernommen. Entwurf und Auftrag verschwinden dann. Ist im
+Quellenordner nichts mehr offen, verschwindet auch `kartenentwuerfe/<ordner>/`.
 
 Den Ordner `kartenentwuerfe/` legt `init_struktur.py` nicht an. Er entsteht mit
 dem ersten Sammelimport. `index.py` und `suche.py` lesen ihn nicht, ein
@@ -316,12 +334,14 @@ nur auf ausdrückliche Ansage neu gebaut (`index.py --md`).
 Alle liegen unter `${CLAUDE_PLUGIN_ROOT}/scripts/` und brauchen nur Python 3
 aus der Standardbibliothek. Es gibt zwei Ausnahmen:
 
-- **Pillow:** `bilder_aufbereiten.py` braucht es und bricht ohne es mit einem
-  Installationshinweis ab (ADR-0005).
-- **`pdftotext`:** `sammelimport.py vorbereiten --plan` liest damit den Text
-  von PDFs. Gesucht wird erst im PATH, unter Windows danach neben `git.exe`,
-  denn Git für Windows bringt es mit. Fehlt es, sagt das Skript das einmal mit
-  Installationshinweis und macht ohne Text weiter (ADR-0008).
+- **Pillow:** `bilder_aufbereiten.py` braucht es, dazu `sammelimport.py
+  vorbereiten`, wenn es das Feldbild ausschneiden soll. Beide brechen ohne es
+  mit einem Installationshinweis ab und schreiben nichts (ADR-0005).
+- **`pdftotext`:** `sammelimport.py vorbereiten` liest damit den Text von
+  PDFs, für die Planeingabe und für die Aufträge. Gesucht wird erst im PATH,
+  unter Windows danach neben `git.exe`, denn Git für Windows bringt es mit.
+  Fehlt es, sagt das Skript das einmal mit Installationshinweis und macht ohne
+  Text weiter (ADR-0008).
 
 Die übrigen Skripte brauchen weder Pillow noch `pdftotext`.
 

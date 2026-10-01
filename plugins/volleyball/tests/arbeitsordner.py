@@ -24,6 +24,8 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import zlib
+from dataclasses import dataclass
 from pathlib import Path
 
 SKRIPTE = Path(__file__).resolve().parent.parent / "scripts"
@@ -262,7 +264,7 @@ Seite. Steht hier, damit der Test sie im Auftrag wiederfindet.
 
 
 def _als_sammelimport(kandidaten: list[dict], freigegeben: str | None,
-                      je_durchgang: int, absprachen: str) -> str:
+                      je_durchgang: int, absprachen: str, einstellungen: dict) -> str:
     zeilen = ["| " + " | ".join(UEBERSICHT_SPALTEN) + " |",
               "|" + "---|" * len(UEBERSICHT_SPALTEN)]
     for k in kandidaten:
@@ -275,7 +277,8 @@ def _als_sammelimport(kandidaten: list[dict], freigegeben: str | None,
         "---\n"
         f"kandidaten_je_durchgang: {je_durchgang}\n"
         f"plan_freigegeben: {_yaml(freigegeben)}\n"
-        "---\n\n"
+        + "".join(f"{name}: {_yaml(wert)}\n" for name, wert in einstellungen.items())
+        + "---\n\n"
         "# Sammelimport\n\n"
         "## Absprachen\n\n"
         f"{absprachen}\n"
@@ -335,28 +338,79 @@ def _pdf_datei(objekte: list[bytes]) -> bytes:
     return bytes(datei)
 
 
-def _pdf_mit_text(seiten: list[list[str]]) -> bytes:
-    """Ein PDF mit Textebene, je Seite eine Liste von Zeilen.
+@dataclass
+class PdfBild:
+    """Ein Bild fuer ein Test-PDF, mit Transparenzmaske, so wie PlayDrill sein Feldbild einbettet.
+
+    Deckend ist nur das Rechteck `deckend`: links, oben, rechts, unten in
+    Pixeln, rechts und unten ausschliesslich. Darum herum ist das Bild
+    durchsichtig. Was beim Ausschneiden uebrig bleiben muss, steht damit im
+    Test und nicht in einer zweiten Rechnung.
+
+    `kaputt` schreibt statt der Pixel Bytes, die sich nicht entpacken lassen.
+    """
+
+    breite: int
+    hoehe: int
+    deckend: tuple[int, int, int, int]
+    kaputt: bool = False
+
+    def objekte(self, nummer: int, farbprofil: int) -> list[bytes]:
+        """Das Bild als Objekt `nummer` und seine Maske gleich dahinter.
+
+        Der Farbraum ist ein Verweis auf ein ICC-Profil, wie in jedem
+        PlayDrill-PDF, und nicht das einfachere /DeviceRGB.
+        """
+        links, oben, rechts, unten = self.deckend
+        maske = bytearray(self.breite * self.hoehe)
+        for zeile in range(oben, unten):
+            anfang = zeile * self.breite
+            maske[anfang + links:anfang + rechts] = b"\xff" * (rechts - links)
+        pixel = b"kein Bild" if self.kaputt else zlib.compress(
+            bytes([30, 120, 200]) * (self.breite * self.hoehe))
+        groesse = f"/Type /XObject /Subtype /Image /Width {self.breite} /Height {self.hoehe} "
+        return [
+            _pdf_strom(pixel, f"{groesse}/ColorSpace [/ICCBased {farbprofil} 0 R] "
+                              f"/BitsPerComponent 8 /Filter /FlateDecode /SMask {nummer + 1} 0 R "),
+            _pdf_strom(zlib.compress(bytes(maske)),
+                       f"{groesse}/ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode "),
+        ]
+
+
+def _pdf_mit_text(seiten: list[list[str]], bilder: list[PdfBild]) -> bytes:
+    """Ein PDF mit Textebene, je Seite eine Liste von Zeilen, die Bilder auf der ersten.
 
     Die Schrift ist Helvetica, eine der vierzehn, die jeder PDF-Leser ohne
     Einbettung kennt. Mit WinAnsiEncoding kommen Umlaute durch, und nur dann
     zeigt der Test, dass pdftotext sie als UTF-8 herausgibt.
 
-    Die Objekte stehen in fester Folge: 1 Katalog, 2 Seitenbaum, 3 Schrift,
-    dann je Seite ihr Inhalt und die Seite selbst. Was eine Seite sonst noch
-    braucht, etwa ein eingebettetes Bild, kommt als weiteres Objekt dazu und
-    in ihre Ressourcen.
+    Die Objekte stehen in fester Folge: 1 Katalog, 2 Seitenbaum, 3 Schrift.
+    Mit Bildern folgt das Farbprofil, das sie sich teilen, dann je Bild das
+    Bild und seine Maske. Zuletzt je Seite ihr Inhalt und die Seite selbst.
     """
     objekte = [b"", b"",
                b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
                b"/Encoding /WinAnsiEncoding >>"]
+    xobjekte, zeichnen = [], b""
+    if bilder:
+        objekte.append(_pdf_strom(b"kein echtes Farbprofil", "/N 3 "))
+        farbprofil = len(objekte)
+    for i, bild in enumerate(bilder, 1):
+        nummer = len(objekte) + 1
+        objekte += bild.objekte(nummer, farbprofil)
+        xobjekte.append(f"/Im{i} {nummer} 0 R")
+        zeichnen += f"q {bild.breite} 0 0 {bild.hoehe} 50 {100 * i} cm /Im{i} Do Q\n".encode()
     kinder = []
-    for zeilen in seiten:
+    for seite, zeilen in enumerate(seiten or [[]]):
         inhalt = (b"BT /F1 10 Tf 12 TL 50 800 Td\n"
                   + b"".join(_pdf_zeichenkette(z) + b" Tj T*\n" for z in zeilen)
                   + b"ET")
+        ressourcen = "/Font << /F1 3 0 R >>"
+        if seite == 0 and xobjekte:
+            inhalt = zeichnen + inhalt
+            ressourcen += f" /XObject << {' '.join(xobjekte)} >>"
         objekte.append(_pdf_strom(inhalt))
-        objekte.append(f"<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 3 0 R >> >> "
+        objekte.append(f"<< /Type /Page /Parent 2 0 R /Resources << {ressourcen} >> "
                        f"/Contents {len(objekte)} 0 R >>".encode())
         kinder.append(f"{len(objekte)} 0 R")
     objekte[0] = b"<< /Type /Catalog /Pages 2 0 R >>"
@@ -467,29 +521,34 @@ class Arbeitsordner:
         datei.write_bytes(inhalt)
         return datei
 
-    def lege_quell_pdf_an(self, name: str, *seiten: list[str]) -> Path:
+    def lege_quell_pdf_an(self, name: str, *seiten: list[str],
+                          bilder: list[PdfBild] | None = None) -> Path:
         """Legt ein PDF mit Textebene in `quellen/` ab, je Seite eine Liste von Zeilen.
 
         Gebaut wird es zur Laufzeit mit der Standardbibliothek, so wie
         `lege_quellbild_an` sein Foto baut. Kein Binaermaterial im Repo, und
-        was im PDF steht, steht hier im Test.
+        was im PDF steht, steht hier im Test. `bilder` kommen auf die erste
+        Seite, in der genannten Reihenfolge.
         """
-        return self.lege_quelldatei_an(name, _pdf_mit_text(list(seiten)))
+        return self.lege_quelldatei_an(name, _pdf_mit_text(list(seiten), bilder or []))
 
     def lege_quellenordner_an(self, ordner: str, kandidaten: list[dict],
                               freigegeben: str | None = "2026-09-30",
                               je_durchgang: int = 30,
-                              absprachen: str = ABSPRACHEN) -> Path:
+                              absprachen: str = ABSPRACHEN,
+                              **einstellungen) -> Path:
         """Legt einen Quellenordner mit `sammelimport.md` und Quelldateien an.
 
         `kandidaten` sind die Zeilen der Uebersicht. Jede nennt `kandidat` und
         `dateien`, relativ zum Quellenordner. Die uebrigen Spalten haben einen
         Standard: eine offene Uebung ohne Karte und Notiz. Jede genannte Datei
-        entsteht leer unter `quellen/<ordner>/`. Der Sammelimport liest sie
-        in diesem Zuschnitt nicht, er muss nur wissen, dass es sie gibt.
+        entsteht leer unter `quellen/<ordner>/`. Wer ihren Inhalt braucht,
+        etwa den Text eines PDF, legt sie danach mit `lege_quell_pdf_an`
+        neu an.
 
         `freigegeben=None` ist der Plan, den der Trainer noch nicht
-        freigegeben hat.
+        freigegeben hat. Weitere Einstellungen, etwa `textmarke`, kommen
+        als Schluesselwort und stehen dann so im Frontmatter.
         """
         for k in kandidaten:
             for datei in k["dateien"]:
@@ -497,7 +556,7 @@ class Arbeitsordner:
         datei = self.pfad / "quellen" / ordner / "sammelimport.md"
         datei.parent.mkdir(parents=True, exist_ok=True)
         datei.write_text(
-            _als_sammelimport(kandidaten, freigegeben, je_durchgang, absprachen),
+            _als_sammelimport(kandidaten, freigegeben, je_durchgang, absprachen, einstellungen),
             encoding="utf-8",
         )
         return datei

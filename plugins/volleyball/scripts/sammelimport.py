@@ -16,9 +16,12 @@ die Bibliotheksliste. Ein zweiter Lauf über denselben Ordner nimmt so nur, was
 neu ist. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
 
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
-nächsten offenen Kandidaten an. `pruefen` setzt den Status aus den
-Kartenentwürfen, die dort auf der Platte liegen. `uebernehmen` macht aus
-freigegebenen Entwürfen Karten in `uebungen/`, erst jetzt mit ID (ADR-0010).
+nächsten offenen Kandidaten an, mit dem Text jedes PDF und der Angabe, ob der
+Ablauf aus dem Bild kommt. Wenn die Einstellungen es wollen, schneidet es
+daneben das Feldbild aus dem PDF, dafür braucht es Pillow (ADR-0005). `pruefen`
+setzt den Status aus den Kartenentwürfen, die dort auf der Platte liegen.
+`uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`, erst
+jetzt mit ID (ADR-0010), und legt das Feldbild als ihr Schaubild ab.
 
 Nach der Freigabe des Plans schreibt nur noch dieses Skript in die Übersicht.
 Mehrere Agenten entwerfen parallel, und keiner von ihnen fasst sie an.
@@ -27,12 +30,14 @@ Mehrere Agenten entwerfen parallel, und keiner von ihnen fasst sie an.
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import re
 import shutil
 import subprocess
 import sys
 import unicodedata
+import zlib
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -59,6 +64,13 @@ JE_DURCHGANG = 30
 # gereicht. Warum mehr als die ersten Zeilen: Nachtrag zu ADR-0008.
 GANZER_TEXT_BIS = 400_000
 ERSTE_ZEILEN_BIS = 400
+
+# Weniger Zeichen Ablauf als hier, und der Ablauf kommt aus dem Bild (#29).
+# Was als Ablauf zählt, sagt ablauftext().
+WENIG_TEXT = 150
+
+# Der Anfang der Zeile im Auftrag, die `pruefen` wieder liest.
+AUS_DEM_BILD = "Ablauf aus dem Bild"
 
 SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "Notiz"]
 ERGEBNISSE = {"uebung", "folge", "zurückgestellt", "übersprungen"}
@@ -284,6 +296,32 @@ class Sammelimport:
                           f"ist {zahl!r}, erwartet ist eine Zahl ab 1.")
         return zahl
 
+    def _text_einstellung(self, name: str) -> str | None:
+        wert = self.einstellungen.get(name)
+        if wert is None:
+            return None
+        return str(wert).strip() or None
+
+    @property
+    def feldbild_ausschneiden(self) -> bool:
+        wert = self.einstellungen.get("feldbild_ausschneiden")
+        if wert is None:
+            return False
+        if not isinstance(wert, bool):
+            raise Abbruch(f"feldbild_ausschneiden in quellen/{self.ordner}/{SAMMELIMPORT} "
+                          f"ist {wert!r}, erwartet ist true oder false.")
+        return wert
+
+    @property
+    def textmarke(self) -> str | None:
+        """Ab hier beschreibt eine Quelle ihren Ablauf, bei PlayDrill `Ausführung:`."""
+        return self._text_einstellung("textmarke")
+
+    @property
+    def platzhalter(self) -> str | None:
+        """Was eine Quelle hinschreibt, wenn sie keinen Ablauf hat."""
+        return self._text_einstellung("platzhalter")
+
     @property
     def absprachen(self) -> str:
         return "\n".join(_abschnitt(self.zeilen, "Absprachen") or []).strip()
@@ -298,6 +336,9 @@ class Sammelimport:
     def auftrag(self, k: Kandidat) -> Path:
         return self.entwurfsordner / f"{k.nummer}.auftrag.md"
 
+    def feldbild(self, k: Kandidat) -> Path:
+        return self.entwurfsordner / f"{k.nummer}.feldbild.png"
+
 
 # --------------------------------------------------------------------------
 # Der Kartenentwurf
@@ -307,6 +348,7 @@ class Sammelimport:
 class Befund:
     fehler: str | None = None
     ohne_vermutung: int = 0
+    aus_dem_bild: bool = False
 
 
 _LISTENKOPF = re.compile(r"^(Vorschläge|Rückfragen):\s*(.*)$")
@@ -339,8 +381,25 @@ def _listen(freigabe: list[str]) -> dict[str, list[str]]:
     return listen
 
 
-def pruefe_entwurf(datei: Path) -> Befund:
+_AUS_DEM_BILD_JA = re.compile(rf"^- {AUS_DEM_BILD}: ja\b", re.MULTILINE)
+
+
+def laut_auftrag_aus_dem_bild(auftrag: Path) -> bool:
+    """Hat `vorbereiten` in den Auftrag geschrieben, dass der Ablauf aus dem Bild kommt?
+
+    Gelesen wird der Auftrag und nicht noch einmal die Quelle: Die Regel hat
+    gegolten, als der Agent den Entwurf schrieb, und pdftotext muss für
+    `pruefen` nicht da sein.
+    """
+    try:
+        return bool(_AUS_DEM_BILD_JA.search(auftrag.read_text(encoding="utf-8")))
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
     """Sagt, ob ein Kartenentwurf Karte werden kann, und wenn nicht, warum."""
+    datei = sammelimport.entwurf(k)
     if not datei.is_file():
         return Befund("kein Entwurf")
     try:
@@ -354,6 +413,11 @@ def pruefe_entwurf(datei: Path) -> Befund:
         return Befund("kein lesbares Frontmatter")
     if not felder.get("titel"):
         return Befund("Frontmatter ohne titel")
+    # Im Entwurf nennt `schaubild:` das Feldbild neben ihm. Erst `uebernehmen`
+    # legt es nach schaubilder/, unter den Namen der Karte.
+    schaubild = str(felder.get("schaubild") or "")
+    if schaubild and (Path(schaubild).name != schaubild or not (datei.parent / schaubild).is_file()):
+        return Befund(f"Feldbild {schaubild} liegt nicht neben dem Entwurf")
     freigabe = _abschnitt(rumpf.splitlines(), "Freigabe")
     if freigabe is None:
         return Befund("## Freigabe fehlt")
@@ -362,7 +426,8 @@ def pruefe_entwurf(datei: Path) -> Befund:
         if liste not in listen:
             return Befund(f"## Freigabe ohne {liste}:")
     ohne = [r for r in listen["Rückfragen"] if _OHNE_VERMUTUNG.search(r)]
-    return Befund(ohne_vermutung=len(ohne))
+    return Befund(ohne_vermutung=len(ohne),
+                  aus_dem_bild=laut_auftrag_aus_dem_bild(sammelimport.auftrag(k)))
 
 
 # --------------------------------------------------------------------------
@@ -457,14 +522,14 @@ def _eingezaeunt(text: str) -> list[str]:
     return [f"{zaun}text", text, zaun]
 
 
-def melde_ohne_pdftotext() -> None:
+def melde_ohne_pdftotext(wohin: str, wofuer: str) -> None:
     """Sagt einmal, dass pdftotext fehlt und wie es dazukommt.
 
     Abgebrochen wird nicht (ADR-0008). Ohne Text liest der Agent die PDFs
     selbst. Das kostet mehr, geht aber.
     """
-    print("pdftotext fehlt, die PDFs kommen ohne Text in die Planeingabe.")
-    print("Der Agent für den Zerlegungsplan liest sie dann selbst, das kostet mehr.\n")
+    print(f"pdftotext fehlt, die PDFs kommen ohne Text in {wohin}.")
+    print(f"Der Agent für {wofuer} liest sie dann selbst, das kostet mehr.\n")
     print("Installieren:")
     print("  Windows: kommt mit Git für Windows, …\\Git\\mingw64\\bin\\pdftotext.exe")
     print("  macOS:   brew install poppler")
@@ -556,7 +621,7 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     pdfs = {name for name, pfad in dateien.items() if pfad.suffix.lower() == ".pdf"}
     pdftotext = finde_pdftotext() if pdfs else None
     if pdfs and not pdftotext:
-        melde_ohne_pdftotext()
+        melde_ohne_pdftotext("die Planeingabe", "den Zerlegungsplan")
     texte = {name: pdf_text(pdftotext, dateien[name]) for name in pdfs} if pdftotext else {}
 
     zeichen = sum(len(t) for t in texte.values() if t)
@@ -593,6 +658,245 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
 
 
 # --------------------------------------------------------------------------
+# Das Feldbild
+# --------------------------------------------------------------------------
+
+class KeinFeldbild(Exception):
+    """Aus einem PDF ließ sich kein Feldbild ausschneiden. Der Text sagt, warum."""
+
+
+class OhneBild(KeinFeldbild):
+    """Das PDF bettet gar kein Bild ein. Dann kommt das nächste PDF des Kandidaten dran."""
+
+
+_OBJEKT = re.compile(rb"(?<!\d)(\d+)\s+\d+\s+obj\b\s*")
+_STROM = re.compile(rb"\s*stream\r?\n")
+
+
+def _woerterbuch_ende(daten: bytes, anfang: int) -> int | None:
+    """Wo das Wörterbuch endet, das bei `anfang` mit `<<` beginnt: gleich hinter seinem `>>`.
+
+    Gezählt wird die Tiefe, denn ein Wörterbuch kann weitere enthalten.
+    Zeichenketten werden übersprungen, `(…)` und `<…>`, weil eine
+    Klammer oder ein `>` darin sonst mitzählte.
+    """
+    tiefe, i = 0, anfang
+    while i < len(daten):
+        if daten.startswith(b"<<", i):
+            tiefe, i = tiefe + 1, i + 2
+        elif daten.startswith(b">>", i):
+            tiefe, i = tiefe - 1, i + 2
+            if tiefe == 0:
+                return i
+        elif daten[i:i + 1] == b"<":
+            i = daten.find(b">", i) + 1 or len(daten)
+        elif daten[i:i + 1] == b"(":
+            klammern = 0
+            while i < len(daten):
+                zeichen = daten[i:i + 1]
+                if zeichen == b"\\":
+                    i += 1
+                elif zeichen == b"(":
+                    klammern += 1
+                elif zeichen == b")":
+                    klammern -= 1
+                    if klammern == 0:
+                        break
+                i += 1
+            i += 1
+        else:
+            i += 1
+    return None
+
+
+def pdf_objekte(daten: bytes) -> dict[int, tuple[bytes, bytes | None]]:
+    """Die Objekte eines PDF, die ein Wörterbuch sind: je Nummer das Wörterbuch und der Strom.
+
+    Gelesen wird der Reihe nach durch die Datei, ohne die Querverweistabelle.
+    Den Inhalt eines Stroms überspringt die Suche, sonst fände sie darin
+    zufällig ein `obj`. Die Länge eines Stroms steht in `/Length`, gilt aber
+    nur, wenn dort auch `endstream` folgt. Sonst, etwa bei einer Länge als
+    Verweis, endet er vor dem nächsten `endstream`. Kommt eine Nummer zweimal
+    vor, gilt die spätere, so wie bei einer nachträglich geänderten Datei.
+
+    Das Vorbild im PlayDrill-Log suchte mit einem einzigen Muster bis zum
+    nächsten `stream` und griff bei einem Objekt ohne Strom in das nächste
+    Objekt hinein.
+    """
+    objekte: dict[int, tuple[bytes, bytes | None]] = {}
+    pos = 0
+    while (objekt := _OBJEKT.search(daten, pos)):
+        pos = objekt.end()
+        if not daten.startswith(b"<<", pos):
+            continue
+        ende = _woerterbuch_ende(daten, pos)
+        if ende is None:
+            break
+        woerterbuch, pos = daten[pos:ende], ende
+        strom = None
+        kopf = _STROM.match(daten, pos)
+        if kopf:
+            anfang = kopf.end()
+            laenge = _zahl(woerterbuch, b"Length")
+            schluss = anfang + laenge if laenge is not None else -1
+            if laenge is None or not re.match(rb"\s*endstream", daten[schluss:schluss + 20]):
+                schluss = daten.find(b"endstream", anfang)
+                if schluss < 0:
+                    break
+                schluss -= 2 if daten[schluss - 2:schluss] == b"\r\n" else 1
+            strom, pos = daten[anfang:schluss], schluss
+        objekte[int(objekt.group(1))] = (woerterbuch, strom)
+    return objekte
+
+
+def _zahl(woerterbuch: bytes, name: bytes) -> int | None:
+    """Eine Zahl im Wörterbuch, aber kein Verweis wie `/Length 12 0 R`."""
+    treffer = re.search(rb"/" + name + rb"\s+(\d+)\b(?!\s+\d+\s+R)", woerterbuch)
+    return int(treffer.group(1)) if treffer else None
+
+
+def _verweis(woerterbuch: bytes, name: bytes) -> int | None:
+    """Die Nummer des Objekts, auf das ein Eintrag verweist, etwa `/SMask 7 0 R`."""
+    treffer = re.search(rb"/" + name + rb"\s+(\d+)\s+\d+\s+R", woerterbuch)
+    return int(treffer.group(1)) if treffer else None
+
+
+def _farbmodus(objekte: dict[int, tuple[bytes, bytes | None]], woerterbuch: bytes) -> str:
+    """Der Modus für Pillow aus dem Farbraum des Bildes.
+
+    PlayDrill nennt den Farbraum über ein ICC-Profil, `[/ICCBased 6 0 R]`.
+    Wie viele Farben ein Pixel hat, steht dann als `/N` beim Profil.
+    """
+    modi = {1: "L", 3: "RGB", 4: "CMYK"}
+    treffer = re.search(rb"/ColorSpace\s*(/\w+|\[\s*/ICCBased\s+(\d+)\s+\d+\s+R\s*\])", woerterbuch)
+    if treffer and treffer.group(2):
+        profil = objekte.get(int(treffer.group(2)))
+        farben = _zahl(profil[0], b"N") if profil else None
+        if farben in modi:
+            return modi[farben]
+    elif treffer:
+        name = {b"/DeviceGray": 1, b"/DeviceRGB": 3, b"/DeviceCMYK": 4}.get(treffer.group(1))
+        if name:
+            return modi[name]
+    raise KeinFeldbild("den Farbraum des Bildes liest das Skript nicht")
+
+
+def _bild(objekte: dict[int, tuple[bytes, bytes | None]], nummer: int, maske: bool = False):
+    """Ein eingebettetes Bild als Bild von Pillow, eine Maske als Graustufen.
+
+    Gelesen werden die Bilder, wie PlayDrill sie einbettet: entpackt mit
+    /FlateDecode, 8 Bit je Farbe. Dazu JPEG, /DCTDecode, das Pillow selbst
+    öffnet. Alles andere meldet KeinFeldbild.
+    """
+    from PIL import Image  # erst hier, verlange_pillow() hat vorher geprüft
+
+    woerterbuch, strom = objekte[nummer]
+    breite, hoehe = _zahl(woerterbuch, b"Width"), _zahl(woerterbuch, b"Height")
+    if not breite or not hoehe or strom is None:
+        raise KeinFeldbild("das Bild hat keine lesbare Größe")
+    gefiltert = re.search(rb"/Filter\s*(?:\[\s*)?(/\w+)\s*\]?", woerterbuch)
+    filter_ = gefiltert.group(1).decode() if gefiltert else ""
+    if filter_ == "/DCTDecode":
+        bild = Image.open(io.BytesIO(strom))
+        bild.load()
+        return bild.convert("L" if maske else "RGB")
+    if filter_ not in ("", "/FlateDecode") or re.search(rb"/Filter\s*\[[^\]]*/\w+[^\]]*/\w+",
+                                                        woerterbuch):
+        raise KeinFeldbild(f"das Bild ist mit {filter_} gepackt, das liest das Skript nicht")
+    if (_zahl(woerterbuch, b"Predictor") or 1) > 1 or _zahl(woerterbuch, b"BitsPerComponent") != 8:
+        raise KeinFeldbild("das Bild ist anders gepackt, als das Skript es liest")
+    modus = "L" if maske else _farbmodus(objekte, woerterbuch)
+    pixel = zlib.decompress(strom) if filter_ else strom
+    return Image.frombytes(modus, (breite, hoehe), pixel).convert("L" if maske else "RGB")
+
+
+def schneide_feldbild_aus(pdf: Path, ziel: Path) -> None:
+    """Legt das größte eingebettete Bild eines PDF als PNG ab, ohne den durchsichtigen Rand.
+
+    Das größte nach Pixeln, und nur unter den Bildern, die keine Maske eines
+    anderen sind. PlayDrill bettet sein Feldbild mit 1920 × 1040 Pixeln ein,
+    dazu eine Transparenzmaske. Was die Maske ganz durchsichtig lässt, wird
+    abgeschnitten, wie im PlayDrill-Log. Ein Feldbild ohne Maske bleibt, wie
+    es ist.
+    """
+    try:
+        objekte = pdf_objekte(pdf.read_bytes())
+    except OSError as fehler:
+        raise KeinFeldbild(f"die Datei lässt sich nicht lesen ({fehler})") from fehler
+    bilder = {n: w for n, (w, strom) in objekte.items()
+              if strom is not None and re.search(rb"/Subtype\s*/Image\b", w)}
+    masken = {_verweis(w, name) for w in bilder.values() for name in (b"SMask", b"Mask")}
+    kandidaten = [n for n in bilder if n not in masken]
+    if not kandidaten:
+        raise OhneBild("das PDF bettet kein Bild ein")
+    nummer = max(kandidaten, key=lambda n: (_zahl(bilder[n], b"Width") or 0)
+                 * (_zahl(bilder[n], b"Height") or 0))
+    try:
+        bild = _bild(objekte, nummer)
+        maske = _verweis(bilder[nummer], b"SMask")
+        if maske in bilder:
+            alpha = _bild(objekte, maske, maske=True).resize(bild.size)
+            rahmen = alpha.getbbox()
+            if rahmen is None:
+                raise KeinFeldbild("das Bild ist ganz durchsichtig")
+            bild.putalpha(alpha)
+            bild = bild.crop(rahmen)
+    except (zlib.error, OSError, ValueError) as fehler:
+        raise KeinFeldbild(f"das Bild lässt sich nicht lesen ({fehler})") from fehler
+    bild.save(ziel, "PNG", optimize=True)
+
+
+def verlange_pillow(sammelimport: Sammelimport) -> None:
+    """Bricht ab, wenn das Feldbild ausgeschnitten werden soll und Pillow fehlt (ADR-0005).
+
+    Vor dem ersten Auftrag, damit nichts geschrieben ist: Ein Durchgang ohne
+    Feldbild ergäbe Karten ohne Bild, und Entwürfe, die der Agent ohne das
+    Bild gelesen hat.
+    """
+    try:
+        from PIL import Image  # noqa: F401  Der Import ist die Prüfung.
+    except ImportError:
+        raise Abbruch(
+            f"Für das Ausschneiden des Feldbilds fehlt Pillow. In quellen/"
+            f"{sammelimport.ordner}/{SAMMELIMPORT} steht feldbild_ausschneiden: true.\n\n"
+            f"Installieren mit:\n  {interpreter()} -m pip install Pillow\n\n"
+            f"Es ist noch kein Auftrag geschrieben.") from None
+
+
+def lege_feldbild_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[str, str | None]:
+    """Schneidet das Feldbild eines Kandidaten aus, wenn die Einstellungen es wollen.
+
+    Zurück kommt die Zeile für den Auftrag und, wenn es nicht geklappt hat,
+    was das Skript dazu sagt. Genommen wird das erste PDF des Kandidaten, das
+    ein Bild einbettet. Bei einem Zirkel steht das Übersichtsblatt vorn, und
+    sein Bild zeigt den ganzen Aufbau. Lässt sich dieses Bild nicht lesen,
+    springt kein Stationsblatt ein: Das Bild wäre ein anderes.
+    """
+    ziel = sammelimport.feldbild(k)
+    ziel.unlink(missing_ok=True)
+    if not sammelimport.feldbild_ausschneiden:
+        return "- Feldbild: wird bei dieser Quelle nicht ausgeschnitten.", None
+    pdfs = [d for d in k.dateien if _ist_pdf(d)]
+    if not pdfs:
+        return "- Feldbild: keins, der Kandidat hat kein PDF.", None
+    quellordner = sammelimport.wurzel / "quellen" / sammelimport.ordner
+    grund = "kein PDF des Kandidaten bettet ein Bild ein"
+    for datei in pdfs:
+        try:
+            schneide_feldbild_aus(quellordner / datei, ziel)
+        except OhneBild:
+            continue
+        except KeinFeldbild as fehler:
+            grund = f"`{datei}`: {fehler}"
+            break
+        return (f"- Feldbild: `{ziel.as_posix()}`, aus `{datei}`. Trag es im Entwurf als "
+                f"`schaubild: {ziel.name}` ein."), None
+    ziel.unlink(missing_ok=True)
+    return (f"- Feldbild: keins ausgeschnitten, {grund}. Sieh dir das Bild im PDF selbst an.",
+            f"Kein Feldbild, {grund}.")
+
+
+# --------------------------------------------------------------------------
 # vorbereiten
 # --------------------------------------------------------------------------
 
@@ -614,15 +918,85 @@ def kennungstabelle(wurzel: Path) -> list[str]:
     return zeilen
 
 
-def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[str]) -> Path:
+def _ist_pdf(datei: str | Path) -> bool:
+    return Path(datei).suffix.lower() == ".pdf"
+
+
+def _muster(text: str) -> re.Pattern[str]:
+    """Ein Text als Suchmuster, gleich in welcher Schreibung und mit welchem Leerraum.
+
+    Bei PlayDrill steht „hier Könnte ihr Text stehen“ mit großem K auf dem
+    Blatt, im Log des Trainers mit kleinem. Und pdftotext bricht eine Zeile,
+    wo das Blatt sie bricht.
+    """
+    return re.compile(r"\s+".join(re.escape(w) for w in _nfc(text).split()), re.IGNORECASE)
+
+
+def ablauftext(text: str, textmarke: str | None, platzhalter: str | None) -> str:
+    """Der Teil eines Texts, der den Ablauf beschreibt, ohne den Platzhalter.
+
+    Das ist der Text nach dem ersten Vorkommen der Textmarke. Ohne Textmarke,
+    oder wenn die Datei sie nicht trägt, ist es der ganze Text. PlayDrill
+    schreibt auch „Ausführung(1) …“ oder „Ausführung 1“, mit vollem Ablauf
+    dahinter. Leerraum zählt als ein Zeichen.
+    """
+    text = _nfc(text)
+    if textmarke:
+        marke = _muster(textmarke).search(text)
+        if marke:
+            text = text[marke.end():]
+    if platzhalter:
+        text = _muster(platzhalter).sub(" ", text)
+    return " ".join(text.split())
+
+
+def ablauf_aus_dem_bild(sammelimport: Sammelimport, texte: list[str | None]) -> str:
+    """Die Zeile des Auftrags, ob der Ablauf aus dem Bild kommt (#29, Geschichte 44).
+
+    `texte` hat je Datei des Kandidaten ihren Text, oder None, wenn sie
+    keinen hat: ein Foto, ein PDF ohne Textebene, oder pdftotext fehlt.
+    Unter WENIG_TEXT Zeichen Ablauf kommt er aus dem Bild. Fehlt einer Datei
+    der Text, kann die Regel das nicht sagen, dann entscheidet der Agent.
+    Genug Text ist aber genug, auch wenn daneben ein Foto liegt.
+
+    `pruefen` liest die Zeile wieder, an ihrem Anfang, siehe AUS_DEM_BILD.
+    """
+    marke, platzhalter = sammelimport.textmarke, sammelimport.platzhalter
+    zeichen = sum(len(ablauftext(t, marke, platzhalter)) for t in texte if t)
+    gezaehlt = f"nach „{marke}“" if marke else "im ganzen Text"
+    ohne = ", ohne den Platzhalter," if platzhalter else ""
+    if zeichen >= WENIG_TEXT:
+        return f"- {AUS_DEM_BILD}: nein. {gezaehlt.capitalize()} stehen{ohne} {zeichen} Zeichen."
+    if not texte or not all(texte):
+        return (f"- {AUS_DEM_BILD}: entscheidest du. Nicht jede Datei hat Text, die Regel "
+                f"kann es nicht sagen.")
+    return (f"- {AUS_DEM_BILD}: ja. {gezaehlt.capitalize()} stehen{ohne} nur {zeichen} Zeichen. "
+            f"Den Ablauf liest du aus dem Bild, der Trainer prüft ihn einzeln.")
+
+
+def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[str],
+                     pdftotext: str | None, feldbild: str) -> Path:
     """Legt den Auftrag für einen Kandidaten an, alles, was der Agent braucht.
 
     Die Pfade stehen absolut da, denn der Agent liest und schreibt mit ihnen.
     `quelldatei:` steht relativ zu `quellen/`, so wie auf der Karte, damit sie
     auf jedem Rechner stimmt, egal wo dort der Arbeitsordner liegt.
+
+    Unter jedem PDF steht sein ganzer Text, anders als in der Planeingabe nie
+    gekappt: Der Agent schreibt aus ihm die Karte. Ohne Text steht da, warum,
+    und dass er das PDF selbst lesen muss.
     """
-    quellen = sammelimport.wurzel / "quellen"
+    quellordner = sammelimport.wurzel / "quellen" / sammelimport.ordner
     relativ = [f"{sammelimport.ordner}/{d}" for d in k.dateien]
+    dateien: list[str] = []
+    texte: list[str | None] = []
+    for d in k.dateien:
+        pfad = quellordner / d
+        dateien += [f"### `{d}`", "", f"`{pfad.as_posix()}`", ""]
+        text = pdf_text(pdftotext, pfad) if pdftotext and _ist_pdf(d) else None
+        texte.append(text)
+        if _ist_pdf(d):
+            dateien += [*_text_oder_grund(text, pdftotext), ""]
     teile = [
         f"# Auftrag für Kandidat {k.nummer}",
         "",
@@ -631,12 +1005,13 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
         f"- Was es ist: {k.was}",
         f"- Typ laut Zerlegungsplan: `{k.ergebnis}`",
         f"- `quelldatei:` `{', '.join(relativ)}`",
+        ablauf_aus_dem_bild(sammelimport, texte),
+        feldbild,
         f"- Zielpfad des Entwurfs: `{sammelimport.entwurf(k).as_posix()}`",
         "",
         "## Dateien",
         "",
-        *(f"- `{(quellen / r).as_posix()}`" for r in relativ),
-        "",
+        *dateien,
         "## Absprachen",
         "",
         sammelimport.absprachen or "Keine.",
@@ -655,15 +1030,26 @@ def vorbereiten(wurzel: Path, ordner: str) -> int:
     sammelimport = Sammelimport(wurzel, ordner)
     sammelimport.verlange_freigabe()
     offen = [k for k in sammelimport.kandidaten
-             if k.wartet and pruefe_entwurf(sammelimport.entwurf(k)).fehler]
+             if k.wartet and pruefe_entwurf(sammelimport, k).fehler]
     dran = offen[:sammelimport.je_durchgang]
     print(f"Aufträge für {len(dran)} von {len(offen)} offenen Kandidaten:")
     if not dran:
         return 0
+    if sammelimport.feldbild_ausschneiden:
+        verlange_pillow(sammelimport)
+    pdftotext = None
+    if any(_ist_pdf(d) for k in dran for d in k.dateien):
+        pdftotext = finde_pdftotext()
+        if not pdftotext:
+            melde_ohne_pdftotext("die Aufträge", "den Kartenentwurf")
     sammelimport.entwurfsordner.mkdir(parents=True, exist_ok=True)
     kennungen = kennungstabelle(wurzel)
     for k in dran:
-        print(f"  {k.nummer}  {schreibe_auftrag(sammelimport, k, kennungen).as_posix()}")
+        feldbild, meldung = lege_feldbild_an(sammelimport, k)
+        auftrag = schreibe_auftrag(sammelimport, k, kennungen, pdftotext, feldbild)
+        print(f"  {k.nummer}  {auftrag.as_posix()}")
+        if meldung:
+            print(f"      {meldung}")
     return 0
 
 
@@ -674,17 +1060,20 @@ def vorbereiten(wurzel: Path, ordner: str) -> int:
 def setze_befund(k: Kandidat, befund: Befund) -> None:
     """Der Status eines Kandidaten, wie ihn sein Entwurf auf der Platte ergibt.
 
-    `rückfrage` heißt: Hier muss einzeln gefragt werden, weil der Entwurf für
-    mindestens eine Rückfrage keine Vermutung hat. Eine Rückfrage mit Vermutung
-    bestätigt der Trainer in der Tabelle wie einen Vorschlag.
+    `rückfrage` heißt: Hier muss einzeln gefragt werden. Entweder hat der
+    Entwurf für mindestens eine Rückfrage keine Vermutung, oder der Ablauf
+    kommt laut Auftrag aus dem Bild. Dann ist er als Ganzes eine Vermutung,
+    und der Trainer prüft ihn mit dem Feldbild vor sich. Eine Rückfrage mit
+    Vermutung bestätigt er sonst in der Tabelle wie einen Vorschlag.
     """
     if befund.fehler:
         k.setze("offen", befund.fehler)
-    elif befund.ohne_vermutung:
+        return
+    gruende = [AUS_DEM_BILD] if befund.aus_dem_bild else []
+    if befund.ohne_vermutung:
         anzahl = befund.ohne_vermutung
-        k.setze("rückfrage", f"{anzahl} Rückfrage{'n' if anzahl > 1 else ''} ohne Vermutung")
-    else:
-        k.setze("bereit")
+        gruende.append(f"{anzahl} Rückfrage{'n' if anzahl > 1 else ''} ohne Vermutung")
+    k.setze("rückfrage" if gruende else "bereit", ", ".join(gruende))
 
 
 def pruefen(wurzel: Path, ordner: str) -> int:
@@ -694,7 +1083,7 @@ def pruefen(wurzel: Path, ordner: str) -> int:
     for k in sammelimport.kandidaten:
         if not k.wartet:
             continue
-        setze_befund(k, pruefe_entwurf(sammelimport.entwurf(k)))
+        setze_befund(k, pruefe_entwurf(sammelimport, k))
         stand[k.status] = stand.get(k.status, 0) + 1
         print(f"  {k.nummer}  {k.status}{': ' + k.notiz if k.notiz else ''}")
     sammelimport.speichere()
@@ -737,23 +1126,31 @@ def naechste_id(wurzel: Path) -> str:
     return f"ue-{hoechste + 1:04d}"
 
 
-def als_karte(entwurf: str, uid: str, heute: str) -> str:
+def _setze_feld(felder: list[str], name: str, wert: str) -> list[str]:
+    """Die Zeilen des Frontmatters mit `name: wert`, ersetzt oder hinten angehängt."""
+    zeile = f"{name}: {wert}"
+    felder = [zeile if re.match(rf"{name}\s*:", z) else z for z in felder]
+    return felder if zeile in felder else [*felder, zeile]
+
+
+def als_karte(entwurf: str, uid: str, heute: str, schaubild: str | None = None) -> str:
     """Aus dem Text eines Kartenentwurfs der Text der Karte.
 
     `id` kommt als erstes Feld dazu, `angelegt` wird der Tag der Freigabe.
-    `## Freigabe` fällt weg: Vorschläge und Rückfragen sind mit dem Ja des
-    Trainers erledigt und gehören nicht auf die Karte in der Halle. Dass das
-    Frontmatter sauber schließt, hat `pruefe_entwurf` vorher festgestellt.
+    `schaubild`, wenn angegeben, ersetzt den Namen des Feldbilds neben dem
+    Entwurf durch den in schaubilder/. `## Freigabe` fällt weg: Vorschläge
+    und Rückfragen sind mit dem Ja des Trainers erledigt und gehören nicht auf
+    die Karte in der Halle. Dass das Frontmatter sauber schließt, hat
+    `pruefe_entwurf` vorher festgestellt.
     """
     zeilen = entwurf.splitlines()
     ende = _frontmatter_ende(zeilen)
     if ende is None:
         raise ValueError("Kartenentwurf ohne geschlossenes Frontmatter")
     felder = [z for z in zeilen[1:ende] if not re.match(r"id\s*:", z)]
-    datum = f"angelegt: {heute}"
-    felder = [datum if re.match(r"angelegt\s*:", z) else z for z in felder]
-    if datum not in felder:
-        felder.append(datum)
+    felder = _setze_feld(felder, "angelegt", heute)
+    if schaubild:
+        felder = _setze_feld(felder, "schaubild", schaubild)
 
     rumpf = zeilen[ende + 1:]
     grenzen = _abschnitt_grenzen(rumpf, "Freigabe")
@@ -767,26 +1164,53 @@ def als_karte(entwurf: str, uid: str, heute: str) -> str:
 def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     """Schreibt die Karte eines freigegebenen Kandidaten. Gibt ihre ID zurück.
 
-    Die Reihenfolge ist Absicht. Erst die Karte, dann sofort die Übersicht,
-    zuletzt Entwurf und Auftrag löschen. Bricht der Lauf dazwischen ab, liegt
+    Die Reihenfolge ist Absicht. Erst die Karte und ihr Schaubild, dann sofort
+    die Übersicht, zuletzt aufräumen. Bricht der Lauf dazwischen ab, liegt
     höchstens ein Entwurf zu viel herum. Stünde die Übersicht zuletzt, fände
     der nächste Lauf einen offenen Kandidaten mit gültigem Entwurf und schriebe
     dieselbe Karte ein zweites Mal.
+
+    Das Feldbild bekommt den Namen der Karte, wie jedes PlayDrill-Bild in
+    schaubilder/. Liegt dort schon eine Datei unter diesem Namen, wird nichts
+    geschrieben, auch die Karte nicht: Überschrieben wird in schaubilder/
+    nichts.
     """
     entwurf = sammelimport.entwurf(k)
     felder, _ = lies_frontmatter(entwurf)
     uid = naechste_id(sammelimport.wurzel)
-    ziel = sammelimport.wurzel / "uebungen" / f"{uid}-{slug(str(felder['titel']))}.md"
-    text = als_karte(entwurf.read_text(encoding="utf-8"), uid, date.today().isoformat())
+    name = f"{uid}-{slug(str(felder['titel']))}"
+    ziel = sammelimport.wurzel / "uebungen" / f"{name}.md"
+    feldbild = str(felder.get("schaubild") or "")
+    schaubild = sammelimport.wurzel / "schaubilder" / f"{name}{Path(feldbild).suffix}"
+    if feldbild and schaubild.exists():
+        raise NichtUebernommen(f"schaubilder/{schaubild.name} gibt es schon")
+    text = als_karte(entwurf.read_text(encoding="utf-8"), uid, date.today().isoformat(),
+                     schaubild.name if feldbild else None)
     # "x" legt nur neu an. Eine Datei unter dieser ID gibt es laut
     # naechste_id() nicht, und falls doch, wird sie nicht überschrieben.
     with ziel.open("x", encoding="utf-8") as datei:
         datei.write(text)
+    if feldbild:
+        schaubild.parent.mkdir(exist_ok=True)
+        shutil.move(entwurf.parent / feldbild, schaubild)
     k.setze("importiert", notiz, karte=uid)
     sammelimport.speichere()
-    entwurf.unlink()
-    sammelimport.auftrag(k).unlink(missing_ok=True)
+    raeume_kandidat_weg(sammelimport, k)
     return uid
+
+
+class NichtUebernommen(Exception):
+    """Ein Kandidat, dessen Karte nicht geschrieben wurde. Der Text sagt, warum."""
+
+
+def raeume_kandidat_weg(sammelimport: Sammelimport, k: Kandidat) -> None:
+    """Löscht, was der Sammelimport für einen erledigten Kandidaten angelegt hat.
+
+    Das Feldbild auch dann, wenn der Entwurf es nicht eingetragen hat. Es
+    ließe sich jederzeit neu aus dem PDF schneiden.
+    """
+    for datei in (sammelimport.entwurf(k), sammelimport.auftrag(k), sammelimport.feldbild(k)):
+        datei.unlink(missing_ok=True)
 
 
 def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> str | None:
@@ -800,7 +1224,7 @@ def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> st
         return "steht nicht in der Übersicht"
     if not k.wartet:
         return f"ist {k.status}, nicht offen"
-    befund = pruefe_entwurf(sammelimport.entwurf(k))
+    befund = pruefe_entwurf(sammelimport, k)
     if befund.fehler:
         setze_befund(k, befund)
         sammelimport.speichere()
@@ -818,11 +1242,14 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]]) -
     for nummer, notiz in freigegeben:
         k = nach_nummer.get(nummer)
         grund = pruefe_fuer_uebernahme(sammelimport, k)
-        if grund or k is None:
-            print(f"  {nummer}  nicht übernommen: {grund}")
-            nicht_uebernommen += 1
-            continue
-        print(f"  {nummer}  importiert als {uebernimm(sammelimport, k, notiz)}")
+        if not grund and k is not None:
+            try:
+                print(f"  {nummer}  importiert als {uebernimm(sammelimport, k, notiz)}")
+                continue
+            except NichtUebernommen as fehler:
+                grund = str(fehler)
+        print(f"  {nummer}  nicht übernommen: {grund}")
+        nicht_uebernommen += 1
 
     # Der Linter prüft die ganze Bibliothek, nicht nur die neuen Karten. Was
     # er meldet, steht damit vor dem Trainer, solange der Durchgang frisch ist.

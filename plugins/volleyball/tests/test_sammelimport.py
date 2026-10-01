@@ -24,7 +24,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from arbeitsordner import Arbeitsordner, auffaelligkeiten
+from arbeitsordner import Arbeitsordner, PdfBild, auffaelligkeiten
 
 ORDNER = "stapel"
 
@@ -33,6 +33,14 @@ ORDNER = "stapel"
 # das Skript es faende. Die Suche neben git.exe prueft die Abnahme (#29).
 BRAUCHT_PDFTOTEXT = unittest.skipUnless(
     shutil.which("pdftotext"), "pdftotext ist nicht im PATH")
+
+try:
+    from PIL import Image
+    HAT_PILLOW = True
+except ImportError:
+    HAT_PILLOW = False
+
+BRAUCHT_PILLOW = unittest.skipUnless(HAT_PILLOW, "Pillow ist nicht installiert")
 
 
 class VorbereitenTest(unittest.TestCase):
@@ -163,6 +171,325 @@ class VorbereitenTest(unittest.TestCase):
         # deshalb fuer beide. Das muss der Agent so lesen koennen.
         self.assertIn("beide", zeile_mit(auftrag, "`standortbestimmung`"))
 
+    def auftrag(self, kandidat: int) -> str:
+        return (self.ordner.pfad / "kartenentwuerfe" / ORDNER / f"{kandidat}.auftrag.md").read_text(
+            encoding="utf-8")
+
+    @BRAUCHT_PDFTOTEXT
+    def test_der_auftrag_traegt_den_text_je_datei(self) -> None:
+        # Ein Zirkel ueber zwei Blaetter. Der Agent muss wissen, welcher Text
+        # auf dem Uebersichtsblatt steht und welcher auf der Station, sonst
+        # landet die Stationsliste im Ablauf der falschen Station.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 4, "dateien": ["zirkel.pdf", "station-1.pdf"], "ergebnis": "folge"}])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/zirkel.pdf", ["Stationsübersicht Sprungkraftzirkel"])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/station-1.pdf", ["Station 1: Sprünge über die Kiste"])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout)
+        zirkel = unter_datei(self.auftrag(4), "zirkel.pdf")
+        self.assertIn("Stationsübersicht Sprungkraftzirkel", zirkel)
+        self.assertNotIn("Station 1", zirkel)
+        self.assertIn("Station 1: Sprünge über die Kiste", unter_datei(self.auftrag(4), "station-1.pdf"))
+
+    @BRAUCHT_PDFTOTEXT
+    def test_ein_pdf_ohne_textebene_sagt_dem_agenten_dass_er_es_selbst_lesen_muss(self) -> None:
+        self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["scan.pdf"]}])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/scan.pdf", [])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("selbst lesen", unter_datei(self.auftrag(1), "scan.pdf"))
+
+    def test_ohne_pdftotext_sagt_der_auftrag_dass_der_agent_das_pdf_selbst_liest(self) -> None:
+        # Wie bei der Planeingabe: teurer, aber kein Abbruch (ADR-0008). Der
+        # Hinweis kommt einmal je Lauf, nicht einmal je Auftrag.
+        leer = Path(tempfile.mkdtemp(prefix="ohne-pdftotext-"))
+        self.addCleanup(shutil.rmtree, leer, True)
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"]}, {"kandidat": 2, "dateien": ["b.pdf"]}])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/a.pdf", ["Abwehr vom Kasten"])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/b.pdf", ["Sprungkraftzirkel"])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER,
+                                    umgebung={"PATH": str(leer)})
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(fertig.stdout.count("pdftotext fehlt"), 1, fertig.stdout)
+        self.assertNotIn("Abwehr vom Kasten", self.auftrag(1))
+        self.assertIn("selbst lesen", unter_datei(self.auftrag(1), "a.pdf"))
+
+
+PLAYDRILL = {"textmarke": "Ausführung:", "platzhalter": "hier könnte ihr Text stehen"}
+
+# Kopf und Ansage eines PlayDrill-Blatts, ueber 150 Zeichen. Zaehlte der
+# ganze Text, haette jedes Blatt genug, auch eins, unter dessen "Ausführung:"
+# nur der Platzhalter steht.
+PLAYDRILL_KOPF = [
+    "Abwehr gegen den Kasten",
+    "Trainer/Ersteller: Stege",
+    "ZEIT: 10 Min-Spieler 6+",
+    "Ansage:",
+    "Zu besetzende Positionen: 2 Angreifer auf Kasten, 2 Ballanreicher, 2 Fänger,",
+    "der Rest in zwei Gruppen in der Abwehr.",
+]
+
+
+class AblaufAusDemBildTest(unittest.TestCase):
+    """Ob der Ablauf aus dem Bild kommt, entscheidet eine Regel, nicht das Modell.
+
+    Steht nach der Textmarke einer Quelle zu wenig, muss der Agent den Ablauf
+    aus dem Feldbild lesen, und der Trainer prueft ihn einzeln. Das soll nicht
+    am Urteil des Agenten haengen (#29, Geschichte 44).
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def ablauf(self, kandidat: int) -> str:
+        """Was der Auftrag zum Ablauf aus dem Bild sagt, die ganze Zeile."""
+        auftrag = (self.ordner.pfad / "kartenentwuerfe" / ORDNER / f"{kandidat}.auftrag.md")
+        return zeile_mit(auftrag.read_text(encoding="utf-8"), "Ablauf aus dem Bild")
+
+    def bereite_vor(self) -> None:
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+
+    @BRAUCHT_PDFTOTEXT
+    def test_nur_der_platzhalter_nach_der_textmarke_ergibt_ablauf_aus_dem_bild(self) -> None:
+        # Das Blatt schreibt "Könnte" gross, die Einstellung klein, so wie bei
+        # PlayDrill wirklich. Der Platzhalter gilt trotzdem als Platzhalter.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["leer.pdf"]},
+            {"kandidat": 2, "dateien": ["ausfuehrlich.pdf"]},
+        ], **PLAYDRILL)
+        self.ordner.lege_quell_pdf_an(
+            f"{ORDNER}/leer.pdf", [*PLAYDRILL_KOPF, "Ausführung: hier Könnte ihr Text stehen"])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/ausfuehrlich.pdf", [
+            *PLAYDRILL_KOPF,
+            "Ausführung: Die Angreifer schlagen abwechselnd vom Kasten auf beide",
+            "Abwehrgruppen. Wer abgewehrt hat, stellt sich hinten an, und der Fänger",
+            "bringt den Ball zurück zum Anreicher.",
+        ])
+
+        self.bereite_vor()
+
+        self.assertIn(": ja", self.ablauf(1))
+        self.assertIn(": nein", self.ablauf(2))
+
+    @BRAUCHT_PDFTOTEXT
+    def test_traegt_eine_datei_die_textmarke_nicht_zaehlt_ihr_ganzer_text(self) -> None:
+        # 22 von 260 PlayDrill-Blaettern schreiben "Ausführung(1)" oder
+        # "Ausführung 1", ohne Doppelpunkt und mit vollem Ablauf dahinter.
+        # Das ist kein fehlender Ablauf. Ein Blatt, auf dem nur der Titel
+        # steht, hat dagegen auch ohne Marke zu wenig.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["ohne-doppelpunkt.pdf"]},
+            {"kandidat": 2, "dateien": ["nur-titel.pdf"]},
+        ], **PLAYDRILL)
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/ohne-doppelpunkt.pdf", [
+            "Standweitsprung", "Ausführung(1) Standweitsprung über die Spielfeldbreite,",
+            "neun Meter. Ziel bei den Damen höchstens vier Sprünge, bei den Herren drei.",
+            "(2) Standhochsprung auf die Matten als Wettkampf, zwei Versuche je Spieler."])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/nur-titel.pdf", ["Terraband_Kraftpart"])
+
+        self.bereite_vor()
+
+        self.assertIn(": nein", self.ablauf(1))
+        self.assertIn(": ja", self.ablauf(2))
+
+    @BRAUCHT_PDFTOTEXT
+    def test_ohne_textmarke_in_den_einstellungen_zaehlt_der_ganze_text(self) -> None:
+        # Eine Magazinquelle hat keine feste Stelle fuer den Ablauf. Dann zaehlt
+        # alles, auch der Kopf, und ein Platzhalter darunter faellt nicht auf.
+        self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"]}])
+        self.ordner.lege_quell_pdf_an(
+            f"{ORDNER}/a.pdf", [*PLAYDRILL_KOPF, "Ausführung: hier Könnte ihr Text stehen"])
+
+        self.bereite_vor()
+
+        self.assertIn(": nein", self.ablauf(1))
+
+    def test_ohne_text_entscheidet_der_agent(self) -> None:
+        # Eine abfotografierte Seite hat keine Textebene. Ob dort ein Ablauf
+        # steht, sieht nur, wer sie liest.
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 1, "dateien": ["seite-24.jpg"]}], **PLAYDRILL)
+
+        self.bereite_vor()
+
+        self.assertNotIn(": ja", self.ablauf(1))
+        self.assertNotIn(": nein", self.ablauf(1))
+        self.assertIn("entscheidest du", self.ablauf(1))
+
+
+class FeldbildTest(unittest.TestCase):
+    """Das Feldbild aus dem PDF: von `vorbereiten` ausgeschnitten, bei `uebernehmen` Schaubild.
+
+    PlayDrill bettet in jedes Blatt ein Feldbild mit Transparenzmaske ein.
+    Der Agent soll es ansehen koennen, ohne das PDF zu oeffnen, und auf der
+    fertigen Karte steht es als Schaubild (#29, Geschichte 33).
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+        self.entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
+
+    def auftrag(self, kandidat: int) -> str:
+        return (self.entwuerfe / f"{kandidat}.auftrag.md").read_text(encoding="utf-8")
+
+    @BRAUCHT_PILLOW
+    def test_das_feldbild_ist_auf_seinen_inhalt_zugeschnitten(self) -> None:
+        # Vor dem Feldbild steht ein kleines Logo im PDF. Genommen wird das
+        # groessere, und von ihm nur, was deckend ist: 68 x 46 Pixel.
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], feldbild_ausschneiden=True)
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/kasten.pdf", ["Abwehr vom Kasten"], bilder=[
+            PdfBild(20, 20, deckend=(0, 0, 20, 20)),
+            PdfBild(90, 60, deckend=(12, 5, 80, 51)),
+        ])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        feldbild = self.entwuerfe / "3.feldbild.png"
+        with Image.open(feldbild) as bild:
+            self.assertEqual(bild.size, (68, 46))
+            self.assertEqual(bild.convert("RGBA").getpixel((0, 0)), (30, 120, 200, 255))
+        # Der Agent sieht es sich unter dem absoluten Pfad an und traegt es
+        # unter seinem Namen in den Entwurf ein, neben dem es liegt.
+        zeile = zeile_mit(self.auftrag(3), "Feldbild")
+        self.assertIn(feldbild.resolve().as_posix(), zeile)
+        self.assertIn("schaubild: 3.feldbild.png", zeile)
+
+    @BRAUCHT_PILLOW
+    def test_bei_mehreren_pdfs_kommt_es_aus_dem_ersten_mit_bild(self) -> None:
+        # Ein Zirkel: vorn ein Deckblatt ohne Bild, dann die Uebersicht, dann
+        # eine Station mit groesserem Bild. Das Feldbild der Folge ist das
+        # der Uebersicht, sie zeigt den ganzen Aufbau. Die Reihenfolge der
+        # Dateien legt der Zerlegungsplan fest.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 5, "dateien": ["deckblatt.pdf", "zirkel.pdf", "station-1.pdf"],
+             "ergebnis": "folge"}], feldbild_ausschneiden=True)
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/deckblatt.pdf", ["Sprungkraftzirkel"])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/zirkel.pdf", ["Übersicht"], bilder=[
+            PdfBild(50, 40, deckend=(5, 5, 45, 35))])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/station-1.pdf", ["Station 1"], bilder=[
+            PdfBild(90, 60, deckend=(0, 0, 90, 60))])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        with Image.open(self.entwuerfe / "5.feldbild.png") as bild:
+            self.assertEqual(bild.size, (40, 30))
+        self.assertIn("zirkel.pdf", zeile_mit(self.auftrag(5), "Feldbild"))
+
+    @BRAUCHT_PILLOW
+    def test_ein_bild_das_sich_nicht_lesen_laesst_nennen_ausgabe_und_auftrag(self) -> None:
+        # Sonst saehe der Agent im Auftrag kein Feldbild und wuesste nicht,
+        # ob es keins gibt oder ob er es im PDF suchen muss.
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], feldbild_ausschneiden=True)
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/kasten.pdf", ["Abwehr vom Kasten"], bilder=[
+            PdfBild(90, 60, deckend=(12, 5, 80, 51), kaputt=True)])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertIn("kasten.pdf", zeile_mit(fertig.stdout, "Feldbild"))
+        self.assertIn("im PDF selbst", zeile_mit(self.auftrag(3), "Feldbild"))
+        self.assertFalse((self.entwuerfe / "3.feldbild.png").exists())
+
+    def test_ohne_pillow_bricht_es_vor_dem_ersten_auftrag_ab(self) -> None:
+        # Wie in test_bilder.py: Ein PIL.py, das beim Import abbricht,
+        # verdeckt das echte Paket. So laeuft der Test auch dort, wo Pillow
+        # installiert ist. Ohne Abbruch kaemen 30 Karten ohne Bild heraus.
+        schatten = Path(tempfile.mkdtemp(prefix="ohne-pillow-"))
+        self.addCleanup(shutil.rmtree, schatten, True)
+        (schatten / "PIL.py").write_text(
+            'raise ImportError("Pillow ist fuer diesen Test ausgeblendet")\n', encoding="utf-8")
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], feldbild_ausschneiden=True)
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER,
+                                    umgebung={"PYTHONPATH": str(schatten)})
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("pip install Pillow", fertig.stdout)
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
+
+    def test_fehlt_das_eingetragene_feldbild_geht_der_kandidat_zurueck_auf_offen(self) -> None:
+        # Etwa weil es jemand beim Aufraeumen geloescht hat. Die Karte zeigte
+        # nach der Uebernahme ins Leere. Ein Feldbild neben dem Entwurf reicht
+        # dagegen, ob es aus dem PDF kommt, sieht pruefen nicht.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
+            {"kandidat": 2, "dateien": ["b.pdf"], "status": "bereit"},
+        ])
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Ohne Bild daneben",
+                                          schaubild="1.feldbild.png")
+        self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Mit Bild daneben",
+                                          schaubild="2.feldbild.png")
+        (self.entwuerfe / "2.feldbild.png").write_bytes(b"ein Bild")
+
+        fertig = self.ordner.starte("sammelimport.py", "pruefen", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual(uebersicht["1"]["Status"], "offen")
+        self.assertIn("1.feldbild.png", uebersicht["1"]["Notiz"])
+        self.assertEqual(uebersicht["2"]["Status"], "bereit")
+
+    def lege_freigegebenen_entwurf_an(self) -> None:
+        """Kandidat 3 mit Feldbild, freigegeben. Die naechste freie ID ist ue-0010."""
+        self.ordner.lege_karte_an(id="ue-0009", titel="Die bisher höchste ID")
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"], "status": "bereit"}])
+        self.ordner.lege_kartenentwurf_an(ORDNER, 3, titel="Abwehr vom Kasten",
+                                          quelldatei=f"{ORDNER}/kasten.pdf",
+                                          schaubild="3.feldbild.png")
+        (self.entwuerfe / "3.feldbild.png").write_bytes(b"das Feldbild")
+
+    def test_nach_uebernehmen_ist_das_feldbild_das_schaubild_der_karte(self) -> None:
+        # So liegen die PlayDrill-Bilder schon heute: unter dem Namen der
+        # Karte, und die Leseansicht zeigt sie. Den Ordner schaubilder/ gibt
+        # es im kuenstlichen Arbeitsordner noch nicht.
+        self.lege_freigegebenen_entwurf_an()
+
+        fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, "--kandidat", "3", "")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        name = "ue-0010-abwehr-vom-kasten"
+        self.assertEqual((self.ordner.pfad / "schaubilder" / f"{name}.png").read_bytes(),
+                         b"das Feldbild")
+        karte = (self.ordner.pfad / "uebungen" / f"{name}.md").read_text(encoding="utf-8")
+        self.assertIn(f"\nschaubild: {name}.png\n", karte)
+        self.assertFalse((self.entwuerfe / "3.feldbild.png").exists())
+        index = self.ordner.starte("index.py")
+        self.assertEqual(auffaelligkeiten(index.stdout), [], index.stdout)
+
+    def test_ein_schaubild_unter_dem_kartennamen_wird_nicht_ueberschrieben(self) -> None:
+        # Unter der naechsten freien ID gibt es noch keine Karte, eine Datei
+        # in schaubilder/ kann trotzdem dort liegen, etwa von Hand
+        # hingelegt. Bei der Abnahme von Welle 1c ist schon einmal eine
+        # Ansicht in schaubilder/ verloren gegangen, weil ein Skript sie
+        # ueberschrieb.
+        self.lege_freigegebenen_entwurf_an()
+        schon_da = self.ordner.lege_schaubild_an("ue-0010-abwehr-vom-kasten.png")
+        vorher = schon_da.read_bytes()
+
+        fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, "--kandidat", "3", "")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("ue-0010-abwehr-vom-kasten.png", zeile_mit(fertig.stdout, "nicht übernommen"))
+        self.assertEqual(schon_da.read_bytes(), vorher)
+        self.assertEqual(list((self.ordner.pfad / "uebungen").glob("ue-0010-*")), [])
+        self.assertTrue((self.entwuerfe / "3.feldbild.png").exists())
+
 
 class PlaneingabeTest(unittest.TestCase):
     """`vorbereiten --plan` legt an, woraus der Agent den Zerlegungsplan macht.
@@ -191,7 +518,7 @@ class PlaneingabeTest(unittest.TestCase):
 
     def zu_datei(self, name: str) -> str:
         """Was die Planeingabe unter der Ueberschrift einer Datei sagt."""
-        return self.planeingabe().split(f"### `{name}`\n", 1)[1].split("\n#", 1)[0]
+        return unter_datei(self.planeingabe(), name)
 
     def test_die_planeingabe_nennt_jede_datei_auch_aus_unterordnern(self) -> None:
         # PlayDrill sortiert seine Uebungen in Unterordner, und eine Folge kann
@@ -447,6 +774,29 @@ class PruefenTest(unittest.TestCase):
 
         self.assertEqual(zeile["Status"], "rückfrage")
 
+    @BRAUCHT_PDFTOTEXT
+    def test_ein_ablauf_aus_dem_bild_ergibt_rueckfrage_auch_mit_vermutung(self) -> None:
+        # Die Vermutung des Agenten ist hier der ganze Ablauf. Den bestaetigt
+        # der Trainer nicht in einer Tabellenzeile, sondern einzeln, mit
+        # Feldbild und Ablauftext vor sich (#29, Geschichte 22).
+        self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"]}],
+                                          **PLAYDRILL)
+        self.ordner.lege_quell_pdf_an(
+            f"{ORDNER}/a.pdf", [*PLAYDRILL_KOPF, "Ausführung: hier Könnte ihr Text stehen"])
+        vorbereitet = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+        self.assertEqual(vorbereitet.returncode, 0, vorbereitet.stdout + vorbereitet.stderr)
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 1, titel="Aus dem Bild",
+            rueckfragen=["Laufen die Abwehrspieler nach jedem Ball hinten an? "
+                         "Vermutung im Entwurf: ja, so zeigen es die Pfeile."])
+
+        fertig = self.ordner.starte("sammelimport.py", "pruefen", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        zeile = self.ordner.uebersicht(ORDNER)["1"]
+        self.assertEqual(zeile["Status"], "rückfrage")
+        self.assertIn("Ablauf aus dem Bild", zeile["Notiz"])
+
     def test_ohne_abschnitt_freigabe_bleibt_der_kandidat_offen(self) -> None:
         # Ohne den Abschnitt weiss niemand, was der Entwurf gedeutet und wo er
         # eine Luecke gefunden hat. Er wird neu entworfen.
@@ -644,6 +994,15 @@ class UebernehmenTest(unittest.TestCase):
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         self.assertTrue(entwurf.exists())
+
+
+def unter_datei(text: str, name: str) -> str:
+    """Was Planeingabe oder Auftrag unter der Ueberschrift einer Datei sagen.
+
+    Jede Datei hat dort eine Ueberschrift `### \\`<name>\\``, relativ zum
+    Quellenordner. Was darunter steht, reicht bis zur naechsten Ueberschrift.
+    """
+    return text.split(f"### `{name}`\n", 1)[1].split("\n#", 1)[0]
 
 
 def zeile_mit(text: str, stichwort: str) -> str:

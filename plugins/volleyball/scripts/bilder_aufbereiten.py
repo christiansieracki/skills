@@ -17,9 +17,10 @@ auf den Karten mehrdeutig und höbe die Ersparnis auf, statt sie zu halbieren.
 Das ist der einzige unumkehrbare Schritt; `--ja` überspringt die Rückfrage für
 den, der schon weiß, was kommt.
 
-Pillow ist die einzige Abhängigkeit und nur hier eine (ADR-0005). Fehlt es,
-bricht dieses Skript mit einem Installationshinweis ab und schreibt nichts.
-Die übrigen Skripte des Plugins laufen davon unberührt weiter mit der
+Pillow ist die einzige Abhängigkeit (ADR-0005). Fehlt es, bricht dieses
+Skript mit einem Installationshinweis ab und schreibt nichts. Sonst braucht es
+nur der Sammelimport, wenn er das Feldbild aus dem PDF ausschneidet. Die
+übrigen Skripte des Plugins laufen davon unberührt weiter mit der
 Standardbibliothek.
 
 Bewusst nicht zugesagt wird "alles, was Pillow öffnet": HEIC und TIFF öffnet es
@@ -73,8 +74,8 @@ def pillow_da() -> bool:
         print("Für die Bildaufbereitung fehlt Pillow.\n")
         print("Installieren mit:")
         print(f"  {interpreter()} -m pip install Pillow\n")
-        print("Nur dieses Skript braucht Pillow. Die übrigen Skripte des")
-        print("Plugins laufen ohne es weiter.")
+        print("Pillow brauchen nur dieses Skript und das Ausschneiden des Feldbilds")
+        print("im Sammelimport. Die übrigen Skripte des Plugins laufen ohne es weiter.")
         return False
     return True
 
