@@ -261,6 +261,41 @@ Stücken, weil `Read` je Aufruf begrenzt ist. Ob die Schwelle von 400 000
 Zeichen trägt, zeigt die Abnahme (#37). Liegt sie zu hoch, bekommt jede Datei
 nur ihre ersten Zeilen, und Übersichtsblätter verlieren ihre Stationsliste.
 
+Aufgefallen am 01.10.2026 bei #33.
+
+### „Wenig Text“ trifft bei PlayDrill 15 Blätter, nicht 40
+
+ADR-0008 rechnet mit 40 von 258 PlayDrill-PDFs, die zu wenig Ausführungstext
+haben, 27 davon nur mit dem Platzhalter. Gemessen mit `textmarke: "Ausführung:"`
+und dem Platzhalter aus dem Log trifft die Regel 15 von 260 PDFs in den
+Übungsordnern. Den Platzhalter „hier Könnte ihr Text stehen“ trägt auf seiner
+Textebene nur ein einziges Blatt, `Ü_Abwehr/#12P+_Kat1_Abwehr_Bewegung-Reaktion.pdf`.
+Sechs der 15 sind Stationsblätter aus `Ü_Zirkelübung`. Als Teil einer Folge
+kann ihr Text zusammen über 150 Zeichen kommen, denn gezählt wird über alle
+Dateien eines Kandidaten.
+
+Woher die 27 kommen, ist nicht geklärt. Die Abnahme (#37) zeigt, ob die Regel
+die Blätter findet, deren Ablauf wirklich im Bild steht. Dabei auch die
+Feldbilder ansehen: Ausgeschnitten sind alle 343. Drei davon sind byte-gleich
+mit `ue-0022`, `ue-0023` und `ue-0042` geprüft, eines mit dem Auge.
+
+### Wie der Agent sagt, dass der Ablauf aus dem Bild kommt
+
+Hat eine Datei keinen Text, etwa ein Foto, steht im Auftrag „Ablauf aus dem
+Bild: entscheidest du“. Laut #29 entscheidet der Agent dann „und sagt es“. Wie,
+steht nirgends. `pruefen` erkennt den Ablauf aus dem Bild nur am Auftrag.
+Schreibt der Agent dazu eine Rückfrage mit Vermutung, landet der Kandidat in
+der Tabelle statt in der Einzelfrage. Die Regeln des Kartenentwurfs (#35)
+sollten für diesen Fall eine Rückfrage ohne Vermutung verlangen, oder eine
+feste Form, die `pruefen` erkennt.
+
+### Bei einer Folge steht das Übersichtsblatt vorn
+
+Das Feldbild kommt aus dem ersten PDF eines Kandidaten, das ein Bild
+einbettet, in der Reihenfolge der Spalte Dateien. Entschieden am 01.10.2026.
+Bei einem Zirkel soll das das Übersichtsblatt sein. Die Regeln des
+Zerlegungsplans (#35) müssen es deshalb an die erste Stelle setzen.
+
 ## Aus Welle 1b bewusst ausgelassen
 
 Steht so in #10 unter *Out of Scope* und gilt weiter.
