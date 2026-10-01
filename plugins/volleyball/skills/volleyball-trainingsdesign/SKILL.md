@@ -109,7 +109,7 @@ heißt das Bild nach Datum und Thema und landet auf keiner Karte.
 
 `trainings/<gruppe>/JJJJ-MM-TT.md` nach der Vorlage in
 `${CLAUDE_PLUGIN_ROOT}/referenzen/VORLAGEN.md`. In der Ablauftabelle steht in
-der Spalte **ID** die Kennung der Karte, zum Beispiel `ue-0042`. Darüber
+der Spalte **ID** die Kennung der Karte, zum Beispiel `ue-000042`. Darüber
 findet `index.py` später, wann welche Übung gelaufen ist.
 
 Fertig ist der Plan, wenn jede Zeile mit Übung auch eine ID trägt oder im Text
@@ -144,7 +144,10 @@ bewährt?**
 
 Bei ja wandert die Anpassung in die Übungskarte. Als Zeile unter
 `## Variationen`, oder, wenn sie den Charakter der Übung ändert, als eigene
-Karte mit `variante_von: ue-####`.
+Karte mit `variante_von: ue-######`. Ihre ID kommt von
+`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --naechste-id`. Endet das mit
+einem Fehler, gilt, was `volleyball-uebungsimport` unter „Wenn es keine ID
+gibt“ sagt.
 
 Alles in den Abschnitt Nachbereitung des Trainingsplans eintragen. Das ist die
 Grundlage für die nächste Einheit und den nächsten Trainingsblock.

@@ -344,20 +344,20 @@ class SchaubildTest(unittest.TestCase):
     def test_szene_und_bild_liegen_unter_demselben_basisnamen(self) -> None:
         # Daran haengt, dass eine Korrektur ein halbes Jahr spaeter drei Zeilen
         # kostet: wer das Bild sieht, findet seine Quelle ohne zu suchen.
-        self.zeichne("ue-0042", """
+        self.zeichne("ue-000042", """
             form: halle
             spieler:
               - bei: 3
         """)
 
         namen = sorted(p.name for p in (self.ordner.pfad / "schaubilder").iterdir())
-        self.assertEqual(namen, ["ue-0042.svg", "ue-0042.szene.yml"])
+        self.assertEqual(namen, ["ue-000042.svg", "ue-000042.szene.yml"])
 
     def test_eine_szene_ausserhalb_des_ordners_laesst_schaubilder_unberuehrt(self) -> None:
         # Daran haengt die Vorschau-Schleife von volleyball-schaubild: gerendert
         # wird Runde um Runde neben dem Entwurf im Temp-Verzeichnis, und nach
         # schaubilder/ kommt erst, was der Trainer freigegeben hat.
-        entwurf = self.ordner.lege_entwurf_an("ue-0042", """
+        entwurf = self.ordner.lege_entwurf_an("ue-000042", """
             form: halle
             spieler:
               - bei: 3
@@ -366,13 +366,13 @@ class SchaubildTest(unittest.TestCase):
         fertig = self.ordner.starte("schaubild.py", str(entwurf))
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        self.assertTrue((entwurf.parent / "ue-0042.svg").is_file(),
+        self.assertTrue((entwurf.parent / "ue-000042.svg").is_file(),
                         "das Bild entsteht neben seiner Szene")
         self.assertFalse((self.ordner.pfad / "schaubilder").exists(),
                          "vor der Freigabe steht in schaubilder/ nichts")
 
     def test_eine_unbekannte_form_bricht_ab_und_schreibt_keine_datei(self) -> None:
-        fertig = self.scheitert("ue-0043", """
+        fertig = self.scheitert("ue-000043", """
             form: turnhalle
             spieler:
               - bei: 3
@@ -380,20 +380,20 @@ class SchaubildTest(unittest.TestCase):
 
         self.assertIn("turnhalle", fertig.stdout)
         self.assertIn("halle", fertig.stdout, "die Meldung nennt, was es gibt")
-        self.assertFalse(self.bild("ue-0043").exists(),
+        self.assertFalse(self.bild("ue-000043").exists(),
                          "eine Szene, die nicht aufgeht, hinterlaesst kein halbes Bild")
 
     def test_ein_vertippter_schluessel_wird_gemeldet(self) -> None:
         # Sonst waere der Tippfehler die stillste Art, das halbe Bild zu
         # verlieren: `spiler:` ergaebe ein leeres Feld, und das sieht fertig aus.
-        fertig = self.scheitert("ue-0044", """
+        fertig = self.scheitert("ue-000044", """
             form: halle
             spiler:
               - bei: 3
         """)
 
         self.assertIn("spiler", fertig.stdout)
-        self.assertFalse(self.bild("ue-0044").exists())
+        self.assertFalse(self.bild("ue-000044").exists())
 
     # -- Der Weg zur Szene -------------------------------------------------
 
@@ -402,7 +402,7 @@ class SchaubildTest(unittest.TestCase):
         # Hand zeichnet, soll das aus jedem Verzeichnis heraus koennen, auch
         # aus einem, ueber dem keine Wurzeldatei steht. Eine Suche vorweg
         # verlangte etwas, das dieser Lauf gar nicht braucht.
-        entwurf = self.ordner.lege_entwurf_an("ue-0042", """
+        entwurf = self.ordner.lege_entwurf_an("ue-000042", """
             form: halle
             spieler:
               - bei: 3
@@ -412,14 +412,14 @@ class SchaubildTest(unittest.TestCase):
                                     mit_wurzel=False, verzeichnis=entwurf.parent)
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        self.assertTrue((entwurf.parent / "ue-0042.svg").is_file(),
+        self.assertTrue((entwurf.parent / "ue-000042.svg").is_file(),
                         "das Bild entsteht neben seiner Szene")
 
     def test_ohne_arbeitsordner_steht_der_hinweis_ohne_wortlaut(self) -> None:
         # Der Titelvorschlag kommt von einer Uebungskarte, und ohne
         # Arbeitsordner gibt es keine. Geraten wird deshalb nichts, und
         # abgebrochen erst recht nicht: das Bild steht zu dem Zeitpunkt schon.
-        entwurf = self.ordner.lege_entwurf_an("ue-0001", """
+        entwurf = self.ordner.lege_entwurf_an("ue-000001", """
             form: halle
             untertitel: ohne etwas darueber
         """)
@@ -428,7 +428,7 @@ class SchaubildTest(unittest.TestCase):
                                     mit_wurzel=False, verzeichnis=entwurf.parent)
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        self.assertTrue((entwurf.parent / "ue-0001.svg").is_file())
+        self.assertTrue((entwurf.parent / "ue-000001.svg").is_file())
         self.assertIn("titel:", fertig.stdout, "der Hinweis steht da")
         self.assertNotIn("Uebungskarte", fertig.stdout, "nur ohne Wortlaut")
 
@@ -438,9 +438,9 @@ class SchaubildTest(unittest.TestCase):
         # aus der, in der der Aufruf zufaellig steht.
         fremd = Arbeitsordner()
         self.addCleanup(fremd.raeume_auf)
-        self.ordner.lege_karte_an(id="ue-0042", titel="Zielzone im eigenen Ordner")
-        fremd.lege_karte_an(id="ue-0042", titel="Zielzone im fremden Ordner")
-        szene = self.ordner.lege_szene_an("ue-0042", """
+        self.ordner.lege_karte_an(id="ue-000042", titel="Zielzone im eigenen Ordner")
+        fremd.lege_karte_an(id="ue-000042", titel="Zielzone im fremden Ordner")
+        szene = self.ordner.lege_szene_an("ue-000042", """
             form: halle
             untertitel: ohne etwas darueber
         """)
@@ -458,7 +458,7 @@ class SchaubildTest(unittest.TestCase):
         # Der Rueckfall, und die Vorschau-Schleife von volleyball-schaubild
         # besteht ganz aus ihm: der Entwurf liegt im Temp-Verzeichnis, ueber
         # dem keine Wurzel steht, und der Aufruf steht im Arbeitsordner.
-        entwurf = self.ordner.lege_entwurf_an("ue-0001", """
+        entwurf = self.ordner.lege_entwurf_an("ue-000001", """
             form: halle
             untertitel: ohne etwas darueber
         """)
@@ -475,9 +475,9 @@ class SchaubildTest(unittest.TestCase):
         # Ordner der Szene noch der des Aufrufs redet dann noch mit.
         fremd = Arbeitsordner()
         self.addCleanup(fremd.raeume_auf)
-        self.ordner.lege_karte_an(id="ue-0042", titel="Zielzone aus der genannten Wurzel")
-        fremd.lege_karte_an(id="ue-0042", titel="Zielzone neben der Szene")
-        szene = fremd.lege_szene_an("ue-0042", """
+        self.ordner.lege_karte_an(id="ue-000042", titel="Zielzone aus der genannten Wurzel")
+        fremd.lege_karte_an(id="ue-000042", titel="Zielzone neben der Szene")
+        szene = fremd.lege_szene_an("ue-000042", """
             form: halle
             untertitel: ohne etwas darueber
         """)
@@ -497,7 +497,7 @@ class SchaubildTest(unittest.TestCase):
         # die alte.
         daneben = self.ordner.lege_entwurfsordner_an()
 
-        fertig = self.ordner.starte("schaubild.py", "ue-0042",
+        fertig = self.ordner.starte("schaubild.py", "ue-000042",
                                     mit_wurzel=False, verzeichnis=daneben)
 
         gesagt = fertig.stdout + fertig.stderr
@@ -509,18 +509,18 @@ class SchaubildTest(unittest.TestCase):
         # Die dritte Form, und die einzige, bei der beides im Spiel ist:
         # Wurzel und Pfad. Gerufen wird von woanders, damit der Test wirklich
         # die Wurzel misst und nicht das Verzeichnis des Testlaufs.
-        self.ordner.lege_szene_an("ue-0042", """
+        self.ordner.lege_szene_an("ue-000042", """
             form: halle
             spieler:
               - bei: 3
         """)
         daneben = self.ordner.lege_entwurfsordner_an()
 
-        fertig = self.ordner.starte("schaubild.py", "schaubilder/ue-0042.szene.yml",
+        fertig = self.ordner.starte("schaubild.py", "schaubilder/ue-000042.szene.yml",
                                     verzeichnis=daneben)
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        self.assertTrue(self.bild("ue-0042").is_file(),
+        self.assertTrue(self.bild("ue-000042").is_file(),
                         "das Bild steht in schaubilder/, nicht im Verzeichnis des Aufrufs")
 
     # -- Die beiden Feldvorlagen -------------------------------------------
@@ -1859,7 +1859,7 @@ stellen:
         # Abzubrechen hiesse, dem Trainer wegen einer Kleinigkeit das ganze
         # Bild vorzuenthalten. Eine einzelne Zeile ueber dem Feld ist ein
         # Titel, gleich unter welchem Schluessel sie in der Szene steht.
-        baum = self.zeichne("ue-0001", """
+        baum = self.zeichne("ue-000001", """
             form: halle
             untertitel: ohne etwas darueber
         """)
@@ -1889,7 +1889,7 @@ stellen:
         # Der Basisname der Szene ist die Uebungs-ID, und auf der Karte steht
         # der Titel schon. Der Trainer uebernimmt ihn mit einer Zeile oder
         # laesst es.
-        fertig = self.laufe("ue-0001", """
+        fertig = self.laufe("ue-000001", """
             form: halle
             untertitel: ohne etwas darueber
         """)
@@ -1897,17 +1897,17 @@ stellen:
         self.assertIn("titel:", fertig.stdout,
                       "das Skript meldet, was es getan hat")
         self.assertIn("Annahme im Halbfeld", fertig.stdout,
-                      "und nennt den Titel der Karte ue-0001 als Vorschlag")
+                      "und nennt den Titel der Karte ue-000001 als Vorschlag")
 
     def test_ohne_passende_uebungskarte_steht_der_hinweis_ohne_wortlaut(self) -> None:
         # Drei Wege, auf denen kein Vorschlag zustande kommt. Geraten wird auf
         # keinem davon, und das Bild entsteht auf allen dreien.
-        (self.ordner.pfad / "uebungen" / "ue-0009-ohne-titel.md").write_text(
-            "---\nid: ue-0009\n---\n", encoding="utf-8")
+        (self.ordner.pfad / "uebungen" / "ue-000009-ohne-titel.md").write_text(
+            "---\nid: ue-000009\n---\n", encoding="utf-8")
 
         for name, warum in (("aufstellung", "keine Uebungs-ID"),
-                            ("ue-9999", "eine ID ohne Karte"),
-                            ("ue-0009", "eine Karte ohne Titel")):
+                            ("ue-009999", "eine ID ohne Karte"),
+                            ("ue-000009", "eine Karte ohne Titel")):
             with self.subTest(warum=warum):
                 fertig = self.laufe(name, """
                     form: halle
@@ -1923,13 +1923,13 @@ stellen:
     def test_die_szene_bleibt_stehen_wie_sie_geschrieben_ist(self) -> None:
         # Wer die Szene liest, soll nicht suchen muessen, welche Zeile das
         # Skript wohin geschoben hat.
-        datei = self.ordner.lege_szene_an("ue-0001", """
+        datei = self.ordner.lege_szene_an("ue-000001", """
             form: halle
             untertitel: ohne etwas darueber
         """)
         vorher = datei.read_text(encoding="utf-8")
 
-        self.ordner.starte("schaubild.py", "ue-0001")
+        self.ordner.starte("schaubild.py", "ue-000001")
 
         self.assertEqual(datei.read_text(encoding="utf-8"), vorher)
         self.assertIn("untertitel: ohne etwas darueber", vorher)

@@ -11,7 +11,7 @@ in `scripts/tpdaten.py` macht das.
 
 ```
 <wurzel>/
-├── trainingsplanung-root.yml   Gruppen, Teams, führendes Team
+├── trainingsplanung-root.yml   Gruppen, Teams, führendes Team, Trainer
 ├── README.md                   für Mittrainer
 ├── glossary.md                 Begriffsregeln
 ├── schwerpunkte.md             die erlaubten Schwerpunkt-Kennungen
@@ -27,15 +27,16 @@ in `scripts/tpdaten.py` macht das.
 Die Gruppe ist, wer zusammen in der Halle steht, daran hängen die Einheiten.
 Das Team ist die Wettkampfmannschaft mit Saisonplan. Welche Gruppe welche Teams
 abdeckt und welches Team bei Konflikten führt, steht in der Wurzeldatei. Nie im
-Skill hart kodieren.
+Skill hart kodieren. Dort steht auch, welcher Trainer welche Nummer hat, siehe
+„Die ID“.
 
 ## Die Übungskarte
 
-Dateiname `ue-####-sprechender-slug.md`, Frontmatter komplett:
+Dateiname `ue-######-sprechender-slug.md`, Frontmatter komplett:
 
 ```yaml
 ---
-id: ue-0042                      # stabil, ändert sich nie
+id: ue-000042                    # stabil, ändert sich nie
 titel: "Annahme-Challenge auf dem Halbfeld"
 typ: uebung                      # uebung | folge
 disziplin: [halle]               # Liste, halle und/oder beach, Pflicht
@@ -149,14 +150,73 @@ schlechter als gar keine. Im Zweifel nachfragen.
 
 `id` ist die Identität. Trainingspläne verweisen darüber, `index.py` löst sie
 auf die Datei auf. **Eine vergebene ID wird nie wieder geändert**, auch nicht
-beim Umbenennen der Datei. Sonst brechen alle Pläne, die auf sie zeigen.
+beim Umbenennen der Datei. Sonst brechen alle Pläne, die auf sie zeigen. Die
+Umstellung auf sechs Stellen bricht diese Regel ein einziges Mal, mit einem
+Skript, das den ganzen Arbeitsordner zugleich umstellt (ADR-0011).
 
-Nächste freie ID: `python3 scripts/suche.py --json` (Windows: `python`) und die
-höchste Nummer plus eins. Format immer vierstellig mit führenden Nullen. Beim
-Sammelimport vergibt `sammelimport.py uebernehmen` sie selbst, erst bei der
-Freigabe (ADR-0010).
+Eine ID ist `ue-` und sechs Ziffern: zwei für die Nummer des Trainers, der sie
+vergeben hat, vier laufend. `ue-000042` ist die Karte 42 von Trainer 00,
+`ue-010001` die erste von Trainer 01. Jeder Trainer vergibt die höchste Nummer
+in seinem Bereich plus eins. Zwei Trainer vergeben so nie dieselbe ID, auch
+wenn Nextcloud ihre Rechner noch nicht abgeglichen hat.
+
+Nächste freie ID: `python3 scripts/suche.py --naechste-id` (Windows: `python`).
+Gezählt werden Dateiname und `id:` jeder Karte, aber nur im Bereich des
+Trainers, der an diesem Rechner sitzt. Nie selbst aus der Trefferliste
+rechnen. Beim Sammelimport vergibt `sammelimport.py uebernehmen` die ID über
+dieselbe Funktion, erst bei der Freigabe (ADR-0010).
+
+Keine ID gibt es, wenn der Rechner zu keinem Trainer gehört oder wenn
+`uebungen/` noch eine vierstellige ID trägt. Der Aufruf endet dann mit
+Exitcode 1 und sagt warum, bei einem unbekannten Rechner mit dessen Namen.
+
+Ein Trainer an zwei Rechnern kann dieselbe ID zweimal vergeben, bevor Nextcloud
+abgleicht. Das ist hingenommen. Der Linter meldet die doppelte ID.
 
 Der Dateiname beginnt mit der ID, darf aber sonst geändert werden.
+
+### Wer welcher Trainer ist
+
+Der Abschnitt `trainer:` in der Wurzeldatei nennt je Trainer seine Nummer und
+die Rechner, an denen er importiert:
+
+```yaml
+trainer:
+  christian:
+    nummer: "00"                 # zwei Ziffern, in Anführungszeichen
+    rechner: [LAPTOP-J9V3J4LU]   # Liste in eckigen Klammern
+```
+
+Die Namen sind dieselben wie unter `gruppen.<gruppe>.trainer`. Erkannt wird der
+Rechner an seinem Namen, so wie er sich selbst nennt, unter Windows ist das der
+Gerätename. Groß- und Kleinschreibung zählen nicht. Auf dem Rechner selbst wird
+nichts gespeichert, so sieht jeder in der Wurzeldatei, wer welche Nummer hat.
+Jede Nummer gehört genau einem Trainer, jeder Rechner genau einem Trainer.
+
+Den Eintrag legt `volleyball-uebungsimport` an, wenn `--naechste-id` den
+Rechner nicht kennt: Er fragt, wer da sitzt. Ein Trainer aus der Liste bekommt
+den Rechner dazu, ein neuer Trainer die nächste freie Nummer, der erste
+überhaupt `00`. Eingetragen wird erst nach dem Ja des Trainers.
+`init_struktur.py` legt den Abschnitt leer an.
+
+### Vierstellige IDs
+
+Bis 2.5.1 waren IDs vierstellig, etwa `ue-0042`. Seitdem gilt nur das neue
+Format. `index.py` meldet eine Karte mit vierstelliger ID und einen
+Trainingsplan, der noch eine nennt, jeweils mit Hinweis auf
+`ids_umstellen.py`. Das Skript stellt einen Arbeitsordner um:
+
+- Ohne `--schreiben` zeigt es jede Änderung und schreibt nichts.
+- Jede vierstellige ID als ganzes Wort in den `.md`- und `.yml`-Dateien des
+  Arbeitsordners wird `ue-00` und die vier Ziffern, auch unter `quellen/`.
+- Karten in `uebungen/` und Dateien in `schaubilder/`, deren Name mit einer ID
+  beginnt, werden umbenannt.
+- Steht unter `trainer:` noch niemand, kommt der mit `--trainer` genannte
+  Trainer hinein, als `00` und mit diesem Rechner.
+- `index.md` und die Leseansichten sind erzeugt und bleiben. Das Skript sagt
+  am Ende, womit sie neu entstehen.
+- Ist ein neuer Dateiname schon belegt, schreibt es nichts. Ein zweiter Lauf
+  findet nichts mehr zu tun.
 
 ## Der Sammelimport
 
@@ -188,7 +248,7 @@ daraus gelten. Geht unverändert in jeden Auftrag.
 
 | Kandidat | Dateien | Was es ist | Ergebnis | Status | Karte | Notiz |
 |---|---|---|---|---|---|---|
-| 1 | `Ü_Abwehr/Abwehr vom Kasten.pdf` | Abwehr gegen Angriffe vom Kasten | uebung | importiert | ue-0291 | spieler_min auf 6 |
+| 1 | `Ü_Abwehr/Abwehr vom Kasten.pdf` | Abwehr gegen Angriffe vom Kasten | uebung | importiert | ue-000291 | spieler_min auf 6 |
 | 2 | `seite-24.jpg`, `seite-25.jpg` | Übung über zwei Seiten | uebung | offen | | kein Entwurf |
 ```
 
@@ -277,7 +337,7 @@ Tabelle die Spalte „aus dem Bild“.
 
 Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
 mit `angelegt` von heute und ohne `## Freigabe`. Das Feldbild kommt unter dem
-Namen der Karte nach `schaubilder/`, etwa `ue-0291-abwehr-vom-kasten.png`, und
+Namen der Karte nach `schaubilder/`, etwa `ue-000291-abwehr-vom-kasten.png`, und
 `schaubild:` zeigt darauf. Liegt dort schon eine Datei unter diesem Namen, wird
 der Kandidat nicht übernommen. Entwurf und Auftrag verschwinden dann. Streicht
 der Trainer einen Kandidaten, wird er `übersprungen`, mit dem Grund in der
@@ -298,8 +358,8 @@ eine Beschreibung in YAML, die durchgehend in Metern rechnet und aus der
 unter demselben Basisnamen:
 
 ```
-schaubilder/ue-0042.szene.yml    die Quelle, hier wird geändert
-schaubilder/ue-0042.svg          das Erzeugnis, wird überschrieben
+schaubilder/ue-000042.szene.yml    die Quelle, hier wird geändert
+schaubilder/ue-000042.svg          das Erzeugnis, wird überschrieben
 ```
 
 Auf der Karte steht in `schaubild:` der Dateiname des **Bildes**, nicht der
@@ -346,7 +406,7 @@ Altersklasse umschreiben. Wer per ID auf sie verweist, bekommt sonst eine
 andere Übung, ohne es zu merken.
 
 Stattdessen: Anpassung in den Abschnitt `## Variationen`. Ändert sie den
-Charakter der Übung wirklich, eine eigene Karte mit `variante_von: ue-####`.
+Charakter der Übung wirklich, eine eigene Karte mit `variante_von: ue-######`.
 
 Beim Planen entsteht eine Anpassung erst nur im Trainingsplan. Ob sie in die
 Bibliothek wandert, entscheidet die Nachbereitung nach der Einheit. So wächst
@@ -381,15 +441,17 @@ Die übrigen Skripte brauchen weder Pillow noch `pdftotext`.
 | Skript | Wofür |
 |---|---|
 | `index.py` | Index neu bauen, Bibliothek prüfen, mit `--md` die Lesebrille schreiben |
-| `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek |
+| `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek. Mit `--naechste-id` die ID für die nächste Karte |
 | `leseansicht.py` | aus einem Trainingsplan die HTML-Fassung fürs Handy erzeugen, samt den Schaubildern der verwendeten Übungen |
 | `export_pdf.py` | PDF zum Ausdrucken |
 | `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen |
 | `bilder_aufbereiten.py` | Quellbilder verkleinern und nach EXIF geradedrehen |
 | `sammelimport.py` | Sammelimport über einen Quellenordner: `vorbereiten --plan` legt die Eingabe für den Zerlegungsplan an, `vorbereiten` die Aufträge, `pruefen` setzt den Status aus den Entwürfen und gibt mit `--json` aus, was die Freigabe braucht, `uebernehmen` macht freigegebene Entwürfe zu Karten und trägt gestrichene und ergänzende Kandidaten ein |
+| `ids_umstellen.py` | einen Arbeitsordner von vierstelligen auf sechsstellige IDs umstellen, einmal je Arbeitsordner |
 
-`index.py` ohne Argumente ist auch der Linter: doppelte IDs, fehlende oder
-unbekannte `disziplin`, unbekannte Schwerpunkte, fehlende Level, ins Leere
-zeigende `variante_von`, `schaubild` auf eine Datei, die es unter
-`schaubilder/` nicht gibt, Trainingspläne mit unbekannten IDs. Vor größeren
-Änderungen und nach jedem Import laufen lassen.
+`index.py` ohne Argumente ist auch der Linter: doppelte IDs, vierstellige IDs
+auf Karten und in Trainingsplänen, fehlende oder unbekannte `disziplin`,
+unbekannte Schwerpunkte, fehlende Level, ins Leere zeigende `variante_von`,
+`schaubild` auf eine Datei, die es unter `schaubilder/` nicht gibt,
+Trainingspläne mit unbekannten IDs. Vor größeren Änderungen und nach jedem
+Import laufen lassen.

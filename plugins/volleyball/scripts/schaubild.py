@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Zeichnet aus einer Szene ein Schaubild als SVG.
 
-    <python> schaubild.py ue-0042                       # schaubilder/ue-0042.szene.yml
-    <python> schaubild.py schaubilder/ue-0042.szene.yml
-    <python> schaubild.py ue-0042 --wurzel <pfad>
+    <python> schaubild.py ue-000042                       # schaubilder/ue-000042.szene.yml
+    <python> schaubild.py schaubilder/ue-000042.szene.yml
+    <python> schaubild.py ue-000042 --wurzel <pfad>
 
 Die Szene ist die Quelle, das SVG ist das Erzeugnis (ADR-0004). Beide liegen
 unter demselben Basisnamen in `schaubilder/`, damit eine Korrektur ein halbes
@@ -878,7 +878,7 @@ def ziel(quelle: Path) -> Path:
 
     Der Basisname ist der Dateiname ohne `.yml` beziehungsweise `.yaml` und
     ohne das `.szene` davor. Eine Regel statt einer Liste von Schreibweisen:
-    `ue-0042.szene.yml` und `ue-0042.szene.yaml` ergeben beide `ue-0042.svg`.
+    `ue-000042.szene.yml` und `ue-000042.szene.yaml` ergeben beide `ue-000042.svg`.
     """
     stamm = quelle.with_suffix("").name
     if stamm.endswith(".szene"):
@@ -889,7 +889,7 @@ def ziel(quelle: Path) -> Path:
 def kartentitel(basisname: str, wurzel: Path | None) -> str:
     """Der `titel:` der Uebungskarte, deren ID dieser Basisname ist.
 
-    `schaubilder/ue-0042.szene.yml` gehoert zu `uebungen/ue-0042-*.md`, und
+    `schaubilder/ue-000042.szene.yml` gehoert zu `uebungen/ue-000042-*.md`, und
     dort steht der Titel schon. Gesucht wird darum eine einzige Datei und nicht
     die ganze Bibliothek: das Skript braucht den Titel nur, um ihn
     vorzuschlagen, und dafuer lohnt kein Index.
@@ -914,7 +914,7 @@ def main() -> int:
         description="Aus einer Szene ein Schaubild als SVG zeichnen")
     ap.add_argument("szene",
                     help="Szenendatei oder Basisname, dann unter schaubilder/ "
-                         "gesucht (etwa ue-0042)")
+                         "gesucht (etwa ue-000042)")
     ap.add_argument("--wurzel", type=Path, default=None)
     a = ap.parse_args()
 

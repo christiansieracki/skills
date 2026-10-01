@@ -14,6 +14,7 @@ Beacheinheit eine Hallenuebung im Ergebnis steht.
 from __future__ import annotations
 
 import json
+import socket
 import unittest
 
 from arbeitsordner import Arbeitsordner
@@ -61,7 +62,7 @@ class SucheTest(unittest.TestCase):
         self.assertEqual(sorted(e["id"] for e in gefunden), sorted(self.ordner.ids))
 
     def test_jeder_treffer_traegt_die_felder_seiner_karte(self) -> None:
-        (gefunden,) = self.treffer("--id", "ue-0003")
+        (gefunden,) = self.treffer("--id", "ue-000003")
 
         self.assertEqual(gefunden["titel"], "Sideout-Serie über zwei Spielflächen")
         self.assertEqual(gefunden["element"], ["annahme", "angriff"])
@@ -75,21 +76,21 @@ class SucheTest(unittest.TestCase):
     def test_zu_wenige_spielflaechen_lassen_die_uebung_herausfallen(self) -> None:
         gefunden = [e["id"] for e in self.treffer("--spielflaechen", "1")]
 
-        self.assertNotIn("ue-0003", gefunden)  # braucht zwei
-        self.assertIn("ue-0002", gefunden)     # kommt mit einem aus
+        self.assertNotIn("ue-000003", gefunden)  # braucht zwei
+        self.assertIn("ue-000002", gefunden)     # kommt mit einem aus
 
     def test_mehr_anwesende_als_die_obergrenze_bleiben_ein_treffer(self) -> None:
-        # ue-0002 ist fuer hoechstens vier Spieler gedacht. Bei zwoelf
+        # ue-000002 ist fuer hoechstens vier Spieler gedacht. Bei zwoelf
         # Anwesenden laeuft sie in drei Gruppen, sie faellt nicht heraus.
         gefunden = [e["id"] for e in self.treffer("--spieler", "12")]
 
-        self.assertIn("ue-0002", gefunden)
+        self.assertIn("ue-000002", gefunden)
 
     def test_die_trefferzeile_nennt_spielflaechen_und_gruppen(self) -> None:
         # Die lesbare Ausgabe zeigt zwei Dinge, die die JSON-Fassung nicht
         # hergibt: die Beschriftung des Spielflaechenfeldes und die Zahl der
         # Gruppen, in denen die Uebung bei so vielen Anwesenden laeuft.
-        fertig = self.ordner.starte("suche.py", "--id", "ue-0002", "--spieler", "12", "--lang")
+        fertig = self.ordner.starte("suche.py", "--id", "ue-000002", "--spieler", "12", "--lang")
 
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
         self.assertIn("[3 Gruppen parallel]", fertig.stdout)
@@ -98,31 +99,31 @@ class SucheTest(unittest.TestCase):
     def test_mit_genau_zaehlt_die_obergrenze_dann_doch(self) -> None:
         gefunden = [e["id"] for e in self.treffer("--spieler", "12", "--genau")]
 
-        self.assertNotIn("ue-0002", gefunden)  # Obergrenze 4
-        self.assertIn("ue-0003", gefunden)     # 12 bis 16
+        self.assertNotIn("ue-000002", gefunden)  # Obergrenze 4
+        self.assertIn("ue-000003", gefunden)     # 12 bis 16
 
     def test_der_disziplinfilter_beach_laesst_die_hallenkarte_draussen(self) -> None:
         gefunden = [e["id"] for e in self.treffer("--disziplin", "beach")]
 
-        self.assertIn("ue-0004", gefunden)     # nur beach
-        self.assertIn("ue-0005", gefunden)     # halle und beach
-        self.assertNotIn("ue-0001", gefunden)  # nur halle
+        self.assertIn("ue-000004", gefunden)     # nur beach
+        self.assertIn("ue-000005", gefunden)     # halle und beach
+        self.assertNotIn("ue-000001", gefunden)  # nur halle
 
     def test_der_disziplinfilter_halle_laesst_die_beachkarte_draussen(self) -> None:
         gefunden = [e["id"] for e in self.treffer("--disziplin", "halle")]
 
-        self.assertIn("ue-0001", gefunden)
-        self.assertIn("ue-0005", gefunden)
-        self.assertNotIn("ue-0004", gefunden)
+        self.assertIn("ue-000001", gefunden)
+        self.assertIn("ue-000005", gefunden)
+        self.assertNotIn("ue-000004", gefunden)
 
     def test_beide_werte_zusammen_treffen_jede_disziplin(self) -> None:
         # Mehrere Werte sind erlaubt und werden als Mengenschnitt gegen die
         # Liste auf der Karte verknuepft, genau wie beim Element.
         gefunden = [e["id"] for e in self.treffer("--disziplin", "halle", "beach")]
 
-        self.assertIn("ue-0001", gefunden)  # nur halle
-        self.assertIn("ue-0004", gefunden)  # nur beach
-        self.assertIn("ue-0005", gefunden)  # beides
+        self.assertIn("ue-000001", gefunden)  # nur halle
+        self.assertIn("ue-000004", gefunden)  # nur beach
+        self.assertIn("ue-000005", gefunden)  # beides
 
     def test_auch_die_kurze_trefferliste_nennt_die_disziplin(self) -> None:
         # Ab vier Treffern faellt die ausfuehrliche Darstellung weg. Gerade
@@ -131,11 +132,11 @@ class SucheTest(unittest.TestCase):
         fertig = self.ordner.starte("suche.py")
 
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
-        zeile = next(z for z in fertig.stdout.splitlines() if z.startswith("ue-0004"))
+        zeile = next(z for z in fertig.stdout.splitlines() if z.startswith("ue-000004"))
         self.assertIn("beach", zeile)
 
     def test_die_ausfuehrliche_ausgabe_beschriftet_die_disziplin(self) -> None:
-        fertig = self.ordner.starte("suche.py", "--id", "ue-0005", "--lang")
+        fertig = self.ordner.starte("suche.py", "--id", "ue-000005", "--lang")
 
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
         self.assertIn("Disziplin    halle, beach", fertig.stdout)
@@ -145,7 +146,7 @@ class SucheTest(unittest.TestCase):
         # Liegt sie unter quellen/, steht dort ein Pfad, den man kopieren
         # kann, so wie `schaubilder/<datei>` in der Zeile darueber.
         zeile = self.quelldateizeile(
-            "ue-0013", vorhanden=("playdrill/Annahme Diagonal.pdf",),
+            "ue-000013", vorhanden=("playdrill/Annahme Diagonal.pdf",),
             titel="Annahme diagonal",
             quelldatei="playdrill/Annahme Diagonal.pdf")
 
@@ -157,7 +158,7 @@ class SucheTest(unittest.TestCase):
         # die Datei nicht. Die Zeile sieht bei ihm aus wie bisher, statt ihm
         # einen Pfad zu zeigen, unter dem nichts liegt.
         zeile = self.quelldateizeile(
-            "ue-0014", titel="Annahme diagonal, ohne Quellen",
+            "ue-000014", titel="Annahme diagonal, ohne Quellen",
             quelldatei="playdrill/Annahme Diagonal.pdf")
 
         self.assertEqual(
@@ -173,7 +174,7 @@ class SucheTest(unittest.TestCase):
         datei = self.ordner.lege_quelldatei_an("playdrill/Annahme Diagonal.pdf", b"")
         mit_laufwerk = datei.as_posix()
         ohne_laufwerk = "/" + datei.relative_to(datei.anchor).as_posix()
-        for uid, wert in (("ue-0015", mit_laufwerk), ("ue-0016", ohne_laufwerk)):
+        for uid, wert in (("ue-000015", mit_laufwerk), ("ue-000016", ohne_laufwerk)):
             with self.subTest(wert=wert):
                 zeile = self.quelldateizeile(
                     uid, titel=f"Annahme diagonal, absolut verwiesen ({uid})",
@@ -186,7 +187,7 @@ class SucheTest(unittest.TestCase):
         # setzt, bekommt vom Parser eine Liste. Die ist kein Pfad, und die
         # Suche darf an ihr nicht scheitern.
         zeile = self.quelldateizeile(
-            "ue-0017", vorhanden=("magazin/seite-04.jpg", "magazin/seite-05.jpg"),
+            "ue-000017", vorhanden=("magazin/seite-04.jpg", "magazin/seite-05.jpg"),
             titel="Abwehr über zwei Seiten, als Liste",
             quelldatei=["magazin/seite-04.jpg", "magazin/seite-05.jpg"])
 
@@ -199,7 +200,7 @@ class SucheTest(unittest.TestCase):
         # beide liegen unter quellen/. Ein Praefix am Anfang der Angabe saesse
         # nur vor der ersten.
         zeile = self.quelldateizeile(
-            "ue-0010", vorhanden=("magazin/seite-04.jpg", "magazin/seite-05.jpg"),
+            "ue-000010", vorhanden=("magazin/seite-04.jpg", "magazin/seite-05.jpg"),
             titel="Abwehr über zwei Seiten",
             quelldatei="magazin/seite-04.jpg, magazin/seite-05.jpg")
 
@@ -213,7 +214,7 @@ class SucheTest(unittest.TestCase):
         # die Ausgabe nicht haengen: die zweite Seite soll in beiden Faellen
         # genauso dastehen wie die erste.
         zeile = self.quelldateizeile(
-            "ue-0011", vorhanden=("magazin/seite-04.jpg", "magazin/seite-05.jpg"),
+            "ue-000011", vorhanden=("magazin/seite-04.jpg", "magazin/seite-05.jpg"),
             titel="Abwehr über zwei Seiten, anders geschrieben",
             quelldatei="magazin/seite-04.jpg und magazin/seite-05.jpg")
 
@@ -227,7 +228,7 @@ class SucheTest(unittest.TestCase):
         # Pfad: `quellen/S. 1` gibt es nicht. Die Datei selbst liegt da, aber
         # der Wert ist mehr als ihr Name.
         zeile = self.quelldateizeile(
-            "ue-0012", vorhanden=("unsortiert/Vorschlag Dienstag 14.09.23 _ H1.pdf",),
+            "ue-000012", vorhanden=("unsortiert/Vorschlag Dienstag 14.09.23 _ H1.pdf",),
             titel="Vorschlag aus der Sammlung",
             quelldatei="unsortiert/Vorschlag Dienstag 14.09.23 _ H1.pdf, S. 1")
 
@@ -235,6 +236,124 @@ class SucheTest(unittest.TestCase):
             "in quellen/ · unsortiert/Vorschlag Dienstag 14.09.23 _ H1.pdf, S. 1",
             zeile)
         self.assertEqual(1, zeile.count("quellen/"))
+
+
+class NaechsteIdTest(unittest.TestCase):
+    """`suche.py --naechste-id`: die ID fuer die naechste Karte dieses Rechners.
+
+    Jeder Trainer vergibt in seinem eigenen Bereich, dem mit seiner Nummer
+    vorn (ADR-0011). Welcher Trainer an diesem Rechner sitzt, steht unter
+    `trainer:` in der Wurzeldatei. Der Fixture traegt dort den Rechner, auf dem
+    der Test laeuft, als Trainer 00.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def naechste_id(self) -> str:
+        fertig = self.ordner.starte("suche.py", "--naechste-id")
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        return fertig.stdout.strip()
+
+    def keine_id(self) -> str:
+        """Ruft `--naechste-id` auf, wo es keine ID geben darf. Gibt die Meldung zurueck."""
+        fertig = self.ordner.starte("suche.py", "--naechste-id")
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertEqual(fertig.stdout, "", "auf stdout darf nichts stehen, was nach einer ID aussieht")
+        return fertig.stderr
+
+    def test_die_hoechste_id_im_eigenen_bereich_plus_eins(self) -> None:
+        # Mit einer Luecke: gezaehlt wird von der hoechsten, nicht die Karten.
+        self.ordner.lege_karte_an(id="ue-000009", titel="Die bisher höchste ID")
+
+        self.assertEqual(self.naechste_id(), "ue-000010")
+
+    def test_ein_leerer_bereich_beginnt_bei_eins(self) -> None:
+        self.ordner.setze_trainer({**TRAINER_ANDERER_RECHNER,
+                                   "neu": {"nummer": "01", "rechner": [socket.gethostname()]}})
+
+        self.assertEqual(self.naechste_id(), "ue-010001")
+
+    def test_karten_eines_anderen_trainers_zaehlen_nicht(self) -> None:
+        # Der Fixture traegt die Karten 00…05 von Trainer 00. Dazu eine hoehere
+        # von Trainer 02. Fuer Trainer 01 zaehlt nur seine eigene.
+        self.ordner.setze_trainer({**TRAINER_ANDERER_RECHNER,
+                                   "neu": {"nummer": "01", "rechner": [socket.gethostname()]}})
+        self.ordner.lege_karte_an(id="ue-010003", titel="Eine eigene Karte")
+        self.ordner.lege_karte_an(id="ue-020007", titel="Karte eines dritten Trainers")
+
+        self.assertEqual(self.naechste_id(), "ue-010004")
+
+    def test_dateiname_und_id_zaehlen_beide(self) -> None:
+        # Laufen beide auseinander, meldet der Linter die Karte. Bis dahin soll
+        # keine der beiden Nummern ein zweites Mal vergeben werden.
+        self.ordner.lege_karte_an(id="ue-000007", titel="Umbenannte Karte")
+        karte = next((self.ordner.pfad / "uebungen").glob("ue-000007-*.md"))
+        karte.rename(karte.with_name("ue-000009-umbenannte-karte.md"))
+
+        self.assertEqual(self.naechste_id(), "ue-000010")
+
+    def test_gross_und_kleinschreibung_des_rechners_zaehlt_nicht(self) -> None:
+        self.ordner.setze_trainer({"test": {"nummer": "00",
+                                            "rechner": [socket.gethostname().swapcase()]}})
+
+        self.assertEqual(self.naechste_id(), "ue-000006")
+
+    def test_ein_unbekannter_rechner_bekommt_keine_id(self) -> None:
+        self.ordner.setze_trainer(TRAINER_ANDERER_RECHNER)
+
+        meldung = self.keine_id()
+
+        self.assertIn(socket.gethostname(), meldung)
+
+    def test_die_meldung_nennt_die_trainer_und_die_naechste_freie_nummer(self) -> None:
+        # Damit der Import-Skill fragen kann, wer da sitzt, ohne die
+        # Wurzeldatei selbst auszulesen.
+        self.ordner.setze_trainer({
+            **TRAINER_ANDERER_RECHNER,
+            "zweiter": {"nummer": "01", "rechner": ["ANDERER-RECHNER-2"]},
+        })
+
+        meldung = self.keine_id()
+
+        self.assertIn("anderer (00)", meldung)
+        self.assertIn("zweiter (01)", meldung)
+        self.assertIn("Nummer 02", meldung)
+
+    def test_ohne_abschnitt_trainer_gibt_es_keine_id(self) -> None:
+        self.ordner.setze_trainer(None)
+
+        meldung = self.keine_id()
+
+        self.assertIn(socket.gethostname(), meldung)
+        self.assertIn("Nummer 00", meldung, "der erste Trainer ueberhaupt bekommt 00")
+
+    def test_zwei_trainer_mit_derselben_nummer_bekommen_keine_id(self) -> None:
+        # Dann vergaeben beide dieselben IDs, und genau das soll die Nummer
+        # verhindern.
+        self.ordner.setze_trainer({
+            "test": {"nummer": "00", "rechner": [socket.gethostname()]},
+            "anderer": {"nummer": "00", "rechner": ["ANDERER-RECHNER"]},
+        })
+
+        meldung = self.keine_id()
+
+        self.assertIn("anderer", meldung)
+
+    def test_solange_es_vierstellige_ids_gibt_gibt_es_keine_neue(self) -> None:
+        # Sonst bekaeme eine neue Karte ue-000042, und die alte ue-0042 wuerde
+        # beim Umstellen zu derselben ID.
+        self.ordner.lege_karte_an(id="ue-0042", titel="Karte von vor der Umstellung")
+
+        meldung = self.keine_id()
+
+        self.assertIn("ids_umstellen.py", meldung)
+
+
+# Ein Trainer, der an einem anderen Rechner sitzt als dem, auf dem der Test
+# laeuft.
+TRAINER_ANDERER_RECHNER = {"anderer": {"nummer": "00", "rechner": ["ANDERER-RECHNER"]}}
 
 
 if __name__ == "__main__":

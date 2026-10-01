@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import tempfile
 import unicodedata
 import unittest
@@ -73,7 +74,7 @@ class VorbereitenTest(unittest.TestCase):
         # 6 keinen Auftrag, und der Durchgang waere kleiner als eingestellt.
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 1, "dateien": ["seite-01.jpg"], "status": "importiert",
-             "karte": "ue-0001"},
+             "karte": "ue-000001"},
             {"kandidat": 2, "dateien": ["seite-02.jpg"], "ergebnis": "zurückgestellt",
              "status": "zurückgestellt"},
             {"kandidat": 3, "dateien": ["seite-03.jpg"], "ergebnis": "übersprungen",
@@ -484,8 +485,8 @@ class FeldbildTest(unittest.TestCase):
             self.assertIn(eingetragen, uebersicht[kandidat]["Notiz"])
 
     def lege_freigegebenen_entwurf_an(self) -> None:
-        """Kandidat 3 mit Feldbild, freigegeben. Die naechste freie ID ist ue-0010."""
-        self.ordner.lege_karte_an(id="ue-0009", titel="Die bisher höchste ID")
+        """Kandidat 3 mit Feldbild, freigegeben. Die naechste freie ID ist ue-000010."""
+        self.ordner.lege_karte_an(id="ue-000009", titel="Die bisher höchste ID")
         self.ordner.lege_quellenordner_an(
             ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"], "status": "bereit"}])
         self.ordner.lege_kartenentwurf_an(ORDNER, 3, titel="Abwehr vom Kasten",
@@ -502,7 +503,7 @@ class FeldbildTest(unittest.TestCase):
         fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, "--kandidat", "3", "")
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        name = "ue-0010-abwehr-vom-kasten"
+        name = "ue-000010-abwehr-vom-kasten"
         self.assertEqual((self.ordner.pfad / "schaubilder" / f"{name}.png").read_bytes(),
                          b"das Feldbild")
         karte = (self.ordner.pfad / "uebungen" / f"{name}.md").read_text(encoding="utf-8")
@@ -518,16 +519,16 @@ class FeldbildTest(unittest.TestCase):
         # Ansicht in schaubilder/ verloren gegangen, weil ein Skript sie
         # ueberschrieb.
         self.lege_freigegebenen_entwurf_an()
-        schon_da = self.ordner.lege_schaubild_an("ue-0010-abwehr-vom-kasten.png")
+        schon_da = self.ordner.lege_schaubild_an("ue-000010-abwehr-vom-kasten.png")
         vorher = schon_da.read_bytes()
 
         fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, "--kandidat", "3", "")
 
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
-        self.assertIn("ue-0010-abwehr-vom-kasten.png",
+        self.assertIn("ue-000010-abwehr-vom-kasten.png",
                       zeile_mit(fertig.stdout, "nicht übernommen"))
         self.assertEqual(schon_da.read_bytes(), vorher)
-        self.assertEqual(list((self.ordner.pfad / "uebungen").glob("ue-0010-*")), [])
+        self.assertEqual(list((self.ordner.pfad / "uebungen").glob("ue-000010-*")), [])
         self.assertTrue((self.entwuerfe / "3.feldbild.png").exists())
 
 
@@ -582,7 +583,7 @@ class PlaneingabeTest(unittest.TestCase):
         # offene Kandidat 2. Die sammelimport.md selbst ist keine Quelle.
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 1, "dateien": ["seite-01.jpg"], "status": "importiert",
-             "karte": "ue-0001"},
+             "karte": "ue-000001"},
             {"kandidat": 2, "dateien": ["unter/seite-02.jpg", "unter/seite-03.jpg"]},
         ])
         self.ordner.lege_quelldatei_an(f"{ORDNER}/unter/seite-04.jpg", b"")
@@ -703,11 +704,11 @@ class PlaneingabeTest(unittest.TestCase):
         # seiner ID, statt es ein zweites Mal entwerfen zu lassen. Eine Karte
         # ueber zwei Seiten nennt beide Dateien. Ein Ordner, der nur genauso
         # anfaengt, ist ein anderer.
-        self.ordner.lege_karte_an(id="ue-0006", titel="Abwehr vom Kasten", element=["abwehr"],
+        self.ordner.lege_karte_an(id="ue-000006", titel="Abwehr vom Kasten", element=["abwehr"],
                                   quelldatei=f"{ORDNER}/Ü_Abwehr/kasten.pdf")
-        self.ordner.lege_karte_an(id="ue-0007", titel="Über zwei Seiten",
+        self.ordner.lege_karte_an(id="ue-000007", titel="Über zwei Seiten",
                                   quelldatei=f"{ORDNER}/seite-01.jpg, {ORDNER}/seite-02.jpg")
-        self.ordner.lege_karte_an(id="ue-0008", titel="Aus dem alten Stapel",
+        self.ordner.lege_karte_an(id="ue-000008", titel="Aus dem alten Stapel",
                                   quelldatei=f"{ORDNER}-alt/seite-01.jpg")
         self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-09.jpg", b"")
 
@@ -715,12 +716,12 @@ class PlaneingabeTest(unittest.TestCase):
 
         liste = self.bibliothek()
         self.assertEqual(sorted(liste), sorted(self.ordner.ids))
-        kasten = liste["ue-0006"]
+        kasten = liste["ue-000006"]
         self.assertEqual(kasten["Titel"], "Abwehr vom Kasten")
         self.assertEqual(kasten["Element"], "abwehr")
         self.assertEqual(kasten["quelldatei"], f"{ORDNER}/Ü_Abwehr/kasten.pdf")
         self.assertEqual({uid for uid, zeile in liste.items() if zeile["Aus diesem Ordner"]},
-                         {"ue-0006", "ue-0007"})
+                         {"ue-000006", "ue-000007"})
 
     def test_ein_foto_ueber_2_mb_ergibt_den_hinweis_auf_die_bildaufbereitung(self) -> None:
         # So schwer ist eine abfotografierte Magazinseite mit 50 Megapixeln.
@@ -850,7 +851,7 @@ class PruefenTest(unittest.TestCase):
                 {"rueckfragen": ["Wie viele Spieler? Und wie viele Bälle? "
                                  "Vermutung im Entwurf: keine"]}, "Fragezeichen"),
             # Die ID vergibt erst uebernehmen (ADR-0010).
-            "Entwurf mit id": ({"id": "ue-0099"}, "ue-0099"),
+            "Entwurf mit id": ({"id": "ue-000099"}, "ue-000099"),
             "fehlendes Feld": ({"spieler_min": OHNE}, "spieler_min"),
             # Ohne Feld oder Ueberschrift vorn laesst sich der Vorschlag
             # keiner Spalte der Tabelle zuordnen.
@@ -1030,12 +1031,12 @@ class PruefenTest(unittest.TestCase):
         # "offen", entwuerfe der naechste Durchgang dieselbe Uebung ein
         # zweites Mal.
         self.plane({"kandidat": 1, "dateien": ["a.pdf"], "status": "importiert",
-                    "karte": "ue-0001", "notiz": "spieler_min auf 6"})
+                    "karte": "ue-000001", "notiz": "spieler_min auf 6"})
 
         uebersicht = self.pruefe()
 
         self.assertEqual(uebersicht["1"]["Status"], "importiert")
-        self.assertEqual(uebersicht["1"]["Karte"], "ue-0001")
+        self.assertEqual(uebersicht["1"]["Karte"], "ue-000001")
         self.assertEqual(uebersicht["1"]["Notiz"], "spieler_min auf 6")
 
     def test_eine_erledigte_zeile_bleibt_zeichengenau_stehen(self) -> None:
@@ -1043,11 +1044,11 @@ class PruefenTest(unittest.TestCase):
         # einem `|` darin und doppelten Leerzeichen ueberstuende sonst den
         # naechsten Aufruf nicht, obwohl an der Zeile nichts zu tun war.
         datei = self.ordner.lege_quellenordner_an(ORDNER, [
-            {"kandidat": 1, "dateien": ["a.pdf"], "status": "importiert", "karte": "ue-0001"},
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "importiert", "karte": "ue-000001"},
             {"kandidat": 2, "dateien": ["b.pdf"]},
         ])
         text = datei.read_text(encoding="utf-8")
-        von_hand = "| 1 | `a.pdf` | Übung  aus dem Test | uebung | importiert | ue-0001 | A | B |"
+        von_hand = "| 1 | `a.pdf` | Übung  aus dem Test | uebung | importiert | ue-000001 | A | B |"
         datei.write_text(
             text.replace(zeile_mit(text, "| importiert |"), von_hand), encoding="utf-8")
 
@@ -1065,7 +1066,7 @@ class UebernehmenTest(unittest.TestCase):
         self.addCleanup(self.ordner.raeume_auf)
         # Eine Luecke in den IDs des Fixtures: Die naechste freie ID ist die
         # hoechste plus eins, nicht die Zahl der Karten plus eins.
-        self.ordner.lege_karte_an(id="ue-0009", titel="Die bisher höchste ID")
+        self.ordner.lege_karte_an(id="ue-000009", titel="Die bisher höchste ID")
 
     def uebernimm(self, *argumente: str):
         return self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, *argumente)
@@ -1085,8 +1086,8 @@ class UebernehmenTest(unittest.TestCase):
         fertig = self.uebernimm("--kandidat", "1", "unverändert")
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        karte = self.karte("ue-0010")
-        self.assertIn("\nid: ue-0010\n", karte)
+        karte = self.karte("ue-000010")
+        self.assertIn("\nid: ue-000010\n", karte)
         self.assertIn(f"\nangelegt: {date.today().isoformat()}\n", karte)
         self.assertIn("\n## Ablauf\n", karte)
         # Vorschlaege und Rueckfragen sind mit der Freigabe erledigt. Auf der
@@ -1111,7 +1112,7 @@ class UebernehmenTest(unittest.TestCase):
         zeile = self.ordner.uebersicht(ORDNER)["1"]
         self.assertEqual(
             (zeile["Status"], zeile["Karte"], zeile["Notiz"]),
-            ("importiert", "ue-0010", "spieler_min auf 6"))
+            ("importiert", "ue-000010", "spieler_min auf 6"))
 
     def test_zwei_kandidaten_bekommen_aufeinanderfolgende_ids(self) -> None:
         self.ordner.lege_quellenordner_an(ORDNER, [
@@ -1124,8 +1125,41 @@ class UebernehmenTest(unittest.TestCase):
         fertig = self.uebernimm("--kandidat", "1", "", "--kandidat", "2", "")
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        self.assertIn("titel: \"Erster Kandidat\"", self.karte("ue-0010"))
-        self.assertIn("titel: \"Zweiter Kandidat\"", self.karte("ue-0011"))
+        self.assertIn("titel: \"Erster Kandidat\"", self.karte("ue-000010"))
+        self.assertIn("titel: \"Zweiter Kandidat\"", self.karte("ue-000011"))
+
+    def test_die_id_kommt_aus_dem_bereich_des_trainers_an_diesem_rechner(self) -> None:
+        # Dieselbe naechste ID wie `suche.py --naechste-id` (ADR-0011). Die
+        # Karten des Fixtures gehoeren Trainer 00, an diesem Rechner sitzt
+        # einer mit 01, und dessen Bereich ist noch leer.
+        self.ordner.setze_trainer({
+            "test": {"nummer": "00", "rechner": ["ANDERER-RECHNER"]},
+            "zweiter": {"nummer": "01", "rechner": [socket.gethostname()]},
+        })
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"}])
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Vom zweiten Trainer")
+
+        fertig = self.uebernimm("--kandidat", "1", "")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertIn("\nid: ue-010001\n", self.karte("ue-010001"))
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["1"]["Karte"], "ue-010001")
+
+    def test_gehoert_der_rechner_zu_keinem_trainer_wird_nichts_geschrieben(self) -> None:
+        self.ordner.setze_trainer({"test": {"nummer": "00", "rechner": ["ANDERER-RECHNER"]}})
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"}])
+        entwurf = self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Wartet auf seine ID")
+
+        fertig = self.uebernimm("--kandidat", "1", "")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn(socket.gethostname(), fertig.stdout)
+        self.assertEqual(len(list((self.ordner.pfad / "uebungen").glob("*.md"))),
+                         len(self.ordner.ids))
+        self.assertTrue(entwurf.exists())
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["1"]["Status"], "bereit")
 
     def test_danach_meldet_der_linter_keine_auffaelligkeit(self) -> None:
         # Der Pruefvertrag aus test_index.py. Eine Karte, die der Linter
@@ -1159,8 +1193,8 @@ class UebernehmenTest(unittest.TestCase):
         fertig = self.uebernimm("--kandidat", "1", "", "--kandidat", "2", "")
 
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
-        self.assertIn("titel: \"Heil\"", self.karte("ue-0010"))
-        self.assertEqual(list((self.ordner.pfad / "uebungen").glob("ue-0011-*")), [])
+        self.assertIn("titel: \"Heil\"", self.karte("ue-000010"))
+        self.assertEqual(list((self.ordner.pfad / "uebungen").glob("ue-000011-*")), [])
         zeile = self.ordner.uebersicht(ORDNER)["1"]
         self.assertEqual(zeile["Status"], "offen")
         self.assertIn("## Freigabe", zeile["Notiz"])
@@ -1180,7 +1214,7 @@ class UebernehmenTest(unittest.TestCase):
 
     def test_uebersprungen_und_ergaenzt_setzen_nur_den_status(self) -> None:
         # Kandidat 1 hat der Trainer bei der Freigabe gestrichen, Kandidat 2
-        # war ein Duplikat von ue-0003, und der Skill hat diese Karte schon
+        # war ein Duplikat von ue-000003, und der Skill hat diese Karte schon
         # ergaenzt. Keiner von beiden wird Karte. Kandidat 3 ist noch offen
         # und haelt den Entwurfsordner fest, so zeigt sich, dass Entwurf,
         # Auftrag und Feldbild einzeln verschwinden.
@@ -1198,7 +1232,7 @@ class UebernehmenTest(unittest.TestCase):
         vorher = sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir())
 
         fertig = self.uebernimm("--uebersprungen", "1", "Vorlage ohne Übung",
-                                "--ergaenzt", "2", "ue-0003")
+                                "--ergaenzt", "2", "ue-000003")
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         uebersicht = self.ordner.uebersicht(ORDNER)
@@ -1206,7 +1240,7 @@ class UebernehmenTest(unittest.TestCase):
             (uebersicht["1"]["Status"], uebersicht["1"]["Karte"], uebersicht["1"]["Notiz"]),
             ("übersprungen", "", "Vorlage ohne Übung"))
         self.assertEqual((uebersicht["2"]["Status"], uebersicht["2"]["Karte"]),
-                         ("ergänzt", "ue-0003"))
+                         ("ergänzt", "ue-000003"))
         self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir()),
                          vorher)
         self.assertFalse((self.ordner.pfad / "schaubilder").exists())
@@ -1223,10 +1257,10 @@ class UebernehmenTest(unittest.TestCase):
         ])
         entwurf = self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Duplikat")
 
-        fertig = self.uebernimm("--ergaenzt", "1", "ue-0300", "--uebersprungen", "2", " ")
+        fertig = self.uebernimm("--ergaenzt", "1", "ue-000300", "--uebersprungen", "2", " ")
 
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
-        self.assertIn("ue-0300", zeile_mit(fertig.stdout, "  1  "))
+        self.assertIn("ue-000300", zeile_mit(fertig.stdout, "  1  "))
         self.assertIn("Grund", zeile_mit(fertig.stdout, "  2  "))
         uebersicht = self.ordner.uebersicht(ORDNER)
         self.assertEqual((uebersicht["1"]["Status"], uebersicht["2"]["Status"]),

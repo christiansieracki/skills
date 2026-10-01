@@ -5,7 +5,7 @@
     <python> sammelimport.py vorbereiten <ordner>
     <python> sammelimport.py pruefen <ordner> [--json]
     <python> sammelimport.py uebernehmen <ordner> --kandidat 3 "Notiz" ...
-                 --uebersprungen 4 "Grund" ... --ergaenzt 5 ue-0027 ...
+                 --uebersprungen 4 "Grund" ... --ergaenzt 5 ue-000027 ...
 
 `<ordner>` ist der Quellenordner, relativ zu `quellen/`. In ihm liegt die
 `sammelimport.md` mit den Einstellungen im Frontmatter, den Absprachen und der
@@ -52,9 +52,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_nach_gewicht  # noqa: E402
 from tpdaten import (  # noqa: E402
-    DISZIPLIN_SPALTE, ID_MUSTER, KARTENFELDER, TYPEN, finde_wurzel, hole_index, interpreter,
+    DISZIPLIN_SPALTE, KARTENFELDER, TYPEN, KeineId, finde_wurzel, hole_index, interpreter,
     konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_schwerpunkte,
-    lies_uebungen, pruefe_felder,
+    lies_uebungen, naechste_id, pruefe_felder,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -1358,30 +1358,6 @@ def slug(titel: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", titel.lower().translate(UMLAUTE)).strip("-")
 
 
-def naechste_id(wurzel: Path) -> str:
-    """Die höchste ID in `uebungen/` plus eins, so wie das Datenmodell es sagt.
-
-    Gelesen wird bei jedem Aufruf neu, unmittelbar vor dem Schreiben. Hat
-    Nextcloud inzwischen eine Karte von einem anderen Rechner gebracht, zählt
-    sie schon mit. Gezählt werden Dateiname und `id:`, denn der Linter meldet
-    eine Karte, bei der beide auseinanderlaufen, und bis dahin soll keine der
-    beiden Nummern ein zweites Mal vergeben werden.
-    """
-    hoechste = 0
-    for pfad in (wurzel / "uebungen").glob("*.md"):
-        nummern = [pfad.name]
-        try:
-            felder, _ = lies_frontmatter(pfad)
-            nummern.append(str(felder.get("id") or ""))
-        except (OSError, UnicodeDecodeError):
-            pass
-        for text in nummern:
-            m = re.match(ID_MUSTER, text)
-            if m:
-                hoechste = max(hoechste, int(m.group()[len("ue-"):]))
-    return f"ue-{hoechste + 1:04d}"
-
-
 def _setze_feld(felder: list[str], name: str, wert: str) -> list[str]:
     """Die Zeilen des Frontmatters mit `name: wert`, ersetzt oder hinten angehängt."""
     zeile = f"{name}: {wert}"
@@ -1433,7 +1409,12 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     """
     entwurf = sammelimport.entwurf(k)
     felder, _ = lies_frontmatter(entwurf)
-    uid = naechste_id(sammelimport.wurzel)
+    # Vor der Schleife in `uebernehmen` gab es schon eine. Scheitert sie hier,
+    # ist der Bereich mitten im Durchgang voll geworden.
+    try:
+        uid = naechste_id(sammelimport.wurzel)
+    except KeineId as fehler:
+        raise NichtUebernommen(str(fehler)) from None
     name = f"{uid}-{slug(str(felder['titel']))}"
     ziel = sammelimport.wurzel / "uebungen" / f"{name}.md"
     # Welches Feldbild, hat `pruefe_entwurf` sichergestellt: nur das eigene.
@@ -1520,6 +1501,14 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
     if not (freigegeben or uebersprungen or ergaenzt):
         raise Abbruch("Kein Kandidat genannt. Je Kandidat: --kandidat <nr> \"<notiz>\", "
                       "--uebersprungen <nr> \"<grund>\" oder --ergaenzt <nr> <id>")
+    # Gibt es an diesem Rechner keine ID, dann für keinen Kandidaten. Das
+    # steht einmal da, bevor irgendetwas geschrieben ist, statt je Kandidat.
+    # Gestrichene und ergänzende Kandidaten brauchen keine ID.
+    if freigegeben:
+        try:
+            naechste_id(wurzel)
+        except KeineId as fehler:
+            raise Abbruch(f"{fehler}\nNichts übernommen.") from None
     nach_nummer = {k.nummer: k for k in sammelimport.kandidaten}
 
     abgewiesen = 0

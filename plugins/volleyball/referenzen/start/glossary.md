@@ -7,7 +7,7 @@ volleyball-Skills halten sich daran.
 
 | Begriff | Was es ist | Wo es liegt |
 |---|---|---|
-| **Übung** | Eine einzelne Karte. Lässt sich allein in einen Trainingsteil setzen, meist 8 bis 25 Minuten. | `uebungen/ue-####-*.md` |
+| **Übung** | Eine einzelne Karte. Lässt sich allein in einen Trainingsteil setzen, meist 8 bis 25 Minuten. | `uebungen/ue-######-*.md` |
 | **Übungsfolge** | Ein fertiger Ablauf, der nur als Ganzes Sinn ergibt, weil Reihenfolge und Dosierung dazugehören. Ein DVV-Athletikplan ist so eine. | `uebungen/`, mit `typ: folge` |
 | **Übungsquelle** | Ein Fremddokument, aus dem Übungen gezogen wurden. Bleibt als Datei liegen, wird nie selbst zur Karte. | `quellen/` |
 | **Prinzip** | Eine Regel, die über Übungen hinweg gilt, zum Beispiel „maximal drei Annahmespieler im Riegel". Hängt am Team, nicht an der Übung. | `teams/<team>/team-profil.md` |
@@ -25,7 +25,7 @@ ein kompletter Trainingsabend? Dann Quelle, aus der Übungen gezogen werden.
 | **Zerlegungsplan** | Die Liste, welche Dateien welche Karte ergeben, ob daraus eine Übung oder eine Folge wird und was liegen bleibt. Wird freigegeben, bevor der erste Kartenentwurf entsteht. | in `sammelimport.md` |
 | **Kandidat** | Eine Zeile im Zerlegungsplan: die Dateien, aus denen eine Karte werden soll. Aus jedem Kandidaten entsteht ein Kartenentwurf. | in `sammelimport.md` |
 | **Kartenentwurf** | Eine Karte, die noch nicht freigegeben ist. Hat keine ID, liegt nicht in `uebungen/`, und die Suche findet sie nicht. | `kartenentwuerfe/<ordner>/` |
-| **Feldbild** | Das Bild aus der Übungsquelle selbst, etwa die Feldskizze eines PlayDrill-Blatts. Der Sammelimport schneidet es aus dem PDF aus, bei der Freigabe wird es das Schaubild der Karte. Anders als ein gezeichnetes Schaubild hat es keine Szene und wird nie neu erzeugt. | `kartenentwuerfe/<ordner>/17.feldbild.png`, danach `schaubilder/ue-####-*.png` |
+| **Feldbild** | Das Bild aus der Übungsquelle selbst, etwa die Feldskizze eines PlayDrill-Blatts. Der Sammelimport schneidet es aus dem PDF aus, bei der Freigabe wird es das Schaubild der Karte. Anders als ein gezeichnetes Schaubild hat es keine Szene und wird nie neu erzeugt. | `kartenentwuerfe/<ordner>/17.feldbild.png`, danach `schaubilder/ue-######-*.png` |
 | **Rückfrage** | Was ein Kartenentwurf vom Trainer wissen muss, bevor er Karte werden kann. Etwa ein Ablauf, der nur aus dem Bild gelesen ist, oder ein Verdacht auf ein Duplikat. | im Kartenentwurf |
 | **Vermutung** | Wie der Kartenentwurf eine Rückfrage vorläufig beantwortet. Sie steht im Text des Entwurfs, und die Rückfrage nennt sie. Nicht jede Rückfrage hat eine. | im Kartenentwurf |
 | **Freigabe** | Das Ja des Trainers. Damit wird aus dem Kartenentwurf eine Karte mit ID. | danach `uebungen/` |
@@ -64,8 +64,8 @@ Wer in die Leseansicht tippt, verliert seine Änderung beim nächsten Erzeugen.
 
 | Begriff | Was es ist | Wo es liegt |
 |---|---|---|
-| **Szene** | Die Beschreibung eines Schaubildes in YAML, in Metern gerechnet. Das ist die Quelle, hier wird geändert. | `schaubilder/ue-0042.szene.yml` |
-| **Schaubild** | Das Bild, das daraus entsteht. Ein Erzeugnis: es wird beim nächsten Mal überschrieben. | `schaubilder/ue-0042.svg` |
+| **Szene** | Die Beschreibung eines Schaubildes in YAML, in Metern gerechnet. Das ist die Quelle, hier wird geändert. | `schaubilder/ue-000042.szene.yml` |
+| **Schaubild** | Das Bild, das daraus entsteht. Ein Erzeugnis: es wird beim nächsten Mal überschrieben. | `schaubilder/ue-000042.svg` |
 | **Grundform** | Worauf eine Szene gezeichnet wird: eine Feldvorlage oder eine freie Leinwand. | in der Szene, als `form:` |
 | **Feldvorlage** | Ein Spielfeld als Grundform: Halle 9×18 m oder Beach 8×16 m, mit den Linien, die es dort wirklich gibt. | `form: halle`, `form: beach` |
 | **freie Leinwand** | Eine Fläche mit angesagtem Maß in Metern, ohne Spielfeld darauf. Für einen Aufbau, der auf kein Feld passt. | `form: frei` mit `groesse:` |

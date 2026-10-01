@@ -5,9 +5,10 @@
     <python> suche.py --schwerpunkt sideout-sicherheit --level fortgeschritten
     <python> suche.py --disziplin beach   # Beachübungen und die für beides
     <python> suche.py --form spielform --dauer 20 --lang
-    <python> suche.py --id ue-0042
+    <python> suche.py --id ue-000042
     <python> suche.py --nie-benutzt
     <python> suche.py --seit 180          # seit über 180 Tagen nicht eingesetzt
+    <python> suche.py --naechste-id       # die ID für die nächste Karte
 
 Der Index wird vor jeder Suche neu gebaut, die Treffer sind also immer aktuell.
 `--spieler 14` heißt "heute sind 14 da", nicht "nimm genau 14". Eine Übung
@@ -27,6 +28,11 @@ lesbar aus, für den Fall dass ein Skill sie weiterverarbeitet.
 Wichtig: `--jugend` blendet Übungen mit Erwachsenenbelastung NICHT aus. Es
 markiert sie und zeigt den Hinweis, damit du entscheiden kannst, ob und wie du
 sie anpasst.
+
+`--naechste-id` sucht nichts. Es gibt die ID aus, die der Trainer an diesem
+Rechner als nächste vergibt, und sonst nichts. Gehört der Rechner zu keinem
+Trainer unter `trainer:` in der Wurzeldatei, steht stattdessen auf stderr,
+warum, und der Aufruf endet mit 1 (ADR-0011).
 """
 
 from __future__ import annotations
@@ -39,8 +45,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    DISZIPLINEN, LEVEL, disziplin_text, finde_wurzel, hole_index,
-    interpreter, konsole_vorbereiten,
+    DISZIPLINEN, LEVEL, KeineId, disziplin_text, finde_wurzel, hole_index,
+    interpreter, konsole_vorbereiten, naechste_id,
 )
 
 
@@ -239,9 +245,19 @@ def main() -> int:
                     help="Übungen mit Erwachsenenbelastung deutlich markieren, nicht ausblenden")
     ap.add_argument("--lang", action="store_true", help="alle Felder zeigen")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--naechste-id", action="store_true",
+                    help="nur die ID ausgeben, die der Trainer an diesem Rechner als nächste vergibt")
     a = ap.parse_args()
 
     wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
+    if a.naechste_id:
+        try:
+            print(naechste_id(wurzel))
+        except KeineId as fehler:
+            print(fehler, file=sys.stderr)
+            return 1
+        return 0
+
     daten = hole_index(wurzel)
     treffer = filtere(daten["uebungen"], a)
 

@@ -45,3 +45,9 @@ Was aus einem Kandidaten geworden ist, steht nach der Freigabe nur noch in der
 
 Die ID entsteht erst bei der Freigabe. Die Gefahr, dass zwei Rechner dieselbe
 ID vergeben, sitzt damit genau dort. Sie steht in `offene-punkte.md`.
+
+## Nachtrag, 02.10.2026
+
+Die Gefahr aus dem letzten Absatz ist gebannt. Seit ADR-0011 vergibt jeder
+Trainer in seinem eigenen Bereich, zwei Rechner verschiedener Trainer kommen
+sich bei der Freigabe nicht mehr in die Quere (#38).

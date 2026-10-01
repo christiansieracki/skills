@@ -11,8 +11,8 @@ Handvoll Karten, die genau die geprueften Faelle abdecken. Wer einen weiteren
 Fall braucht, legt eine Karte dazu, statt eine bestehende umzubiegen. Sonst
 zieht eine Aenderung Tests mit, die von ihr nichts wissen wollen.
 
-Die IDs gehoeren dem Fixture. Wer hier ue-0005 liest, liest nicht die Karte
-ue-0005 aus der echten Bibliothek.
+Die IDs gehoeren dem Fixture. Wer hier ue-000005 liest, liest nicht die Karte
+ue-000005 aus der echten Bibliothek.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -41,15 +42,19 @@ ORIENTIERUNG = 274
 ROOT_YML = """\
 # Wurzeldatei eines kuenstlichen Arbeitsordners fuer die Tests.
 #
-# Heute zaehlt nur, dass es sie gibt: finde_wurzel() erkennt den Ordner an
-# ihrem Namen. Gelesen wird sie von index.py und suche.py nicht, deshalb steht
-# hier nur das Noetigste. Was ein echter Arbeitsordner mitbringt, legt
-# init_struktur.py an.
+# finde_wurzel() erkennt den Ordner an ihrem Namen, und die naechste ID liest
+# hier, welcher Trainer an diesem Rechner sitzt. Mehr lesen die Skripte nicht
+# aus ihr, deshalb steht hier nur das Noetigste. Was ein echter Arbeitsordner
+# mitbringt, legt init_struktur.py an.
 
 version: 1
 verein: "Testverein"
 saison: "2025/26"
 """
+
+# Der Trainer des Fixtures. Er sitzt an dem Rechner, auf dem der Test laeuft,
+# und hat die Nummer 00, wie alle Karten in STANDARDKARTEN.
+TRAINER = {"test": {"nummer": "00", "rechner": [socket.gethostname()]}}
 
 SCHWERPUNKTE_MD = """\
 # Schwerpunkte
@@ -104,7 +109,7 @@ Siehe Frontmatter.
 # Arbeitsordner gibt nur an, was fuer ihren Fall wichtig ist, der Rest kommt
 # von hier.
 KARTE = {
-    "id": "ue-0000",
+    "id": "ue-000000",
     "titel": "Ohne Titel",
     "typ": "uebung",
     "disziplin": ["halle"],
@@ -134,7 +139,7 @@ KARTE = {
 STANDARDKARTEN = [
     # Braucht wenige Spieler und eine Spielflaeche.
     {
-        "id": "ue-0001",
+        "id": "ue-000001",
         "titel": "Annahme im Halbfeld",
         "element": ["annahme"],
         "spielphase": "sideout",
@@ -149,7 +154,7 @@ STANDARDKARTEN = [
     # Die Karte mit der niedrigsten Obergrenze. Bei mehr Anwesenden wird daraus
     # eine zweite Gruppe, kein Ausschluss.
     {
-        "id": "ue-0002",
+        "id": "ue-000002",
         "titel": "Zonenbaggern im Paar",
         "spieler_min": 2,
         "spieler_max": 4,
@@ -158,7 +163,7 @@ STANDARDKARTEN = [
     },
     # Die einzige Karte, die zwei Spielflaechen braucht.
     {
-        "id": "ue-0003",
+        "id": "ue-000003",
         "titel": "Sideout-Serie über zwei Spielflächen",
         "element": ["annahme", "angriff"],
         "spielphase": "sideout",
@@ -174,7 +179,7 @@ STANDARDKARTEN = [
     # Die einzige reine Beachkarte. Sie darf in der Hallensuche nicht
     # auftauchen und in der ungefilterten Suche sehr wohl.
     {
-        "id": "ue-0004",
+        "id": "ue-000004",
         "titel": "Annahme zu zweit im Sand",
         "disziplin": ["beach"],
         "element": ["annahme"],
@@ -189,7 +194,7 @@ STANDARDKARTEN = [
     # Laeuft drinnen wie draussen. Sie steht in beiden Disziplinfiltern, das
     # ist der Fall, den eine Karte mit Einzelwert nicht abbilden koennte.
     {
-        "id": "ue-0005",
+        "id": "ue-000005",
         "titel": "Zwei gegen Zwei auf dem Kleinfeld",
         "disziplin": ["halle", "beach"],
         "element": ["annahme", "angriff"],
@@ -252,6 +257,26 @@ def _yaml(wert) -> str:
 def _als_karte(felder: dict) -> str:
     frontmatter = "\n".join(f"{k}: {_yaml(v)}" for k, v in felder.items())
     return f"---\n{frontmatter}\n---\n" + RUMPF.format(titel=felder["titel"])
+
+
+def _als_wurzeldatei(trainer: dict | None) -> str:
+    """Die Wurzeldatei, mit dem Abschnitt `trainer:` in der Form aus DATENMODELL.md.
+
+    `None` laesst den Abschnitt weg, so wie in jedem Arbeitsordner vor 3.0.0.
+    """
+    if trainer is None:
+        return ROOT_YML
+    zeilen = ["", "trainer:"]
+    for name, eintrag in trainer.items():
+        zeilen += [f"  {name}:",
+                   f'    nummer: "{eintrag["nummer"]}"',
+                   f"    rechner: [{', '.join(eintrag['rechner'])}]"]
+    return ROOT_YML + "\n".join(zeilen) + "\n"
+
+
+def _vierstellig(uid: str) -> str:
+    """Eine ID des Fixtures so, wie sie vor 3.0.0 hiess: `ue-000042` wird `ue-0042`."""
+    return uid[:len("ue-")] + uid[len("ue-00"):]
 
 
 # Die Spalten der Uebersicht in sammelimport.md, in der Reihenfolge aus #29.
@@ -420,17 +445,51 @@ def _pdf_mit_text(seiten: list[list[str]], bilder: list[PdfBild]) -> bytes:
 
 
 class Arbeitsordner:
-    """Ein kuenstlicher Arbeitsordner, der sich wieder wegraeumen laesst."""
+    """Ein kuenstlicher Arbeitsordner, der sich wieder wegraeumen laesst.
 
-    def __init__(self) -> None:
+    `vor_der_umstellung=True` baut ihn so, wie er unter 2.5.1 aussah: die
+    Standardkarten mit vierstelliger ID und ohne `trainer:` in der
+    Wurzeldatei. Das ist der Ordner, den `ids_umstellen.py` vorfindet.
+    """
+
+    def __init__(self, vor_der_umstellung: bool = False) -> None:
         self.pfad = Path(tempfile.mkdtemp(prefix="trainingsplanung-test-"))
         self.ids: list[str] = []
         self.entwurfsordner: Path | None = None
-        (self.pfad / WURZELDATEI).write_text(ROOT_YML, encoding="utf-8")
+        self.setze_trainer(None if vor_der_umstellung else TRAINER)
         (self.pfad / "schwerpunkte.md").write_text(SCHWERPUNKTE_MD, encoding="utf-8")
         (self.pfad / "uebungen").mkdir()
         for felder in STANDARDKARTEN:
+            if vor_der_umstellung:
+                felder = {**felder, "id": _vierstellig(felder["id"])}
             self.lege_karte_an(**felder)
+
+    def setze_trainer(self, trainer: dict | None) -> None:
+        """Schreibt die Wurzeldatei neu, mit diesen Trainern unter `trainer:`.
+
+        Je Trainer `nummer` und `rechner`, wie in TRAINER. `None` laesst den
+        Abschnitt ganz weg.
+        """
+        (self.pfad / WURZELDATEI).write_text(_als_wurzeldatei(trainer), encoding="utf-8")
+
+    def lege_trainingsplan_an(self, name: str, *ids: str) -> Path:
+        """Legt unter `trainings/` einen Trainingsplan an, der diese IDs nennt.
+
+        `name` ist der Pfad unter `trainings/`, etwa `gruppe/2026-09-15.md`.
+        Jede ID steht in einer eigenen Zeile der Ablauftabelle, in der Spalte
+        ID, so wie die Vorlage es vorsieht.
+        """
+        zeilen = ["| Zeit | Teil | Übung | ID | Anpassung | Warum hier |",
+                  "|---|---|---|---|---|---|"]
+        zeilen += [f"| 18:00 | Hauptteil | Übung aus dem Test | {uid} | | |" for uid in ids]
+        datei = self.pfad / "trainings" / name
+        datei.parent.mkdir(parents=True, exist_ok=True)
+        datei.write_text(
+            f"---\ndatum: {Path(name).stem}\ngruppe: gruppe\nstatus: geplant\n---\n\n"
+            "# Training\n\n## Ablauf\n\n" + "\n".join(zeilen) + "\n",
+            encoding="utf-8",
+        )
+        return datei
 
     def ergaenze_schwerpunkt(self, kennung: str, disziplin: str) -> None:
         """Haengt eine Zeile an die Tabelle der inhaltlichen Schwerpunkte.

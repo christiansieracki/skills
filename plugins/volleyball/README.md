@@ -29,9 +29,11 @@ plugins/volleyball/
 ├── skills/            die vier SKILL.md
 ├── referenzen/        DATENMODELL, SPRACHE, VORLAGEN, METHODIK, ...
 ├── scripts/           index.py, suche.py, leseansicht.py, export_pdf.py,
-│                      bilder_aufbereiten.py, schaubild.py, szene.py
-└── tests/             Linter, Suche, Bildaufbereitung, Schaubilder und
-                       PDF-Export gegen einen künstlichen Arbeitsordner
+│                      bilder_aufbereiten.py, schaubild.py, szene.py,
+│                      sammelimport.py, ids_umstellen.py
+└── tests/             Linter, Suche, Bildaufbereitung, Schaubilder,
+                       PDF-Export, Sammelimport und das Umstellen der IDs
+                       gegen einen künstlichen Arbeitsordner
 ```
 
 **Im Plugin liegt das Werkzeug, im Arbeitsordner liegen die Daten.** Übungen,

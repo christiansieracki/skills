@@ -49,6 +49,20 @@ gruppen:
 
 teams:
 {teams_block}
+# --- Trainer ----------------------------------------------------------------
+# Jeder Trainer, der Uebungen anlegt, hat eine Nummer. Sie steht vorn in jeder
+# ID, die er vergibt: ue-010001 ist die erste Uebung von Trainer 01. Dazu die
+# Rechner, an denen er importiert, mit dem Namen, den der Rechner sich selbst
+# gibt. Die Namen der Trainer sind dieselben wie unter gruppen.<gruppe>.trainer.
+# Den Eintrag legt volleyball-uebungsimport an, nach Rueckfrage. Etwa:
+#
+#   trainer:
+#     christian:
+#       nummer: "00"
+#       rechner: [LAPTOP-J9V3J4LU]
+
+trainer:
+
 # --- Ordner -----------------------------------------------------------------
 
 ordner:
@@ -113,7 +127,7 @@ eine andere Übung.
 
 **Stattdessen:** Anpassungen gehören in den Abschnitt „Variationen" der Karte.
 Ändern sie den Charakter der Übung, leg eine eigene Karte an und trag
-`variante_von: ue-0042` ein.
+`variante_von: ue-000042` ein.
 
 ## Claude einrichten
 

@@ -113,7 +113,7 @@ Sieht etwas nach derselben Übung aus, entscheidet diese Tabelle:
 | Was sich unterscheidet | Was passiert |
 |---|---|
 | Nur der Untergrund | Die Disziplin kommt auf der **bestehenden** Karte dazu, die Sandbesonderheiten unter `## Variationen`. Keine zweite Karte. |
-| Aufstellung, Spielerzahl oder Ziel | Eigene Karte mit `variante_von: ue-####` und eigener Disziplin |
+| Aufstellung, Spielerzahl oder Ziel | Eigene Karte mit `variante_von: ue-######` und eigener Disziplin |
 | Es ist eine andere Übung | Neue Karte |
 
 Zonenbaggern zu zweit im Sand ist dieselbe Übung: `beach` kommt zu `[halle]`
@@ -133,7 +133,7 @@ Eine Zeile je Kandidat:
 
 | Titel | Inhalt in einem Satz | Typ | Disziplin | Duplikat |
 |---|---|---|---|---|
-| Zonenbaggern im Sand | Bagger in Zonen, zu zweit, ohne Netz | uebung | `[halle, beach]` | ergänzt ue-0002 |
+| Zonenbaggern im Sand | Bagger in Zonen, zu zweit, ohne Netz | uebung | `[halle, beach]` | ergänzt ue-000002 |
 | Sideout-Serie zu zweit | Aufschlag, Annahme, Angriff im Sand, auf Punkte | uebung | `[beach]` | — |
 | Aufschlagserie mit Zielfeldern | Zehn Aufschläge auf wechselnde Zonen | uebung | `?` sagt die Quelle nicht | — |
 
@@ -154,9 +154,11 @@ noch eine Antwort.
 
 ## Karten schreiben
 
-Pro freigegebener Übung eine Datei `uebungen/ue-####-slug.md` nach dem Schema
-in `DATENMODELL.md`. Die nächste freie Nummer ergibt
-`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --json`, höchste ID plus eins.
+Pro freigegebener Übung eine Datei `uebungen/ue-######-slug.md` nach dem Schema
+in `DATENMODELL.md`. Die ID holst du unmittelbar vor jeder Karte mit
+`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --naechste-id`. Das Skript gibt
+nur die ID aus. Rechne sie nicht selbst aus der Trefferliste: Jeder Trainer
+vergibt in seinem eigenen Bereich, und welcher das ist, weiß nur das Skript.
 
 Ein Kandidat, der laut Liste eine bestehende Karte ergänzt, bekommt keine neue
 Datei. Dort kommt die Disziplin ins Frontmatter, alles Weitere unter
@@ -184,14 +186,37 @@ Raten:
 Inhalte in eigenen Worten wiedergeben, mit Kurzquelle in `quelle:`. Kein
 Volltext aus der Vorlage.
 
+### Wenn es keine ID gibt
+
+Endet der Aufruf mit einem Fehler, wird nichts geschrieben. Die Meldung sagt,
+warum:
+
+- **Der Rechner gehört zu keinem Trainer.** Die Meldung nennt den Rechner, die
+  eingetragenen Trainer und die Nummer, die ein neuer bekäme. Frag, wer da
+  sitzt. Ist es ein Trainer aus der Liste, kommt der Rechner in dessen
+  `rechner:`-Liste. Ist es ein neuer, bekommt er einen eigenen Eintrag mit
+  dieser Nummer, der erste überhaupt `00`. Sein Name ist derselbe wie unter
+  `gruppen.<gruppe>.trainer`. Zeig den Eintrag, wie er unter `trainer:` in
+  `trainingsplanung-root.yml` stehen wird, und trag ihn erst nach dem Ja ein.
+  Die Form steht in `DATENMODELL.md` unter „Wer welcher Trainer ist“. Danach
+  `--naechste-id` noch einmal.
+- **`uebungen/` hat noch vierstellige IDs.** Der Arbeitsordner ist nicht
+  umgestellt. Das macht
+  `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/ids_umstellen.py --trainer <name>`.
+  Die bisherigen Karten bekommen `00` vorn, und `<name>` vergibt als Trainer
+  `00` danach weiter, in aller Regel der, der bisher importiert hat. Ohne
+  `--schreiben` zeigt das Skript nur, was sich ändert. Es benennt Karten im
+  ganzen Ordner um, also für alle Trainer. Zeig, was es ändern würde, und
+  schreib erst nach dem Ja. Bis dahin wird nichts importiert.
+
 ## Prüfen
 
 `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py` laufen lassen. Der Import ist
 fertig, wenn es null Auffälligkeiten meldet und jede neue Karte
-`suche.py --id ue-####` findet.
+`suche.py --id ue-######` findet.
 
 Eine ergänzte Karte gehört mit geprüft:
-`suche.py --id ue-#### --disziplin <die dazugekommene Disziplin>` muss sie
+`suche.py --id ue-###### --disziplin <die dazugekommene Disziplin>` muss sie
 jetzt zeigen.
 
 Danach anbieten, `index.py --md` laufen zu lassen, damit die Lesebrille
@@ -232,7 +257,8 @@ Wie viele Karten dazugekommen sind, welche IDs, und welche Disziplin jede von
 ihnen trägt. Dazu die bestehenden Karten, die eine Disziplin dazubekommen
 haben, und was du beim Zerlegen entschieden hast, wo es nicht eindeutig war.
 Neue Schwerpunkt-Kennungen, die du nach Freigabe eingetragen hast, stehen mit
-dabei, und ebenso die, für die es kein Ja gab. Fragen, die du unterwegs gestellt und selbst
+dabei, und ebenso die, für die es kein Ja gab. Hast du unter `trainer:` einen
+Rechner oder einen Trainer eingetragen, gehört das auch dazu. Fragen, die du unterwegs gestellt und selbst
 beantwortet hast, gehören ebenfalls hinein, damit er sie kippen kann.
 
 Zum Schluss die Kandidaten für ein Schaubild, die offen geblieben sind, mit

@@ -6,8 +6,8 @@ nicht mehr. Szene und Bild liegen nebeneinander in `schaubilder/`, unter
 demselben Basisnamen:
 
 ```
-schaubilder/ue-0042.szene.yml    die Quelle, hier wird geändert
-schaubilder/ue-0042.svg          das Erzeugnis, wird überschrieben
+schaubilder/ue-000042.szene.yml    die Quelle, hier wird geändert
+schaubilder/ue-000042.svg          das Erzeugnis, wird überschrieben
 ```
 
 Dasselbe Muster wie bei Trainingsplan und Leseansicht: Wer in das SVG tippt,
@@ -18,8 +18,8 @@ Neuzeichnung.
 Erzeugt wird mit:
 
 ```
-<python> ${CLAUDE_PLUGIN_ROOT}/scripts/schaubild.py ue-0042
-<python> ${CLAUDE_PLUGIN_ROOT}/scripts/schaubild.py ue-0042 --wurzel <pfad>
+<python> ${CLAUDE_PLUGIN_ROOT}/scripts/schaubild.py ue-000042
+<python> ${CLAUDE_PLUGIN_ROOT}/scripts/schaubild.py ue-000042 --wurzel <pfad>
 ```
 
 Das Argument ist der Basisname (dann wird unter `schaubilder/` gesucht) oder
@@ -28,7 +28,7 @@ Eine Szene, die nicht aufgeht, hinterlässt eine Meldung und das Bild von
 vorher, nie ein halbes.
 
 Auf der Übungskarte steht anschließend der Dateiname des Bildes:
-`schaubild: ue-0042.svg`. `index.py` meldet, wenn er ins Leere zeigt.
+`schaubild: ue-000042.svg`. `index.py` meldet, wenn er ins Leere zeigt.
 
 ## Der Aufbau einer Szene
 
@@ -562,7 +562,7 @@ ganze Bild und eine Runde der Vorschau-Schleife, und das für eine Kleinigkeit.
 
 Das Skript sagt beim Schreiben, dass es das getan hat, und schlägt einen
 `titel:` vor: den der Übungskarte, deren ID der Basisname der Szene ist.
-`schaubilder/ue-0042.szene.yml` gehört zu `uebungen/ue-0042-*.md`, und dort
+`schaubilder/ue-000042.szene.yml` gehört zu `uebungen/ue-000042-*.md`, und dort
 steht der Titel schon. Übernehmen kostet eine Zeile. Ist der Basisname keine
 Übungs-ID, gibt es die Karte nicht oder trägt sie keinen Titel, steht der
 Hinweis ohne Wortlaut da. Geraten wird nichts.

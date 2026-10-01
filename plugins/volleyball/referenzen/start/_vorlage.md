@@ -36,7 +36,7 @@ Bezug zum Trainingsblock:
 | 75–90 | Abschluss |  |  |  |  |
 
 Die Spalte **ID** verweist auf die Übungskarte in `uebungen/`, zum Beispiel
-`ue-0042`. Die Spalte **Anpassung** ist für Abweichungen von der Karte, etwa
+`ue-000042`. Die Spalte **Anpassung** ist für Abweichungen von der Karte, etwa
 „für U16: Angriff aus dem Stand, Zielzone 2 m statt 1 m". Die Karte selbst
 bleibt dabei unberührt.
 

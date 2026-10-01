@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import socket
 import sys
 from pathlib import Path
 
@@ -46,10 +47,21 @@ KARTENFELDER = [
     "schaubild", "quelle", "quelldatei", "variante_von", "autor", "angelegt",
 ]
 
-# Das Muster einer Uebungs-ID, wie DATENMODELL.md es festlegt. Es steht einmal
-# da, weil drei Stellen danach fragen: der Linter, die Suche nach Verweisen im
-# Text und das Schaubild, das zu einem Basisnamen die Karte sucht.
-ID_MUSTER = r"ue-\d{4}"
+# Das Muster einer Uebungs-ID, wie DATENMODELL.md es festlegt: zwei Ziffern fuer
+# die Nummer des Trainers, vier laufend (ADR-0011). Es steht einmal da, weil
+# mehrere Stellen danach fragen: der Linter, die Suche nach Verweisen im Text,
+# das Schaubild, das zu einem Basisnamen die Karte sucht, und die naechste ID.
+ID_MUSTER = r"ue-\d{6}"
+
+# Eine ID, wie sie bis 2.5.1 vergeben wurde. Gilt nicht mehr: der Linter meldet
+# sie, die naechste ID verweigert sich, solange es sie gibt, und
+# ids_umstellen.py macht aus ihr eine sechsstellige. Mit `\b` auf beiden
+# Seiten trifft es `ue-000042` nicht, sonst fuehrte ein zweiter Lauf des
+# Umstellens die Nullen ein zweites Mal ein.
+ALTE_ID_MUSTER = r"ue-\d{4}"
+
+# Was in jeder Meldung zu einer vierstelligen ID steht.
+UMSTELLEN = "ids_umstellen.py stellt den Arbeitsordner auf sechs Stellen um"
 
 
 def disziplin_text(eintrag: dict) -> str:
@@ -251,6 +263,183 @@ def lies_uebungen(wurzel: Path) -> list[dict]:
     return karten
 
 
+# --------------------------------------------------------------------------
+# Die naechste ID
+# --------------------------------------------------------------------------
+
+class KeineId(Exception):
+    """Fuer diesen Rechner gibt es keine ID. Der Text sagt, warum."""
+
+
+def rechnername() -> str:
+    """Der Name, unter dem dieser Rechner in `trainer:` steht.
+
+    Unter Windows ist das der Geraetename. Auf dem Rechner selbst wird nichts
+    gespeichert: Wer welche Nummer hat, steht fuer alle sichtbar in der
+    Wurzeldatei.
+    """
+    return socket.gethostname()
+
+
+_TRAINERNAME = re.compile(r"(?P<name>[^\s:#]+):\s*(#.*)?$")
+
+
+def lies_trainer(wurzel: Path) -> dict[str, dict] | None:
+    """Der Abschnitt `trainer:` der Wurzeldatei: je Trainer `nummer` und `rechner`.
+
+    None, wenn es den Abschnitt nicht gibt. Ein Abschnitt ohne Eintrag, wie
+    ihn init_struktur.py anlegt, ergibt ein leeres Woerterbuch.
+
+    Gelesen wird nur dieser eine Abschnitt, mit dem schmalen Parser des
+    Frontmatters: Er beginnt mit `trainer:` am Zeilenanfang und endet an der
+    naechsten Zeile, die wieder dort beginnt. `rechner` steht in eckigen
+    Klammern, eine Liste aus `- ` Zeilen wird auch verstanden, weil die
+    Wurzeldatei von Hand gepflegt wird.
+    """
+    datei = wurzel / MARKER
+    if not datei.is_file():
+        return None
+    zeilen = datei.read_text(encoding="utf-8").splitlines()
+    anfang = next((i for i, z in enumerate(zeilen) if re.match(r"trainer:\s*(#.*)?$", z)), None)
+    if anfang is None:
+        return None
+    trainer: dict[str, dict] = {}
+    eintrag: dict | None = None
+    feld = ""
+    einzug_der_namen = None
+    for zeile in zeilen[anfang + 1:]:
+        inhalt = zeile.strip()
+        if not inhalt or inhalt.startswith("#"):
+            continue
+        einzug = len(zeile) - len(zeile.lstrip())
+        if einzug == 0:
+            break
+        einzug_der_namen = einzug_der_namen or einzug
+        if einzug == einzug_der_namen:
+            m = _TRAINERNAME.match(inhalt)
+            eintrag = trainer.setdefault(m.group("name"), {}) if m else None
+            continue
+        if eintrag is None:
+            continue
+        if inhalt.startswith("- ") and feld:
+            if not isinstance(eintrag.get(feld), list):
+                eintrag[feld] = []
+            eintrag[feld].append(_wert(inhalt[2:]))
+            continue
+        m = _SKALAR.match(inhalt)
+        if m:
+            feld = m.group("key")
+            eintrag[feld] = _wert(m.group("val"))
+    return trainer
+
+
+def _nummer(wert) -> str | None:
+    """Die Nummer eines Trainers als zwei Ziffern, oder None, wenn sie keine ist.
+
+    Ohne Anfuehrungszeichen liest der Parser `00` als Zahl 0. Auch das ist
+    gemeint, die fuehrende Null kommt hier wieder dazu.
+    """
+    if isinstance(wert, int) and not isinstance(wert, bool) and 0 <= wert <= 99:
+        return f"{wert:02d}"
+    if isinstance(wert, str) and re.fullmatch(r"\d{2}", wert):
+        return wert
+    return None
+
+
+def _rechner(eintrag: dict) -> set[str]:
+    """Die Rechner eines Trainers, klein geschrieben. Ein einzelner Wert zaehlt als Liste."""
+    rechner = eintrag.get("rechner")
+    if not isinstance(rechner, list):
+        rechner = [rechner] if rechner else []
+    return {str(r).lower() for r in rechner if r}
+
+
+def trainernummer(wurzel: Path) -> str:
+    """Die Nummer des Trainers, der an diesem Rechner sitzt.
+
+    Erkannt wird der Rechner an seinem Namen, ohne Ruecksicht auf Gross- und
+    Kleinschreibung. Steht er bei keinem Trainer, bei mehreren, oder teilt
+    sich sein Trainer die Nummer mit einem anderen, gibt es keine: dann
+    vergaeben zwei Rechner aus demselben Bereich, und genau das soll die
+    Nummer verhindern.
+
+    Die Meldung nennt den Rechner, die eingetragenen Trainer und die Nummer,
+    die ein neuer bekaeme. Damit kann der Import-Skill fragen, wer da sitzt.
+    """
+    rechner = rechnername()
+    abschnitt = lies_trainer(wurzel)
+    trainer = abschnitt or {}
+    nummern = {name: _nummer(e.get("nummer")) for name, e in trainer.items()}
+    treffer = [name for name, e in trainer.items() if rechner.lower() in _rechner(e)]
+    if not treffer:
+        vergeben = [int(n) for n in nummern.values() if n is not None]
+        neue = f"{max(vergeben) + 1:02d}" if vergeben else "00"
+        eingetragen = ", ".join(f"{name} ({nummern[name] or '?'})" for name in trainer)
+        grund = (f"In {MARKER} fehlt der Abschnitt trainer:." if abschnitt is None
+                 else f"Unter trainer: in {MARKER} steht er bei niemandem.")
+        raise KeineId(
+            f"Der Rechner {rechner} gehoert zu keinem Trainer. {grund}\n"
+            f"Eingetragen: {eingetragen or 'niemand'}. "
+            f"Ein neuer Trainer bekaeme die Nummer {neue}."
+        )
+    if len(treffer) > 1:
+        raise KeineId(f"Der Rechner {rechner} steht bei mehreren Trainern unter trainer: "
+                      f"in {MARKER}: {', '.join(treffer)}.")
+    name = treffer[0]
+    nummer = nummern[name]
+    if nummer is None:
+        raise KeineId(f"Die Nummer von {name} unter trainer: in {MARKER} ist keine "
+                      f"zweistellige Zahl: {trainer[name].get('nummer')!r}.")
+    gleiche = [n for n, x in nummern.items() if x == nummer and n != name]
+    if gleiche:
+        raise KeineId(f"Die Nummer {nummer} tragen unter trainer: in {MARKER} "
+                      f"{name} und {', '.join(gleiche)}. Jeder Trainer braucht seine eigene.")
+    return nummer
+
+
+def naechste_id(wurzel: Path) -> str:
+    """Die naechste ID fuer den Trainer dieses Rechners: die hoechste in seinem Bereich plus eins.
+
+    Der Bereich sind die IDs mit seiner Nummer vorn. Zwei Trainer vergeben so
+    nie dieselbe ID, auch wenn Nextcloud ihre Rechner noch nicht abgeglichen
+    hat (ADR-0011).
+
+    Gelesen wird bei jedem Aufruf neu, unmittelbar vor dem Schreiben. Hat
+    Nextcloud inzwischen eine Karte von einem anderen Rechner desselben
+    Trainers gebracht, zaehlt sie schon mit. Gezaehlt werden Dateiname und
+    `id:`, denn der Linter meldet eine Karte, bei der beide auseinanderlaufen,
+    und bis dahin soll keine der beiden Nummern ein zweites Mal vergeben werden.
+
+    Steht in `uebungen/` noch eine vierstellige ID, gibt es keine neue. Sonst
+    bekaeme eine neue Karte `ue-000042`, und `ue-0042` wuerde beim Umstellen
+    zu derselben.
+    """
+    vergeben: set[str] = set()
+    vierstellig: list[str] = []
+    for pfad in sorted((wurzel / "uebungen").glob("*.md")):
+        kennungen = [pfad.name]
+        try:
+            felder, _ = lies_frontmatter(pfad)
+            kennungen.append(str(felder.get("id") or ""))
+        except (OSError, UnicodeDecodeError):
+            pass
+        for text in kennungen:
+            if re.match(rf"{ALTE_ID_MUSTER}\b", text):
+                vierstellig.append(pfad.name)
+            m = re.match(rf"{ID_MUSTER}\b", text)
+            if m:
+                vergeben.add(m.group())
+    if vierstellig:
+        raise KeineId(f"uebungen/ hat noch vierstellige IDs, etwa {vierstellig[0]}. "
+                      f"Erst umstellen: {UMSTELLEN}.")
+    nummer = trainernummer(wurzel)
+    laufend = [int(uid[-4:]) for uid in vergeben if uid[len("ue-"):len("ue-00")] == nummer]
+    hoechste = max(laufend, default=0)
+    if hoechste >= 9999:
+        raise KeineId(f"Im Bereich {nummer} ist keine Nummer mehr frei.")
+    return f"ue-{nummer}{hoechste + 1:04d}"
+
+
 def lies_trainings(wurzel: Path) -> list[dict]:
     einheiten = []
     ordner = wurzel / "trainings"
@@ -262,6 +451,7 @@ def lies_trainings(wurzel: Path) -> list[dict]:
         fm, rumpf = lies_frontmatter(pfad)
         fm["datei"] = pfad.relative_to(wurzel).as_posix()
         fm["verwendet"] = sorted(set(re.findall(rf"\b{ID_MUSTER}\b", rumpf)))
+        fm["vierstellig"] = sorted(set(re.findall(rf"\b{ALTE_ID_MUSTER}\b", rumpf)))
         einheiten.append(fm)
     return einheiten
 
@@ -322,8 +512,10 @@ def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
             w.append(f"{datei}: id {kid} gibt es schon in {gesehen[kid]}")
         gesehen[kid] = datei
 
-        if not re.fullmatch(ID_MUSTER, str(kid)):
-            w.append(f"{datei}: id {kid} passt nicht zum Muster ue-####")
+        if re.fullmatch(ALTE_ID_MUSTER, str(kid)):
+            w.append(f"{datei}: id {kid} ist noch vierstellig, {UMSTELLEN}")
+        elif not re.fullmatch(ID_MUSTER, str(kid)):
+            w.append(f"{datei}: id {kid} passt nicht zum Muster ue-######")
         if not str(Path(datei).name).startswith(str(kid)):
             w.append(f"{datei}: Dateiname beginnt nicht mit der id {kid}")
         w += [f"{datei}: {befund}" for befund in pruefe_felder(k, schwerpunkte, bekannt)]
@@ -339,6 +531,11 @@ def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
         for uid in t.get("verwendet", []):
             if uid not in bekannt:
                 w.append(f"{t['datei']}: verweist auf {uid}, das es in uebungen/ nicht gibt")
+        # Eine Zeile je Plan und nicht je ID: vor dem Umstellen nennt jeder
+        # Plan mehrere, und alle haben dieselbe Ursache.
+        if t.get("vierstellig"):
+            w.append(f"{t['datei']}: nennt noch vierstellige IDs "
+                     f"({', '.join(t['vierstellig'])}), {UMSTELLEN}")
 
     return w
 

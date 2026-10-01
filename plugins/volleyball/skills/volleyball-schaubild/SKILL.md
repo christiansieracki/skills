@@ -36,7 +36,7 @@ selbst mit vollem Pfad dasteht.
 
 | Der Trainer nennt | Vorgehen |
 |---|---|
-| eine Übungskarte, etwa `ue-0042` | `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --id ue-0042 --lang` |
+| eine Übungskarte, etwa `ue-000042` | `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --id ue-000042 --lang` |
 | eine Übung ohne ID | mit `suche.py --text <stück des titels>` finden, bei mehreren Treffern fragen |
 | nichts Bestimmtes | Kandidaten suchen, siehe unten |
 
@@ -65,7 +65,7 @@ Vorgelegt wird eine Zeile je Kandidat:
 
 | ID | Titel | Was das Bild zeigen würde |
 |---|---|---|
-| ue-0042 | Annahme-Zielzone | Aufschlagrichtung, Zielzone, die drei Annahmespieler |
+| ue-000042 | Annahme-Zielzone | Aufschlagrichtung, Zielzone, die drei Annahmespieler |
 
 Der Trainer wählt aus, womit angefangen wird.
 
@@ -93,7 +93,7 @@ Bild zeigt ein Feld.
 
 Der Entwurf liegt im Temp-Verzeichnis der Sitzung, außerhalb des
 Arbeitsordners, und trägt schon den Basisnamen, den er später tragen soll:
-`ue-0042.szene.yml`. Die Freigabe kostet damit ein Kopieren.
+`ue-000042.szene.yml`. Die Freigabe kostet damit ein Kopieren.
 
 ## Die Schleife
 
