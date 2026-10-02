@@ -16,6 +16,21 @@ Die Grenze beim Importieren: Lässt sich das Teil aus dem Zusammenhang reißen
 und einzeln einsetzen? Dann Übung. Nur als Ganzes sinnvoll? Dann Folge. Ist es
 ein kompletter Trainingsabend? Dann Quelle, aus der Übungen gezogen werden.
 
+## Die ID und die Nummer des Trainers
+
+| Begriff | Was es ist | Wo es liegt |
+|---|---|---|
+| **Nummer des Trainers** | Zwei Ziffern für jeden Trainer, der Übungen anlegt. Sie stehen vorn in jeder ID, die er vergibt: `ue-010001` ist die erste Übung von Trainer 01. Die Karten aus der Zeit vor den sechsstelligen IDs tragen `00`. | `trainingsplanung-root.yml`, unter `trainer:` |
+| **Bereich** | Alle IDs mit derselben Nummer des Trainers vorn. Jeder Trainer vergibt nur in seinem eigenen Bereich, die höchste Nummer darin plus eins. So vergeben zwei Trainer nie dieselbe ID, auch wenn Nextcloud ihre Rechner noch nicht abgeglichen hat. | `uebungen/ue-01####-*.md` für Trainer 01 |
+
+Unter `trainer:` steht auch, an welchen Rechnern ein Trainer sitzt. Erkannt
+wird ein Rechner an seinem Namen. Ein Rechner, der dort fehlt, bekommt keine
+ID, bis jemand sagt, wer an ihm sitzt.
+
+**Bereich oder Zone?** „Bereich“ allein meint in diesem Ordner immer die IDs
+eines Trainers. Ein Stück Boden im Schaubild ist eine Zone, auch wenn es
+Aufschlagbereich heißt.
+
 ## Sammelimport
 
 | Begriff | Was es ist | Wo es liegt |
