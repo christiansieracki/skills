@@ -27,6 +27,27 @@ und #37.
 
 ## Bewusst nicht gebaut
 
+### Eine Liste in Blockform liest der Parser als leer
+
+Aus #39. `lies_frontmatter` in `tpdaten.py` versteht Listen nur in eckigen
+Klammern, so steht es in `DATENMODELL.md`. Schreibt jemand von Hand
+
+```yaml
+schaubild:
+  - ue-000291-zirkel-1.png
+  - ue-000291-zirkel-2.png
+```
+
+kommt `schaubild` als `null` an. Der Linter schweigt, die Leseansicht zeigt
+kein Bild, und `volleyball-schaubild` hält die Karte für eine ohne Bild. Bei
+`disziplin` fällt dieselbe Form auf, weil das Feld Pflicht ist, bei `schaubild`
+nicht. Abhilfe wäre eine Meldung des Linters für jede Zeile mit `- ` im
+Frontmatter einer Karte. Die Skripte und Skills schreiben die Form mit
+Klammern.
+
+Ziel: bewusst nicht. Auslöser: Eine Karte mit einer Liste in Blockform taucht
+im Arbeitsordner auf.
+
 ### Ein Beach-Team anlegen, solange es keins gibt
 
 Beach ist seit Welle 1a im Plugin und an einer echten Beachübung abgenommen
