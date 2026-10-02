@@ -300,10 +300,12 @@ durchsichtige Rand fällt weg. Ein einzelnes Feldbild steht im Entwurf als
 Spalte Dateien, bei einer Folge also mit dem Übersichtsblatt vorn, und der
 Entwurf trägt sie in dieser Reihenfolge als Liste ein:
 `schaubild: [17.feldbild-1.png, 17.feldbild-2.png]`. Gezählt wird ohne Lücke,
-ein PDF ohne Bild bekommt keine Nummer. Lässt sich das erste Bild nicht lesen,
-gibt es keins, denn sonst stünde eine Station vorn. Lässt sich ein späteres
-nicht lesen, fehlt nur dieses. Der Auftrag nennt jeweils das PDF, in dem der
-Agent selbst nachsieht. Ein fremdes Feldbild darf der Entwurf nicht nennen.
+ein PDF ohne Bild bekommt keine Nummer. Lässt sich ein Bild nicht lesen, fehlt
+nur dieses, auch wenn es das der Übersicht ist. Die Stationen bekommen ihre
+Feldbilder trotzdem, und für die Übersicht lässt sich danach mit
+`volleyball-schaubild` ein Schaubild zeichnen. Der Auftrag nennt das PDF, in
+dem der Agent selbst nachsieht. Ein fremdes Feldbild darf der Entwurf nicht
+nennen.
 
 Ein Kartenentwurf hat das Frontmatter der Karte ohne `id` (ADR-0010), die
 Abschnitte der Karte und am Ende `## Freigabe` mit beiden Listen:

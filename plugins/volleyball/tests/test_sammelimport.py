@@ -408,40 +408,19 @@ class FeldbildTest(unittest.TestCase):
                           for i in (2, 3)))
 
     @BRAUCHT_PILLOW
-    def test_laesst_sich_das_erste_bild_nicht_lesen_springt_kein_spaeteres_ein(self) -> None:
-        # Das erste Bild zeigt bei einem Zirkel den ganzen Aufbau. Ohne es
-        # stuende eine Station vorn, und bei nur einer Station waere ihr Bild
-        # das einzige der Karte. Lieber kein Feldbild, und der Agent sieht in
-        # den PDFs nach.
-        self.ordner.lege_quellenordner_an(ORDNER, [
-            {"kandidat": 5, "dateien": ["zirkel.pdf", "station-1.pdf"], "ergebnis": "folge"}],
-            feldbild_ausschneiden=True)
-        self.ordner.lege_quell_pdf_an(f"{ORDNER}/zirkel.pdf", ["Übersicht"], bilder=[
-            PdfBild(50, 40, deckend=(5, 5, 45, 35), kaputt=True)])
-        self.ordner.lege_quell_pdf_an(f"{ORDNER}/station-1.pdf", ["Station 1"], bilder=[
-            PdfBild(90, 60, deckend=(0, 0, 90, 60))])
-
-        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
-
-        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        self.assertEqual(list(self.entwuerfe.glob("5.feldbild*")), [])
-        zeile = zeile_mit(auftrag_von(self.ordner, 5), "Feldbild")
-        self.assertIn("zirkel.pdf", zeile)
-        self.assertIn("selbst an", zeile)
-        self.assertIn("zirkel.pdf", zeile_mit(fertig.stdout, "Kein Feldbild"))
-
-    @BRAUCHT_PILLOW
-    def test_laesst_sich_ein_spaeteres_bild_nicht_lesen_fehlt_nur_dieses(self) -> None:
-        # Die Uebersicht steht vorn, wie sie soll. Von den Stationen fehlt
-        # nur die mit dem kaputten Bild, gezaehlt wird ohne Luecke, und
-        # Ausgabe und Auftrag sagen, wo der Agent selbst nachsieht.
+    def test_laesst_sich_ein_bild_nicht_lesen_fehlt_nur_dieses(self) -> None:
+        # Auch wenn es das Bild der Uebersicht ist (entschieden am
+        # 02.10.2026): Die Stationen bekommen ihre Feldbilder trotzdem,
+        # gezaehlt ohne Luecke. Fuer die Uebersicht laesst sich spaeter ein
+        # Schaubild zeichnen. Ausgabe und Auftrag nennen das PDF, damit der
+        # Agent dort selbst nachsieht.
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 5, "dateien": ["zirkel.pdf", "station-1.pdf", "station-2.pdf"],
              "ergebnis": "folge"}], feldbild_ausschneiden=True)
         self.ordner.lege_quell_pdf_an(f"{ORDNER}/zirkel.pdf", ["Übersicht"], bilder=[
-            PdfBild(50, 40, deckend=(5, 5, 45, 35))])
+            PdfBild(50, 40, deckend=(5, 5, 45, 35), kaputt=True)])
         self.ordner.lege_quell_pdf_an(f"{ORDNER}/station-1.pdf", ["Station 1"], bilder=[
-            PdfBild(90, 60, deckend=(0, 0, 90, 60), kaputt=True)])
+            PdfBild(90, 60, deckend=(0, 0, 90, 60))])
         self.ordner.lege_quell_pdf_an(f"{ORDNER}/station-2.pdf", ["Station 2"], bilder=[
             PdfBild(30, 20, deckend=(0, 0, 30, 20))])
 
@@ -450,14 +429,14 @@ class FeldbildTest(unittest.TestCase):
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         self.assertEqual(sorted(p.name for p in self.entwuerfe.glob("5.feldbild*")),
                          ["5.feldbild-1.png", "5.feldbild-2.png"])
-        for name, groesse in (("5.feldbild-1.png", (40, 30)), ("5.feldbild-2.png", (30, 20))):
+        for name, groesse in (("5.feldbild-1.png", (90, 60)), ("5.feldbild-2.png", (30, 20))):
             with Image.open(self.entwuerfe / name) as bild:
                 self.assertEqual(bild.size, groesse, name)
         auftrag = auftrag_von(self.ordner, 5)
         self.assertIn("schaubild: [5.feldbild-1.png, 5.feldbild-2.png]",
                       zeile_mit(auftrag, "Feldbilder"))
-        self.assertIn("im PDF selbst", zeile_mit(auftrag, "`station-1.pdf`:"))
-        self.assertIn("station-1.pdf", zeile_mit(fertig.stdout, "Kein Feldbild"))
+        self.assertIn("im PDF selbst", zeile_mit(auftrag, "`zirkel.pdf`:"))
+        self.assertIn("zirkel.pdf", zeile_mit(fertig.stdout, "Kein Feldbild"))
 
     @BRAUCHT_PILLOW
     def test_ein_bild_das_sich_nicht_lesen_laesst_nennen_ausgabe_und_auftrag(self) -> None:

@@ -1109,11 +1109,11 @@ def lege_feldbilder_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list[st
     (#39). Bei einem Zirkel steht dort das Übersichtsblatt vorn (#35), sein
     Bild zeigt den ganzen Aufbau, und die Stationsblätter folgen.
 
-    Lässt sich das erste Bild nicht lesen, gibt es keins: Sonst stünde eine
-    Station vorn, und bei nur einer wäre ihr Bild das einzige der Karte.
-    Lässt sich ein späteres nicht lesen, fehlt nur dieses, und die übrigen
-    zählen ohne Lücke weiter. In beiden Fällen nennt der Auftrag das PDF, und
-    der Agent sieht dort selbst nach.
+    Lässt sich ein Bild nicht lesen, fehlt nur dieses, und die übrigen zählen
+    ohne Lücke weiter. Das gilt auch für das Bild der Übersicht (entschieden
+    am 02.10.2026): Die Stationen bekommen ihre Feldbilder trotzdem, und für
+    die Übersicht lässt sich danach ein Schaubild zeichnen. Der Auftrag nennt
+    das PDF, und der Agent sieht dort selbst nach.
     """
     for altes in sammelimport.feldbilder(k):
         altes.unlink()
@@ -1132,13 +1132,11 @@ def lege_feldbilder_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list[st
             continue
         except KeinFeldbild as warum:
             fehler.append(f"`{datei}`: {warum}")
-            if not ausgeschnitten:
-                break
             continue
         ausgeschnitten.append((datei, ziel))
 
     if not ausgeschnitten:
-        grund = fehler[0] if fehler else "kein PDF des Kandidaten bettet ein Bild ein"
+        grund = "; ".join(fehler) or "kein PDF des Kandidaten bettet ein Bild ein"
         return ([f"- Feldbild: keins ausgeschnitten, {grund}. Sieh dir das Bild im PDF "
                  f"selbst an."], [f"Kein Feldbild, {grund}."])
     if len(ausgeschnitten) == 1:
