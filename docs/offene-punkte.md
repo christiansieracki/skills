@@ -20,12 +20,38 @@ ist, und die Liste „Bewusst nicht gebaut". Was nach dem Ende einer Welle mit
 
 ## Offen
 
-Zurzeit nichts. Bei der Durchsicht am 02.10.2026 vor der Abnahme von Welle 1d
-hat jeder Punkt ein Ticket bekommen, siehe den Nachtrag in #29: #40 als Slice
-1d/9, #38, #39 und #41 bis #48 vor der Abnahme, dazu Ergänzungen in #35, #36
-und #37.
+Bei der Durchsicht am 02.10.2026 vor der Abnahme von Welle 1d hat jeder Punkt
+ein Ticket bekommen, siehe den Nachtrag in #29: #40 als Slice 1d/9, #38, #39
+und #41 bis #48 vor der Abnahme, dazu Ergänzungen in #35, #36 und #37. Der
+Punkt hier kam danach aus dem Interview zur Welle zur Leseansicht.
+
+### DVV Plan 1 als Übungsfolge mit ID
+
+Die Athletik steht in den Plänen mit „—" in der Spalte ID, die Übungen sind im
+Plan ausgeschrieben. Der DVV-Athletikplan ist laut Glossar eine Übungsfolge und
+gehört als Karte nach `uebungen/`. Dann könnte ein Programmpunkt auf die Karte
+zeigen, statt die Übungen in jeden Plan zu kopieren. Fiel im Interview zur Welle
+zur Leseansicht auf, ist aber Arbeit an der Bibliothek.
+
+Ziel: Welle 2.
 
 ## Bewusst nicht gebaut
+
+### Das PDF sieht aus wie die Leseansicht
+
+`export_pdf.py` baut das PDF weiter aus der `.md`, mit eigenem CSS. Die neue
+Leseansicht klappt auf und zu und taugt so nicht zum Drucken. Aus dem Interview
+zur Welle zur Leseansicht.
+
+Ziel: bewusst nicht. Auslöser: Das PDF soll aussehen wie die Leseansicht.
+
+### Zeitmessung und Abhaken in der Leseansicht
+
+Die Leseansicht zeigt den Ablauf, sie misst keine Zeit und hakt nichts ab. Die
+Vorlage sagt das selbst: „Keine laufende Zeitmessung". Aus dem Interview zur
+Welle zur Leseansicht.
+
+Ziel: bewusst nicht. Auslöser: Der Trainer vermisst es in der Halle.
 
 ### Eine Liste in Blockform liest der Parser als leer
 
@@ -62,7 +88,66 @@ Die Reihenfolge stammt aus #10 und ist dort begründet. Der Sammelimport kam am
 30.09.2026 davor und ist Welle 1d (#29). Vor ihrer Abnahme (#37) kommen #38 bis
 #48, die Reihenfolge steht im Nachtrag von #29. Die PlayDrill-Bibliothek
 braucht die Wissenskarte nicht, und die Wissenskarte kann danach den
-Sammelimport um ihre Kartensorte erweitern.
+Sammelimport um ihre Kartensorte erweitern. Zwischen 1d und die Wissenskarte
+kommt die Welle zur Leseansicht, beschlossen am 02.10.2026.
+
+### Welle zur Leseansicht
+
+Die Leseansicht bekommt die freigegebene Gestaltung vom Branch
+`overhaul/html-generation-display`: den Ablauf zum Aufklappen, Hell, Dunkel und
+System. Beschlossen im Interview am 02.10.2026. Kommt nach der Abnahme von 1d
+(#37) und setzt auf #39 auf, weil beide `leseansicht.py` ändern.
+
+- **Technik** steht in ADR-0012. `leseansicht.py` baut die Gestaltung nach,
+  eine einzige Datei, ohne JavaScript ganz lesbar. Umschalter Hell, Dunkel,
+  System, voreingestellt ist System. Keine festen Varianten nur hell oder nur
+  dunkel.
+- **Begriffe** stehen im Glossar: Ablauf, Programmpunkt, Zeitangabe, Abschnitt,
+  Hallenskizze. „Teil" ist kein Begriff mehr.
+- **Gliederung des Trainingsplans** kommt in `VORLAGEN.md`, `DATENMODELL.md`
+  und den Skill Trainingsdesign, dazu in die Hilfetexte der Skripte (etwa
+  `suche.py --dauer`):
+  - Die Spalte heißt „Programmpunkt". Die Skripte verstehen weiter „Teil" und
+    „Block".
+  - Beginnt eine Überschrift mit einer Zeitangabe, gehört der Abschnitt zu
+    diesem Programmpunkt. Bei zwei zur selben Zeit steht der Hallenteil dabei,
+    ohne ihn gilt der Abschnitt für beide. Passt die Zeitangabe auf keinen,
+    bleibt der Abschnitt unter „Vorbereitung", und der Generator meldet es.
+  - Verschiebt sich eine Zeit, zieht der Skill die Überschriften mit.
+  - Unter `## Zum Nachschlagen` wird jede `###` ein Reiter. Ein Verweis aus
+    einem Programmpunkt ist ein Markdown-Link auf die Überschrift.
+  - Eine Tabelle mit den Spalten `Nr | Übung | … | Heute` wird eine Liste zum
+    Aufklappen, `Heute` ist die Dosierung im Kopf.
+  - Der Plan schreibt kein „siehe unten" mehr. Der Generator ändert keinen
+    Text.
+- **Die Leseansicht**:
+  - Kopf: Kurztitel, Wochentag und Datum, Name der Gruppe aus der Wurzeldatei,
+    Teilnehmer, Dauer, Hallenteile aus `spielflaechen`. Der Fuß bleibt.
+  - Ein aufgeklappter Programmpunkt zeigt „Heute", dann die zugehörigen
+    Abschnitte in der Reihenfolge des Plans, mit ihrer Überschrift ohne
+    Zeitangabe. Gleicht die Überschrift dem Namen der Übung, fällt sie weg.
+    Danach das Schaubild der Karte, die Verweise und „Warum hier?" zugeklappt.
+  - Mehrere Schaubilder stehen untereinander, jedes lässt sich vergrößern, und
+    auch im Dunkeln liegen sie auf hellem Grund.
+  - Pause und Umbau erscheinen gedämpft. Zwei Programmpunkte zur selben Zeit
+    stehen untereinander, mit ihrem Hallenteil.
+  - Unter „Vorbereitung" steht alles ohne Zeitangabe außer „Zum Nachschlagen",
+    auch die Nachbereitung. Ein Abschnitt, der dabei leer wird, entfällt.
+  - Der Satz zum Abhaken im Docstring fliegt raus, das gibt es nicht.
+- **Ablage**: Die React-Dateien kommen nach `docs/gestaltung/leseansicht/`, sie
+  werden nicht mit dem Plugin ausgeliefert. Danach wird der Branch gelöscht.
+- **Abnahme**:
+  - Die Pläne vom 01.10. und vom 17.09. werden von Hand umgestellt, der eine
+    zum Vergleich mit der Vorlage, der andere wegen der Programmpunkte zur
+    selben Zeit. `_vorlage.md` und die lebende `glossary.md` im Arbeitsordner
+    ziehen wir von Hand nach.
+  - Das Android-Handy auf beiden Wegen, per WhatsApp vom Rechner und aus der
+    Nextcloud in den Browser, je in Hell und Dunkel.
+  - Ein Desktop-Browser mit ausgeschaltetem JavaScript im schmalen Fenster.
+  - Ein echtes iPhone: Ein Spieler bekommt die Datei per WhatsApp und schickt
+    einen Screenshot. Klappt das bis zur Abnahme nicht, kommt es mit Ziel
+    hierher.
+- **Version**: ein kleiner Sprung, alte Pläne bleiben gültig.
 
 ### Der zweite Ast von Welle 1b: die Wissenskarte
 

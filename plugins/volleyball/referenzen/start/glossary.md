@@ -7,7 +7,7 @@ volleyball-Skills halten sich daran.
 
 | Begriff | Was es ist | Wo es liegt |
 |---|---|---|
-| **Übung** | Eine einzelne Karte. Lässt sich allein in einen Trainingsteil setzen, meist 8 bis 25 Minuten. | `uebungen/ue-######-*.md` |
+| **Übung** | Eine einzelne Karte. Lässt sich allein in einen Programmpunkt setzen, meist 8 bis 25 Minuten. | `uebungen/ue-######-*.md` |
 | **Übungsfolge** | Ein fertiger Ablauf, der nur als Ganzes Sinn ergibt, weil Reihenfolge und Dosierung dazugehören. Ein DVV-Athletikplan ist so eine. | `uebungen/`, mit `typ: folge` |
 | **Übungsquelle** | Ein Fremddokument, aus dem Übungen gezogen wurden. Bleibt als Datei liegen, wird nie selbst zur Karte. | `quellen/` |
 | **Prinzip** | Eine Regel, die über Übungen hinweg gilt, zum Beispiel „maximal drei Annahmespieler im Riegel". Hängt am Team, nicht an der Übung. | `teams/<team>/team-profil.md` |
@@ -70,10 +70,26 @@ abdeckt und welches Team führt, steht in `trainingsplanung-root.yml`.
 | Begriff | Was es ist |
 |---|---|
 | **Trainingsplan** | Die `.md` einer Einheit. Das ist die Quelle, hier wird geändert. |
+| **Ablauf** | Die Folge der Programmpunkte einer Einheit, als Tabelle im Trainingsplan. |
+| **Programmpunkt** | Eine Zeile der Ablauftabelle: Zeitangabe, Name und meist eine Übung. Auch Pause und Umbau sind Programmpunkte. Laufen zwei gleichzeitig, steht beim Namen der Hallenteil: „Zuspiel, Hallenteil A". |
+| **Zeitangabe** | Von–bis in Minuten ab Beginn der Einheit, wie in der Spalte Zeit: „46–93". Mit dem Hallenteil bestimmt sie einen Programmpunkt eindeutig. |
+| **Abschnitt** | Ein Stück des Trainingsplans unter einer Überschrift (`##` oder `###`). |
+| **Hallenskizze** | Die Zeichnung im Trainingsplan, wie die Halle in einem Programmpunkt an diesem Abend aufgebaut ist, mit Zeichen in einem Codeblock gezeichnet. Gehört zum Abend, nicht zur Übung. |
 | **Leseansicht** | Die daraus erzeugte Fassung als HTML fürs Handy und als PDF zum Ausdrucken. Darf jederzeit weggeworfen und neu gebaut werden. |
 
 Wer in die Leseansicht tippt, verliert seine Änderung beim nächsten Erzeugen.
 Änderungen gehören immer in die `.md`.
+
+Beginnt die Überschrift eines Abschnitts mit einer Zeitangabe, gehört der
+Abschnitt zu diesem Programmpunkt: `## 46–93 Drei Sechser mit Zweierserie`.
+Laufen zwei Programmpunkte zur selben Zeit, kommt der Hallenteil dazu:
+`### 69–89 Hallenteil A: Hallenskizze`. Ohne ihn gilt der Abschnitt für beide.
+In der Leseansicht steht er dort, wo man den Programmpunkt aufklappt.
+
+**Schaubild oder Hallenskizze?** Das Schaubild gehört zur Karte und zeigt die
+Übung. Die Hallenskizze gehört zum Trainingsplan und zeigt, wie die Übung an
+diesem Abend steht. In der Leseansicht heißt das eine „Schaubild der Karte",
+nie „Grundform": Grundform ist, worauf eine Szene gezeichnet wird.
 
 ## Szene und Schaubild
 
@@ -124,13 +140,13 @@ ausgeschnitten wurden, haben keine Szene. Sie bleiben, wie sie sind.
 ## Die Block-Regel
 
 „Block" ist im Volleyball ein Technikelement. Deshalb steht das Wort in unseren
-Dokumenten **nur noch dafür**. Für Zeiträume und Abschnitte nehmen wir andere
-Wörter.
+Dokumenten **nur noch dafür**. Für Zeiträume und für die Zeilen im Ablauf
+nehmen wir andere Wörter.
 
 | Gemeint ist | Begriff | Beispiel |
 |---|---|---|
 | Technikelement am Netz | **Block** | „Sprungangriff und Block im Aufbau", „Blockabstimmung", „kein Block" |
-| Abschnitt einer Trainingseinheit | **Teil** | „Teil 68–90", „Erwärmungsteil", „Zuspielteil", Spaltenüberschrift „Teil" |
+| Zeile im Ablauf einer Trainingseinheit | **Programmpunkt** | „der Programmpunkt 46–93", „zwölf Programmpunkte", Spaltenüberschrift „Programmpunkt" |
 | 3–6-Wochen-Zeitraum (Mesozyklus) | **Trainingsblock** | „Rahmenbedingungen dieses Trainingsblocks", „erster Trainingsblock der Saison" |
 | Räumliche Hallenaufteilung | **Hallenteil** | „zwei Hallenteile mit je einem Netz" |
 
@@ -138,9 +154,9 @@ Wörter.
 „Mesozyklus" steht in Überschriften und Dateinamen, „Trainingsblock" im
 Fließtext, wo es natürlicher klingt. „Block" allein ist dafür tabu.
 
-**Teil oder Hallenteil?** „Teil" ist immer ein Zeitabschnitt, „Hallenteil"
-immer ein Raum. Wenn beides in einem Satz vorkommt, lieber „Hallenteil A" und
-„Hallenteil B" schreiben, damit es eindeutig bleibt.
+**Kein „Teil" für den Programmpunkt.** Das Wort steckt schon in Hallenteil,
+in Hauptteil und in den Teilen eines Geräts. Ältere Pläne tragen in der
+Ablauftabelle noch die Spaltenüberschrift „Teil" und gelten weiter.
 
 ## Halle und Beach
 
@@ -168,6 +184,8 @@ für beide Disziplinen.
 | Peak, peaken | Saisonhöhepunkt, Formhöhepunkt, die wichtigen Spieltage, „in Form kommen" |
 | Movement Preps | Bewegungsvorbereitung, Mobilisation |
 | Athletikspur | Athletikprogramm, Athletik über die Saison |
+| Teil, Trainingsteil für eine Zeile im Ablauf | Programmpunkt |
+| Grundform für das Bild der Karte in der Leseansicht | Schaubild der Karte |
 
 **Bleibt so:** Sideout, Annahme, Abwehr, Zuspiel, Libero, Riegel, 5-1, 6-2 und
 die übrigen eingeführten Volleyballbegriffe.
