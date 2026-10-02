@@ -274,6 +274,19 @@ class Sammelimport:
                 f"Aufträge, Prüfung und Übernahme."
             )
 
+    def verlange_aktuelle_einstellungen(self) -> None:
+        """Bricht ab, wenn eine Einstellung noch unter ihrem alten Namen steht.
+
+        Bis zum 02.10.2026 hieß die Einstellung zum Ausschneiden anders (#49).
+        Ginge `vorbereiten` über den alten Namen hinweg, schnitte es still
+        nichts aus, und die Karten kämen ohne Bild heraus.
+        """
+        if "feldbild_ausschneiden" in self.einstellungen:
+            raise Abbruch(f"In quellen/{self.ordner}/{SAMMELIMPORT} steht noch "
+                          f"feldbild_ausschneiden. Die Einstellung heißt jetzt "
+                          f"quellgrafik_ausschneiden, benenn sie um.\n"
+                          f"Es ist noch kein Auftrag geschrieben.")
+
     def speichere(self) -> None:
         """Schreibt die geänderten Zeilen der Übersicht zurück, sonst nichts.
 
@@ -311,14 +324,6 @@ class Sammelimport:
 
     @property
     def quellgrafik_ausschneiden(self) -> bool:
-        # Bis zum 02.10.2026 hieß die Quellgrafik Feldbild (#49). Ohne diesen
-        # Abbruch schnitte `vorbereiten` bei der alten Einstellung still
-        # nichts aus.
-        if "feldbild_ausschneiden" in self.einstellungen:
-            raise Abbruch(f"In quellen/{self.ordner}/{SAMMELIMPORT} steht noch "
-                          f"feldbild_ausschneiden. Die Einstellung heißt jetzt "
-                          f"quellgrafik_ausschneiden, benenn sie um.\n"
-                          f"Es ist noch kein Auftrag geschrieben.")
         wert = self.einstellungen.get("quellgrafik_ausschneiden")
         if wert is None:
             return False
@@ -1061,10 +1066,10 @@ def schneide_quellgrafik_aus(pdf: Path, ziel: Path) -> None:
     """Legt das größte eingebettete Bild eines PDF als PNG ab, ohne den durchsichtigen Rand.
 
     Das größte nach Pixeln, und nur unter den Bildern, die keine Maske eines
-    anderen sind. PlayDrill bettet seine Feldskizze mit 1920 × 1040 Pixeln
+    anderen sind. PlayDrill bettet seine Quellgrafik mit 1920 × 1040 Pixeln
     ein, dazu eine Transparenzmaske. Was die Maske ganz durchsichtig lässt,
-    wird abgeschnitten, wie im PlayDrill-Log. Ein Bild ohne Maske bleibt, wie
-    es ist.
+    wird abgeschnitten, wie im PlayDrill-Log. Eine Quellgrafik ohne Maske
+    bleibt, wie sie ist.
     """
     try:
         objekte = pdf_objekte(pdf.read_bytes())
@@ -1293,15 +1298,15 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
 
 def vorbereiten(wurzel: Path, ordner: str) -> int:
     sammelimport = Sammelimport(wurzel, ordner)
+    sammelimport.verlange_aktuelle_einstellungen()
     sammelimport.verlange_freigabe()
-    ausschneiden = sammelimport.quellgrafik_ausschneiden
     offen = [k for k in sammelimport.kandidaten
              if k.wartet and pruefe_entwurf(sammelimport, k).fehler]
     dran = offen[:sammelimport.je_durchgang]
     print(f"Aufträge für {len(dran)} von {len(offen)} offenen Kandidaten:")
     if not dran:
         return 0
-    if ausschneiden:
+    if sammelimport.quellgrafik_ausschneiden:
         verlange_pillow(sammelimport)
     pdftotext = None
     if any(_ist_pdf(d) for k in dran for d in k.dateien):
@@ -1490,8 +1495,9 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
                      for bild in schaubilder(felder.get("schaubild"))]
     nummern = ([f"-{nr}" for nr in range(1, len(quellgrafiken) + 1)]
                if len(quellgrafiken) > 1 else [""])
-    verschoben = {grafik: sammelimport.wurzel / "schaubilder" / f"{name}{nummer}{grafik.suffix}"
-                  for grafik, nummer in zip(quellgrafiken, nummern)}
+    verschoben = {quellgrafik: (sammelimport.wurzel / "schaubilder"
+                                / f"{name}{nummer}{quellgrafik.suffix}")
+                  for quellgrafik, nummer in zip(quellgrafiken, nummern)}
     belegt = [bild.name for bild in verschoben.values() if bild.exists()]
     if belegt:
         raise NichtUebernommen(f"schaubilder/{', schaubilder/'.join(belegt)} gibt es schon")
@@ -1501,9 +1507,9 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     # naechste_id() nicht, und falls doch, wird sie nicht überschrieben.
     with ziel.open("x", encoding="utf-8") as datei:
         datei.write(text)
-    for grafik, schaubild in verschoben.items():
+    for quellgrafik, schaubild in verschoben.items():
         schaubild.parent.mkdir(exist_ok=True)
-        shutil.move(grafik, schaubild)
+        shutil.move(quellgrafik, schaubild)
     sammelimport.bekannt.add(uid)
     schliesse_ab(sammelimport, k, "importiert", notiz, karte=uid)
     return uid

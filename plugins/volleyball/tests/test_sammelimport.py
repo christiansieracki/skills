@@ -331,7 +331,7 @@ class AblaufAusDemBildTest(unittest.TestCase):
 class QuellgrafikTest(unittest.TestCase):
     """Die Quellgrafik aus dem PDF: von `vorbereiten` ausgeschnitten, bei `uebernehmen` Schaubild.
 
-    PlayDrill bettet in jedes Blatt eine Feldskizze mit Transparenzmaske ein.
+    PlayDrill bettet in jedes Blatt eine Quellgrafik mit Transparenzmaske ein.
     Der Agent soll sie ansehen koennen, ohne das PDF zu oeffnen, und auf der
     fertigen Karte steht sie als Schaubild (#29, Geschichte 33).
     """
@@ -344,7 +344,7 @@ class QuellgrafikTest(unittest.TestCase):
     @BRAUCHT_PILLOW
     def test_die_quellgrafik_ist_auf_ihren_inhalt_zugeschnitten(self) -> None:
         # Vor der Quellgrafik steht ein kleines Logo im PDF. Genommen wird das
-        # groessere, und von ihm nur, was deckend ist: 68 x 46 Pixel.
+        # groessere Bild, und von ihm nur, was deckend ist: 68 x 46 Pixel.
         self.ordner.lege_quellenordner_an(
             ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], quellgrafik_ausschneiden=True)
         self.ordner.lege_quell_pdf_an(f"{ORDNER}/kasten.pdf", ["Abwehr vom Kasten"], bilder=[
@@ -359,8 +359,8 @@ class QuellgrafikTest(unittest.TestCase):
         with Image.open(quellgrafik) as bild:
             self.assertEqual(bild.size, (68, 46))
             self.assertEqual(bild.convert("RGBA").getpixel((0, 0)), (30, 120, 200, 255))
-        # Der Agent sieht es sich unter dem absoluten Pfad an und traegt es
-        # unter seinem Namen in den Entwurf ein, neben dem es liegt.
+        # Der Agent sieht sie sich unter dem absoluten Pfad an und traegt sie
+        # unter ihrem Namen in den Entwurf ein, neben dem sie liegt.
         zeile = zeile_mit(auftrag_von(self.ordner, 3), "Quellgrafik")
         self.assertIn(quellgrafik.resolve().as_posix(), zeile)
         self.assertIn("schaubild: 3.quellgrafik.png", zeile)
@@ -474,9 +474,9 @@ class QuellgrafikTest(unittest.TestCase):
         self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
 
     def test_mit_der_alten_einstellung_bricht_es_ab_und_nennt_die_neue(self) -> None:
-        # Bis zum 02.10.2026 hiess die Quellgrafik Feldbild (#49). Liefe
-        # vorbereiten mit der alten Einstellung weiter, schnitte es still
-        # nichts aus, und die Karten kaemen ohne Bild heraus.
+        # Bis zum 02.10.2026 hiess die Einstellung anders (#49). Liefe
+        # vorbereiten mit dem alten Namen weiter, schnitte es still nichts
+        # aus, und die Karten kaemen ohne Bild heraus.
         self.ordner.lege_quellenordner_an(
             ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], feldbild_ausschneiden=True)
 
@@ -1439,7 +1439,7 @@ class UebernehmenTest(unittest.TestCase):
         ])
         entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
         for nr, quellgrafiken in ((1, ["1.quellgrafik.png"]),
-                               (2, ["2.quellgrafik-1.png", "2.quellgrafik-2.png"])):
+                                  (2, ["2.quellgrafik-1.png", "2.quellgrafik-2.png"])):
             self.ordner.lege_kartenentwurf_an(ORDNER, nr, titel=f"Kandidat {nr}",
                                               schaubild=quellgrafiken)
             (entwuerfe / f"{nr}.auftrag.md").write_text("# Auftrag\n", encoding="utf-8")

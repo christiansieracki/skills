@@ -54,10 +54,6 @@ Auch die bestätigt oder kippt der Trainer.
 **Kandidat oder Einheit?** Einheit heißt in diesem Ordner immer
 Trainingseinheit. Was im Sammelimport zur Karte werden soll, ist ein Kandidat.
 
-**Quellgrafik oder Quellbild?** Ein Quellbild ist eine ganze Bilddatei in
-`quellen/`, etwa das Foto einer Magazinseite. `bilder_aufbereiten.py`
-verkleinert es. Die Quellgrafik schneidet der Sammelimport aus einem PDF aus.
-
 ## Team und Trainingsgruppe
 
 | Begriff | Was es ist |
