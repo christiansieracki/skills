@@ -46,7 +46,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
     DISZIPLINEN, LEVEL, KeineId, disziplin_text, finde_wurzel, hole_index,
-    interpreter, konsole_vorbereiten, naechste_id,
+    interpreter, konsole_vorbereiten, naechste_id, schaubilder,
 )
 
 
@@ -178,8 +178,13 @@ def zeige(e, lang: bool, wurzel: Path, anwesend=None):
         print(f"    Belastung    {e.get('belastungshinweis') or 'Erwachsenenbelastung, Hinweis fehlt'}")
     if e.get("variante_von"):
         print(f"    Variante von {e['variante_von']}")
-    if e.get("schaubild"):
-        print(f"    Schaubild    schaubilder/{e['schaubild']}")
+    # Je Bild eine Zeile mit seinem Pfad, bei einer Liste untereinander. In
+    # einer Zeile mit Kommas stuende `schaubilder/` nur vor dem ersten.
+    bilder = schaubilder(e.get("schaubild"))
+    beschriftung = "Schaubilder  " if len(bilder) > 1 else "Schaubild    "
+    for bild in bilder:
+        print(f"    {beschriftung}schaubilder/{bild}")
+        beschriftung = " " * len(beschriftung)
     if e.get("quelle"):
         print(f"    Quelle       {e['quelle']}")
     if e.get("quelldatei"):

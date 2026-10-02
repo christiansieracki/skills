@@ -75,6 +75,22 @@ def disziplin_text(eintrag: dict) -> str:
     return ", ".join(eintrag.get("disziplin") or []) or "—"
 
 
+def schaubilder(wert) -> list[str]:
+    """Die Dateinamen in `schaubild:`, in ihrer Reihenfolge.
+
+    Das Feld traegt einen Namen oder eine Liste davon, etwa bei einem Zirkel
+    aus Uebersichtsblatt und Stationsblaettern je Blatt ein Bild (#39). Wer
+    es liest, der Linter, die Leseansicht, die Suche und der Sammelimport,
+    bekommt hier immer eine Liste. Leer ist sie, wenn das Feld fehlt oder
+    `null` ist.
+    """
+    if wert is None or wert == "":
+        return []
+    if isinstance(wert, list):
+        return [str(name) for name in wert if name not in (None, "")]
+    return [str(wert)]
+
+
 # --------------------------------------------------------------------------
 # Konsole
 # --------------------------------------------------------------------------
@@ -529,10 +545,11 @@ def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
 
         # Ein toter Bildverweis faellt sonst nirgends auf: die Leseansicht
         # laesst das Bild still weg, und gemerkt wird es erst in der Halle am
-        # Blatt ohne Bild.
-        bild = k.get("schaubild")
-        if bild and not (wurzel / "schaubilder" / str(bild)).is_file():
-            w.append(f"{datei}: schaubild zeigt auf {bild}, das es unter schaubilder/ nicht gibt")
+        # Blatt ohne Bild. Bei einer Liste steht jedes fehlende Bild einzeln
+        # da, denn jedes fehlt fuer sich.
+        for bild in schaubilder(k.get("schaubild")):
+            if not (wurzel / "schaubilder" / bild).is_file():
+                w.append(f"{datei}: schaubild zeigt auf {bild}, das es unter schaubilder/ nicht gibt")
 
     for t in trainings:
         for uid in t.get("verwendet", []):

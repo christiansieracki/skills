@@ -19,13 +19,13 @@ neu ist. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
 nächsten offenen Kandidaten an, mit dem Text jedes PDF und der Angabe, ob der
 Ablauf aus dem Bild kommt. Wenn die Einstellungen es wollen, schneidet es
-daneben das Feldbild aus dem PDF, dafür braucht es Pillow (ADR-0005). `pruefen`
-setzt den Status aus den Kartenentwürfen, die dort auf der Platte liegen, und
-weist ab, was das Datenmodell bricht oder die Form der Freigabe nicht einhält.
-Mit `--json` gibt es aus, was die Freigabe im Chat braucht. `uebernehmen` macht
-aus freigegebenen Entwürfen Karten in `uebungen/`, erst jetzt mit ID
-(ADR-0010), und legt das Feldbild als ihr Schaubild ab. Gestrichene und
-ergänzende Kandidaten bekommen nur ihren Status.
+daneben aus jedem PDF mit Bild das Feldbild aus, dafür braucht es Pillow
+(ADR-0005). `pruefen` setzt den Status aus den Kartenentwürfen, die dort auf
+der Platte liegen, und weist ab, was das Datenmodell bricht oder die Form der
+Freigabe nicht einhält. Mit `--json` gibt es aus, was die Freigabe im Chat
+braucht. `uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`,
+erst jetzt mit ID (ADR-0010), und legt die Feldbilder als ihre Schaubilder ab.
+Gestrichene und ergänzende Kandidaten bekommen nur ihren Status.
 
 Nach der Freigabe des Plans schreibt nur noch dieses Skript in die Übersicht.
 Mehrere Agenten entwerfen parallel, und keiner von ihnen fasst sie an.
@@ -54,7 +54,7 @@ from bilder_aufbereiten import kandidaten as bilder_nach_gewicht  # noqa: E402
 from tpdaten import (  # noqa: E402
     DISZIPLIN_SPALTE, KARTENFELDER, TYPEN, KeineId, finde_wurzel, hole_index, interpreter,
     konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_schwerpunkte,
-    lies_uebungen, naechste_id, pruefe_felder,
+    lies_uebungen, naechste_id, pruefe_felder, schaubilder,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -347,8 +347,25 @@ class Sammelimport:
     def auftrag(self, k: Kandidat) -> Path:
         return self.entwurfsordner / f"{k.nummer}.auftrag.md"
 
-    def feldbild(self, k: Kandidat) -> Path:
-        return self.entwurfsordner / f"{k.nummer}.feldbild.png"
+    def feldbild(self, k: Kandidat, nr: int | None = None) -> Path:
+        """Wo ein Feldbild des Kandidaten liegt.
+
+        Ohne Nummer das einzige, `17.feldbild.png`. Hat der Kandidat mehrere,
+        etwa ein Zirkel mit einem Bild je Blatt, heißen sie
+        `17.feldbild-1.png`, `17.feldbild-2.png` und so weiter (#39).
+        """
+        endung = "" if nr is None else f"-{nr}"
+        return self.entwurfsordner / f"{k.nummer}.feldbild{endung}.png"
+
+    def ist_feldbild_von(self, k: Kandidat, name: str) -> bool:
+        """Ist `name` ein Feldbild dieses Kandidaten, einzeln oder mit Nummer?"""
+        return re.fullmatch(rf"{re.escape(k.nummer)}\.feldbild(-[1-9]\d*)?\.png", name) is not None
+
+    def feldbilder(self, k: Kandidat) -> list[Path]:
+        """Die Feldbilder des Kandidaten, die neben dem Entwurf liegen."""
+        if not self.entwurfsordner.is_dir():
+            return []
+        return sorted(p for p in self.entwurfsordner.iterdir() if self.ist_feldbild_von(k, p.name))
 
     # Was die Prüfung eines Entwurfs aus dem Arbeitsordner braucht. Gelesen
     # wird einmal je Aufruf, nicht je Entwurf: Ein Durchgang hat 30, die
@@ -533,16 +550,22 @@ def pruefe_frontmatter(sammelimport: Sammelimport, k: Kandidat, felder: dict) ->
     if befunde:
         raise Formfehler(befunde[0])
     pruefe_quelldatei(sammelimport.wurzel, felder.get("quelldatei"))
-    # Im Entwurf nennt `schaubild:` das Feldbild neben ihm, und nur das
-    # eigene: `uebernehmen` trägt es nach schaubilder/, unter den Namen der
-    # Karte. Ein fremdes fehlte danach seinem Kandidaten.
-    schaubild = str(felder.get("schaubild") or "")
-    feldbild = sammelimport.feldbild(k)
-    if schaubild and schaubild != feldbild.name:
-        raise Formfehler(f"schaubild: nennt {schaubild}, das Feldbild dieses Kandidaten "
-                         f"heißt {feldbild.name}")
-    if schaubild and not feldbild.is_file():
-        raise Formfehler(f"Feldbild {schaubild} liegt nicht neben dem Entwurf")
+    # Im Entwurf nennt `schaubild:` die Feldbilder neben ihm, einzeln oder als
+    # Liste, und nur die eigenen: `uebernehmen` trägt sie nach schaubilder/,
+    # unter den Namen der Karte. Ein fremdes fehlte danach seinem Kandidaten,
+    # und ein doppeltes ließe sich nur einmal verschieben.
+    gesehen: set[str] = set()
+    for name in schaubilder(felder.get("schaubild")):
+        if not sammelimport.ist_feldbild_von(k, name):
+            raise Formfehler(
+                f"schaubild: nennt {name}, das ist kein Feldbild dieses Kandidaten "
+                f"({sammelimport.feldbild(k).name}, bei mehreren "
+                f"{sammelimport.feldbild(k, 1).name} und weiter)")
+        if name in gesehen:
+            raise Formfehler(f"schaubild: nennt {name} zweimal")
+        gesehen.add(name)
+        if not (sammelimport.entwurfsordner / name).is_file():
+            raise Formfehler(f"Feldbild {name} liegt nicht neben dem Entwurf")
 
 
 def lies_vorschlag(nr: int, text: str, felder: dict, ueberschriften: set[str]) -> Vorschlag:
@@ -1077,36 +1100,62 @@ def verlange_pillow(sammelimport: Sammelimport) -> None:
             f"Es ist noch kein Auftrag geschrieben.") from None
 
 
-def lege_feldbild_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[str, str | None]:
-    """Schneidet das Feldbild eines Kandidaten aus, wenn die Einstellungen es wollen.
+def lege_feldbilder_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list[str], list[str]]:
+    """Schneidet die Feldbilder eines Kandidaten aus, wenn die Einstellungen es wollen.
 
-    Zurück kommt die Zeile für den Auftrag und, wenn es nicht geklappt hat,
-    was das Skript dazu sagt. Genommen wird das erste PDF des Kandidaten, das
-    ein Bild einbettet. Bei einem Zirkel steht das Übersichtsblatt vorn, und
-    sein Bild zeigt den ganzen Aufbau. Lässt sich dieses Bild nicht lesen,
-    springt kein Stationsblatt ein: Das Bild wäre ein anderes.
+    Zurück kommen die Zeilen für den Auftrag und, was das Skript dazu sagt,
+    wenn etwas nicht geklappt hat. Jedes PDF des Kandidaten, das ein Bild
+    einbettet, gibt ein Feldbild, in der Reihenfolge der Spalte Dateien
+    (#39). Bei einem Zirkel steht dort das Übersichtsblatt vorn (#35), sein
+    Bild zeigt den ganzen Aufbau, und die Stationsblätter folgen.
+
+    Lässt sich das erste Bild nicht lesen, gibt es keins: Sonst stünde eine
+    Station vorn, und bei nur einer wäre ihr Bild das einzige der Karte.
+    Lässt sich ein späteres nicht lesen, fehlt nur dieses, und die übrigen
+    zählen ohne Lücke weiter. In beiden Fällen nennt der Auftrag das PDF, und
+    der Agent sieht dort selbst nach.
     """
-    ziel = sammelimport.feldbild(k)
-    ziel.unlink(missing_ok=True)
+    for altes in sammelimport.feldbilder(k):
+        altes.unlink()
     if not sammelimport.feldbild_ausschneiden:
-        return "- Feldbild: wird bei dieser Quelle nicht ausgeschnitten.", None
+        return ["- Feldbild: wird bei dieser Quelle nicht ausgeschnitten."], []
     pdfs = [d for d in k.dateien if _ist_pdf(d)]
     if not pdfs:
-        return "- Feldbild: keins, der Kandidat hat kein PDF.", None
-    grund = "kein PDF des Kandidaten bettet ein Bild ein"
+        return ["- Feldbild: keins, der Kandidat hat kein PDF."], []
+    ausgeschnitten: list[tuple[str, Path]] = []
+    fehler: list[str] = []
     for datei in pdfs:
+        ziel = sammelimport.feldbild(k, len(ausgeschnitten) + 1)
         try:
             schneide_feldbild_aus(sammelimport.quellordner / datei, ziel)
         except OhneBild:
             continue
-        except KeinFeldbild as fehler:
-            grund = f"`{datei}`: {fehler}"
-            break
-        return (f"- Feldbild: `{ziel.as_posix()}`, aus `{datei}`. Trag es im Entwurf als "
-                f"`schaubild: {ziel.name}` ein."), None
-    ziel.unlink(missing_ok=True)
-    return (f"- Feldbild: keins ausgeschnitten, {grund}. Sieh dir das Bild im PDF selbst an.",
-            f"Kein Feldbild, {grund}.")
+        except KeinFeldbild as warum:
+            fehler.append(f"`{datei}`: {warum}")
+            if not ausgeschnitten:
+                break
+            continue
+        ausgeschnitten.append((datei, ziel))
+
+    if not ausgeschnitten:
+        grund = fehler[0] if fehler else "kein PDF des Kandidaten bettet ein Bild ein"
+        return ([f"- Feldbild: keins ausgeschnitten, {grund}. Sieh dir das Bild im PDF "
+                 f"selbst an."], [f"Kein Feldbild, {grund}."])
+    if len(ausgeschnitten) == 1:
+        # Ein einzelnes Feldbild trägt keine Nummer, auf der Karte wird es
+        # ein einzelner Name.
+        datei, ziel = ausgeschnitten[0]
+        ziel = ziel.replace(sammelimport.feldbild(k))
+        zeilen = [f"- Feldbild: `{ziel.as_posix()}`, aus `{datei}`. Trag es im Entwurf als "
+                  f"`schaubild: {ziel.name}` ein."]
+    else:
+        namen = ", ".join(ziel.name for _, ziel in ausgeschnitten)
+        zeilen = [f"- Feldbilder: eins je PDF mit Bild, in der Reihenfolge der Dateien. Trag "
+                  f"sie im Entwurf in dieser Reihenfolge ein, als `schaubild: [{namen}]`.",
+                  *(f"  - `{ziel.as_posix()}`, aus `{datei}`" for datei, ziel in ausgeschnitten)]
+    zeilen += [f"- Kein Feldbild aus {grund}. Sieh dir das Bild im PDF selbst an."
+               for grund in fehler]
+    return zeilen, [f"Kein Feldbild aus {grund}." for grund in fehler]
 
 
 # --------------------------------------------------------------------------
@@ -1184,7 +1233,7 @@ def ablauf_aus_dem_bild(sammelimport: Sammelimport, texte: list[str | None]) -> 
 
 
 def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[str],
-                     pdftotext: str | None, feldbild: str) -> Path:
+                     pdftotext: str | None, feldbildzeilen: list[str]) -> Path:
     """Legt den Auftrag für einen Kandidaten an, alles, was der Agent braucht.
 
     Die Pfade stehen absolut da, denn der Agent liest und schreibt mit ihnen.
@@ -1214,7 +1263,7 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
         f"- Typ laut Zerlegungsplan: `{k.ergebnis}`",
         f"- `quelldatei:` `{', '.join(relativ)}`",
         ablauf_aus_dem_bild(sammelimport, texte),
-        feldbild,
+        *feldbildzeilen,
         f"- Zielpfad des Entwurfs: `{sammelimport.entwurf(k).as_posix()}`",
         "",
         "## Dateien",
@@ -1253,10 +1302,10 @@ def vorbereiten(wurzel: Path, ordner: str) -> int:
     sammelimport.entwurfsordner.mkdir(parents=True, exist_ok=True)
     kennungen = kennungstabelle(wurzel)
     for k in dran:
-        feldbild, meldung = lege_feldbild_an(sammelimport, k)
-        auftrag = schreibe_auftrag(sammelimport, k, kennungen, pdftotext, feldbild)
+        feldbildzeilen, meldungen = lege_feldbilder_an(sammelimport, k)
+        auftrag = schreibe_auftrag(sammelimport, k, kennungen, pdftotext, feldbildzeilen)
         print(f"  {k.nummer}  {auftrag.as_posix()}")
-        if meldung:
+        for meldung in meldungen:
             print(f"      {meldung}")
     return 0
 
@@ -1287,14 +1336,18 @@ def setze_befund(k: Kandidat, befund: Befund) -> None:
 def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -> dict:
     """Was der Skill für die Freigabe im Chat über einen Kandidaten braucht (#29).
 
-    Einzeln fragt er die Rückfragen ohne Vermutung, mit dem Feldbild, und
+    Einzeln fragt er die Rückfragen ohne Vermutung, mit den Feldbildern, und
     bei `ablauf_aus_dem_bild` den Ablauf. Alles andere kommt in eine Tabelle:
     die Felder in ihren Spalten, die Vorschläge zu Feldern daran, die
     Rückfragen mit Vermutung zum Bestätigen, und eine Spalte „aus dem
     Bild“ aus den Vorschlägen zu Textstellen. Ein abgewiesener Entwurf kommt
     nicht in die Freigabe, von ihm stehen nur Status und Notiz da.
+
+    `feldbilder` sind die, die der Entwurf in `schaubild:` nennt, in seiner
+    Reihenfolge, so wie sie auf die Karte kommen. Ist das keins, ist die
+    Liste leer.
     """
-    entwurf, feldbild = sammelimport.entwurf(k), sammelimport.feldbild(k)
+    entwurf = sammelimport.entwurf(k)
     return {
         "kandidat": k.nummer,
         "was": k.was,
@@ -1303,7 +1356,8 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
         "status": k.status,
         "notiz": k.notiz,
         "entwurf": entwurf.as_posix() if entwurf.is_file() else None,
-        "feldbild": feldbild.as_posix() if befund.felder.get("schaubild") else None,
+        "feldbilder": [(sammelimport.entwurfsordner / name).as_posix()
+                       for name in schaubilder(befund.felder.get("schaubild"))],
         "ablauf_aus_dem_bild": befund.aus_dem_bild,
         "felder": befund.felder,
         "vorschlaege": {
@@ -1365,15 +1419,16 @@ def _setze_feld(felder: list[str], name: str, wert: str) -> list[str]:
     return felder if zeile in felder else [*felder, zeile]
 
 
-def als_karte(entwurf: str, uid: str, heute: str, schaubild: str | None = None) -> str:
+def als_karte(entwurf: str, uid: str, heute: str,
+              schaubildnamen: list[str] | None = None) -> str:
     """Aus dem Text eines Kartenentwurfs der Text der Karte.
 
     `id` kommt als erstes Feld dazu, `angelegt` wird der Tag der Freigabe.
-    `schaubild`, wenn angegeben, ersetzt den Namen des Feldbilds neben dem
-    Entwurf durch den in schaubilder/. `## Freigabe` fällt weg: Vorschläge
-    und Rückfragen sind mit dem Ja des Trainers erledigt und gehören nicht auf
-    die Karte in der Halle. Dass das Frontmatter sauber schließt, hat
-    `pruefe_entwurf` vorher festgestellt.
+    `schaubildnamen`, wenn angegeben, ersetzt die Namen der Feldbilder neben dem
+    Entwurf durch die in schaubilder/. Einer steht als Name da, mehrere als
+    Liste. `## Freigabe` fällt weg: Vorschläge und Rückfragen sind mit dem Ja
+    des Trainers erledigt und gehören nicht auf die Karte in der Halle. Dass
+    das Frontmatter sauber schließt, hat `pruefe_entwurf` vorher festgestellt.
     """
     zeilen = entwurf.splitlines()
     ende = _frontmatter_ende(zeilen)
@@ -1381,8 +1436,10 @@ def als_karte(entwurf: str, uid: str, heute: str, schaubild: str | None = None) 
         raise ValueError("Kartenentwurf ohne geschlossenes Frontmatter")
     felder = [z for z in zeilen[1:ende] if not re.match(r"id\s*:", z)]
     felder = _setze_feld(felder, "angelegt", heute)
-    if schaubild:
-        felder = _setze_feld(felder, "schaubild", schaubild)
+    if schaubildnamen:
+        wert = (schaubildnamen[0] if len(schaubildnamen) == 1
+                else f"[{', '.join(schaubildnamen)}]")
+        felder = _setze_feld(felder, "schaubild", wert)
 
     rumpf = zeilen[ende + 1:]
     grenzen = _abschnitt_grenzen(rumpf, "Freigabe")
@@ -1403,9 +1460,10 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     dieselbe Karte ein zweites Mal.
 
     Das Feldbild bekommt den Namen der Karte, wie jedes PlayDrill-Bild in
-    schaubilder/. Liegt dort schon eine Datei unter diesem Namen, wird nichts
-    geschrieben, auch die Karte nicht: Überschrieben wird in schaubilder/
-    nichts.
+    schaubilder/. Mehrere bekommen ihn mit Nummer, in der Reihenfolge, in der
+    der Entwurf sie nennt (#39). Liegt dort schon eine Datei unter einem
+    dieser Namen, wird nichts geschrieben, auch die Karte nicht: Überschrieben
+    wird in schaubilder/ nichts.
     """
     entwurf = sammelimport.entwurf(k)
     felder, _ = lies_frontmatter(entwurf)
@@ -1417,18 +1475,22 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
         raise NichtUebernommen(str(fehler)) from None
     name = f"{uid}-{slug(str(felder['titel']))}"
     ziel = sammelimport.wurzel / "uebungen" / f"{name}.md"
-    # Welches Feldbild, hat `pruefe_entwurf` sichergestellt: nur das eigene.
-    feldbild = sammelimport.feldbild(k) if felder.get("schaubild") else None
-    schaubild = sammelimport.wurzel / "schaubilder" / f"{name}{sammelimport.feldbild(k).suffix}"
-    if feldbild and schaubild.exists():
-        raise NichtUebernommen(f"schaubilder/{schaubild.name} gibt es schon")
+    # Welche Feldbilder, hat `pruefe_entwurf` sichergestellt: nur die
+    # eigenen, jedes einmal, und jedes liegt da.
+    feldbilder = [sammelimport.entwurfsordner / bild for bild in schaubilder(felder.get("schaubild"))]
+    nummern = [f"-{nr}" for nr in range(1, len(feldbilder) + 1)] if len(feldbilder) > 1 else [""]
+    verschoben = {feldbild: sammelimport.wurzel / "schaubilder" / f"{name}{nummer}{feldbild.suffix}"
+                  for feldbild, nummer in zip(feldbilder, nummern)}
+    belegt = [bild.name for bild in verschoben.values() if bild.exists()]
+    if belegt:
+        raise NichtUebernommen(f"schaubilder/{', schaubilder/'.join(belegt)} gibt es schon")
     text = als_karte(entwurf.read_text(encoding="utf-8"), uid, date.today().isoformat(),
-                     schaubild.name if feldbild else None)
+                     [bild.name for bild in verschoben.values()])
     # "x" legt nur neu an. Eine Datei unter dieser ID gibt es laut
     # naechste_id() nicht, und falls doch, wird sie nicht überschrieben.
     with ziel.open("x", encoding="utf-8") as datei:
         datei.write(text)
-    if feldbild:
+    for feldbild, schaubild in verschoben.items():
         schaubild.parent.mkdir(exist_ok=True)
         shutil.move(feldbild, schaubild)
     sammelimport.bekannt.add(uid)
@@ -1448,12 +1510,12 @@ def schliesse_ab(sammelimport: Sammelimport, k: Kandidat, status: str, notiz: st
     höchstens ein Entwurf zu viel herum, und kein erledigter Kandidat sieht
     wieder offen aus.
 
-    Das Feldbild verschwindet auch dann, wenn der Entwurf es nicht
-    eingetragen hat. Es ließe sich jederzeit neu aus dem PDF schneiden.
+    Die Feldbilder verschwinden auch dann, wenn der Entwurf sie nicht
+    eingetragen hat. Sie ließen sich jederzeit neu aus dem PDF schneiden.
     """
     k.setze(status, notiz, karte=karte)
     sammelimport.speichere()
-    for datei in (sammelimport.entwurf(k), sammelimport.auftrag(k), sammelimport.feldbild(k)):
+    for datei in (sammelimport.entwurf(k), sammelimport.auftrag(k), *sammelimport.feldbilder(k)):
         datei.unlink(missing_ok=True)
 
 

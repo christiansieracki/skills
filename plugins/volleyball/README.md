@@ -31,9 +31,9 @@ plugins/volleyball/
 ├── scripts/           index.py, suche.py, leseansicht.py, export_pdf.py,
 │                      bilder_aufbereiten.py, schaubild.py, szene.py,
 │                      sammelimport.py, ids_umstellen.py
-└── tests/             Linter, Suche, Bildaufbereitung, Schaubilder,
-                       PDF-Export, Sammelimport und das Umstellen der IDs
-                       gegen einen künstlichen Arbeitsordner
+└── tests/             Linter, Suche, Leseansicht, Bildaufbereitung,
+                       Schaubilder, PDF-Export, Sammelimport und das
+                       Umstellen der IDs gegen einen künstlichen Arbeitsordner
 ```
 
 **Im Plugin liegt das Werkzeug, im Arbeitsordner liegen die Daten.** Übungen,

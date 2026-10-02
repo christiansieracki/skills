@@ -130,7 +130,7 @@ der Markdown-Datei erzeugt und tragen das Datum ihrer Erzeugung. Änderungen
 gehören in die Markdown-Datei.
 
 Hat eine Übung im Ablauf ein `schaubild:` auf ihrer Karte, steckt das Bild mit
-in der HTML. Eingebettet, damit die Datei allein läuft, wenn man sie sich aufs
+in der HTML, bei einer Liste alle Bilder in ihrer Reihenfolge. Eingebettet, damit die Datei allein läuft, wenn man sie sich aufs
 Handy schickt. Das macht sie groß. Bei vielen Schaubildern in einer Einheit
 stattdessen `--bilder verweis` anbieten, dann steht nur ein Pfad nach
 `schaubilder/` drin und die Datei bleibt klein, funktioniert aber nur im

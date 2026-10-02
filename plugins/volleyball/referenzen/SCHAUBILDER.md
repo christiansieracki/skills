@@ -28,7 +28,10 @@ Eine Szene, die nicht aufgeht, hinterlässt eine Meldung und das Bild von
 vorher, nie ein halbes.
 
 Auf der Übungskarte steht anschließend der Dateiname des Bildes:
-`schaubild: ue-000042.svg`. `index.py` meldet, wenn er ins Leere zeigt.
+`schaubild: ue-000042.svg`. `index.py` meldet, wenn er ins Leere zeigt. Hat
+eine Übung mehrere Bilder, steht dort eine Liste, siehe `DATENMODELL.md`. Ein
+zweites gezeichnetes Bild derselben Karte heißt nach der ID mit Nummer, etwa
+`ue-000042-2.szene.yml`.
 
 ## Der Aufbau einer Szene
 
@@ -563,8 +566,9 @@ ganze Bild und eine Runde der Vorschau-Schleife, und das für eine Kleinigkeit.
 Das Skript sagt beim Schreiben, dass es das getan hat, und schlägt einen
 `titel:` vor: den der Übungskarte, deren ID der Basisname der Szene ist.
 `schaubilder/ue-000042.szene.yml` gehört zu `uebungen/ue-000042-*.md`, und dort
-steht der Titel schon. Übernehmen kostet eine Zeile. Ist der Basisname keine
-Übungs-ID, gibt es die Karte nicht oder trägt sie keinen Titel, steht der
+steht der Titel schon. `ue-000042-2.szene.yml`, das zweite Bild derselben
+Karte, gehört auch dorthin. Übernehmen kostet eine Zeile. Ist der Basisname
+keine Übungs-ID, gibt es die Karte nicht oder trägt sie keinen Titel, steht der
 Hinweis ohne Wortlaut da. Geraten wird nichts.
 
 In der Szene ändert sich nichts. Der Text steht weiter unter `untertitel:`,

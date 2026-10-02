@@ -55,7 +55,7 @@ netz: true
 erwachsenenbelastung: false
 belastungshinweis: ""            # Klartext, wenn erwachsenenbelastung true ist
 material: [zielmatte, baelle]    # kleingeschrieben, ohne Umlaute
-schaubild: null                  # Dateiname in schaubilder/, landet in der Leseansicht
+schaubild: null                  # Dateiname in schaubilder/ oder Liste davon, landet in der Leseansicht
 quelle: "..."                    # nie leer
 quelldatei: null                 # Datei in quellen/, freier Text, bei zwei Seiten beide
 variante_von: null               # id, wenn abgeleitet
@@ -288,14 +288,22 @@ die Eingabe für den Zerlegungsplan: jede Datei des Quellenordners, die noch in
 keiner Zeile der Übersicht steht, bei PDFs ihr Text, und die Bibliotheksliste,
 in der die Karten aus diesem Quellenordner markiert sind. Der Rest ist nach der
 Nummer des Kandidaten benannt: `17.auftrag.md` ist der Auftrag für den Agenten,
-`17.md` der Kartenentwurf, `17.feldbild.png` das Feldbild.
+`17.md` der Kartenentwurf, `17.feldbild.png` das Feldbild, bei mehreren
+`17.feldbild-1.png`, `17.feldbild-2.png` und so weiter.
 
 Der Auftrag trägt unter jedem PDF des Kandidaten dessen ganzen Text, oder den
 Hinweis, dass der Agent das PDF selbst lesen muss. Er sagt, ob der Ablauf aus
-dem Bild kommt. Ist `feldbild_ausschneiden` an, schneidet `vorbereiten` aus dem
-ersten PDF des Kandidaten, das ein Bild einbettet, das größte Bild aus. Der
-durchsichtige Rand fällt weg. Im Entwurf steht es als `schaubild: 17.feldbild.png`,
-ein anderes Feldbild darf er nicht nennen.
+dem Bild kommt. Ist `feldbild_ausschneiden` an, schneidet `vorbereiten` aus
+jedem PDF des Kandidaten, das ein Bild einbettet, das größte Bild aus. Der
+durchsichtige Rand fällt weg. Ein einzelnes Feldbild steht im Entwurf als
+`schaubild: 17.feldbild.png`. Mehrere nennt der Auftrag in der Reihenfolge der
+Spalte Dateien, bei einer Folge also mit dem Übersichtsblatt vorn, und der
+Entwurf trägt sie in dieser Reihenfolge als Liste ein:
+`schaubild: [17.feldbild-1.png, 17.feldbild-2.png]`. Gezählt wird ohne Lücke,
+ein PDF ohne Bild bekommt keine Nummer. Lässt sich das erste Bild nicht lesen,
+gibt es keins, denn sonst stünde eine Station vorn. Lässt sich ein späteres
+nicht lesen, fehlt nur dieses. Der Auftrag nennt jeweils das PDF, in dem der
+Agent selbst nachsieht. Ein fremdes Feldbild darf der Entwurf nicht nennen.
 
 Ein Kartenentwurf hat das Frontmatter der Karte ohne `id` (ADR-0010), die
 Abschnitte der Karte und am Ende `## Freigabe` mit beiden Listen:
@@ -330,7 +338,8 @@ neu. Geprüft wird:
   Anders als auf einer Karte von Hand ist das hier kein freier Text: Der
   Auftrag gibt den Wert vor, mit den Dateien des Kandidaten, bei mehreren
   durch Komma getrennt;
-- das Feldbild: nur das eigene, und es liegt neben dem Entwurf;
+- die Feldbilder: nur die eigenen, jedes einmal, und jedes eingetragene liegt
+  neben dem Entwurf;
 - `## Freigabe` mit beiden Listen, jede Rückfrage und jeder Vorschlag in der
   Form oben. Ein Vorschlag nennt ein Feld aus dem Frontmatter oder einen
   Abschnitt, den der Entwurf hat.
@@ -338,19 +347,24 @@ neu. Geprüft wird:
 Mit `--json` gibt `pruefen` je Kandidat aus, was die Freigabe im Chat braucht:
 die Felder des Entwurfs, die Vorschläge getrennt nach Feldern und Textstellen,
 die Rückfragen getrennt nach mit und ohne Vermutung, ob der Ablauf aus dem Bild
-kommt, und die Pfade von Entwurf und Feldbild. Die Textstellen ergeben in der
-Tabelle die Spalte „aus dem Bild“.
+kommt, den Pfad des Entwurfs und als Liste `feldbilder` die Pfade der
+Feldbilder, die er einträgt, in seiner Reihenfolge. Die Textstellen ergeben in
+der Tabelle die Spalte „aus dem Bild“.
 
 Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
 mit `angelegt` von heute und ohne `## Freigabe`. Das Feldbild kommt unter dem
 Namen der Karte nach `schaubilder/`, etwa `ue-000291-abwehr-vom-kasten.png`, und
-`schaubild:` zeigt darauf. Liegt dort schon eine Datei unter diesem Namen, wird
-der Kandidat nicht übernommen. Entwurf und Auftrag verschwinden dann. Streicht
-der Trainer einen Kandidaten, wird er `übersprungen`, mit dem Grund in der
-Notiz. Ergänzt er als Duplikat eine bestehende Karte, wird er `ergänzt`, mit
-deren ID in der Spalte Karte. Aus beiden entsteht keine Karte, aber auch ihr
-Entwurf und Auftrag verschwinden. Ist im Quellenordner nichts mehr offen,
-verschwindet auch `kartenentwuerfe/<ordner>/`.
+`schaubild:` zeigt darauf. Mehrere bekommen den Namen der Karte mit Nummer, in
+der Reihenfolge des Entwurfs, etwa `ue-000291-zirkel-1.png`, und `schaubild:`
+trägt sie als Liste. Ein einzelnes Feldbild bleibt ein einzelner Name, auch wenn
+der Entwurf es in eckigen Klammern nennt. Liegt dort schon eine Datei unter
+einem dieser Namen, wird der Kandidat nicht übernommen. Entwurf und Auftrag
+verschwinden dann. Streicht der Trainer einen Kandidaten, wird er
+`übersprungen`, mit dem Grund in der Notiz. Ergänzt er als Duplikat eine
+bestehende Karte, wird er `ergänzt`, mit deren ID in der Spalte Karte. Aus
+beiden entsteht keine Karte, aber auch ihr Entwurf und Auftrag verschwinden.
+Ist im Quellenordner nichts mehr offen, verschwindet auch
+`kartenentwuerfe/<ordner>/`.
 
 Den Ordner `kartenentwuerfe/` legt `init_struktur.py` nicht an. Er entsteht mit
 dem ersten Sammelimport. `index.py` und `suche.py` lesen ihn nicht, ein
@@ -369,9 +383,21 @@ schaubilder/ue-000042.svg          das Erzeugnis, wird überschrieben
 ```
 
 Auf der Karte steht in `schaubild:` der Dateiname des **Bildes**, nicht der
-Szene. Zeigt er ins Leere, meldet `index.py` das. Das Feld trägt einen
-Dateinamen und schreibt keine Endung vor: ältere Schaubilder ohne Szene bleiben
-liegen, wie sie sind.
+Szene. Zeigt er ins Leere, meldet `index.py` das. Das Feld schreibt keine
+Endung vor: ältere Schaubilder ohne Szene bleiben liegen, wie sie sind.
+
+Hat eine Übung mehrere Bilder, trägt das Feld eine Liste in eckigen Klammern.
+Ein Zirkel aus PlayDrill etwa hat ein Bild je Blatt, die Übersicht vorn:
+
+```yaml
+schaubild: [ue-000291-zirkel-1.png, ue-000291-zirkel-2.png, ue-000291-zirkel-3.png]
+```
+
+Beide Formen gelten. Die Leseansicht zeigt die Bilder in der Reihenfolge der
+Liste, `suche.py --lang` nennt jedes als eigenen Pfad, und `index.py` meldet
+jeden Eintrag einzeln, den es nicht gibt. Fehlt eine Datei, lässt die
+Leseansicht nur dieses Bild weg. Eine Karte mit Liste hat Bilder, auch für
+`volleyball-schaubild`, das Karten ohne Bild sucht.
 
 Die **Grundform** einer Szene ist eine **Feldvorlage** oder eine **freie
 Leinwand**. Als Feldvorlage gibt es Halle 9×18 m mit Netz und beiden
@@ -458,6 +484,6 @@ Die übrigen Skripte brauchen weder Pillow noch `pdftotext`.
 `index.py` ohne Argumente ist auch der Linter: doppelte IDs, vierstellige IDs
 auf Karten und in Trainingsplänen, fehlende oder unbekannte `disziplin`,
 unbekannte Schwerpunkte, fehlende Level, ins Leere zeigende `variante_von`,
-`schaubild` auf eine Datei, die es unter `schaubilder/` nicht gibt,
-Trainingspläne mit unbekannten IDs. Vor größeren Änderungen und nach jedem
+jeder Eintrag in `schaubild` auf eine Datei, die es unter `schaubilder/` nicht
+gibt, Trainingspläne mit unbekannten IDs. Vor größeren Änderungen und nach jedem
 Import laufen lassen.

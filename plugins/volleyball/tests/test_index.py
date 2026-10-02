@@ -233,6 +233,39 @@ class LinterTest(unittest.TestCase):
 
         self.assertEqual(auffaelligkeiten(fertig.stdout), [])
 
+    def test_eine_liste_von_schaubildern_meldet_nichts_wenn_jedes_da_ist(self) -> None:
+        # Ein Zirkel aus Uebersichtsblatt und Stationsblaettern traegt je
+        # Blatt ein Bild (#39).
+        for name in ("ue-000023-zirkel-1.png", "ue-000023-zirkel-2.png"):
+            self.ordner.lege_schaubild_an(name)
+        self.ordner.lege_karte_an(
+            id="ue-000023", titel="Zirkel mit zwei Bildern",
+            schaubild=["ue-000023-zirkel-1.png", "ue-000023-zirkel-2.png"],
+        )
+
+        fertig = self.ordner.starte("index.py")
+
+        self.assertEqual(auffaelligkeiten(fertig.stdout), [])
+
+    def test_aus_einer_liste_wird_genau_das_fehlende_schaubild_gemeldet(self) -> None:
+        # Die beiden anderen sind da. Die Meldung nennt das fehlende allein,
+        # sonst sucht der Trainer unter drei Namen nach dem einen.
+        for name in ("ue-000024-zirkel-1.png", "ue-000024-zirkel-3.png"):
+            self.ordner.lege_schaubild_an(name)
+        self.ordner.lege_karte_an(
+            id="ue-000024", titel="Zirkel mit einem fehlenden Bild",
+            schaubild=["ue-000024-zirkel-1.png", "ue-000024-zirkel-2.png",
+                       "ue-000024-zirkel-3.png"],
+        )
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertIn("ue-000024", gemeldet[0])
+        self.assertIn("ue-000024-zirkel-2.png", gemeldet[0])
+        self.assertNotIn("zirkel-1", gemeldet[0])
+        self.assertNotIn("zirkel-3", gemeldet[0])
+
     def test_karte_ohne_schaubild_meldet_nichts(self) -> None:
         # Das Feld ist optional. Die Standardkarten fuehren es leer, hier fehlt
         # es ganz. Beide Schreibweisen duerfen nichts ausloesen.

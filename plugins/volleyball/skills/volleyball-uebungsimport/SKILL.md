@@ -251,7 +251,9 @@ weil auf ihnen noch kein `schaubild:` steht.
 Das bleibt eine Empfehlung. Der Nutzer entscheidet. Zeigt die Quelle ein
 brauchbares Feldbild, kann es stattdessen ausgeschnitten, nach `schaubilder/`
 gelegt und mit seinem Dateinamen in `schaubild:` eingetragen werden. Das Feld
-schreibt keine Endung vor und braucht keine Szene daneben.
+schreibt keine Endung vor und braucht keine Szene daneben. Zeigt die Quelle
+mehrere, etwa eins je Station, kommen alle als Liste hinein, in der
+Reihenfolge der Quelle: `schaubild: [<erstes>.png, <zweites>.png]`.
 
 ## Was der Nutzer am Ende hört
 

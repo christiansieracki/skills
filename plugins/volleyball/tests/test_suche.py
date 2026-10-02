@@ -145,6 +145,53 @@ class SucheTest(unittest.TestCase):
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
         self.assertIn("Disziplin    halle, beach", fertig.stdout)
 
+    def schaubildzeilen(self, uid: str) -> list[str]:
+        """Die Zeilen der ausfuehrlichen Ausgabe, die ein Schaubild nennen."""
+        fertig = self.ordner.starte("suche.py", "--id", uid, "--lang")
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        return [z for z in fertig.stdout.splitlines() if "schaubilder/" in z]
+
+    def test_ein_einzelnes_schaubild_steht_als_pfad_da(self) -> None:
+        self.ordner.lege_karte_an(id="ue-000018", titel="Mit einem Bild",
+                                  schaubild="ue-000018-aufbau.svg")
+
+        self.assertEqual(self.schaubildzeilen("ue-000018"),
+                         ["    Schaubild    schaubilder/ue-000018-aufbau.svg"])
+
+    def test_eine_liste_nennt_jedes_schaubild_als_eigenen_pfad(self) -> None:
+        # Ein Zirkel mit Uebersichtsblatt und zwei Stationen (#39). Jede Zeile
+        # ist ein Pfad zum Kopieren, in der Reihenfolge der Karte. In einer
+        # Zeile mit Kommas stuende `schaubilder/` nur vor dem ersten.
+        self.ordner.lege_karte_an(
+            id="ue-000019", titel="Zirkel mit drei Bildern",
+            schaubild=["ue-000019-zirkel-1.png", "ue-000019-zirkel-2.png",
+                       "ue-000019-zirkel-3.png"])
+
+        zeilen = self.schaubildzeilen("ue-000019")
+
+        self.assertEqual([z.split()[-1] for z in zeilen],
+                         ["schaubilder/ue-000019-zirkel-1.png",
+                          "schaubilder/ue-000019-zirkel-2.png",
+                          "schaubilder/ue-000019-zirkel-3.png"])
+        self.assertIn("Schaubilder", zeilen[0])
+        # Die Pfade stehen untereinander, buendig mit dem ersten.
+        spalte = zeilen[0].index("schaubilder/")
+        self.assertEqual([z.index("schaubilder/") for z in zeilen], [spalte] * 3)
+
+    def test_json_gibt_die_liste_der_schaubilder_weiter(self) -> None:
+        # Der Skill volleyball-schaubild sucht seine Kandidaten mit --json:
+        # Karten, deren `schaubild` leer ist. Eine Karte mit Liste hat Bilder
+        # und darf dort nicht als Karte ohne Bild auftauchen (#39). Die Liste
+        # kommt deshalb so an, wie sie auf der Karte steht.
+        namen = ["ue-000020-zirkel-1.png", "ue-000020-zirkel-2.png"]
+        self.ordner.lege_karte_an(id="ue-000020", titel="Zirkel mit zwei Bildern",
+                                  schaubild=namen)
+
+        nach_id = {e["id"]: e for e in self.treffer()}
+
+        self.assertEqual(nach_id["ue-000020"]["schaubild"], namen)
+        self.assertIsNone(nach_id["ue-000001"]["schaubild"])
+
     def test_eine_vorhandene_einzelne_datei_wird_zu_einem_pfad(self) -> None:
         # Der haeufigste Fall: jede PlayDrill-Karte nennt genau eine Datei.
         # Liegt sie unter quellen/, steht dort ein Pfad, den man kopieren

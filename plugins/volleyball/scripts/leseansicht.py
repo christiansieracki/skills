@@ -7,11 +7,12 @@ Erzeugt die .html neben der .md. Die Ablauftabelle wird dabei bewusst NICHT
 als Tabelle gerendert: sechs Spalten sind auf einem Handy in der Halle
 unlesbar. Jede Zeile wird ein Block, den man mit dem Daumen abhaken kann.
 
-Hat eine Uebung im Ablauf ein Schaubild auf ihrer Karte, landet es mit im
-Block. Standardmaessig als Data-URI eingebettet, damit die Datei allein
-lauffaehig ist und auch dann noch Bilder zeigt, wenn man sie sich aufs Handy
-schickt. Das macht sie gross. Wer sie klein braucht, nimmt --bilder verweis,
-dann steht ein relativer Pfad nach schaubilder/ drin.
+Hat eine Uebung im Ablauf ein Schaubild auf ihrer Karte, steht es bei ihr,
+bei einer Liste alle in ihrer Reihenfolge. Standardmaessig als Data-URI
+eingebettet, damit die Datei allein lauffaehig ist und auch dann noch Bilder
+zeigt, wenn man sie sich aufs Handy schickt. Das macht sie gross. Wer sie
+klein braucht, nimmt --bilder verweis, dann steht ein relativer Pfad nach
+schaubilder/ drin.
 
 Der Trainingsplan bleibt die Quelle. Die Leseansicht traegt oben das Datum
 ihrer Erzeugung, damit man sieht, ob sie zur aktuellen Fassung passt. Wer in
@@ -32,7 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    finde_wurzel, konsole_vorbereiten, lies_frontmatter, lies_uebungen,
+    finde_wurzel, konsole_vorbereiten, lies_frontmatter, lies_uebungen, schaubilder,
 )
 
 CSS = """
@@ -83,33 +84,39 @@ def kein_bild(_uid: str) -> str:
 
 
 def baue_bildaufloeser(wurzel, ziel: Path, modus: str):
-    """Gibt eine Funktion uid -> HTML-Schnipsel fuer das Schaubild zurueck.
+    """Gibt eine Funktion uid -> HTML-Schnipsel fuer die Schaubilder zurueck.
 
-    Faellt auf "kein Bild" zurueck, wenn die Karte keins traegt oder die Datei
-    unter schaubilder/ fehlt. Eine Leseansicht ohne Bild ist brauchbar, eine
-    mit totem Bildverweis nicht.
+    Traegt die Karte eine Liste, kommen alle Bilder, in ihrer Reihenfolge.
+    Faellt auf "kein Bild" zurueck, wenn die Karte keins traegt. Fehlt eine
+    Datei unter schaubilder/, faellt nur dieses Bild weg. Eine Leseansicht
+    ohne Bild ist brauchbar, eine mit totem Bildverweis nicht.
     """
     if modus == "aus" or wurzel is None:
         return kein_bild
 
     nach_id = {k["id"]: k for k in lies_uebungen(wurzel) if k.get("id")}
 
-    def aufloesen(uid: str) -> str:
-        karte = nach_id.get(uid)
-        if not karte or not karte.get("schaubild"):
-            return ""
-        datei = wurzel / "schaubilder" / str(karte["schaubild"])
-        if not datei.is_file():
-            return ""
+    def adresse(datei: Path) -> str:
         if modus == "einbetten":
             typ = mimetypes.guess_type(datei.name)[0] or "image/png"
             roh = base64.b64encode(datei.read_bytes()).decode("ascii")
-            quelle = f"data:{typ};base64,{roh}"
-        else:
-            quelle = Path(os.path.relpath(datei, ziel.parent)).as_posix()
-        beschriftung = html.escape(f"Schaubild: {karte.get('titel') or uid}")
-        return (f'<div class="bild"><img src="{quelle}" alt="{beschriftung}" '
-                f'loading="lazy"></div>')
+            return f"data:{typ};base64,{roh}"
+        return Path(os.path.relpath(datei, ziel.parent)).as_posix()
+
+    def aufloesen(uid: str) -> str:
+        karte = nach_id.get(uid)
+        if not karte:
+            return ""
+        dateien = [wurzel / "schaubilder" / name for name in schaubilder(karte.get("schaubild"))]
+        dateien = [datei for datei in dateien if datei.is_file()]
+        titel = karte.get("titel") or uid
+        schnipsel = []
+        for nr, datei in enumerate(dateien, 1):
+            zaehler = f" {nr} von {len(dateien)}" if len(dateien) > 1 else ""
+            beschriftung = html.escape(f"Schaubild{zaehler}: {titel}")
+            schnipsel.append(f'<div class="bild"><img src="{adresse(datei)}" '
+                             f'alt="{beschriftung}" loading="lazy"></div>')
+        return "\n".join(schnipsel)
 
     return aufloesen
 

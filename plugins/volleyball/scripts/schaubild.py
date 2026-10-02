@@ -894,14 +894,18 @@ def kartentitel(basisname: str, wurzel: Path | None) -> str:
     die ganze Bibliothek: das Skript braucht den Titel nur, um ihn
     vorzuschlagen, und dafuer lohnt kein Index.
 
+    Ein zweites Bild derselben Karte traegt eine Nummer hinter der ID, etwa
+    `ue-000042-2` (#39). Auch das ist die Karte ue-000042.
+
     Geraten wird nichts. Kein Arbeitsordner, ein Basisname, der keine
     Uebungs-ID ist, eine ID ohne Karte, eine Karte ohne `titel:`: in allen vier
     Faellen kommt eine leere Zeichenkette zurueck, und der Hinweis steht dann
     ohne Wortlaut da.
     """
-    if wurzel is None or not re.fullmatch(ID_MUSTER, basisname):
+    treffer = re.fullmatch(rf"({ID_MUSTER})(-\d+)?", basisname)
+    if wurzel is None or not treffer:
         return ""
-    karten = sorted((wurzel / "uebungen").glob(f"{basisname}-*.md"))
+    karten = sorted((wurzel / "uebungen").glob(f"{treffer.group(1)}-*.md"))
     if not karten:
         return ""
     frontmatter, _ = lies_frontmatter(karten[0])

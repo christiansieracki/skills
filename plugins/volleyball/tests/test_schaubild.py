@@ -1899,6 +1899,16 @@ stellen:
         self.assertIn("Annahme im Halbfeld", fertig.stdout,
                       "und nennt den Titel der Karte ue-000001 als Vorschlag")
 
+    def test_ein_zweites_bild_mit_nummer_bekommt_denselben_vorschlag(self) -> None:
+        # Kommt zu einer Karte mit Szene ein Bild dazu, heisst es nach der ID
+        # mit Nummer dahinter (#39). Gemeint ist dieselbe Karte.
+        fertig = self.laufe("ue-000001-2", """
+            form: halle
+            untertitel: ohne etwas darueber
+        """)
+
+        self.assertIn("Annahme im Halbfeld", fertig.stdout)
+
     def test_ohne_passende_uebungskarte_steht_der_hinweis_ohne_wortlaut(self) -> None:
         # Drei Wege, auf denen kein Vorschlag zustande kommt. Geraten wird auf
         # keinem davon, und das Bild entsteht auf allen dreien.

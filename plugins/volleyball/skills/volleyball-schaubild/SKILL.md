@@ -50,7 +50,9 @@ liegt, sagt `suche.py --lang` in der Zeile `Datei`.
 ```
 
 Kandidat ist eine Karte, deren `schaubild` leer ist und deren Ablauf räumlich
-ist: eine Aufstellung, Laufwege, eine Zielzone, ein Stationsaufbau.
+ist: eine Aufstellung, Laufwege, eine Zielzone, ein Stationsaufbau. Leer heißt
+`null`, `[]` oder gar nicht da. Eine Karte mit einer Liste in `schaubild`,
+etwa ein Zirkel mit einem Bild je Blatt, hat Bilder und ist kein Kandidat.
 
 Vorsortiert wird an den Feldern, die schon im JSON stehen: `form: station` und
 `form: spielform`, ein gefülltes `material`, Elemente wie annahme, block oder
@@ -148,7 +150,10 @@ Vier Schritte, in dieser Reihenfolge:
 2. `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/schaubild.py <basisname>`. Jetzt
    liegt das Bild in `schaubilder/`, neben seiner Szene.
 3. Auf der Karte `schaubild: <basisname>.svg` eintragen. Dort steht der
-   Dateiname des Bildes, nicht der Szene.
+   Dateiname des Bildes, nicht der Szene. Hatte die Karte schon Bilder, gilt,
+   was der Trainer gesagt hat, siehe unten: Das neue kommt in die Liste, etwa
+   `schaubild: [<erstes>.png, <basisname>.svg]`, oder steht dort statt des
+   ersetzten.
 4. `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py` laufen lassen. Zeigt der
    Verweis ins Leere, meldet er ihn.
 
@@ -165,6 +170,16 @@ Gibt es keine Szene, ist das Bild älter als die Szenen oder aus einer Quelle
 ausgeschnitten. Es bleibt liegen, solange der Trainer es nicht ausdrücklich
 neu haben will. Will er es, sag vorher, dass ein neues Bild das alte ersetzt
 und dabei auf der Karte der Dateiname wechselt.
+
+Trägt die Karte eine Liste, etwa die Feldbilder eines Zirkels, frag vor dem
+Entwurf der Szene, ob das neue Bild dazukommt oder eins der Liste ersetzt, und
+bei Ersetzen, welches. Dazu die Liste mit Nummern zeigen. Ein neues Bild kommt
+ans Ende, wenn der Trainer keine Stelle nennt. Die Reihenfolge ist die, in der
+die Leseansicht die Bilder zeigt.
+
+Kommt ein Bild dazu und liegt unter dem Basisnamen der ID schon eine Szene,
+bekommt das neue eine Nummer dahinter, etwa `ue-000042-2`. Sonst überschriebe
+die Freigabe die Szene des Bildes, das bleiben soll.
 
 ## Mehrere Bilder
 
