@@ -365,7 +365,7 @@ def _pdf_datei(objekte: list[bytes]) -> bytes:
 
 @dataclass
 class PdfBild:
-    """Ein Bild fuer ein Test-PDF, mit Transparenzmaske, so wie PlayDrill sein Feldbild einbettet.
+    """Ein Bild fuer ein Test-PDF, mit Transparenzmaske, so wie PlayDrill seine Feldskizze einbettet.
 
     Deckend ist nur das Rechteck `deckend`: links, oben, rechts, unten in
     Pixeln, rechts und unten ausschliesslich. Darum herum ist das Bild

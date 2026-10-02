@@ -50,13 +50,13 @@ vor.
 
 Oben steht, kein anderes Skript bekomme eine neue Voraussetzung. Das gilt so
 nicht mehr. Seit #33 braucht auch `sammelimport.py vorbereiten` Pillow, aber
-nur, wenn in der `sammelimport.md` `feldbild_ausschneiden: true` steht. Dann
-schneidet es das Feldbild aus dem PDF. Die Spec #29 hat das so entschieden und
+nur, wenn in der `sammelimport.md` `quellgrafik_ausschneiden: true` steht.
+Dann schneidet es die Quellgrafik aus dem PDF. Die Spec #29 hat das so entschieden und
 sich dabei auf diese Entscheidung berufen.
 
 Das Muster bleibt: Fehlt Pillow, bricht das Skript vor dem ersten Auftrag mit
 Installationshinweis ab und schreibt nichts. Ohne die Einstellung läuft es mit
-der Standardbibliothek. Ein mit Flate gepacktes Feldbild, wie PlayDrill es
-einbettet, ließe sich auch ohne Pillow als PNG schreiben. Ein als JPEG
-eingebettetes nicht, wie oben. Die Spec hat Pillow gewählt, so wie die Vorlage
+der Standardbibliothek. Eine mit Flate gepackte Quellgrafik, wie PlayDrill sie
+einbettet, ließe sich auch ohne Pillow als PNG schreiben. Eine als JPEG
+eingebettete nicht, wie oben. Die Spec hat Pillow gewählt, so wie die Vorlage
 im PlayDrill-Log.

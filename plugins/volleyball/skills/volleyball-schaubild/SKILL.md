@@ -171,7 +171,7 @@ ausgeschnitten. Es bleibt liegen, solange der Trainer es nicht ausdrücklich
 neu haben will. Will er es, sag vorher, dass ein neues Bild das alte ersetzt
 und dabei auf der Karte der Dateiname wechselt.
 
-Trägt die Karte eine Liste, etwa die Feldbilder eines Zirkels, frag vor dem
+Trägt die Karte eine Liste, etwa die Quellgrafiken eines Zirkels, frag vor dem
 Entwurf der Szene, ob das neue Bild dazukommt oder eins der Liste ersetzt, und
 bei Ersetzen, welches. Dazu die Liste mit Nummern zeigen. Ein neues Bild kommt
 ans Ende, wenn der Trainer keine Stelle nennt. Die Reihenfolge ist die, in der

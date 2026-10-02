@@ -240,7 +240,7 @@ kandidaten_je_durchgang: 30      # so viele Aufträge je Durchgang
 plan_freigegeben: 2026-09-30     # null, solange der Plan nicht freigegeben ist
 textmarke: "Ausführung:"         # optional: ab hier beschreibt die Quelle ihren Ablauf
 platzhalter: "hier könnte ihr Text stehen"   # optional: was dort steht, wenn nichts dasteht
-feldbild_ausschneiden: true      # optional: das Feldbild aus dem PDF ausschneiden
+quellgrafik_ausschneiden: true   # optional: die Quellgrafik aus dem PDF ausschneiden
 ---
 
 # Sammelimport playdrill
@@ -288,23 +288,23 @@ die Eingabe für den Zerlegungsplan: jede Datei des Quellenordners, die noch in
 keiner Zeile der Übersicht steht, bei PDFs ihr Text, und die Bibliotheksliste,
 in der die Karten aus diesem Quellenordner markiert sind. Der Rest ist nach der
 Nummer des Kandidaten benannt: `17.auftrag.md` ist der Auftrag für den Agenten,
-`17.md` der Kartenentwurf, `17.feldbild.png` das Feldbild, bei mehreren
-`17.feldbild-1.png`, `17.feldbild-2.png` und so weiter.
+`17.md` der Kartenentwurf, `17.quellgrafik.png` die Quellgrafik, bei
+mehreren `17.quellgrafik-1.png`, `17.quellgrafik-2.png` und so weiter.
 
 Der Auftrag trägt unter jedem PDF des Kandidaten dessen ganzen Text, oder den
 Hinweis, dass der Agent das PDF selbst lesen muss. Er sagt, ob der Ablauf aus
-dem Bild kommt. Ist `feldbild_ausschneiden` an, schneidet `vorbereiten` aus
-jedem PDF des Kandidaten, das ein Bild einbettet, das größte Bild aus. Der
-durchsichtige Rand fällt weg. Ein einzelnes Feldbild steht im Entwurf als
-`schaubild: 17.feldbild.png`. Mehrere nennt der Auftrag in der Reihenfolge der
-Spalte Dateien, bei einer Folge also mit dem Übersichtsblatt vorn, und der
+dem Bild kommt. Ist `quellgrafik_ausschneiden` an, schneidet `vorbereiten`
+aus jedem PDF des Kandidaten, das ein Bild einbettet, das größte Bild aus. Der
+durchsichtige Rand fällt weg. Eine einzelne Quellgrafik steht im Entwurf als
+`schaubild: 17.quellgrafik.png`. Mehrere nennt der Auftrag in der Reihenfolge
+der Spalte Dateien, bei einer Folge also mit dem Übersichtsblatt vorn, und der
 Entwurf trägt sie in dieser Reihenfolge als Liste ein:
-`schaubild: [17.feldbild-1.png, 17.feldbild-2.png]`. Gezählt wird ohne Lücke,
-ein PDF ohne Bild bekommt keine Nummer. Lässt sich ein Bild nicht lesen, fehlt
-nur dieses, auch wenn es das der Übersicht ist. Die Stationen bekommen ihre
-Feldbilder trotzdem, und für die Übersicht lässt sich danach mit
+`schaubild: [17.quellgrafik-1.png, 17.quellgrafik-2.png]`. Gezählt wird ohne
+Lücke, ein PDF ohne Bild bekommt keine Nummer. Lässt sich ein Bild nicht lesen,
+fehlt nur dieses, auch wenn es das der Übersicht ist. Die Stationen bekommen
+ihre Quellgrafiken trotzdem, und für die Übersicht lässt sich danach mit
 `volleyball-schaubild` ein Schaubild zeichnen. Der Auftrag nennt das PDF, in
-dem der Agent selbst nachsieht. Ein fremdes Feldbild darf der Entwurf nicht
+dem der Agent selbst nachsieht. Eine fremde Quellgrafik darf der Entwurf nicht
 nennen.
 
 Ein Kartenentwurf hat das Frontmatter der Karte ohne `id` (ADR-0010), die
@@ -340,7 +340,7 @@ neu. Geprüft wird:
   Anders als auf einer Karte von Hand ist das hier kein freier Text: Der
   Auftrag gibt den Wert vor, mit den Dateien des Kandidaten, bei mehreren
   durch Komma getrennt;
-- die Feldbilder: nur die eigenen, jedes einmal, und jedes eingetragene liegt
+- die Quellgrafiken: nur die eigenen, jede einmal, und jede eingetragene liegt
   neben dem Entwurf;
 - `## Freigabe` mit beiden Listen, jede Rückfrage und jeder Vorschlag in der
   Form oben. Ein Vorschlag nennt ein Feld aus dem Frontmatter oder einen
@@ -349,17 +349,17 @@ neu. Geprüft wird:
 Mit `--json` gibt `pruefen` je Kandidat aus, was die Freigabe im Chat braucht:
 die Felder des Entwurfs, die Vorschläge getrennt nach Feldern und Textstellen,
 die Rückfragen getrennt nach mit und ohne Vermutung, ob der Ablauf aus dem Bild
-kommt, den Pfad des Entwurfs und als Liste `feldbilder` die Pfade der
-Feldbilder, die er einträgt, in seiner Reihenfolge. Die Textstellen ergeben in
+kommt, den Pfad des Entwurfs und als Liste `quellgrafiken` die Pfade der
+Quellgrafiken, die er einträgt, in seiner Reihenfolge. Die Textstellen ergeben in
 der Tabelle die Spalte „aus dem Bild“.
 
 Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
-mit `angelegt` von heute und ohne `## Freigabe`. Das Feldbild kommt unter dem
-Namen der Karte nach `schaubilder/`, etwa `ue-000291-abwehr-vom-kasten.png`, und
+mit `angelegt` von heute und ohne `## Freigabe`. Die Quellgrafik kommt unter
+dem Namen der Karte nach `schaubilder/`, etwa `ue-000291-abwehr-vom-kasten.png`, und
 `schaubild:` zeigt darauf. Mehrere bekommen den Namen der Karte mit Nummer, in
 der Reihenfolge des Entwurfs, etwa `ue-000291-zirkel-1.png`, und `schaubild:`
-trägt sie als Liste. Ein einzelnes Feldbild bleibt ein einzelner Name, auch wenn
-der Entwurf es in eckigen Klammern nennt. Liegt dort schon eine Datei unter
+trägt sie als Liste. Eine einzelne Quellgrafik bleibt ein einzelner Name, auch
+wenn der Entwurf sie in eckigen Klammern nennt. Liegt dort schon eine Datei unter
 einem dieser Namen, wird der Kandidat nicht übernommen. Entwurf und Auftrag
 verschwinden dann. Streicht der Trainer einen Kandidaten, wird er
 `übersprungen`, mit dem Grund in der Notiz. Ergänzt er als Duplikat eine
@@ -462,7 +462,7 @@ Alle liegen unter `${CLAUDE_PLUGIN_ROOT}/scripts/` und brauchen nur Python 3
 aus der Standardbibliothek. Es gibt zwei Ausnahmen:
 
 - **Pillow:** `bilder_aufbereiten.py` braucht es, dazu `sammelimport.py
-  vorbereiten`, wenn es das Feldbild ausschneiden soll. Beide brechen ohne es
+  vorbereiten`, wenn es die Quellgrafik ausschneiden soll. Beide brechen ohne es
   mit einem Installationshinweis ab und schreiben nichts (ADR-0005).
 - **`pdftotext`:** `sammelimport.py vorbereiten` liest damit den Text von
   PDFs, für die Planeingabe und für die Aufträge. Gesucht wird erst im PATH,

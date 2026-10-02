@@ -40,7 +40,7 @@ Aufschlagbereich heißt.
 | **Zerlegungsplan** | Die Liste, welche Dateien welche Karte ergeben, ob daraus eine Übung oder eine Folge wird und was liegen bleibt. Wird freigegeben, bevor der erste Kartenentwurf entsteht. | in `sammelimport.md` |
 | **Kandidat** | Eine Zeile im Zerlegungsplan: die Dateien, aus denen eine Karte werden soll. Aus jedem Kandidaten entsteht ein Kartenentwurf. | in `sammelimport.md` |
 | **Kartenentwurf** | Eine Karte, die noch nicht freigegeben ist. Hat keine ID, liegt nicht in `uebungen/`, und die Suche findet sie nicht. | `kartenentwuerfe/<ordner>/` |
-| **Feldbild** | Das Bild aus der Übungsquelle selbst, etwa die Feldskizze eines PlayDrill-Blatts. Der Sammelimport schneidet es aus dem PDF aus, bei der Freigabe wird es das Schaubild der Karte. Ein Kandidat aus mehreren Blättern, etwa ein Zirkel, hat eins je Blatt mit Bild. Anders als ein gezeichnetes Schaubild hat es keine Szene und wird nie neu erzeugt. | `kartenentwuerfe/<ordner>/17.feldbild.png`, bei mehreren `17.feldbild-1.png` und weiter, danach `schaubilder/ue-######-*.png` |
+| **Quellgrafik** | Das Bild aus der Übungsquelle selbst, etwa die Feldskizze eines PlayDrill-Blatts oder ein Stationsaufbau. Der Sammelimport schneidet sie aus dem PDF aus, bei der Freigabe wird sie das Schaubild der Karte. Ein Kandidat aus mehreren Blättern, etwa ein Zirkel, hat eine je Blatt mit Bild. Anders als ein gezeichnetes Schaubild hat sie keine Szene und wird nie neu erzeugt. | `kartenentwuerfe/<ordner>/17.quellgrafik.png`, bei mehreren `17.quellgrafik-1.png` und weiter, danach `schaubilder/ue-######-*.png` |
 | **Rückfrage** | Was ein Kartenentwurf vom Trainer wissen muss, bevor er Karte werden kann. Etwa ein Ablauf, der nur aus dem Bild gelesen ist, oder ein Verdacht auf ein Duplikat. | im Kartenentwurf |
 | **Vermutung** | Wie der Kartenentwurf eine Rückfrage vorläufig beantwortet. Sie steht im Text des Entwurfs, und die Rückfrage nennt sie. Nicht jede Rückfrage hat eine. | im Kartenentwurf |
 | **Freigabe** | Das Ja des Trainers. Damit wird aus dem Kartenentwurf eine Karte mit ID. | danach `uebungen/` |
@@ -53,6 +53,10 @@ Auch die bestätigt oder kippt der Trainer.
 
 **Kandidat oder Einheit?** Einheit heißt in diesem Ordner immer
 Trainingseinheit. Was im Sammelimport zur Karte werden soll, ist ein Kandidat.
+
+**Quellgrafik oder Quellbild?** Ein Quellbild ist eine ganze Bilddatei in
+`quellen/`, etwa das Foto einer Magazinseite. `bilder_aufbereiten.py`
+verkleinert es. Die Quellgrafik schneidet der Sammelimport aus einem PDF aus.
 
 ## Team und Trainingsgruppe
 
@@ -186,6 +190,7 @@ für beide Disziplinen.
 | Athletikspur | Athletikprogramm, Athletik über die Saison |
 | Teil, Trainingsteil für eine Zeile im Ablauf | Programmpunkt |
 | Grundform für das Bild der Karte in der Leseansicht | Schaubild der Karte |
+| Feldbild für das Bild, das der Sammelimport aus der Quelle ausschneidet | Quellgrafik |
 
 **Bleibt so:** Sideout, Annahme, Abwehr, Zuspiel, Libero, Riegel, 5-1, 6-2 und
 die übrigen eingeführten Volleyballbegriffe.

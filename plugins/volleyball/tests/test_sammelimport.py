@@ -242,7 +242,7 @@ class AblaufAusDemBildTest(unittest.TestCase):
     """Ob der Ablauf aus dem Bild kommt, entscheidet eine Regel, nicht das Modell.
 
     Steht nach der Textmarke einer Quelle zu wenig, muss der Agent den Ablauf
-    aus dem Feldbild lesen, und der Trainer prueft ihn einzeln. Das soll nicht
+    aus der Quellgrafik lesen, und der Trainer prueft ihn einzeln. Das soll nicht
     am Urteil des Agenten haengen (#29, Geschichte 44).
     """
 
@@ -328,12 +328,12 @@ class AblaufAusDemBildTest(unittest.TestCase):
         self.assertIn("entscheidest du", self.ablauf(1))
 
 
-class FeldbildTest(unittest.TestCase):
-    """Das Feldbild aus dem PDF: von `vorbereiten` ausgeschnitten, bei `uebernehmen` Schaubild.
+class QuellgrafikTest(unittest.TestCase):
+    """Die Quellgrafik aus dem PDF: von `vorbereiten` ausgeschnitten, bei `uebernehmen` Schaubild.
 
-    PlayDrill bettet in jedes Blatt ein Feldbild mit Transparenzmaske ein.
-    Der Agent soll es ansehen koennen, ohne das PDF zu oeffnen, und auf der
-    fertigen Karte steht es als Schaubild (#29, Geschichte 33).
+    PlayDrill bettet in jedes Blatt eine Feldskizze mit Transparenzmaske ein.
+    Der Agent soll sie ansehen koennen, ohne das PDF zu oeffnen, und auf der
+    fertigen Karte steht sie als Schaubild (#29, Geschichte 33).
     """
 
     def setUp(self) -> None:
@@ -342,11 +342,11 @@ class FeldbildTest(unittest.TestCase):
         self.entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
 
     @BRAUCHT_PILLOW
-    def test_das_feldbild_ist_auf_seinen_inhalt_zugeschnitten(self) -> None:
-        # Vor dem Feldbild steht ein kleines Logo im PDF. Genommen wird das
+    def test_die_quellgrafik_ist_auf_ihren_inhalt_zugeschnitten(self) -> None:
+        # Vor der Quellgrafik steht ein kleines Logo im PDF. Genommen wird das
         # groessere, und von ihm nur, was deckend ist: 68 x 46 Pixel.
         self.ordner.lege_quellenordner_an(
-            ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], feldbild_ausschneiden=True)
+            ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], quellgrafik_ausschneiden=True)
         self.ordner.lege_quell_pdf_an(f"{ORDNER}/kasten.pdf", ["Abwehr vom Kasten"], bilder=[
             PdfBild(20, 20, deckend=(0, 0, 20, 20)),
             PdfBild(90, 60, deckend=(12, 5, 80, 51)),
@@ -355,27 +355,27 @@ class FeldbildTest(unittest.TestCase):
         fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        feldbild = self.entwuerfe / "3.feldbild.png"
-        with Image.open(feldbild) as bild:
+        quellgrafik = self.entwuerfe / "3.quellgrafik.png"
+        with Image.open(quellgrafik) as bild:
             self.assertEqual(bild.size, (68, 46))
             self.assertEqual(bild.convert("RGBA").getpixel((0, 0)), (30, 120, 200, 255))
         # Der Agent sieht es sich unter dem absoluten Pfad an und traegt es
         # unter seinem Namen in den Entwurf ein, neben dem es liegt.
-        zeile = zeile_mit(auftrag_von(self.ordner, 3), "Feldbild")
-        self.assertIn(feldbild.resolve().as_posix(), zeile)
-        self.assertIn("schaubild: 3.feldbild.png", zeile)
+        zeile = zeile_mit(auftrag_von(self.ordner, 3), "Quellgrafik")
+        self.assertIn(quellgrafik.resolve().as_posix(), zeile)
+        self.assertIn("schaubild: 3.quellgrafik.png", zeile)
 
     @BRAUCHT_PILLOW
-    def test_jedes_pdf_mit_bild_gibt_ein_feldbild_in_der_reihenfolge_der_dateien(self) -> None:
+    def test_jedes_pdf_mit_bild_gibt_eine_quellgrafik_in_der_reihenfolge_der_dateien(self) -> None:
         # Ein Zirkel (#39): vorn das Uebersichtsblatt, wie der Zerlegungsplan
         # es setzt (#35), dann zwei Stationen, dazwischen ein Blatt ohne
         # Bild. Alphabetisch stuende die Uebersicht zuletzt. Jedes Blatt mit
-        # Bild gibt ein Feldbild, durchnummeriert ohne Luecke, und die Groesse
-        # zeigt, aus welchem Blatt es stammt.
+        # Bild gibt eine Quellgrafik, durchnummeriert ohne Luecke, und die
+        # Groesse zeigt, aus welchem Blatt sie stammt.
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 5, "dateien": ["zirkel.pdf", "station-1.pdf", "notizen.pdf",
                                         "station-2.pdf"],
-             "ergebnis": "folge"}], feldbild_ausschneiden=True)
+             "ergebnis": "folge"}], quellgrafik_ausschneiden=True)
         self.ordner.lege_quell_pdf_an(f"{ORDNER}/zirkel.pdf", ["Übersicht"], bilder=[
             PdfBild(50, 40, deckend=(5, 5, 45, 35))])
         self.ordner.lege_quell_pdf_an(f"{ORDNER}/station-1.pdf", ["Station 1"], bilder=[
@@ -387,10 +387,10 @@ class FeldbildTest(unittest.TestCase):
         fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        erwartet = [("5.feldbild-1.png", "zirkel.pdf", (40, 30)),
-                    ("5.feldbild-2.png", "station-1.pdf", (90, 60)),
-                    ("5.feldbild-3.png", "station-2.pdf", (30, 20))]
-        self.assertEqual(sorted(p.name for p in self.entwuerfe.glob("5.feldbild*")),
+        erwartet = [("5.quellgrafik-1.png", "zirkel.pdf", (40, 30)),
+                    ("5.quellgrafik-2.png", "station-1.pdf", (90, 60)),
+                    ("5.quellgrafik-3.png", "station-2.pdf", (30, 20))]
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.glob("5.quellgrafik*")),
                          [name for name, _, _ in erwartet])
         auftrag = auftrag_von(self.ordner, 5)
         for name, pdf, groesse in erwartet:
@@ -399,24 +399,25 @@ class FeldbildTest(unittest.TestCase):
             zeile = zeile_mit(auftrag, (self.entwuerfe / name).resolve().as_posix())
             self.assertIn(f"`{pdf}`", zeile)
         # Der Agent traegt sie als Liste ein, in genau dieser Folge.
-        self.assertIn("`schaubild: [5.feldbild-1.png, 5.feldbild-2.png, 5.feldbild-3.png]`",
-                      zeile_mit(auftrag, "Feldbilder"))
+        self.assertIn(
+            "`schaubild: [5.quellgrafik-1.png, 5.quellgrafik-2.png, 5.quellgrafik-3.png]`",
+            zeile_mit(auftrag, "Quellgrafiken"))
         zeilen = auftrag.splitlines()
-        self.assertLess(*(zeilen.index(zeile_mit(auftrag, f"5.feldbild-{i}.png`"))
+        self.assertLess(*(zeilen.index(zeile_mit(auftrag, f"5.quellgrafik-{i}.png`"))
                           for i in (1, 2)))
-        self.assertLess(*(zeilen.index(zeile_mit(auftrag, f"5.feldbild-{i}.png`"))
+        self.assertLess(*(zeilen.index(zeile_mit(auftrag, f"5.quellgrafik-{i}.png`"))
                           for i in (2, 3)))
 
     @BRAUCHT_PILLOW
     def test_laesst_sich_ein_bild_nicht_lesen_fehlt_nur_dieses(self) -> None:
         # Auch wenn es das Bild der Uebersicht ist (entschieden am
-        # 02.10.2026): Die Stationen bekommen ihre Feldbilder trotzdem,
+        # 02.10.2026): Die Stationen bekommen ihre Quellgrafiken trotzdem,
         # gezaehlt ohne Luecke. Fuer die Uebersicht laesst sich spaeter ein
         # Schaubild zeichnen. Ausgabe und Auftrag nennen das PDF, damit der
         # Agent dort selbst nachsieht.
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 5, "dateien": ["zirkel.pdf", "station-1.pdf", "station-2.pdf"],
-             "ergebnis": "folge"}], feldbild_ausschneiden=True)
+             "ergebnis": "folge"}], quellgrafik_ausschneiden=True)
         self.ordner.lege_quell_pdf_an(f"{ORDNER}/zirkel.pdf", ["Übersicht"], bilder=[
             PdfBild(50, 40, deckend=(5, 5, 45, 35), kaputt=True)])
         self.ordner.lege_quell_pdf_an(f"{ORDNER}/station-1.pdf", ["Station 1"], bilder=[
@@ -427,32 +428,32 @@ class FeldbildTest(unittest.TestCase):
         fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        self.assertEqual(sorted(p.name for p in self.entwuerfe.glob("5.feldbild*")),
-                         ["5.feldbild-1.png", "5.feldbild-2.png"])
-        for name, groesse in (("5.feldbild-1.png", (90, 60)), ("5.feldbild-2.png", (30, 20))):
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.glob("5.quellgrafik*")),
+                         ["5.quellgrafik-1.png", "5.quellgrafik-2.png"])
+        for name, groesse in (("5.quellgrafik-1.png", (90, 60)), ("5.quellgrafik-2.png", (30, 20))):
             with Image.open(self.entwuerfe / name) as bild:
                 self.assertEqual(bild.size, groesse, name)
         auftrag = auftrag_von(self.ordner, 5)
-        self.assertIn("schaubild: [5.feldbild-1.png, 5.feldbild-2.png]",
-                      zeile_mit(auftrag, "Feldbilder"))
+        self.assertIn("schaubild: [5.quellgrafik-1.png, 5.quellgrafik-2.png]",
+                      zeile_mit(auftrag, "Quellgrafiken"))
         self.assertIn("im PDF selbst", zeile_mit(auftrag, "`zirkel.pdf`:"))
-        self.assertIn("zirkel.pdf", zeile_mit(fertig.stdout, "Kein Feldbild"))
+        self.assertIn("zirkel.pdf", zeile_mit(fertig.stdout, "Keine Quellgrafik"))
 
     @BRAUCHT_PILLOW
     def test_ein_bild_das_sich_nicht_lesen_laesst_nennen_ausgabe_und_auftrag(self) -> None:
-        # Sonst saehe der Agent im Auftrag kein Feldbild und wuesste nicht,
-        # ob es keins gibt oder ob er es im PDF suchen muss.
+        # Sonst saehe der Agent im Auftrag keine Quellgrafik und wuesste nicht,
+        # ob es keine gibt oder ob er sie im PDF suchen muss.
         self.ordner.lege_quellenordner_an(
-            ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], feldbild_ausschneiden=True)
+            ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], quellgrafik_ausschneiden=True)
         self.ordner.lege_quell_pdf_an(f"{ORDNER}/kasten.pdf", ["Abwehr vom Kasten"], bilder=[
             PdfBild(90, 60, deckend=(12, 5, 80, 51), kaputt=True)])
 
         fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
-        self.assertIn("kasten.pdf", zeile_mit(fertig.stdout, "Feldbild"))
-        self.assertIn("im PDF selbst", zeile_mit(auftrag_von(self.ordner, 3), "Feldbild"))
-        self.assertFalse((self.entwuerfe / "3.feldbild.png").exists())
+        self.assertIn("kasten.pdf", zeile_mit(fertig.stdout, "Quellgrafik"))
+        self.assertIn("im PDF selbst", zeile_mit(auftrag_von(self.ordner, 3), "Quellgrafik"))
+        self.assertFalse((self.entwuerfe / "3.quellgrafik.png").exists())
 
     def test_ohne_pillow_bricht_es_vor_dem_ersten_auftrag_ab(self) -> None:
         # Wie in test_bilder.py: Ein PIL.py, das beim Import abbricht,
@@ -463,7 +464,7 @@ class FeldbildTest(unittest.TestCase):
         (schatten / "PIL.py").write_text(
             'raise ImportError("Pillow ist fuer diesen Test ausgeblendet")\n', encoding="utf-8")
         self.ordner.lege_quellenordner_an(
-            ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], feldbild_ausschneiden=True)
+            ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], quellgrafik_ausschneiden=True)
 
         fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER,
                                     umgebung={"PYTHONPATH": str(schatten)})
@@ -472,64 +473,78 @@ class FeldbildTest(unittest.TestCase):
         self.assertIn("pip install Pillow", fertig.stdout)
         self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
 
-    def test_fehlt_das_eingetragene_feldbild_geht_der_kandidat_zurueck_auf_offen(self) -> None:
-        # Etwa weil es jemand beim Aufraeumen geloescht hat. Die Karte zeigte
-        # nach der Uebernahme ins Leere. Ein Feldbild neben dem Entwurf reicht
-        # dagegen, ob es aus dem PDF kommt, sieht pruefen nicht.
+    def test_mit_der_alten_einstellung_bricht_es_ab_und_nennt_die_neue(self) -> None:
+        # Bis zum 02.10.2026 hiess die Quellgrafik Feldbild (#49). Liefe
+        # vorbereiten mit der alten Einstellung weiter, schnitte es still
+        # nichts aus, und die Karten kaemen ohne Bild heraus.
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], feldbild_ausschneiden=True)
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("feldbild_ausschneiden", fertig.stdout)
+        self.assertIn("quellgrafik_ausschneiden", fertig.stdout)
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
+
+    def test_fehlt_die_eingetragene_quellgrafik_geht_der_kandidat_zurueck_auf_offen(self) -> None:
+        # Etwa weil sie jemand beim Aufraeumen geloescht hat. Die Karte zeigte
+        # nach der Uebernahme ins Leere. Eine Quellgrafik neben dem Entwurf
+        # reicht dagegen, ob sie aus dem PDF kommt, sieht pruefen nicht.
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
             {"kandidat": 2, "dateien": ["b.pdf"], "status": "bereit"},
         ])
         self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Ohne Bild daneben",
-                                          schaubild="1.feldbild.png")
+                                          schaubild="1.quellgrafik.png")
         self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Mit Bild daneben",
-                                          schaubild="2.feldbild.png")
-        (self.entwuerfe / "2.feldbild.png").write_bytes(b"ein Bild")
+                                          schaubild="2.quellgrafik.png")
+        (self.entwuerfe / "2.quellgrafik.png").write_bytes(b"ein Bild")
 
         fertig = self.ordner.starte("sammelimport.py", "pruefen", ORDNER)
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         uebersicht = self.ordner.uebersicht(ORDNER)
         self.assertEqual(uebersicht["1"]["Status"], "offen")
-        self.assertIn("1.feldbild.png", uebersicht["1"]["Notiz"])
+        self.assertIn("1.quellgrafik.png", uebersicht["1"]["Notiz"])
         self.assertEqual(uebersicht["2"]["Status"], "bereit")
 
-    def test_ein_entwurf_traegt_nur_sein_eigenes_feldbild_ein(self) -> None:
-        # Vertippt: Kandidat 1 nennt das Feldbild von Kandidat 2. Es liegt
-        # neben dem Entwurf, aber uebernehmen truege es weg, und Kandidat 2
+    def test_ein_entwurf_traegt_nur_seine_eigene_quellgrafik_ein(self) -> None:
+        # Vertippt: Kandidat 1 nennt die Quellgrafik von Kandidat 2. Sie liegt
+        # neben dem Entwurf, aber uebernehmen truege sie weg, und Kandidat 2
         # stuende ohne da. Der Auftrag liegt auch daneben und ist kein Bild.
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 1, "dateien": ["a.pdf"]},
             {"kandidat": 2, "dateien": ["b.pdf"]},
         ])
         self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Fremdes Bild",
-                                          schaubild="2.feldbild.png")
+                                          schaubild="2.quellgrafik.png")
         self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Auftrag als Bild",
                                           schaubild="2.auftrag.md")
-        (self.entwuerfe / "2.feldbild.png").write_bytes(b"das Bild von 2")
+        (self.entwuerfe / "2.quellgrafik.png").write_bytes(b"das Bild von 2")
         (self.entwuerfe / "2.auftrag.md").write_text("# Auftrag\n", encoding="utf-8")
 
         fertig = self.ordner.starte("sammelimport.py", "pruefen", ORDNER)
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         uebersicht = self.ordner.uebersicht(ORDNER)
-        for kandidat, eingetragen in (("1", "2.feldbild.png"), ("2", "2.auftrag.md")):
+        for kandidat, eingetragen in (("1", "2.quellgrafik.png"), ("2", "2.auftrag.md")):
             self.assertEqual(uebersicht[kandidat]["Status"], "offen")
             self.assertIn(eingetragen, uebersicht[kandidat]["Notiz"])
 
-    def test_eine_liste_besteht_wenn_jedes_eingetragene_feldbild_daneben_liegt(self) -> None:
-        # Kandidat 1 traegt seine beiden Feldbilder ein, und beide liegen da.
-        # Bei 2 fehlt das zweite, bei 3 steht ein fremdes in der Liste. Die
+    def test_eine_liste_besteht_wenn_jede_eingetragene_quellgrafik_daneben_liegt(self) -> None:
+        # Kandidat 1 traegt seine beiden Quellgrafiken ein, und beide liegen da.
+        # Bei 2 fehlt die zweite, bei 3 steht eine fremde in der Liste. Die
         # Notiz nennt genau das, woran es liegt (#39).
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": n, "dateien": [f"{n}.pdf"], "ergebnis": "folge"} for n in (1, 2, 3)])
-        for kandidat, liste in ((1, ["1.feldbild-1.png", "1.feldbild-2.png"]),
-                                (2, ["2.feldbild-1.png", "2.feldbild-2.png"]),
-                                (3, ["3.feldbild-1.png", "4.feldbild-1.png"])):
+        for kandidat, liste in ((1, ["1.quellgrafik-1.png", "1.quellgrafik-2.png"]),
+                                (2, ["2.quellgrafik-1.png", "2.quellgrafik-2.png"]),
+                                (3, ["3.quellgrafik-1.png", "4.quellgrafik-1.png"])):
             self.ordner.lege_kartenentwurf_an(ORDNER, kandidat, typ="folge",
                                               titel=f"Zirkel {kandidat}", schaubild=liste)
-        for name in ("1.feldbild-1.png", "1.feldbild-2.png", "2.feldbild-1.png",
-                     "3.feldbild-1.png", "4.feldbild-1.png"):
+        for name in ("1.quellgrafik-1.png", "1.quellgrafik-2.png", "2.quellgrafik-1.png",
+                     "3.quellgrafik-1.png", "4.quellgrafik-1.png"):
             (self.entwuerfe / name).write_bytes(b"ein Bild")
 
         fertig = self.ordner.starte("sammelimport.py", "pruefen", ORDNER)
@@ -538,21 +553,21 @@ class FeldbildTest(unittest.TestCase):
         uebersicht = self.ordner.uebersicht(ORDNER)
         self.assertEqual(uebersicht["1"]["Status"], "bereit", uebersicht["1"]["Notiz"])
         self.assertEqual(uebersicht["2"]["Status"], "offen")
-        self.assertIn("2.feldbild-2.png", uebersicht["2"]["Notiz"])
-        self.assertNotIn("2.feldbild-1.png", uebersicht["2"]["Notiz"])
+        self.assertIn("2.quellgrafik-2.png", uebersicht["2"]["Notiz"])
+        self.assertNotIn("2.quellgrafik-1.png", uebersicht["2"]["Notiz"])
         self.assertEqual(uebersicht["3"]["Status"], "offen")
-        self.assertIn("4.feldbild-1.png", uebersicht["3"]["Notiz"])
+        self.assertIn("4.quellgrafik-1.png", uebersicht["3"]["Notiz"])
 
-    def test_ein_doppelt_eingetragenes_feldbild_weist_den_entwurf_ab(self) -> None:
-        # Es liegt da und ist das eigene, aber uebernehmen kann es nur einmal
-        # verschieben. Beim zweiten Mal fehlte es, und die Karte stuende
+    def test_eine_doppelt_eingetragene_quellgrafik_weist_den_entwurf_ab(self) -> None:
+        # Sie liegt da und ist die eigene, aber uebernehmen kann sie nur einmal
+        # verschieben. Beim zweiten Mal fehlte sie, und die Karte stuende
         # schon in uebungen/.
         self.ordner.lege_quellenordner_an(
             ORDNER, [{"kandidat": 1, "dateien": ["1.pdf"], "ergebnis": "folge"}])
         self.ordner.lege_kartenentwurf_an(
             ORDNER, 1, typ="folge", titel="Zirkel",
-            schaubild=["1.feldbild-1.png", "1.feldbild-2.png", "1.feldbild-1.png"])
-        for name in ("1.feldbild-1.png", "1.feldbild-2.png"):
+            schaubild=["1.quellgrafik-1.png", "1.quellgrafik-2.png", "1.quellgrafik-1.png"])
+        for name in ("1.quellgrafik-1.png", "1.quellgrafik-2.png"):
             (self.entwuerfe / name).write_bytes(b"ein Bild")
 
         fertig = self.ordner.starte("sammelimport.py", "pruefen", ORDNER)
@@ -560,19 +575,19 @@ class FeldbildTest(unittest.TestCase):
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         zeile = self.ordner.uebersicht(ORDNER)["1"]
         self.assertEqual(zeile["Status"], "offen")
-        self.assertIn("1.feldbild-1.png zweimal", zeile["Notiz"])
+        self.assertIn("1.quellgrafik-1.png zweimal", zeile["Notiz"])
 
     def lege_freigegebenen_entwurf_an(self) -> None:
-        """Kandidat 3 mit Feldbild, freigegeben. Die naechste freie ID ist ue-000010."""
+        """Kandidat 3 mit Quellgrafik, freigegeben. Die naechste freie ID ist ue-000010."""
         self.ordner.lege_karte_an(id="ue-000009", titel="Die bisher höchste ID")
         self.ordner.lege_quellenordner_an(
             ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"], "status": "bereit"}])
         self.ordner.lege_kartenentwurf_an(ORDNER, 3, titel="Abwehr vom Kasten",
                                           quelldatei=f"{ORDNER}/kasten.pdf",
-                                          schaubild="3.feldbild.png")
-        (self.entwuerfe / "3.feldbild.png").write_bytes(b"das Feldbild")
+                                          schaubild="3.quellgrafik.png")
+        (self.entwuerfe / "3.quellgrafik.png").write_bytes(b"die Quellgrafik")
 
-    def test_nach_uebernehmen_ist_das_feldbild_das_schaubild_der_karte(self) -> None:
+    def test_nach_uebernehmen_ist_die_quellgrafik_das_schaubild_der_karte(self) -> None:
         # So liegen die PlayDrill-Bilder schon heute: unter dem Namen der
         # Karte, und die Leseansicht zeigt sie. Den Ordner schaubilder/ gibt
         # es im kuenstlichen Arbeitsordner noch nicht.
@@ -583,26 +598,29 @@ class FeldbildTest(unittest.TestCase):
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         name = "ue-000010-abwehr-vom-kasten"
         self.assertEqual((self.ordner.pfad / "schaubilder" / f"{name}.png").read_bytes(),
-                         b"das Feldbild")
+                         b"die Quellgrafik")
         karte = (self.ordner.pfad / "uebungen" / f"{name}.md").read_text(encoding="utf-8")
         self.assertIn(f"\nschaubild: {name}.png\n", karte)
-        self.assertFalse((self.entwuerfe / "3.feldbild.png").exists())
+        self.assertFalse((self.entwuerfe / "3.quellgrafik.png").exists())
         index = self.ordner.starte("index.py")
         self.assertEqual(auffaelligkeiten(index.stdout), [], index.stdout)
 
     def lege_freigegebenen_zirkel_an(self) -> None:
-        """Kandidat 5, eine Folge mit drei Feldbildern, freigegeben. Die naechste freie ID ist ue-000010."""
+        """Kandidat 5, eine Folge mit drei Quellgrafiken, freigegeben.
+
+        Die naechste freie ID ist ue-000010.
+        """
         self.ordner.lege_karte_an(id="ue-000009", titel="Die bisher höchste ID")
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 5, "dateien": ["zirkel.pdf", "station-1.pdf", "station-2.pdf"],
              "ergebnis": "folge", "status": "bereit"}])
         self.ordner.lege_kartenentwurf_an(
             ORDNER, 5, typ="folge", titel="Zirkel",
-            schaubild=["5.feldbild-1.png", "5.feldbild-2.png", "5.feldbild-3.png"])
+            schaubild=["5.quellgrafik-1.png", "5.quellgrafik-2.png", "5.quellgrafik-3.png"])
         for nr in (1, 2, 3):
-            (self.entwuerfe / f"5.feldbild-{nr}.png").write_bytes(f"Blatt {nr}".encode())
+            (self.entwuerfe / f"5.quellgrafik-{nr}.png").write_bytes(f"Blatt {nr}".encode())
 
-    def test_mehrere_feldbilder_werden_durchnummeriert_und_als_liste_eingetragen(self) -> None:
+    def test_mehrere_quellgrafiken_werden_durchnummeriert_und_als_liste_eingetragen(self) -> None:
         # Unter dem Namen der Karte, mit Nummer, in der Reihenfolge aus dem
         # Entwurf. Die Leseansicht zeigt sie so (#39).
         self.lege_freigegebenen_zirkel_an()
@@ -616,19 +634,19 @@ class FeldbildTest(unittest.TestCase):
                              f"Blatt {nr}".encode())
         karte = (self.ordner.pfad / "uebungen" / "ue-000010-zirkel.md").read_text(encoding="utf-8")
         self.assertIn(f"\nschaubild: [{', '.join(namen)}]\n", karte)
-        self.assertEqual(list(self.entwuerfe.glob("5.feldbild*")), [])
+        self.assertEqual(list(self.entwuerfe.glob("5.quellgrafik*")), [])
         index = self.ordner.starte("index.py")
         self.assertEqual(auffaelligkeiten(index.stdout), [], index.stdout)
 
-    def test_eine_liste_mit_einem_feldbild_wird_ein_einzelner_name(self) -> None:
-        # Ein einzelnes Feldbild bleibt ein einzelner Name, auch wenn der
-        # Agent es in eckige Klammern gesetzt hat.
+    def test_eine_liste_mit_einer_quellgrafik_wird_ein_einzelner_name(self) -> None:
+        # Eine einzelne Quellgrafik bleibt ein einzelner Name, auch wenn der
+        # Agent sie in eckige Klammern gesetzt hat.
         self.ordner.lege_karte_an(id="ue-000009", titel="Die bisher höchste ID")
         self.ordner.lege_quellenordner_an(
             ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"], "status": "bereit"}])
         self.ordner.lege_kartenentwurf_an(ORDNER, 3, titel="Abwehr vom Kasten",
-                                          schaubild=["3.feldbild.png"])
-        (self.entwuerfe / "3.feldbild.png").write_bytes(b"das Feldbild")
+                                          schaubild=["3.quellgrafik.png"])
+        (self.entwuerfe / "3.quellgrafik.png").write_bytes(b"die Quellgrafik")
 
         fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, "--kandidat", "3", "")
 
@@ -639,7 +657,7 @@ class FeldbildTest(unittest.TestCase):
         self.assertTrue((self.ordner.pfad / "schaubilder" / f"{name}.png").is_file())
 
     def test_liegt_eins_der_nummerierten_schon_da_wird_nichts_geschrieben(self) -> None:
-        # Wie beim einzelnen Feldbild: In schaubilder/ wird nichts
+        # Wie bei der einzelnen Quellgrafik: In schaubilder/ wird nichts
         # ueberschrieben. Auch die beiden anderen bleiben neben dem Entwurf,
         # sonst fehlten sie beim naechsten Versuch.
         self.lege_freigegebenen_zirkel_an()
@@ -654,7 +672,7 @@ class FeldbildTest(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "schaubilder").iterdir()),
                          ["ue-000010-zirkel-2.png"])
         self.assertEqual(list((self.ordner.pfad / "uebungen").glob("ue-000010-*")), [])
-        self.assertEqual(len(list(self.entwuerfe.glob("5.feldbild-*.png"))), 3)
+        self.assertEqual(len(list(self.entwuerfe.glob("5.quellgrafik-*.png"))), 3)
 
     @BRAUCHT_PILLOW
     def test_drei_pdfs_mit_bild_ergeben_eine_karte_mit_drei_schaubildern(self) -> None:
@@ -664,7 +682,7 @@ class FeldbildTest(unittest.TestCase):
         # Groesse jedes Bildes verraet, aus welchem Blatt es stammt.
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 5, "dateien": ["zirkel.pdf", "station-1.pdf", "station-2.pdf"],
-             "ergebnis": "folge"}], feldbild_ausschneiden=True)
+             "ergebnis": "folge"}], quellgrafik_ausschneiden=True)
         for datei, groesse in (("zirkel.pdf", (40, 30)), ("station-1.pdf", (90, 60)),
                                ("station-2.pdf", (30, 20))):
             self.ordner.lege_quell_pdf_an(f"{ORDNER}/{datei}", [datei], bilder=[
@@ -672,7 +690,7 @@ class FeldbildTest(unittest.TestCase):
         vorbereitet = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
         self.assertEqual(vorbereitet.returncode, 0, vorbereitet.stdout + vorbereitet.stderr)
         liste = re.search(r"`schaubild: \[([^\]]+)\]`",
-                          zeile_mit(auftrag_von(self.ordner, 5), "Feldbilder")).group(1)
+                          zeile_mit(auftrag_von(self.ordner, 5), "Quellgrafiken")).group(1)
         self.ordner.lege_kartenentwurf_an(ORDNER, 5, typ="folge", titel="Sprungkraftzirkel",
                                           schaubild=liste.split(", "))
 
@@ -704,7 +722,7 @@ class FeldbildTest(unittest.TestCase):
                       zeile_mit(fertig.stdout, "nicht übernommen"))
         self.assertEqual(schon_da.read_bytes(), vorher)
         self.assertEqual(list((self.ordner.pfad / "uebungen").glob("ue-000010-*")), [])
-        self.assertTrue((self.entwuerfe / "3.feldbild.png").exists())
+        self.assertTrue((self.entwuerfe / "3.quellgrafik.png").exists())
 
 
 class PlaneingabeTest(unittest.TestCase):
@@ -1105,7 +1123,7 @@ class PruefenTest(unittest.TestCase):
         self.assertEqual(kandidat["felder"]["disziplin"], ["halle"])
 
     def test_json_trennt_rueckfragen_mit_vermutung_von_denen_ohne(self) -> None:
-        # Die ohne Vermutung fragt der Skill einzeln, mit dem Feldbild. Die mit
+        # Die ohne Vermutung fragt der Skill einzeln, mit der Quellgrafik. Die mit
         # Vermutung bestaetigt der Trainer in der Tabelle wie einen Vorschlag.
         self.plane()
         self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Mit Rückfragen", rueckfragen=[
@@ -1128,25 +1146,25 @@ class PruefenTest(unittest.TestCase):
         self.assertEqual(kandidat["entwurf"], (
             self.ordner.pfad / "kartenentwuerfe" / ORDNER / "1.md").resolve().as_posix())
 
-    def test_json_nennt_jedes_feldbild_in_der_reihenfolge_des_entwurfs(self) -> None:
-        # Bei den Einzelfragen zeigt der Skill die Feldbilder im Chat, bei
-        # mehreren alle (#36, #39). Kandidat 2 hat keins, die Liste ist leer.
+    def test_json_nennt_jede_quellgrafik_in_der_reihenfolge_des_entwurfs(self) -> None:
+        # Bei den Einzelfragen zeigt der Skill die Quellgrafiken im Chat, bei
+        # mehreren alle (#36, #39). Kandidat 2 hat keine, die Liste ist leer.
         self.plane({"kandidat": 1, "dateien": ["zirkel.pdf", "station-1.pdf"], "ergebnis": "folge"},
                    {"kandidat": 2, "dateien": ["b.pdf"]})
         entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
         self.ordner.lege_kartenentwurf_an(ORDNER, 1, typ="folge", titel="Zirkel",
-                                          schaubild=["1.feldbild-1.png", "1.feldbild-2.png"])
+                                          schaubild=["1.quellgrafik-1.png", "1.quellgrafik-2.png"])
         self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Ohne Bild")
-        for name in ("1.feldbild-1.png", "1.feldbild-2.png"):
+        for name in ("1.quellgrafik-1.png", "1.quellgrafik-2.png"):
             (entwuerfe / name).write_bytes(b"ein Bild")
 
         freigabe = self.freigabe()
 
         self.assertEqual(freigabe["1"]["status"], "bereit", freigabe["1"]["notiz"])
-        self.assertEqual(freigabe["1"]["feldbilder"],
+        self.assertEqual(freigabe["1"]["quellgrafiken"],
                          [(entwuerfe / name).resolve().as_posix()
-                          for name in ("1.feldbild-1.png", "1.feldbild-2.png")])
-        self.assertEqual(freigabe["2"]["feldbilder"], [])
+                          for name in ("1.quellgrafik-1.png", "1.quellgrafik-2.png")])
+        self.assertEqual(freigabe["2"]["quellgrafiken"], [])
 
     def test_json_setzt_den_status_wie_ohne_json(self) -> None:
         # Der Skill ruft nach einem Durchgang nur `pruefen --json` auf. Auch
@@ -1167,7 +1185,7 @@ class PruefenTest(unittest.TestCase):
     def test_ein_ablauf_aus_dem_bild_ergibt_rueckfrage_auch_mit_vermutung(self) -> None:
         # Die Vermutung des Agenten ist hier der ganze Ablauf. Den bestaetigt
         # der Trainer nicht in einer Tabellenzeile, sondern einzeln, mit
-        # Feldbild und Ablauftext vor sich (#29, Geschichte 22).
+        # Quellgrafik und Ablauftext vor sich (#29, Geschichte 22).
         self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"]}],
                                           **PLAYDRILL)
         self.ordner.lege_quell_pdf_an(
@@ -1412,7 +1430,7 @@ class UebernehmenTest(unittest.TestCase):
         # war ein Duplikat von ue-000003, und der Skill hat diese Karte schon
         # ergaenzt. Keiner von beiden wird Karte. Kandidat 3 ist noch offen
         # und haelt den Entwurfsordner fest, so zeigt sich, dass Entwurf,
-        # Auftrag und Feldbilder einzeln verschwinden. Kandidat 2 hat zwei,
+        # Auftrag und Quellgrafiken einzeln verschwinden. Kandidat 2 hat zwei,
         # mit Nummer (#39).
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
@@ -1420,13 +1438,13 @@ class UebernehmenTest(unittest.TestCase):
             {"kandidat": 3, "dateien": ["c.pdf"]},
         ])
         entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
-        for nr, feldbilder in ((1, ["1.feldbild.png"]),
-                               (2, ["2.feldbild-1.png", "2.feldbild-2.png"])):
+        for nr, quellgrafiken in ((1, ["1.quellgrafik.png"]),
+                               (2, ["2.quellgrafik-1.png", "2.quellgrafik-2.png"])):
             self.ordner.lege_kartenentwurf_an(ORDNER, nr, titel=f"Kandidat {nr}",
-                                              schaubild=feldbilder)
+                                              schaubild=quellgrafiken)
             (entwuerfe / f"{nr}.auftrag.md").write_text("# Auftrag\n", encoding="utf-8")
-            for feldbild in feldbilder:
-                (entwuerfe / feldbild).write_bytes(b"ein Bild")
+            for quellgrafik in quellgrafiken:
+                (entwuerfe / quellgrafik).write_bytes(b"ein Bild")
         vorher = sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir())
 
         fertig = self.uebernimm("--uebersprungen", "1", "Vorlage ohne Übung",

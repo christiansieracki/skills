@@ -19,12 +19,12 @@ neu ist. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
 nächsten offenen Kandidaten an, mit dem Text jedes PDF und der Angabe, ob der
 Ablauf aus dem Bild kommt. Wenn die Einstellungen es wollen, schneidet es
-daneben aus jedem PDF mit Bild das Feldbild aus, dafür braucht es Pillow
+daneben aus jedem PDF mit Bild die Quellgrafik aus, dafür braucht es Pillow
 (ADR-0005). `pruefen` setzt den Status aus den Kartenentwürfen, die dort auf
 der Platte liegen, und weist ab, was das Datenmodell bricht oder die Form der
 Freigabe nicht einhält. Mit `--json` gibt es aus, was die Freigabe im Chat
 braucht. `uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`,
-erst jetzt mit ID (ADR-0010), und legt die Feldbilder als ihre Schaubilder ab.
+erst jetzt mit ID (ADR-0010), und legt die Quellgrafiken als ihre Schaubilder ab.
 Gestrichene und ergänzende Kandidaten bekommen nur ihren Status.
 
 Nach der Freigabe des Plans schreibt nur noch dieses Skript in die Übersicht.
@@ -310,12 +310,20 @@ class Sammelimport:
         return str(wert).strip() or None
 
     @property
-    def feldbild_ausschneiden(self) -> bool:
-        wert = self.einstellungen.get("feldbild_ausschneiden")
+    def quellgrafik_ausschneiden(self) -> bool:
+        # Bis zum 02.10.2026 hieß die Quellgrafik Feldbild (#49). Ohne diesen
+        # Abbruch schnitte `vorbereiten` bei der alten Einstellung still
+        # nichts aus.
+        if "feldbild_ausschneiden" in self.einstellungen:
+            raise Abbruch(f"In quellen/{self.ordner}/{SAMMELIMPORT} steht noch "
+                          f"feldbild_ausschneiden. Die Einstellung heißt jetzt "
+                          f"quellgrafik_ausschneiden, benenn sie um.\n"
+                          f"Es ist noch kein Auftrag geschrieben.")
+        wert = self.einstellungen.get("quellgrafik_ausschneiden")
         if wert is None:
             return False
         if not isinstance(wert, bool):
-            raise Abbruch(f"feldbild_ausschneiden in quellen/{self.ordner}/{SAMMELIMPORT} "
+            raise Abbruch(f"quellgrafik_ausschneiden in quellen/{self.ordner}/{SAMMELIMPORT} "
                           f"ist {wert!r}, erwartet ist true oder false.")
         return wert
 
@@ -347,25 +355,27 @@ class Sammelimport:
     def auftrag(self, k: Kandidat) -> Path:
         return self.entwurfsordner / f"{k.nummer}.auftrag.md"
 
-    def feldbild(self, k: Kandidat, nr: int | None = None) -> Path:
-        """Wo ein Feldbild des Kandidaten liegt.
+    def quellgrafik(self, k: Kandidat, nr: int | None = None) -> Path:
+        """Wo eine Quellgrafik des Kandidaten liegt.
 
-        Ohne Nummer das einzige, `17.feldbild.png`. Hat der Kandidat mehrere,
-        etwa ein Zirkel mit einem Bild je Blatt, heißen sie
-        `17.feldbild-1.png`, `17.feldbild-2.png` und so weiter (#39).
+        Ohne Nummer die einzige, `17.quellgrafik.png`. Hat der Kandidat
+        mehrere, etwa ein Zirkel mit einem Bild je Blatt, heißen sie
+        `17.quellgrafik-1.png`, `17.quellgrafik-2.png` und so weiter (#39).
         """
         endung = "" if nr is None else f"-{nr}"
-        return self.entwurfsordner / f"{k.nummer}.feldbild{endung}.png"
+        return self.entwurfsordner / f"{k.nummer}.quellgrafik{endung}.png"
 
-    def ist_feldbild_von(self, k: Kandidat, name: str) -> bool:
-        """Ist `name` ein Feldbild dieses Kandidaten, einzeln oder mit Nummer?"""
-        return re.fullmatch(rf"{re.escape(k.nummer)}\.feldbild(-[1-9]\d*)?\.png", name) is not None
+    def ist_quellgrafik_von(self, k: Kandidat, name: str) -> bool:
+        """Ist `name` eine Quellgrafik dieses Kandidaten, einzeln oder mit Nummer?"""
+        muster = rf"{re.escape(k.nummer)}\.quellgrafik(-[1-9]\d*)?\.png"
+        return re.fullmatch(muster, name) is not None
 
-    def feldbilder(self, k: Kandidat) -> list[Path]:
-        """Die Feldbilder des Kandidaten, die neben dem Entwurf liegen."""
+    def quellgrafiken(self, k: Kandidat) -> list[Path]:
+        """Die Quellgrafiken des Kandidaten, die neben dem Entwurf liegen."""
         if not self.entwurfsordner.is_dir():
             return []
-        return sorted(p for p in self.entwurfsordner.iterdir() if self.ist_feldbild_von(k, p.name))
+        return sorted(p for p in self.entwurfsordner.iterdir()
+                      if self.ist_quellgrafik_von(k, p.name))
 
     # Was die Prüfung eines Entwurfs aus dem Arbeitsordner braucht. Gelesen
     # wird einmal je Aufruf, nicht je Entwurf: Ein Durchgang hat 30, die
@@ -550,22 +560,22 @@ def pruefe_frontmatter(sammelimport: Sammelimport, k: Kandidat, felder: dict) ->
     if befunde:
         raise Formfehler(befunde[0])
     pruefe_quelldatei(sammelimport.wurzel, felder.get("quelldatei"))
-    # Im Entwurf nennt `schaubild:` die Feldbilder neben ihm, einzeln oder als
+    # Im Entwurf nennt `schaubild:` die Quellgrafiken neben ihm, einzeln oder als
     # Liste, und nur die eigenen: `uebernehmen` trägt sie nach schaubilder/,
     # unter den Namen der Karte. Ein fremdes fehlte danach seinem Kandidaten,
     # und ein doppeltes ließe sich nur einmal verschieben.
     gesehen: set[str] = set()
     for name in schaubilder(felder.get("schaubild")):
-        if not sammelimport.ist_feldbild_von(k, name):
+        if not sammelimport.ist_quellgrafik_von(k, name):
             raise Formfehler(
-                f"schaubild: nennt {name}, das ist kein Feldbild dieses Kandidaten "
-                f"({sammelimport.feldbild(k).name}, bei mehreren "
-                f"{sammelimport.feldbild(k, 1).name} und weiter)")
+                f"schaubild: nennt {name}, das ist keine Quellgrafik dieses Kandidaten "
+                f"({sammelimport.quellgrafik(k).name}, bei mehreren "
+                f"{sammelimport.quellgrafik(k, 1).name} und weiter)")
         if name in gesehen:
             raise Formfehler(f"schaubild: nennt {name} zweimal")
         gesehen.add(name)
         if not (sammelimport.entwurfsordner / name).is_file():
-            raise Formfehler(f"Feldbild {name} liegt nicht neben dem Entwurf")
+            raise Formfehler(f"Quellgrafik {name} liegt nicht neben dem Entwurf")
 
 
 def lies_vorschlag(nr: int, text: str, felder: dict, ueberschriften: set[str]) -> Vorschlag:
@@ -892,14 +902,14 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
 
 
 # --------------------------------------------------------------------------
-# Das Feldbild
+# Die Quellgrafik
 # --------------------------------------------------------------------------
 
-class KeinFeldbild(Exception):
-    """Aus einem PDF ließ sich kein Feldbild ausschneiden. Der Text sagt, warum."""
+class KeineQuellgrafik(Exception):
+    """Aus einem PDF ließ sich keine Quellgrafik ausschneiden. Der Text sagt, warum."""
 
 
-class OhneBild(KeinFeldbild):
+class OhneBild(KeineQuellgrafik):
     """Das PDF bettet gar kein Bild ein. Dann kommt das nächste PDF des Kandidaten dran."""
 
 
@@ -1015,7 +1025,7 @@ def _farbmodus(objekte: PdfObjekte, woerterbuch: bytes) -> str:
         farben = {b"/DeviceGray": 1, b"/DeviceRGB": 3, b"/DeviceCMYK": 4}.get(treffer.group(1))
         if farben:
             return modi[farben]
-    raise KeinFeldbild("den Farbraum des Bildes liest das Skript nicht")
+    raise KeineQuellgrafik("den Farbraum des Bildes liest das Skript nicht")
 
 
 def _bild(objekte: PdfObjekte, nummer: int, als_maske: bool = False):
@@ -1023,14 +1033,14 @@ def _bild(objekte: PdfObjekte, nummer: int, als_maske: bool = False):
 
     Gelesen werden die Bilder, wie PlayDrill sie einbettet: entpackt mit
     /FlateDecode, 8 Bit je Farbe. Dazu JPEG, /DCTDecode, das Pillow selbst
-    öffnet. Alles andere meldet KeinFeldbild.
+    öffnet. Alles andere meldet KeineQuellgrafik.
     """
     from PIL import Image  # erst hier, verlange_pillow() hat vorher geprüft
 
     woerterbuch, strom = objekte[nummer]
     breite, hoehe = _zahl(woerterbuch, b"Width"), _zahl(woerterbuch, b"Height")
     if not breite or not hoehe or strom is None:
-        raise KeinFeldbild("das Bild hat keine lesbare Größe")
+        raise KeineQuellgrafik("das Bild hat keine lesbare Größe")
     gefiltert = re.search(rb"/Filter\s*(?:\[\s*)?(/\w+)\s*\]?", woerterbuch)
     filter_ = gefiltert.group(1).decode() if gefiltert else ""
     if filter_ == "/DCTDecode":
@@ -1039,27 +1049,27 @@ def _bild(objekte: PdfObjekte, nummer: int, als_maske: bool = False):
         return bild.convert("L" if als_maske else "RGB")
     if filter_ not in ("", "/FlateDecode") or re.search(rb"/Filter\s*\[[^\]]*/\w+[^\]]*/\w+",
                                                         woerterbuch):
-        raise KeinFeldbild(f"das Bild ist mit {filter_} gepackt, das liest das Skript nicht")
+        raise KeineQuellgrafik(f"das Bild ist mit {filter_} gepackt, das liest das Skript nicht")
     if (_zahl(woerterbuch, b"Predictor") or 1) > 1 or _zahl(woerterbuch, b"BitsPerComponent") != 8:
-        raise KeinFeldbild("das Bild ist anders gepackt, als das Skript es liest")
+        raise KeineQuellgrafik("das Bild ist anders gepackt, als das Skript es liest")
     modus = "L" if als_maske else _farbmodus(objekte, woerterbuch)
     pixel = zlib.decompress(strom) if filter_ else strom
     return Image.frombytes(modus, (breite, hoehe), pixel).convert("L" if als_maske else "RGB")
 
 
-def schneide_feldbild_aus(pdf: Path, ziel: Path) -> None:
+def schneide_quellgrafik_aus(pdf: Path, ziel: Path) -> None:
     """Legt das größte eingebettete Bild eines PDF als PNG ab, ohne den durchsichtigen Rand.
 
     Das größte nach Pixeln, und nur unter den Bildern, die keine Maske eines
-    anderen sind. PlayDrill bettet sein Feldbild mit 1920 × 1040 Pixeln ein,
-    dazu eine Transparenzmaske. Was die Maske ganz durchsichtig lässt, wird
-    abgeschnitten, wie im PlayDrill-Log. Ein Feldbild ohne Maske bleibt, wie
+    anderen sind. PlayDrill bettet seine Feldskizze mit 1920 × 1040 Pixeln
+    ein, dazu eine Transparenzmaske. Was die Maske ganz durchsichtig lässt,
+    wird abgeschnitten, wie im PlayDrill-Log. Ein Bild ohne Maske bleibt, wie
     es ist.
     """
     try:
         objekte = pdf_objekte(pdf.read_bytes())
     except OSError as fehler:
-        raise KeinFeldbild(f"die Datei lässt sich nicht lesen ({fehler})") from fehler
+        raise KeineQuellgrafik(f"die Datei lässt sich nicht lesen ({fehler})") from fehler
     bilder = {n: w for n, (w, strom) in objekte.items()
               if strom is not None and re.search(rb"/Subtype\s*/Image\b", w)}
     masken = {_verweis(w, name) for w in bilder.values() for name in (b"SMask", b"Mask")}
@@ -1075,85 +1085,85 @@ def schneide_feldbild_aus(pdf: Path, ziel: Path) -> None:
             alpha = _bild(objekte, maske, als_maske=True).resize(bild.size)
             rahmen = alpha.getbbox()
             if rahmen is None:
-                raise KeinFeldbild("das Bild ist ganz durchsichtig")
+                raise KeineQuellgrafik("das Bild ist ganz durchsichtig")
             bild.putalpha(alpha)
             bild = bild.crop(rahmen)
     except (zlib.error, OSError, ValueError) as fehler:
-        raise KeinFeldbild(f"das Bild lässt sich nicht lesen ({fehler})") from fehler
+        raise KeineQuellgrafik(f"das Bild lässt sich nicht lesen ({fehler})") from fehler
     bild.save(ziel, "PNG", optimize=True)
 
 
 def verlange_pillow(sammelimport: Sammelimport) -> None:
-    """Bricht ab, wenn das Feldbild ausgeschnitten werden soll und Pillow fehlt (ADR-0005).
+    """Bricht ab, wenn die Quellgrafik ausgeschnitten werden soll und Pillow fehlt (ADR-0005).
 
     Vor dem ersten Auftrag, damit nichts geschrieben ist: Ein Durchgang ohne
-    Feldbild ergäbe Karten ohne Bild, und Entwürfe, die der Agent ohne das
+    Quellgrafik ergäbe Karten ohne Bild, und Entwürfe, die der Agent ohne das
     Bild gelesen hat.
     """
     try:
         from PIL import Image  # noqa: F401  Der Import ist die Prüfung.
     except ImportError:
         raise Abbruch(
-            f"Für das Ausschneiden des Feldbilds fehlt Pillow. In quellen/"
-            f"{sammelimport.ordner}/{SAMMELIMPORT} steht feldbild_ausschneiden: true.\n\n"
+            f"Für das Ausschneiden der Quellgrafik fehlt Pillow. In quellen/"
+            f"{sammelimport.ordner}/{SAMMELIMPORT} steht quellgrafik_ausschneiden: true.\n\n"
             f"Installieren mit:\n  {interpreter()} -m pip install Pillow\n\n"
             f"Es ist noch kein Auftrag geschrieben.") from None
 
 
-def lege_feldbilder_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list[str], list[str]]:
-    """Schneidet die Feldbilder eines Kandidaten aus, wenn die Einstellungen es wollen.
+def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list[str], list[str]]:
+    """Schneidet die Quellgrafiken eines Kandidaten aus, wenn die Einstellungen es wollen.
 
     Zurück kommen die Zeilen für den Auftrag und, was das Skript dazu sagt,
     wenn etwas nicht geklappt hat. Jedes PDF des Kandidaten, das ein Bild
-    einbettet, gibt ein Feldbild, in der Reihenfolge der Spalte Dateien
+    einbettet, gibt eine Quellgrafik, in der Reihenfolge der Spalte Dateien
     (#39). Bei einem Zirkel steht dort das Übersichtsblatt vorn (#35), sein
     Bild zeigt den ganzen Aufbau, und die Stationsblätter folgen.
 
     Lässt sich ein Bild nicht lesen, fehlt nur dieses, und die übrigen zählen
     ohne Lücke weiter. Das gilt auch für das Bild der Übersicht (entschieden
-    am 02.10.2026): Die Stationen bekommen ihre Feldbilder trotzdem, und für
+    am 02.10.2026): Die Stationen bekommen ihre Quellgrafiken trotzdem, und für
     die Übersicht lässt sich danach ein Schaubild zeichnen. Der Auftrag nennt
     das PDF, und der Agent sieht dort selbst nach.
     """
-    for altes in sammelimport.feldbilder(k):
+    for altes in sammelimport.quellgrafiken(k):
         altes.unlink()
-    if not sammelimport.feldbild_ausschneiden:
-        return ["- Feldbild: wird bei dieser Quelle nicht ausgeschnitten."], []
+    if not sammelimport.quellgrafik_ausschneiden:
+        return ["- Quellgrafik: wird bei dieser Quelle nicht ausgeschnitten."], []
     pdfs = [d for d in k.dateien if _ist_pdf(d)]
     if not pdfs:
-        return ["- Feldbild: keins, der Kandidat hat kein PDF."], []
+        return ["- Quellgrafik: keine, der Kandidat hat kein PDF."], []
     ausgeschnitten: list[tuple[str, Path]] = []
     fehler: list[str] = []
     for datei in pdfs:
-        ziel = sammelimport.feldbild(k, len(ausgeschnitten) + 1)
+        ziel = sammelimport.quellgrafik(k, len(ausgeschnitten) + 1)
         try:
-            schneide_feldbild_aus(sammelimport.quellordner / datei, ziel)
+            schneide_quellgrafik_aus(sammelimport.quellordner / datei, ziel)
         except OhneBild:
             continue
-        except KeinFeldbild as warum:
+        except KeineQuellgrafik as warum:
             fehler.append(f"`{datei}`: {warum}")
             continue
         ausgeschnitten.append((datei, ziel))
 
     if not ausgeschnitten:
         grund = "; ".join(fehler) or "kein PDF des Kandidaten bettet ein Bild ein"
-        return ([f"- Feldbild: keins ausgeschnitten, {grund}. Sieh dir das Bild im PDF "
-                 f"selbst an."], [f"Kein Feldbild, {grund}."])
+        return ([f"- Quellgrafik: keine ausgeschnitten, {grund}. Sieh dir das Bild im "
+                 f"PDF selbst an."], [f"Keine Quellgrafik, {grund}."])
     if len(ausgeschnitten) == 1:
-        # Ein einzelnes Feldbild trägt keine Nummer, auf der Karte wird es
-        # ein einzelner Name.
+        # Eine einzelne Quellgrafik trägt keine Nummer, auf der Karte wird
+        # sie ein einzelner Name.
         datei, ziel = ausgeschnitten[0]
-        ziel = ziel.replace(sammelimport.feldbild(k))
-        zeilen = [f"- Feldbild: `{ziel.as_posix()}`, aus `{datei}`. Trag es im Entwurf als "
-                  f"`schaubild: {ziel.name}` ein."]
+        ziel = ziel.replace(sammelimport.quellgrafik(k))
+        zeilen = [f"- Quellgrafik: `{ziel.as_posix()}`, aus `{datei}`. Trag sie im Entwurf "
+                  f"als `schaubild: {ziel.name}` ein."]
     else:
         namen = ", ".join(ziel.name for _, ziel in ausgeschnitten)
-        zeilen = [f"- Feldbilder: eins je PDF mit Bild, in der Reihenfolge der Dateien. Trag "
-                  f"sie im Entwurf in dieser Reihenfolge ein, als `schaubild: [{namen}]`.",
+        zeilen = [f"- Quellgrafiken: eine je PDF mit Bild, in der Reihenfolge der Dateien. "
+                  f"Trag sie im Entwurf in dieser Reihenfolge ein, als `schaubild: [{namen}]`.",
                   *(f"  - `{ziel.as_posix()}`, aus `{datei}`" for datei, ziel in ausgeschnitten)]
-    zeilen += [f"- Kein Feldbild aus {grund}. Sieh dir das Bild im PDF selbst an."
+    zeilen += [f"- Keine Quellgrafik aus {grund}. Sieh dir das Bild im PDF selbst an."
                for grund in fehler]
-    return zeilen, [f"Kein Feldbild aus {grund}." for grund in fehler]
+    return zeilen, [f"Keine Quellgrafik aus {grund}." for grund in fehler]
 
 
 # --------------------------------------------------------------------------
@@ -1231,7 +1241,7 @@ def ablauf_aus_dem_bild(sammelimport: Sammelimport, texte: list[str | None]) -> 
 
 
 def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[str],
-                     pdftotext: str | None, feldbildzeilen: list[str]) -> Path:
+                     pdftotext: str | None, quellgrafikzeilen: list[str]) -> Path:
     """Legt den Auftrag für einen Kandidaten an, alles, was der Agent braucht.
 
     Die Pfade stehen absolut da, denn der Agent liest und schreibt mit ihnen.
@@ -1261,7 +1271,7 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
         f"- Typ laut Zerlegungsplan: `{k.ergebnis}`",
         f"- `quelldatei:` `{', '.join(relativ)}`",
         ablauf_aus_dem_bild(sammelimport, texte),
-        *feldbildzeilen,
+        *quellgrafikzeilen,
         f"- Zielpfad des Entwurfs: `{sammelimport.entwurf(k).as_posix()}`",
         "",
         "## Dateien",
@@ -1284,13 +1294,14 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
 def vorbereiten(wurzel: Path, ordner: str) -> int:
     sammelimport = Sammelimport(wurzel, ordner)
     sammelimport.verlange_freigabe()
+    ausschneiden = sammelimport.quellgrafik_ausschneiden
     offen = [k for k in sammelimport.kandidaten
              if k.wartet and pruefe_entwurf(sammelimport, k).fehler]
     dran = offen[:sammelimport.je_durchgang]
     print(f"Aufträge für {len(dran)} von {len(offen)} offenen Kandidaten:")
     if not dran:
         return 0
-    if sammelimport.feldbild_ausschneiden:
+    if ausschneiden:
         verlange_pillow(sammelimport)
     pdftotext = None
     if any(_ist_pdf(d) for k in dran for d in k.dateien):
@@ -1300,8 +1311,8 @@ def vorbereiten(wurzel: Path, ordner: str) -> int:
     sammelimport.entwurfsordner.mkdir(parents=True, exist_ok=True)
     kennungen = kennungstabelle(wurzel)
     for k in dran:
-        feldbildzeilen, meldungen = lege_feldbilder_an(sammelimport, k)
-        auftrag = schreibe_auftrag(sammelimport, k, kennungen, pdftotext, feldbildzeilen)
+        quellgrafikzeilen, meldungen = lege_quellgrafiken_an(sammelimport, k)
+        auftrag = schreibe_auftrag(sammelimport, k, kennungen, pdftotext, quellgrafikzeilen)
         print(f"  {k.nummer}  {auftrag.as_posix()}")
         for meldung in meldungen:
             print(f"      {meldung}")
@@ -1318,7 +1329,7 @@ def setze_befund(k: Kandidat, befund: Befund) -> None:
     `rückfrage` heißt: Hier muss einzeln gefragt werden. Entweder hat der
     Entwurf für mindestens eine Rückfrage keine Vermutung, oder der Ablauf
     kommt laut Auftrag aus dem Bild. Dann ist er als Ganzes eine Vermutung,
-    und der Trainer prüft ihn mit dem Feldbild vor sich. Eine Rückfrage mit
+    und der Trainer prüft ihn mit der Quellgrafik vor sich. Eine Rückfrage mit
     Vermutung bestätigt er sonst in der Tabelle wie einen Vorschlag.
     """
     if befund.fehler:
@@ -1334,15 +1345,15 @@ def setze_befund(k: Kandidat, befund: Befund) -> None:
 def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -> dict:
     """Was der Skill für die Freigabe im Chat über einen Kandidaten braucht (#29).
 
-    Einzeln fragt er die Rückfragen ohne Vermutung, mit den Feldbildern, und
+    Einzeln fragt er die Rückfragen ohne Vermutung, mit den Quellgrafiken, und
     bei `ablauf_aus_dem_bild` den Ablauf. Alles andere kommt in eine Tabelle:
     die Felder in ihren Spalten, die Vorschläge zu Feldern daran, die
     Rückfragen mit Vermutung zum Bestätigen, und eine Spalte „aus dem
     Bild“ aus den Vorschlägen zu Textstellen. Ein abgewiesener Entwurf kommt
     nicht in die Freigabe, von ihm stehen nur Status und Notiz da.
 
-    `feldbilder` sind die, die der Entwurf in `schaubild:` nennt, in seiner
-    Reihenfolge, so wie sie auf die Karte kommen. Ist das keins, ist die
+    `quellgrafiken` sind die, die der Entwurf in `schaubild:` nennt, in seiner
+    Reihenfolge, so wie sie auf die Karte kommen. Nennt er keine, ist die
     Liste leer.
     """
     entwurf = sammelimport.entwurf(k)
@@ -1354,8 +1365,8 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
         "status": k.status,
         "notiz": k.notiz,
         "entwurf": entwurf.as_posix() if entwurf.is_file() else None,
-        "feldbilder": [(sammelimport.entwurfsordner / name).as_posix()
-                       for name in schaubilder(befund.felder.get("schaubild"))],
+        "quellgrafiken": [(sammelimport.entwurfsordner / name).as_posix()
+                          for name in schaubilder(befund.felder.get("schaubild"))],
         "ablauf_aus_dem_bild": befund.aus_dem_bild,
         "felder": befund.felder,
         "vorschlaege": {
@@ -1422,8 +1433,8 @@ def als_karte(entwurf: str, uid: str, heute: str,
     """Aus dem Text eines Kartenentwurfs der Text der Karte.
 
     `id` kommt als erstes Feld dazu, `angelegt` wird der Tag der Freigabe.
-    `schaubildnamen`, wenn angegeben, ersetzt die Namen der Feldbilder neben dem
-    Entwurf durch die in schaubilder/. Einer steht als Name da, mehrere als
+    `schaubildnamen`, wenn angegeben, ersetzt die Namen der Quellgrafiken neben
+    dem Entwurf durch die in schaubilder/. Einer steht als Name da, mehrere als
     Liste. `## Freigabe` fällt weg: Vorschläge und Rückfragen sind mit dem Ja
     des Trainers erledigt und gehören nicht auf die Karte in der Halle. Dass
     das Frontmatter sauber schließt, hat `pruefe_entwurf` vorher festgestellt.
@@ -1457,7 +1468,7 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     der nächste Lauf einen offenen Kandidaten mit gültigem Entwurf und schriebe
     dieselbe Karte ein zweites Mal.
 
-    Das Feldbild bekommt den Namen der Karte, wie jedes PlayDrill-Bild in
+    Die Quellgrafik bekommt den Namen der Karte, wie jedes PlayDrill-Bild in
     schaubilder/. Mehrere bekommen ihn mit Nummer, in der Reihenfolge, in der
     der Entwurf sie nennt (#39). Liegt dort schon eine Datei unter einem
     dieser Namen, wird nichts geschrieben, auch die Karte nicht: Überschrieben
@@ -1473,12 +1484,14 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
         raise NichtUebernommen(str(fehler)) from None
     name = f"{uid}-{slug(str(felder['titel']))}"
     ziel = sammelimport.wurzel / "uebungen" / f"{name}.md"
-    # Welche Feldbilder, hat `pruefe_entwurf` sichergestellt: nur die
-    # eigenen, jedes einmal, und jedes liegt da.
-    feldbilder = [sammelimport.entwurfsordner / bild for bild in schaubilder(felder.get("schaubild"))]
-    nummern = [f"-{nr}" for nr in range(1, len(feldbilder) + 1)] if len(feldbilder) > 1 else [""]
-    verschoben = {feldbild: sammelimport.wurzel / "schaubilder" / f"{name}{nummer}{feldbild.suffix}"
-                  for feldbild, nummer in zip(feldbilder, nummern)}
+    # Welche Quellgrafiken, hat `pruefe_entwurf` sichergestellt: nur die
+    # eigenen, jede einmal, und jede liegt da.
+    quellgrafiken = [sammelimport.entwurfsordner / bild
+                     for bild in schaubilder(felder.get("schaubild"))]
+    nummern = ([f"-{nr}" for nr in range(1, len(quellgrafiken) + 1)]
+               if len(quellgrafiken) > 1 else [""])
+    verschoben = {grafik: sammelimport.wurzel / "schaubilder" / f"{name}{nummer}{grafik.suffix}"
+                  for grafik, nummer in zip(quellgrafiken, nummern)}
     belegt = [bild.name for bild in verschoben.values() if bild.exists()]
     if belegt:
         raise NichtUebernommen(f"schaubilder/{', schaubilder/'.join(belegt)} gibt es schon")
@@ -1488,9 +1501,9 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     # naechste_id() nicht, und falls doch, wird sie nicht überschrieben.
     with ziel.open("x", encoding="utf-8") as datei:
         datei.write(text)
-    for feldbild, schaubild in verschoben.items():
+    for grafik, schaubild in verschoben.items():
         schaubild.parent.mkdir(exist_ok=True)
-        shutil.move(feldbild, schaubild)
+        shutil.move(grafik, schaubild)
     sammelimport.bekannt.add(uid)
     schliesse_ab(sammelimport, k, "importiert", notiz, karte=uid)
     return uid
@@ -1508,12 +1521,12 @@ def schliesse_ab(sammelimport: Sammelimport, k: Kandidat, status: str, notiz: st
     höchstens ein Entwurf zu viel herum, und kein erledigter Kandidat sieht
     wieder offen aus.
 
-    Die Feldbilder verschwinden auch dann, wenn der Entwurf sie nicht
+    Die Quellgrafiken verschwinden auch dann, wenn der Entwurf sie nicht
     eingetragen hat. Sie ließen sich jederzeit neu aus dem PDF schneiden.
     """
     k.setze(status, notiz, karte=karte)
     sammelimport.speichere()
-    for datei in (sammelimport.entwurf(k), sammelimport.auftrag(k), *sammelimport.feldbilder(k)):
+    for datei in (sammelimport.entwurf(k), sammelimport.auftrag(k), *sammelimport.quellgrafiken(k)):
         datei.unlink(missing_ok=True)
 
 

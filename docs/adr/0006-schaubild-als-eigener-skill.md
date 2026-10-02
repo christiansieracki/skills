@@ -39,8 +39,8 @@ Skills einander nur über die `description`. Das neue Muster muss eng formuliert
 werden, sonst feuert es bei jeder Kleinigkeit.
 
 Der Auslöser bleibt eng: vorgeschlagen wird ein Schaubild nur, wenn es einen
-Anlass gibt — die Quelle enthält ein Feldbild, oder die Beschreibung ist räumlich
+Anlass gibt — die Quelle enthält eine Quellgrafik, oder die Beschreibung ist räumlich
 — und der Vorschlag kommt gesammelt am Ende eines Imports, nicht zwischen jeder
 Karte. Es bleibt ein Vorschlag: ein vorhandenes Bild aus der Quelle
-auszuschneiden bleibt erlaubt, so wie es bei den vier PlayDrill-Feldbildern aus
+auszuschneiden bleibt erlaubt, so wie es bei den vier PlayDrill-Quellgrafiken aus
 Ricos PDF bereits geschehen ist.

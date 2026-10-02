@@ -227,8 +227,8 @@ Danach anbieten, `index.py --md` laufen zu lassen, damit die Lesebrille
 ## Schaubilder vorschlagen
 
 Wenn die Karten stehen und geprüft sind, einmal über sie schauen. Ein
-Schaubild wird vorgeschlagen, wo es einen Anlass gibt: die Quelle zeigt ein
-Feldbild, oder der Ablauf auf der Karte ist räumlich, also eine Aufstellung,
+Schaubild wird vorgeschlagen, wo es einen Anlass gibt: die Quelle hat eine
+Quellgrafik, oder der Ablauf auf der Karte ist räumlich, also eine Aufstellung,
 Laufwege, eine Zielzone oder ein Stationsaufbau. Alles andere bleibt aus der
 Liste. Zu drei Sätzen Kräftigung hilft ein Bild niemandem.
 
@@ -248,11 +248,11 @@ Kontextfenster trägt das Importwissen und ein Dutzend solcher Runden nicht
 zusammen. Die frische Sitzung findet die Karten über dieselbe Suche wieder,
 weil auf ihnen noch kein `schaubild:` steht.
 
-Das bleibt eine Empfehlung. Der Nutzer entscheidet. Zeigt die Quelle ein
-brauchbares Feldbild, kann es stattdessen ausgeschnitten, nach `schaubilder/`
-gelegt und mit seinem Dateinamen in `schaubild:` eingetragen werden. Das Feld
-schreibt keine Endung vor und braucht keine Szene daneben. Zeigt die Quelle
-mehrere, etwa eins je Station, kommen alle als Liste hinein, in der
+Das bleibt eine Empfehlung. Der Nutzer entscheidet. Hat die Quelle eine
+brauchbare Quellgrafik, kann sie stattdessen ausgeschnitten, nach `schaubilder/`
+gelegt und mit ihrem Dateinamen in `schaubild:` eingetragen werden. Das Feld
+schreibt keine Endung vor und braucht keine Szene daneben. Hat die Quelle
+mehrere, etwa eine je Station, kommen alle als Liste hinein, in der
 Reihenfolge der Quelle: `schaubild: [<erstes>.png, <zweites>.png]`.
 
 ## Was der Nutzer am Ende hört

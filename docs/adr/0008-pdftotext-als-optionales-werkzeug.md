@@ -17,8 +17,8 @@ ersten Modellaufruf vorliegt:
   von 258, bei 27 davon steht unter „Ausführung" nur der Platzhalter. Solche
   Kandidaten bekommen ihre Rückfrage nach Regel und nicht nach dem Urteil des
   Modells.
-- Der Agent bekommt den Text wortgenau und dazu das ausgeschnittene Feldbild,
-  das später auch auf der Karte steht.
+- Der Agent bekommt den Text wortgenau und dazu die ausgeschnittene
+  Quellgrafik, die später auch auf der Karte steht.
 
 ADR-0005 hat externe Werkzeuge verworfen, weil unter Windows keins vorhanden
 ist. Für `pdftotext` gilt das nicht. Git für Windows bringt Xpdf 4.00 mit
