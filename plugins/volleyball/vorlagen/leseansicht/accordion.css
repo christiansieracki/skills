@@ -1,0 +1,13 @@
+.tv.accordion {--paper:#f3f6f0;--surface:#e5ece0;--ink:#243d32;--muted:#58705e;--accent:#356548;--line:#c7d6c6}
+.accordion .schedule {border-top:2px solid var(--accent)}
+.accordion .schedule-item {border-bottom:1px solid var(--line)}
+.accordion .schedule-toggle {border:0;border-radius:0;display:grid;grid-template-columns:57px 1fr 20px;width:100%;gap:12px;padding:17px 0;align-items:center}
+.accordion .schedule-toggle:hover {background:transparent}
+.accordion .schedule-toggle .time {font-size:13px;align-self:start;padding-top:3px;font-weight:700}
+.accordion .schedule-toggle .time small {display:block;color:var(--muted);font:11px "Trebuchet MS",sans-serif;font-weight:400;margin-top:3px}
+.accordion .schedule-toggle strong {display:block;font-size:16px;line-height:1.3;margin-top:4px}
+.accordion .schedule-toggle .mark {font-size:23px;font-weight:400}
+.accordion .schedule-toggle[aria-expanded="true"] .mark {color:var(--accent)}
+.accordion .schedule-item:has([aria-expanded="true"]) {border-left:3px solid var(--accent);padding-left:14px;margin-left:-17px}
+.accordion .pause .schedule-toggle strong {font-size:14px;font-weight:400;color:var(--muted)}
+.accordion .schedule-item .details-body {padding-left:0}

@@ -1,0 +1,359 @@
+{
+  "schedule": [
+    {
+      "time": "0–10",
+      "duration": 10,
+      "phase": "Ankommen",
+      "name": "Sechs mit sich",
+      "id": "ue-0013",
+      "today": "<strong>Drei Längsstreifen statt zwei</strong>, je einer pro Sechser, drei Spieler auf jeder Seite des Netzes. Wer gespielt hat, stellt sich auf seiner Seite hinten an. 4 Minuten baggern, 4 Minuten pritschen, die letzten 2 Minuten Zählform. Ablauf siehe unten",
+      "why": "Die Sechser des Abends stehen schon beim Ankommen zusammen, und die Zählform ist der erste kleine Wettkampf zwischen ihnen.",
+      "practical": "<ul>\n<li>Das Feld wird mit Hütchen in <strong>drei Längsstreifen</strong> geteilt, je etwa 3 m breit. Jeder Sechser bekommt einen Streifen, drei Spieler auf jeder Seite des Netzes, hintereinander.</li>\n<li>Der Ball geht von Angriffslinie zu Angriffslinie über das Netz. Wer gespielt hat, stellt sich auf seiner Seite hinten an.</li>\n<li><strong>4 Minuten nur baggern, 4 Minuten nur pritschen.</strong></li>\n<li><strong>Die letzten 2 Minuten Zählform:</strong> Wie viele Überquerungen schafft ein Sechser am Stück ohne Fehler? Der beste Wert zählt. Danach weiß jeder, in welchem Sechser er heute spielt.</li>\n</ul>",
+      "athletics": [],
+      "sketch": "   ┌────────────┬────────────┬────────────┐\n   │  x x x     │  x x x     │  x x x     │\n   │ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ │─ ─ ─ ─ ─ ─ │ Angriffslinie\n   ├━━━━━━━━━━━━┿━━━━━━━━━━━━┿━━━━━━━━━━━━┤ Netz\n   │ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ │─ ─ ─ ─ ─ ─ │ Angriffslinie\n   │  x x x     │  x x x     │  x x x     │\n   └────────────┴────────────┴────────────┘\n      Herren 1      Mix         Herren 2",
+      "image": "",
+      "references": [
+        "teams",
+        "rules"
+      ],
+      "athleticNote": ""
+    },
+    {
+      "time": "10–18",
+      "duration": 8,
+      "phase": "Bewegungsvorbereitung",
+      "name": "DVV Plan 1, Übungen 1–6",
+      "id": "—",
+      "today": "wie immer, siehe Tabelle unten",
+      "why": "Hüfte und Schulter vorbereiten.",
+      "practical": "",
+      "athletics": [
+        {
+          "number": 1,
+          "name": "Ausfallschritt mit Rotation und Hüftstreckung",
+          "description": "Aus dem Einbeinstand in den langen Ausfallschritt, nach rechts und links rotieren, Blick zur hinteren Hand. Dann fußferne Hand absetzen, Hüfte strecken, oberen Arm nach oben drehen und hinterherschauen",
+          "dose": "3–5 Wdh. je Seite"
+        },
+        {
+          "number": 2,
+          "name": "Sumo-Hocke mit Dehnung",
+          "description": "Breiter Stand, Fußspitzen nach außen, tief in die Hocke, Fersen belasten. Mit gestreckten Armen die Füße greifen, Beine strecken, zurück in die Hocke",
+          "dose": "3–5 Wdh."
+        },
+        {
+          "number": 3,
+          "name": "Handläufe mit Sonnengruß",
+          "description": "Aus dem Stand mit den Händen nach vorn in den Liegestütz wandern, Knie ablegen, Hüfte strecken, Hüfte nach hinten schieben, zurückwandern. Beine bleiben gestreckt",
+          "dose": "3–5 Wdh."
+        },
+        {
+          "number": 4,
+          "name": "Hüftrotation",
+          "description": "Rückenlage, Arme in T-Position am Boden, Beine gestreckt. Abwechselnd ein Bein diagonal zur gegenüberliegenden Hand ziehen, Blick in die andere Richtung",
+          "dose": "3–5 Wdh. je Seite"
+        },
+        {
+          "number": 5,
+          "name": "Brustdehnung am Rahmen",
+          "description": "Seitlich zur Wand, gestreckter Arm an den Rahmen, andere Schulter nach hinten ziehen. Bei rechtem Arm steht der rechte Fuß vorn",
+          "dose": "20 s je Seite"
+        },
+        {
+          "number": 6,
+          "name": "Außenrotatoren liegend",
+          "description": "Seitlage, oberes Bein angewinkelt und Knie vorn am Boden, unterer Ellenbogen auf Schulterhöhe aufgestellt. Obere Hand drückt die untere leicht Richtung Bein",
+          "dose": "20 s je Seite"
+        }
+      ],
+      "sketch": "",
+      "image": "",
+      "references": [],
+      "athleticNote": ""
+    },
+    {
+      "time": "18–21",
+      "duration": 3,
+      "phase": "Eigenes Fenster",
+      "name": "jeder kümmert sich um das, was gerade zwickt",
+      "id": "—",
+      "today": "3 Minuten, Bänder und Matten liegen bereit",
+      "why": "Zwei Tage nach dem härtesten Abend des Trainingsblocks.",
+      "practical": "",
+      "athletics": [],
+      "sketch": "",
+      "image": "",
+      "references": [],
+      "athleticNote": ""
+    },
+    {
+      "time": "21–28",
+      "duration": 7,
+      "phase": "Stabilisation",
+      "name": "DVV 7–12",
+      "id": "—",
+      "today": "ein Durchgang, 35 s bei den Halteübungen, auf die Ausführung achten",
+      "why": "Rumpf aktivieren vor Einschlagen und Spiel.",
+      "practical": "",
+      "athletics": [
+        {
+          "number": 7,
+          "name": "Unterarmstütz",
+          "description": "Unterarme schulterbreit, Schultern über den Ellenbogen, Schulterblätter zusammen, kein Buckel, Hüfte gestreckt und nicht durchhängend",
+          "dose": "35 s"
+        },
+        {
+          "number": 8,
+          "name": "Bärenstellung",
+          "description": "Vierfüßlerstand mit geradem Rücken, Knie leicht anheben, Ellenbogen leicht gebeugt, Hände und Füße zur Körpermitte ziehen, Schulter und Hüfte gerade",
+          "dose": "35 s"
+        },
+        {
+          "number": 9,
+          "name": "Seitstütz",
+          "description": "Ellenbogen unter der Schulter, Füße aufeinander, Hüfte und Schulter gerade, Blick nach vorn",
+          "dose": "35 s je Seite"
+        },
+        {
+          "number": 10,
+          "name": "Brücke",
+          "description": "Nur auf Fersen und Schultern, Beine angewinkelt, Arme nach oben gestreckt. Hüfte startet knapp über dem Boden und wird ganz nach oben gestreckt",
+          "dose": "8 Wdh."
+        },
+        {
+          "number": 11,
+          "name": "Schwimmer",
+          "description": "Bauchlage, Blick zum Boden, Bauch angespannt, Arme nach vorn. Diagonal Arm und Bein leicht anheben, Ellenbogen und Knie bleiben gestreckt",
+          "dose": "10 Wdh. je Seite"
+        },
+        {
+          "number": 12,
+          "name": "Sit-up mit Armen nach vorn",
+          "description": "Rückenlage, Beine angewinkelt, Fersen aufgestellt, Arme zeigen nach vorn, Oberkörper aufrichten und wieder ablegen",
+          "dose": "10 Wdh."
+        }
+      ],
+      "sketch": "",
+      "image": "",
+      "references": [],
+      "athleticNote": "Ein Durchgang. Pausen 15 bis 30 Sekunden. Lieber 5 Sekunden kürzer und sauber."
+    },
+    {
+      "time": "28–32",
+      "duration": 4,
+      "phase": "Sprungeinstieg",
+      "name": "DVV 13 und 14",
+      "id": "—",
+      "today": "je <strong>eine</strong> Serie, dann 4 Dreischrittanläufe mit Griff über die Netzkante. Keine Besenstielübungen heute",
+      "why": "Der Anlauf kommt gleich beim Einschlagen. Eine Serie reicht an einem mittleren Abend.",
+      "practical": "",
+      "athletics": [
+        {
+          "number": 13,
+          "name": "Fußgelenksprünge",
+          "description": "Hände an der Hüfte, Absprung nur aus dem Sprunggelenk, Knie bleiben steif. Bei der Landung mit dem Vorderfuß so schnell wie möglich wieder abdrücken, kurzer Bodenkontakt",
+          "dose": "1 Serie à 8"
+        },
+        {
+          "number": 14,
+          "name": "Squat Jump",
+          "description": "Schulterbreiter Stand, Füße leicht nach außen, in die tiefe Kniebeuge, Fersen belastet. Unten 1–2 s halten, dann explosiv hoch",
+          "dose": "1 Serie à 6"
+        }
+      ],
+      "sketch": "",
+      "image": "",
+      "references": [],
+      "athleticNote": ""
+    },
+    {
+      "time": "32–44",
+      "duration": 12,
+      "phase": "Einschlagen",
+      "name": "Dankeballannahme im oberen Zuspiel",
+      "id": "ue-0015",
+      "today": "<strong>Mit Angriff und beidseitig gespiegelt.</strong> Herren 1 auf der einen Seite, Herren 2 auf der anderen. Der Annehmer bekommt drei Dankebälle auf 1, 6 und 5, der Z spielt jeden davon zum Angriff über 4 oder 2. Ablauf siehe unten",
+      "why": "Ball 2 im Hauptteil ist ein Dankeball. Hier wird er sauber im oberen Zuspiel verarbeitet, und gleichzeitig schlagen alle ein.",
+      "practical": "<ul>\n<li><strong>Herren 1 auf der einen Seite, Herren 2 auf der anderen.</strong> Pro Seite steht ein Z am Netz zwischen 2 und 3, ein Werfer an der Seitenlinie Höhe Angriffslinie. Die übrigen sieben teilen sich in Annehmer und Angreifer.</li>\n<li>Der <strong>Werfer von Seite B</strong> wirft dem Annehmer von Seite A drei Dankebälle nacheinander zu: auf Position 1, 6 und 5. Der Annehmer spielt jeden davon im oberen Zuspiel zum Z. Zwischen den Bällen tippt er mit einer Hand eine Bodenmarkierung hinten in der Mitte an.</li>\n<li>Der Z spielt jeden Ball zum Angriff, im Wechsel über 4 und über 2. Die Angreifer stehen in einer Reihe und laufen nacheinander an.</li>\n<li>Dann ist Seite B dran, der Werfer von Seite A wirft.</li>\n<li><strong>Wechsel:</strong> Annehmer nach seinen drei Bällen in die Angreiferreihe. Wer angegriffen hat, holt seinen Ball und stellt sich bei den Annehmern an. Der Werfer tauscht nach der Hälfte. Herren 1 hat drei Z, die sich die Zeit teilen.</li>\n<li>Sprungangriff erlaubt. Wer die ersten Bälle lieber aus dem Stand schlägt, macht das.</li>\n<li>Regel 1 gilt: wer den Dankeball nimmt, ruft „Ich“.</li>\n</ul>",
+      "athletics": [],
+      "sketch": "   SEITE B (Herren 2)\n   ┌──────────────────────────────────────┐\n   │  Annehmer-Reihe hinten               │\n   │                                      │ W  Werfer B wirft\n   │                                      │    auf 1, 6, 5 von A\n   ├━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┤ Netz\n   │  Angreifer       [Z]                 │\n   │  → 4                        ← 2      │\n   │                                      │\n   │     5           6 ▪          1       │  ▪ Bodenmarkierung\n   └──────────────────────────────────────┘\n   SEITE A (Herren 1)",
+      "image": "training-2026-10-01-dankeball.png",
+      "references": [
+        "teams",
+        "rules"
+      ],
+      "athleticNote": ""
+    },
+    {
+      "time": "44–46",
+      "duration": 2,
+      "phase": "Pause",
+      "name": "Trinken, Sechser einteilen, Leibchen",
+      "id": "—",
+      "today": "",
+      "why": "",
+      "practical": "",
+      "athletics": [],
+      "sketch": "",
+      "image": "",
+      "references": [
+        "teams",
+        "rules"
+      ],
+      "athleticNote": ""
+    },
+    {
+      "time": "46–93",
+      "duration": 47,
+      "phase": "Hauptteil",
+      "name": "Drei Sechser mit Zweierserie",
+      "id": "—",
+      "today": "6 Durchgänge à 7 Minuten, jeder Sechser spielt vier davon und wartet zwei. Ablauf siehe unten",
+      "why": "Das 5-1 in der Aufstellung fürs Testspiel, alle sechs Läufer, mit Gegner. Der Dankeball direkt nach dem Ballwechsel zwingt zum Neuordnen.",
+      "practical": "<p><strong>Zweierserie.</strong> Eine Serie besteht aus zwei Bällen:</p>\n<ol>\n<li><strong>Aufschlag</strong> von der einen Seite, der Ballwechsel wird ausgespielt.</li>\n<li>Sobald der Ball tot ist, spielt der Einwerfer von der Aufschlagseite <strong>sofort einen Dankeball</strong> auf die Annahmeseite, hoch übers Netz in die Hinterspieler. Auch dieser Ballwechsel wird ausgespielt.</li>\n</ol>\n<p><strong>Gewinnt eine Mannschaft beide Bälle,</strong> bekommt sie einen großen Punkt. Steht es nach den zwei Bällen 1:1, zählt nichts, und die nächste Serie beginnt. Die Zählweise kommt aus den Wash-Spielformen.</p>\n<p><strong>Pro Läufer schlägt jede Seite zweimal auf,</strong> also vier Serien. Dann rotieren beide Mannschaften in den nächsten Läufer. Die beiden Mannschaften auf dem Feld dürfen dabei in verschiedenen Läufern stehen, wie im Spiel auch.</p>\n<p><strong>Jede Mannschaft merkt sich ihren Läufer,</strong> wenn sie vom Feld geht, und macht beim nächsten Durchgang dort weiter. Bei zwei Läufern pro Durchgang kommt jeder Sechser auf alle sechs Läufer.</p>\n<p><strong>Durchgänge.</strong> 7 Minuten, dann eine Minute Wechsel. Die Mannschaft, die reinkommt, übernimmt die Seite der Mannschaft, die rausgeht.</p>\n<table><thead><tr><th>Durchgang</th><th>Zeit</th><th>Auf dem Feld</th><th>Wartet</th></tr></thead><tbody>\n<tr><td>1</td><td>46–53</td><td>Herren 1 gegen Herren 2</td><td>Mix</td></tr>\n<tr><td>2</td><td>54–61</td><td>Herren 2 gegen Mix</td><td>Herren 1</td></tr>\n<tr><td>3</td><td>62–69</td><td>Mix gegen Herren 1</td><td>Herren 2</td></tr>\n<tr><td>4</td><td>70–77</td><td>Herren 1 gegen Herren 2</td><td>Mix</td></tr>\n<tr><td>5</td><td>78–85</td><td>Herren 2 gegen Mix</td><td>Herren 1</td></tr>\n<tr><td>6</td><td>86–93</td><td>Mix gegen Herren 1</td><td>Herren 2</td></tr>\n</tbody></table>\n<p><strong>Die wartende Mannschaft arbeitet mit:</strong></p>\n<ul>\n<li><strong>Zwei Einwerfer,</strong> einer an jeder Seitenlinie Höhe Angriffslinie. Den Dankeball spielt immer der auf der Aufschlagseite.</li>\n<li><strong>Zwei Ballholer.</strong> Sie bringen den Aufschlägern die Bälle.</li>\n<li><strong>Zwei Beobachter,</strong> einer pro Mannschaft auf dem Feld. Sie schauen auf Regel 2 und 3: Sagt der L vor dem Aufschlag an? Sagt der Z an, bevor aufgeschlagen wird? Beim Wechsel sagt jeder in einem Satz, was er gesehen hat. Einer schreibt die großen Punkte auf.</li>\n</ul>\n<p><strong>Regeln:</strong> Aufschlag von oben. Sprungaufschlag nur, wer ihn im Testspiel schlagen will, und dann höchstens jeder zweite. Drei Kontakte Pflicht, Sprungangriff erlaubt.</p>\n<p><strong>Auf die M achten.</strong> Durch den Tausch steht sie in jedem Läufer vorn und springt mehr als im Spiel. Wer merkt, dass es zu viel wird, greift aus dem Stand an.</p>\n<p><strong>Wertung des Abends:</strong> große Punkte pro Mannschaft über alle Durchgänge.</p>",
+      "athletics": [],
+      "sketch": "          Beobachter    Ballholer\n   ┌──────────────────────────────────────┐\n   │            Sechser 2                 │\n   │                                      │ E  Einwerfer\n   ├━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┤ Netz\n   │                                      │ E  Einwerfer\n   │            Sechser 1                 │\n   └──────────────────────────────────────┘\n          Beobachter    Ballholer",
+      "image": "",
+      "references": [
+        "teams",
+        "rotations",
+        "rules"
+      ],
+      "athleticNote": ""
+    },
+    {
+      "time": "93–96",
+      "duration": 3,
+      "phase": "Pause",
+      "name": "Trinken, Herren 1 stellt sich in der 6-2 auf",
+      "id": "—",
+      "today": "",
+      "why": "",
+      "practical": "",
+      "athletics": [],
+      "sketch": "",
+      "image": "",
+      "references": [
+        "teams",
+        "rotations",
+        "rules"
+      ],
+      "athleticNote": ""
+    },
+    {
+      "time": "96–111",
+      "duration": 15,
+      "phase": "6-2 antesten",
+      "name": "Herren 1 in der 6-2, Herren 2 schlägt auf und spielt aus",
+      "id": "—",
+      "today": "Ablauf siehe unten",
+      "why": "Der Kader soll die 6-2 einmal gespielt haben, bevor sie in der Sitzung am 08.10. eingeordnet wird.",
+      "practical": "<p><strong>Der eine Satz vorweg:</strong> Die 6-2 besteht nur aus den Läufern 1, 6 und 5 des 5-1, also denen, in denen der Z hinten steht und einläuft. Rotiert ein Z nach vorn, greift er als D an, und der zweite Z, der ihm gegenübersteht, ist jetzt hinten und spielt zu.</p>\n<table><thead><tr><th>Z hinten auf</th><th>Form wie im 5-1</th><th>Der andere Z steht vorn auf</th></tr></thead><tbody>\n<tr><td>1</td><td>Läufer 1</td><td>4</td></tr>\n<tr><td>6</td><td>Läufer 6</td><td>3</td></tr>\n<tr><td>5</td><td>Läufer 5</td><td>2</td></tr>\n</tbody></table>\n<p>Danach wiederholen sich die drei Formen mit getauschten Rollen.</p>\n<p><strong>Aufstellung:</strong> Herren 1 stellt sieben: zwei Z, die sich gegenüberstehen, zwei AA, zwei M und den L. Wer der zweite Z ist, sagt der Trainer an. Die zwei übrigen H1-Spieler schlagen mit auf und wechseln nach drei Rotationen ein.</p>\n<p><strong>96–99, trocken:</strong> Herren 1 geht die drei Formen ohne Ball durch. Aufstellung einnehmen, der Trainer klatscht für den Aufschlag, alle laufen auf ihre Annahme- und Angriffsposition und bleiben stehen. Der Trainer prüft, dann die nächste Form.</p>\n<p><strong>99–111, mit Ball:</strong> Herren 2 steht mit sieben auf der anderen Seite, im 5-1 wie im Hauptteil. Aufgeschlagen wird nur auf Herren 1, reihum von denen, die gerade nicht auf dem Feld stehen. Herren 1 nimmt an und spielt aus, Herren 2 verteidigt und greift zurück an. <strong>3 Aufschläge je Rotation,</strong> dann rotiert Herren 1. Nach sechs Rotationen ist jede Form zweimal gelaufen, einmal mit jedem Z.</p>\n<p>Wenn es schnell geht, kommt der Dankeball aus dem Hauptteil dazu.</p>",
+      "athletics": [],
+      "sketch": "",
+      "image": "",
+      "references": [
+        "teams",
+        "rotations",
+        "rules"
+      ],
+      "athleticNote": ""
+    },
+    {
+      "time": "111–116",
+      "duration": 5,
+      "phase": "Kraft",
+      "name": "DVV 17 und 18",
+      "id": "—",
+      "today": "14 Wiederholungen, Woche-4-Wert. Partner zählt und korrigiert",
+      "why": "Danach Pause bis nach dem Spieltag, siehe Mesozyklus.",
+      "practical": "",
+      "athletics": [
+        {
+          "number": 17,
+          "name": "Ausfallschritte statisch",
+          "description": "Weiter Ausfallschritt nach vorn, vorderes Knie senkrecht über dem Fuß, Ferse belastet, hintere Ferse zeigt nach oben. Hinteres Knie absenken und wieder anheben",
+          "dose": "14 Wdh. je Bein"
+        },
+        {
+          "number": 18,
+          "name": "Liegestütz dynamisch, Knie aufgestellt",
+          "description": "Bauchlage, Füße angehoben, Knie am Boden, Hände neben Brust und Schulter. Oberkörper und Hüfte gleichzeitig hochdrücken in die gestreckten Arme",
+          "dose": "14 Wdh."
+        }
+      ],
+      "sketch": "",
+      "image": "",
+      "references": [],
+      "athleticNote": ""
+    },
+    {
+      "time": "116–120",
+      "duration": 4,
+      "phase": "Abschluss",
+      "name": "Cooldown und kurze Runde",
+      "id": "—",
+      "today": "2 Minuten auslaufen, DVV 5 und 6 noch einmal. Dann Runde, siehe unten",
+      "why": "",
+      "practical": "<p>Zwei Fragen:</p>\n<ol>\n<li>Welche Kommunikationsregel sitzt, welche nicht? Die Beobachter fangen an.</li>\n<li>Was war in der 6-2 anders als im 5-1?</li>\n</ol>\n<p>Ausblick: Di 06.10. Testspiel gegen Waldtrudering 2, Herren 2 trainiert parallel nach eigenem Plan. Do 08.10. kurze, lockere Einheit und danach die Mannschaftssitzung mit beiden Teams.</p>",
+      "athletics": [
+        {
+          "number": 5,
+          "name": "Brustdehnung am Rahmen",
+          "description": "Seitlich zur Wand, gestreckter Arm an den Rahmen, andere Schulter nach hinten ziehen. Bei rechtem Arm steht der rechte Fuß vorn",
+          "dose": "20 s je Seite"
+        },
+        {
+          "number": 6,
+          "name": "Außenrotatoren liegend",
+          "description": "Seitlage, oberes Bein angewinkelt und Knie vorn am Boden, unterer Ellenbogen auf Schulterhöhe aufgestellt. Obere Hand drückt die untere leicht Richtung Bein",
+          "dose": "20 s je Seite"
+        }
+      ],
+      "sketch": "",
+      "image": "",
+      "references": [
+        "rules"
+      ],
+      "athleticNote": ""
+    }
+  ],
+  "references": {
+    "teams": "<p>Die Aufstellungen sagt der Trainer in der Halle an.</p>\n<ul>\n<li><strong>Herren 1:</strong> sechs in der Aufstellung fürs Testspiel am 06.10.</li>\n<li><strong>Herren 2:</strong> sechs in der Aufstellung für den 10.10.</li>\n<li><strong>Mix:</strong> die übrigen drei aus Herren 1 und drei aus Herren 2. Auch hier gibt es einen Z und einen L.</li>\n</ul>\n<p>Kürzel: <strong>Z</strong> Zuspiel, <strong>AA</strong> Außen, <strong>M</strong> Mitte, <strong>D</strong> Diagonal, <strong>L</strong> Libero.</p>\n<p>Jeder Sechser spielt Z, D, zwei AA, eine M und einen L. Für eine zweite M ist kein Platz. Deshalb gilt heute der <strong>Tausch von M und L:</strong> Die M spielt immer vorn, der L immer hinten. Wenn die M nach hinten rotieren würde, tauscht sie mit dem L, der gerade nach vorn käme. Die Positionen sehen damit aus wie im Spiel mit zwei M, und der 3er-Riegel aus AA, L, AA steht in jedem Läufer.</p>",
+    "rotations": "<p>Läufer heißt: der Z steht auf dieser Position. Gespielt wird in der Reihenfolge der Rotation, also 1, 6, 5, 4, 3, 2.</p>\n<table><thead><tr><th>Läufer</th><th>Z steht auf</th><th>Weg des Z</th><th>Im Riegel</th><th>Nicht im Riegel</th><th>M und L heute</th></tr></thead><tbody>\n<tr><td>1</td><td>1</td><td>läuft von hinten ein</td><td>AA 5, L 6, AA 2</td><td>M 3, D 4</td><td>M 3, L 6</td></tr>\n<tr><td>6</td><td>6</td><td>läuft von hinten ein</td><td>AA 4, L 5, AA 1</td><td>M 2, D 3</td><td>M 2, L 5</td></tr>\n<tr><td>5</td><td>5</td><td>läuft von hinten ein, längster Weg</td><td>AA 3, AA 6, L 1</td><td>M 4, D 2</td><td><strong>Tausch:</strong> M von 2 auf 4, L von 5 auf 1</td></tr>\n<tr><td>4</td><td>4</td><td>steht vorn, zieht am Netz nach rechts</td><td>AA 2, AA 5, L 6</td><td>M 3, D 1 hinten</td><td>M 3, L 6</td></tr>\n<tr><td>3</td><td>3</td><td>steht vorn</td><td>AA 4, L 5, AA 1</td><td>M 2, D 6 hinten</td><td>M 2, L 5</td></tr>\n<tr><td>2</td><td>2</td><td>steht vorn</td><td>AA 3, AA 6, L 1</td><td>M 4, D 5 hinten</td><td><strong>Tausch:</strong> M von 2 auf 4, L von 5 auf 1</td></tr>\n</tbody></table>\n<p>Im Riegel stehen immer die beiden AA und der L, nie mehr als drei. Steht der D hinten, versteckt er sich in der Annahme und greift über A an, den Hinterfeldangriff über Position 1.</p>",
+    "rules": "<p>Am 29.09. eingeführt. Sie gelten heute in jeder Übung und werden in der Sitzung am 08.10. festgemacht.</p>\n<ol>\n<li><strong>„Ich“ in der Annahme.</strong> Wer den Ball nimmt, ruft „Ich“, bevor der Ball über dem Netz ist. Die anderen beiden machen Platz und rufen „Aus“, wenn er lang geht.</li>\n<li><strong>Der Libero führt den Riegel.</strong> Vor jedem Aufschlag prüft er, ob alle drei richtig stehen, und sagt den Aufschlag an: „Sprung“, „Float“, „kurz“. Kommt ein Ball genau zwischen zwei, entscheidet er mit Namen.</li>\n<li><strong>Der Zuspieler sagt an, bevor aufgeschlagen wird.</strong> Jeder Angreifer weiß vor dem Aufschlag, welchen Ball er bekommt. Die Angreifer rufen im Anlauf.</li>\n<li><strong>„Hilfe“, wenn der Z nicht hinkommt.</strong> Dann spielt der L oder der nächste Hinterspieler hoch auf die Vier. Keiner wartet ab.</li>\n</ol>"
+  },
+  "preparation": [
+    {
+      "title": "Schwerpunkte dieser Einheit",
+      "html": "<ol>\n<li><strong>Das 5-1 in der Aufstellung fürs Testspiel</strong> (<code>laufwege-rotation</code>). Herren 1 spielt heute in der Aufstellung vom 06.10., Herren 2 in der vom 10.10. Jede Mannschaft geht dabei alle sechs Läufer durch. Am Ende wird die 6-2 einmal angetestet.</li>\n<li><strong>Riegel, Sicherung und Neuordnen nach dem Dankeball</strong> (<code>annahme-abwehr-grundordnung</code>). Im Hauptteil kommt nach jedem Ballwechsel sofort ein Dankeball. Der Z muss dann aus der Abwehr in die Zuspielposition, und das ist der Laufweg, den er im Spiel nach jedem Ballwechsel hat.</li>\n</ol>\n<p>Die <strong>Kommunikationsregeln</strong> vom 29.09. gelten weiter, in jeder Übung. Die Wartenden im Hauptteil beobachten, ob L und Z ansagen. Was sie sehen, geht in die Sitzung am 08.10.</p>\n<p><strong>Bezug zum Trainingsblock:</strong> Letzte Einheit von Woche 4, der höchsten Woche von Mesozyklus 1. Die Spitze war am Di 29.09., heute ist die Belastung mittel. Am Di 06.10. kommt das Testspiel gegen Waldtrudering 2, am 10.10. starten beide Teams in die Saison.</p>\n<p><strong>Die Mannschaftssitzung ist verschoben.</strong> Sie sollte heute ab 21:30 laufen. Bei 18 Leuten bleibt die volle Zeit fürs Training, und die Sitzung rückt auf Do 08.10., direkt vor den ersten Spieltag.</p>"
+    },
+    {
+      "title": "Rahmenbedingungen",
+      "html": "<ul>\n<li><strong>Teilnehmer:</strong> 18, Herren 1 stellt 9, Herren 2 stellt 9.</li>\n<li><strong>Halle:</strong> geplant für ein Hallenteil mit einem Netz. Bei zwei Hallenteilen siehe „Wenn es zwei Hallenteile werden“.</li>\n<li><strong>Material:</strong> Bälle in zwei Kisten oder Ballwagen, Hütchen für drei Längsstreifen, Bodenmarkierungen, Leibchen in zwei Farben, Matten für die Stabilisation, Bänder, Zettel und Stift für die Punkte.</li>\n<li><strong>Sprungbelastung:</strong> mittel. Sprungeinstieg je eine Serie, Einschlagen und Sprungangriff im Spiel. Der Deckel läuft im Hauptteil über die Wartezeit: jeder Sechser wartet ein Drittel.</li>\n<li><strong>Besonderheiten:</strong> Alle fit nach dem 29.09., keine Beschwerden gemeldet.</li>\n</ul>"
+    },
+    {
+      "title": "Material gesamt",
+      "html": "<p>Bälle in zwei Kisten oder Ballwagen · Hütchen für drei Längsstreifen · Bodenmarkierungen für das Einschlagen · Leibchen in zwei Farben, der dritte Sechser spielt ohne · Matten für die Stabilisation · Bänder · Zettel und Stift für die großen Punkte</p>"
+    },
+    {
+      "title": "Wenn es zwei Hallenteile werden",
+      "html": "<ul>\n<li><strong>Sechs mit sich</strong> auf beiden Netzen. Dann reichen zwei Streifen pro Netz, vier Gruppen zu vier oder fünf, wie auf der Karte.</li>\n<li><strong>Einschlagen</strong> auf beiden Netzen: Herren 1 auf Hallenteil A, Herren 2 auf Hallenteil B, je mit Werfer auf der Gegenseite.</li>\n<li><strong>Hauptteil</strong> auf Hallenteil A. Von der wartenden Mannschaft bleiben ein Einwerfer und ein Beobachter dort, die anderen vier schlagen auf Hallenteil B auf Ziele auf, in den Laufweg des Z und auf die Schnittstellen im Riegel.</li>\n<li><strong>6-2</strong> bleibt auf Hallenteil A.</li>\n</ul>"
+    },
+    {
+      "title": "Organisation und Coaching-Hinweise",
+      "html": "<ul>\n<li><strong>Sechser gleich beim Ankommen einteilen.</strong> Dann ist der Wechsel in den Hauptteil schnell, und die Leibchen sind schon verteilt.</li>\n<li><strong>Den Tausch von M und L einmal vor dem ersten Durchgang zeigen,</strong> an Läufer 6 nach Läufer 5. Er kommt pro Runde zweimal vor, beim Schritt von 6 nach 5 und von 3 nach 2.</li>\n<li><strong>Beim Hauptteil auf Herren 1 schauen,</strong> vor allem beim Dankeball: Ist der Z schon unterwegs, wenn der Dankeball kommt, oder wartet er, bis er gespielt ist? Sagt der L den Aufschlag an?</li>\n<li><strong>Die Beobachter kurz halten.</strong> Ein Satz pro Wechsel. Wiederholt sich etwas, geht es in die Sitzung am 08.10.</li>\n<li><strong>Wenn die Zeit knapp wird,</strong> Durchgang 6 streichen. Kraft und Cooldown bleiben.</li>\n<li><strong>Herren 2:</strong> kein Sonderfall heute. Herren 2 trainiert am Di 06.10. ohne Trainer bei mittlerer Belastung und startet am 10.10. selbst.</li>\n</ul>"
+    },
+    {
+      "title": "Schaubilder",
+      "html": "<ul>\n<li>Sechs mit sich: Skizze oben, die Karte <code>ue-0013</code> hat kein Schaubild.</li>\n<li>Einschlagen aus dem Dankeball: Feldbild von PlayDrill auf der Karte <code>ue-0015</code>. Es zeigt die Grundform ohne Angriff, die Aufteilung von heute steht in der Skizze oben.</li>\n<li>Drei Sechser und 6-2: Skizzen und Tabellen oben.</li>\n</ul>"
+    },
+    {
+      "title": "Nachbereitung",
+      "html": "<p><strong>Wer war da:</strong> Namen mit Hauptposition / Zweitposition, getrennt nach Herren 1 und Herren 2, und wer in welchem Sechser stand.</p>\n<p><strong>Was lief gut:</strong></p>\n<p><strong>Belastung und Auffälligkeiten:</strong> Wie haben die M den Tausch weggesteckt?</p>\n<p><strong>Drei Sechser mit Zweierserie:</strong> Haben 7 Minuten pro Durchgang für zwei Läufer gereicht? Kam jeder Sechser durch alle sechs Läufer? Wie viele große Punkte gab es, oder wurde fast alles 1:1?</p>\n<p><strong>6-2:</strong> Wer hat den zweiten Z gespielt? Welche Form hat gehakt?</p>\n<p><strong>Was die Beobachter gesehen haben:</strong> für die Sitzung am 08.10.</p>\n<p><strong>Haben sich Anpassungen bewährt?</strong> Sechs mit sich auf drei Streifen, Dankeballannahme mit Angriff.</p>\n<p><strong>Konsequenz für die nächste Einheit oder den Trainingsblock:</strong></p>"
+    },
+    {
+      "title": "Übungskarten und Athletikquelle",
+      "html": "<p><strong>Die Zeilen ohne ID.</strong> DVV 1–18 ist Athletik aus DVV Plan 1, die Übungen stehen weiter unten ausgeschrieben. Für die <strong>Drei Sechser mit Zweierserie</strong> und fürs <strong>6-2 antesten</strong> gibt es noch keine Karten. Beide Formen kommen aus einer kurzen Recherche am 01.10. und werden in einer eigenen Sitzung als Karten angelegt. Bis dahin stehen sie unten ausgeschrieben.</p><p>Quelle: Vorbereitender Athletikplan DVV, Plan 1 (<code>quellen/athletik/Plan-1-Vorbereitender-Athletikplan-DVV.pdf</code>). Kurzbeschreibungen sinngemäß gekürzt, das Original hat zu jeder Übung ein Bild.</p>"
+    }
+  ]
+}
