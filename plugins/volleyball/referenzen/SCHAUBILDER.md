@@ -647,8 +647,8 @@ Szene" bekommt „Durchgezogen ist ein Laufweg, gestrichelt ein Ballweg.", eine
 nur mit Ballwegen „Gestrichelt ist ein Ballweg.", eine mit Maßkette und Pfeil
 „Mit Maßstrichen oder zwei Spitzen ist ein Abstand."
 
-Als Zeichenerklärung gilt eine Zeile der Fußzeile, die „ = " enthält, wie
-„Gestrichelter Pfeil = Ballweg", oder die einen Laufweg, Ballweg oder Abstand
+Als Zeichenerklärung gilt eine Zeile der Fußzeile mit „ = ", wie „Gestrichelter
+Pfeil = Ballweg". Ebenso eine Zeile, die einen Laufweg, Ballweg oder Abstand
 nennt, auch in der Mehrzahl. Steht eine da, bleibt die Fußzeile, wie sie ist,
 und es kommt keine zweite dazu. Wer die Zeile anders will, übernimmt sie aus
 dem Bild in die Szene und ändert sie dort. Nennt die Quelle eines dieser

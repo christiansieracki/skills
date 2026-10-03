@@ -103,6 +103,19 @@ wege:
     nach: 6
 """
 
+# Eine Masskette und ein Pfeil als Eintraege unter `abstaende:`, fuer die
+# Zeichenerklaerung. Den Schluessel setzt der Test davor.
+MASSKETTE = """
+  - art: masskette
+    von: [6.0, 2.0]
+    nach: [9.0, 2.0]
+    versatz: -0.9"""
+ABSTANDSPFEIL = """
+  - art: pfeil
+    von: 4
+    nach: [1.5, 12.0]
+    text: gut 4 m"""
+
 # Ein Legendenblock mit der Zeile aus dem Referenzbild, vor der "3-m-Linie"
 # stand und sich wie deren Anfang las. Vor ihm wird die Gasse gemessen.
 ZUSPIELZIEL = """
@@ -2835,12 +2848,13 @@ geraete:
             stellen:
               - bei: [4.5, 4.5]
                 text: Feldmitte
+            {fuss}
         """
-        self.assertEqual(
-            self.fusszeilen("ohne-wege", aufbau + '    fusszeile: "Quelle: Magazin"'),
+        self.assertEqual(self.fusszeilen(
+            "ohne-wege", aufbau.format(fuss='fusszeile: "Quelle: Magazin"')),
             ["Quelle: Magazin"])
-        self.assertEqual(self.fusszeilen("ohne-wege-ohne-fuss", aufbau), [],
-                         "und ohne Quelle bleibt das Blatt unter dem Bild leer")
+        self.assertEqual(self.fusszeilen("ohne-wege-ohne-fuss", aufbau.format(fuss="")),
+                         [], "und ohne Quelle bleibt das Blatt unter dem Bild leer")
 
     def test_eine_geschriebene_zeichenerklaerung_bleibt_wie_sie_ist(self) -> None:
         # Die Zeilen aus dem Arbeitsordner: 2026-09-15 mit " = ", ue-0037 im
@@ -2865,24 +2879,14 @@ geraete:
         # Massstrichen auch nicht. Die Zahl daneben sagt, wie weit; die
         # Erklaerung sagt, dass es um einen Abstand geht. Die letzte Szene ist
         # die von ue-0020.
-        masskette = """
-  - art: masskette
-    von: [6.0, 2.0]
-    nach: [9.0, 2.0]
-    versatz: -0.9"""
-        pfeil = """
-  - art: pfeil
-    von: 4
-    nach: [1.5, 12.0]
-    text: gut 4 m"""
         for name, szene, erwartet in (
-            ("masskette", "form: halle\nabstaende:" + masskette,
+            ("masskette", "form: halle\nabstaende:" + MASSKETTE,
              "Mit Maßstrichen ist ein Abstand."),
-            ("pfeil", "form: halle\nabstaende:" + pfeil,
+            ("pfeil", "form: halle\nabstaende:" + ABSTANDSPFEIL,
              "Mit zwei Spitzen ist ein Abstand."),
-            ("beide-abstaende", "form: halle\nabstaende:" + masskette + pfeil,
+            ("beide-abstaende", "form: halle\nabstaende:" + MASSKETTE + ABSTANDSPFEIL,
              "Mit Maßstrichen oder zwei Spitzen ist ein Abstand."),
-            ("wege-und-masskette", LAUF_UND_BALL + "abstaende:" + masskette,
+            ("wege-und-masskette", LAUF_UND_BALL + "abstaende:" + MASSKETTE,
              "Durchgezogen ist ein Laufweg, gestrichelt ein Ballweg, "
              "mit Maßstrichen ein Abstand."),
         ):
@@ -2895,15 +2899,13 @@ geraete:
                     [erwartet])
 
     def test_eine_geschriebene_erklaerung_der_abstaende_bleibt_allein(self) -> None:
-        zeile = "Linien mit Maßstrichen zeigen Abstände"
-        self.assertEqual(self.fusszeilen("abstaende-geschrieben", f"""
-            form: halle
-            abstaende:
-              - art: masskette
-                von: [6.0, 2.0]
-                nach: [9.0, 2.0]
-            fusszeile: "{zeile}"
-        """), [zeile])
+        # Auch in der Mehrzahl und ohne Umlaut, wie ihn mancher in YAML meidet.
+        for name, zeile in (("mit-umlaut", "Linien mit Maßstrichen zeigen Abstände"),
+                            ("ohne-umlaut", "Linien mit Massstrichen zeigen Abstaende")):
+            with self.subTest(fall=name):
+                self.assertEqual(self.fusszeilen(
+                    name, "form: halle\nabstaende:" + MASSKETTE
+                    + f'\nfusszeile: "{zeile}"'), [zeile])
 
     def test_das_feld_bleibt_massstaeblich_neben_dem_textwerk(self) -> None:
         # Das Textwerk rueckt das Bild, es verzerrt es nicht. Ohne diese

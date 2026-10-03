@@ -125,6 +125,17 @@ der Fall am 03.10.2026 nicht vor.
 Ziel: bewusst nicht. Auslöser: Ein Schaubild braucht zwei Geräte unter einem
 Spieler.
 
+### Gestrichelt ist auch der Rand einer Zone
+
+Aus #45. Die Zeichenerklärung, die das Skript setzt, sagt „gestrichelt ein
+Ballweg". Gestrichelt sind im Bild aber auch der Rand einer Zone, das Netzband
+und die Maßhilfslinien einer verschobenen Maßkette. Ein Ballweg hat dazu eine
+Spitze und seine eigene Farbe, und der Wortlaut stammt aus der Abnahme von 1c.
+Abhilfe wäre „gestrichelt mit Spitze ein Ballweg" oder ein anderer Strich für
+den Rand einer Zone.
+
+Ziel: bewusst nicht. Auslöser: Jemand liest den Rand einer Zone als Ballweg.
+
 ### Ein Beach-Team anlegen, solange es keins gibt
 
 Beach ist seit Welle 1a im Plugin und an einer echten Beachübung abgenommen
