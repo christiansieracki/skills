@@ -22,6 +22,7 @@ Nur Standardbibliothek, wie alles im Plugin ausser der Bildaufbereitung.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 
@@ -491,17 +492,29 @@ class Abstand:
         return ((self.von[0] + nx * self.versatz, self.von[1] + ny * self.versatz),
                 (self.nach[0] + nx * self.versatz, self.nach[1] + ny * self.versatz))
 
-    @property
-    def text_bei(self) -> Ort:
+    def text_bei(self, wortbreite: float) -> Ort:
         """Wo die Zahl steht: neben der Mitte der Linie.
 
         Auf der Seite, auf die auch der Versatz zeigt. Sonst landete die Zahl
         zwischen der Linie und dem, was sie misst, also genau dort, wo schon
         etwas steht.
+
+        Wie weit daneben, haengt an der Richtung der Linie. Ueber oder unter
+        einer waagerechten reicht TEXTABSTAND. Neben einer senkrechten steht
+        das Wort mit seiner ganzen Breite quer zu ihr, also kommt die halbe
+        Breite dazu, sonst liefe die Linie mitten hindurch. Dazwischen waechst
+        der Abstand mit der Neigung, so wie das Wort quer zur Linie breiter
+        wird. Eine Stufe bei 45 Grad liesse knapp darunter eine schraege Linie
+        durch ein langes Wort laufen.
+
+        `wortbreite` ist die Breite des Wortes in Metern. Wie breit ein Wort
+        wird, haengt an der Schrift, und die kennt schaubild.py.
         """
         (ax, ay), (bx, by) = self.enden
         nx, ny = normale(self.von, self.nach)
-        weite = TEXTABSTAND if self.versatz >= 0 else -TEXTABSTAND
+        weite = TEXTABSTAND + wortbreite / 2 * abs(nx)
+        if self.versatz < 0:
+            weite = -weite
         return ((ax + bx) / 2 + nx * weite, (ay + by) / 2 + ny * weite)
 
     def punkte(self) -> list[Ort]:
@@ -600,17 +613,20 @@ class Szene:
             gesammelt.extend(abstand.punkte())
         return gesammelt + [stelle.bei for stelle in self.stellen]
 
-    def beschriftungen(self) -> list[tuple[str, Ort]]:
+    def beschriftungen(self, wortbreite: Callable[[str], float]) -> list[tuple[str, Ort]]:
         """Die Texte neben dem Aufbau, je mit dem Ort, an dem sie stehen.
 
         Auch sie brauchen Platz im Bild, und wie viel, haengt an der
         Schriftgroesse. Die kennt schaubild.py. Hier steht deshalb nur, was wo
-        steht; wie breit es wird, rechnet der Zeichner aus.
+        steht; wie breit es wird, rechnet der Zeichner aus und reicht es als
+        `wortbreite` herein, in Metern. Gebraucht wird es hier allein fuer die
+        Zahl eines Abstands, die mit ihrer Breite neben ihrer Linie steht.
         """
         texte = [(z.text, z.name_bei) for z in self.zonen]
         texte += [(g.text, g.name_bei) for g in self.geraete if g.text]
         texte += [(s.text, s.bei) for s in self.stellen]
-        return texte + [(a.text, a.text_bei) for a in self.abstaende if a.text]
+        return texte + [(a.text, a.text_bei(wortbreite(a.text)))
+                        for a in self.abstaende if a.text]
 
 
 def scheitel(von: Ort, nach: Ort, bogen: float) -> Ort:

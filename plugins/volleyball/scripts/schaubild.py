@@ -58,6 +58,12 @@ RAND = 1.5
 # Grundlinie soll ganz im Bild stehen, nicht halb angeschnitten.
 LUFT = 0.8
 
+# Die Gasse vor der Legendenspalte, in Metern. So breit wie der Rand um das
+# Feld: neben einem Marker, einem Wort oder einem Geraet ausserhalb des
+# Feldes steht die Spalte so weit ab wie neben dem Feld selbst. Mit weniger
+# Luft liest sich ein Wort davor wie der Anfang der Legendenzeile daneben.
+GASSE = RAND
+
 # Radius eines Spielermarkers in Metern. Knapp ein Meter Durchmesser: so gross
 # wie ein Mensch von oben Platz braucht, und damit massstaeblich statt geraten.
 MARKER = 0.45
@@ -176,24 +182,43 @@ def grenzen(s: Szene) -> tuple[float, float, float, float]:
         xs += [x - LUFT, x + LUFT]
         ys += [y - LUFT, y + LUFT]
     # Eine Beschriftung braucht Platz nach ihrer Laenge und nicht nach LUFT.
-    for text, bei in s.beschriftungen():
+    for text, bei in s.beschriftungen(wortbreite):
         links, unten, rechts, oben = wortflaeche(text, bei).rahmen
         xs += [links, rechts]
         ys += [unten, oben]
     return min(xs), min(ys), max(xs), max(ys)
 
 
+def rechte_kante(s: Szene) -> float:
+    """Wie weit das Gezeichnete nach rechts reicht, in Metern.
+
+    Die Kante selbst, ohne die Luft, die grenzen() um einen Punkt legt: ein
+    Marker reicht um seinen Radius ueber seinen Ort hinaus, ein Wort um seine
+    halbe Breite. Davor haelt die Legendenspalte ihre Gasse.
+    """
+    kanten = [s.grundform.breite]
+    kanten += [x for x, _ in s.punkte()]
+    kanten += [spieler.x + MARKER for spieler in s.spieler]
+    kanten += [wortflaeche(text, bei).rahmen[2]
+               for text, bei in s.beschriftungen(wortbreite)]
+    return max(kanten)
+
+
+def wortbreite(text: str) -> float:
+    """Wie breit eine Beschriftung im Feld ungefaehr wird, in Metern."""
+    return textbreite(text, KLEINSCHRIFT) / MASSSTAB
+
+
 def wortflaeche(text: str, bei: Ort) -> Flaeche:
     """Der Platz, den eine Beschriftung im Feld um ihren Ort einnimmt, in Metern.
 
     Geschaetzt, siehe textbreite(). Dieselbe Rechnung laesst das Blatt um ein
-    Wort wachsen, einen Weg vor dem Wort einer Stelle aufhoeren und sagt, ob
-    das Wort einer Zone in die Zone passt. Zwei Schaetzungen liefen
-    auseinander, und dann stuende ein Wort im Bild, das der Weg fuer kleiner
-    haelt.
+    Wort wachsen, einen Weg vor dem Wort einer Stelle aufhoeren, rueckt die
+    Zahl eines Abstands neben ihre Linie und sagt, ob das Wort einer Zone in
+    die Zone passt. Zwei Schaetzungen liefen auseinander, und dann stuende ein
+    Wort im Bild, das der Weg fuer kleiner haelt.
     """
-    return Flaeche("rechteck", bei, textbreite(text, KLEINSCHRIFT) / MASSSTAB,
-                   KLEINSCHRIFT / MASSSTAB)
+    return Flaeche("rechteck", bei, wortbreite(text), KLEINSCHRIFT / MASSSTAB)
 
 
 def textbreite(text: str, groesse: float) -> float:
@@ -292,11 +317,13 @@ class Satzspiegel:
         # Bild woandershin.
         self.textkante = self.blatt.x(0)
 
-        # Die Legende faengt am rechten Rand des Bildblocks an. Der liegt einen
-        # Feldrand weit neben allem, was gezeichnet ist, und gibt der Spalte
-        # ihre Gasse, ohne dass es dafuer eine zweite Zahl braeuchte. Oben
-        # steht sie mit der Grundform auf einer Hoehe.
-        self.spaltenkante = self.blatt.breite
+        # Die Legende faengt eine Gasse weit rechts von dem an, was am
+        # weitesten rechts steht, gleich ob das Feld, ein Marker oder ein
+        # Wort. Der rechte Rand des Bildblocks taugt dafuer nicht: ein Wort
+        # schiebt ihn genau bis an seine geschaetzte Breite und keinen
+        # Millimeter weiter, und die Spalte stiesse an das Wort. Oben steht
+        # sie mit der Grundform auf einer Hoehe.
+        self.spaltenkante = self.blatt.x(rechte_kante(s) + GASSE)
         self.legende, spaltenende = legendensatz(
             self.werk.legende, self.blatt.y(s.grundform.laenge))
 
@@ -749,7 +776,8 @@ def abstaende(s: Szene, blatt: Blatt) -> str:
                      ' marker-end="url(#spitze-mass)"')
         stuecke.append(strecke("masslinie", blatt, a, b, enden))
         stuecke.append(beschriftung("massbeschriftung", abstand.text,
-                                    abstand.text_bei, blatt))
+                                    abstand.text_bei(wortbreite(abstand.text)),
+                                    blatt))
         stuecke.append("</g>")
     return "".join(stuecke)
 

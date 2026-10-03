@@ -75,6 +75,15 @@ spieler:
     hervorgehoben: false
 """
 
+# Ein Legendenblock mit der Zeile aus dem Referenzbild, vor der "3-m-Linie"
+# stand und sich wie deren Anfang las. Vor ihm wird die Gasse gemessen.
+ZUSPIELZIEL = """
+legende:
+  - ueberschrift: Zuspielziel Position 4
+    zeilen:
+      - Der Ball muss von oben hineinfallen.
+"""
+
 
 # --------------------------------------------------------------------------
 # Das erzeugte Bild lesen
@@ -1708,6 +1717,104 @@ stellen:
         # Zwei Masshilfslinien halten die Kette an dem fest, was sie misst.
         self.assertEqual(len(mit_klasse(baum, "masshilfslinie")), 2)
 
+    def pruefe_neben_der_linie(self, baum, gruppe: ET.Element) -> None:
+        """Die Zahl einer Abstandsangabe steht neben ihrer Linie und nicht darauf.
+
+        Gemessen wird quer zur Linie: wie weit die Mitte des Wortes von ihr
+        weg ist, und wie weit der Kasten um das Wort in diese Richtung
+        reicht. Reicht der Kasten weiter, laeuft die Linie durch das Wort.
+        """
+        linie = mit_klasse(gruppe, "masslinie")[0]
+        wort = mit_klasse(gruppe, "massbeschriftung")[0]
+        x1, y1, x2, y2 = (float(linie.get(a)) for a in ("x1", "y1", "x2", "y2"))
+        laenge = math.hypot(x2 - x1, y2 - y1)
+        nx, ny = -(y2 - y1) / laenge, (x2 - x1) / laenge
+        quer = abs((float(wort.get("x")) - x1) * nx + (float(wort.get("y")) - y1) * ny)
+        breit, hoch = wortkasten(baum, wort)
+        self.assertGreater(quer, breit * abs(nx) + hoch * abs(ny),
+                           f"die Linie laeuft durch {wort.text!r}")
+
+    def test_die_zahl_eines_senkrechten_abstands_steht_neben_ihrer_linie(self) -> None:
+        # In ue-0039 sollte ein Pfeil vom Angreifer zum Verteidiger "5 bis 6 m"
+        # zeigen, und die Linie strich "bis" durch. Neben einer senkrechten
+        # Linie steht das Wort mit seiner ganzen Breite quer zu ihr, auf
+        # beiden Seiten, die der Versatz waehlen kann.
+        baum = self.zeichne("senkrecht", """
+            form: beach
+            abstaende:
+              - art: pfeil
+                von: [4.0, 9.0]
+                nach: [4.0, 3.5]
+                text: 5 bis 6 m
+              - art: masskette
+                von: [1.0, 2.0]
+                nach: [1.0, 6.0]
+                versatz: -0.5
+                text: gut 4 m bis zur Linie
+        """)
+
+        for gruppe in mit_klasse(baum, "abstand"):
+            with self.subTest(wort=mit_klasse(gruppe, "massbeschriftung")[0].text):
+                self.pruefe_neben_der_linie(baum, gruppe)
+                # Neben der Mitte der Linie, nicht hoeher oder tiefer.
+                linie = mit_klasse(gruppe, "masslinie")[0]
+                self.assertAlmostEqual(
+                    float(mit_klasse(gruppe, "massbeschriftung")[0].get("y")),
+                    (float(linie.get("y1")) + float(linie.get("y2"))) / 2, places=1)
+
+    def test_die_zahl_eines_waagerechten_abstands_steht_wie_bisher_darueber(
+            self) -> None:
+        # Ueber einer waagerechten Linie ist die Breite des Wortes gleich: es
+        # steht mittig darueber, so weit weg wie jedes andere, ob kurz oder
+        # lang.
+        baum = self.zeichne("waagerecht", """
+            form: halle
+            abstaende:
+              - art: masskette
+                von: [1.5, 2.0]
+                nach: [7.5, 2.0]
+              - art: masskette
+                von: [1.5, 5.0]
+                nach: [7.5, 5.0]
+                text: sechs Meter von Linie zu Linie
+        """)
+
+        ueber_der_linie = []
+        for gruppe in mit_klasse(baum, "abstand"):
+            linie = mit_klasse(gruppe, "masslinie")[0]
+            wort = mit_klasse(gruppe, "massbeschriftung")[0]
+            with self.subTest(wort=wort.text):
+                self.pruefe_neben_der_linie(baum, gruppe)
+                self.assertAlmostEqual(
+                    float(wort.get("x")),
+                    (float(linie.get("x1")) + float(linie.get("x2"))) / 2, places=1)
+            ueber_der_linie.append(float(linie.get("y1")) - float(wort.get("y")))
+        kurz, lang = ueber_der_linie
+        self.assertGreater(kurz, 0, "die Zahl steht ueber der Linie")
+        self.assertAlmostEqual(kurz, lang, places=2)
+
+    def test_auch_neben_einer_schraegen_linie_steht_die_zahl_frei(self) -> None:
+        # Zwischen waagerecht und senkrecht gibt es keine Stufe, an der ein
+        # langes Wort ploetzlich wieder auf seine Linie rutscht. Die eine
+        # Linie ist eher waagerecht, die andere eher senkrecht.
+        baum = self.zeichne("schraeg", """
+            form: halle
+            abstaende:
+              - art: pfeil
+                von: [1.0, 2.0]
+                nach: [5.0, 5.0]
+                text: gut 5 m bis zum Netz
+              - art: pfeil
+                von: [6.0, 2.0]
+                nach: [8.0, 6.0]
+                versatz: -0.5
+                text: gut 4 m bis zur Linie
+        """)
+
+        for gruppe in mit_klasse(baum, "abstand"):
+            with self.subTest(wort=mit_klasse(gruppe, "massbeschriftung")[0].text):
+                self.pruefe_neben_der_linie(baum, gruppe)
+
     def test_ein_abstand_zwischen_einem_ort_und_sich_selbst_bricht_ab(self) -> None:
         # Und meldet sich als Abstand. Eine Meldung ueber einen Weg schickte den
         # Leser in die Zeilen, in denen gar nichts steht.
@@ -1990,6 +2097,86 @@ stellen:
         rechts = float(feld.get("x")) + float(feld.get("width"))
         for e in mit_klasse(baum, "legendenkopf") + mit_klasse(baum, "legendenzeile"):
             self.assertGreater(float(e.get("x")), rechts, f"{e.text!r} liegt im Feld")
+
+    def gasse(self, baum, kante: float) -> float:
+        """Wie weit rechts von dieser Kante die Legendenspalte anfaengt, in Metern.
+
+        `kante` ist eine x-Koordinate im Bild. Gemessen wird bis zur linken
+        Kante der Spalte, an der jede ihrer Zeilen anfaengt.
+        """
+        spalte = min(float(e.get("x")) for e in mit_klasse(baum, "legendenkopf")
+                     + mit_klasse(baum, "legendenzeile"))
+        return Feldmass(baum, HALLE).strecke(spalte - kante)
+
+    def gasse_neben_dem_feld(self) -> float:
+        """Die Gasse vor der Legendenspalte, wenn rechts nichts als das Feld steht."""
+        baum = self.zeichne("gasse-feld", "form: halle" + ZUSPIELZIEL)
+        feld = mit_klasse(baum, "feld")[0]
+        return self.gasse(baum, float(feld.get("x")) + float(feld.get("width")))
+
+    def gasse_vor_dem_wort(self, baum, klasse: str) -> float:
+        """Die Gasse vor der Legendenspalte, gemessen am Wort dieser Klasse.
+
+        Gemessen wird am knappen Wortkasten. Das Wort im Bild ist breiter,
+        die Gasse davor also schmaler: ist sie hier schon zu schmal, ist sie
+        es im Bild erst recht.
+        """
+        wort = mit_klasse(baum, klasse)[0]
+        halb, _ = wortkasten(baum, wort)
+        return self.gasse(baum, float(wort.get("x")) + halb)
+
+    def test_vor_dem_wort_einer_stelle_bleibt_dieselbe_gasse_wie_vor_einem_marker(
+            self) -> None:
+        # Im Referenzbild steht "3-m-Linie" rechts neben dem Feld, und die
+        # Spalte rueckte bis an das Wort heran. Es las sich wie der Anfang der
+        # Legendenzeile daneben. Die Gasse vor der Spalte ist immer dieselbe,
+        # gleich was am weitesten rechts steht: das Feld, ein Marker, ein Wort.
+        neben_dem_feld = self.gasse_neben_dem_feld()
+        marker = self.zeichne("gasse-marker", "form: halle" + ZUSPIELZIEL + """
+spieler:
+  - bei: [10.0, 6.0]
+    text: Z
+""")
+        stelle = self.zeichne("gasse-stelle", "form: halle" + ZUSPIELZIEL + """
+stellen:
+  - bei: [10.4, 6.0]
+    text: 3-m-Linie
+""")
+
+        kreis = mit_klasse(marker, "marker")[0]
+        vor_dem_marker = self.gasse(marker,
+                                    float(kreis.get("cx")) + float(kreis.get("r")))
+        self.assertAlmostEqual(vor_dem_marker, neben_dem_feld, places=2)
+        self.assertGreaterEqual(self.gasse_vor_dem_wort(stelle, "stelle"), neben_dem_feld)
+
+    def test_vor_dem_namen_einer_zone_oder_eines_geraets_bleibt_die_gasse(self) -> None:
+        # Dasselbe Wort, nur an etwas anderem: eine Zone traegt ihren Namen in
+        # sich, ein Geraet unter sich. Ragt er rechts am weitesten hinaus,
+        # haelt die Spalte vor ihm dieselbe Gasse.
+        neben_dem_feld = self.gasse_neben_dem_feld()
+        for klasse, aufbau in (
+            ("zonenname", """
+zonen:
+  - text: Ablage
+    form: rechteck
+    bei: [10.0, 4.0]
+    groesse: [1.2, 2.0]
+"""),
+            ("geraetname", """
+geraete:
+  - text: Ballwagen
+    teile:
+      - form: rechteck
+        bei: [10.0, 6.0]
+        groesse: [0.8, 0.5]
+"""),
+        ):
+            with self.subTest(wort=klasse):
+                baum = self.zeichne(f"gasse-{klasse}",
+                                    "form: halle" + ZUSPIELZIEL + aufbau)
+
+                self.assertGreaterEqual(self.gasse_vor_dem_wort(baum, klasse),
+                                        neben_dem_feld)
 
     def test_ein_legendenblock_ohne_ueberschrift_oder_ohne_zeilen_bricht_ab(self) -> None:
         # Ein Block ohne Ueberschrift ist eine Liste, von der niemand weiss,

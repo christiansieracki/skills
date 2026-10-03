@@ -488,6 +488,12 @@ Ohne `text` steht da, was gemessen wurde: `6 m`, `4,5 m`. Wer selbst etwas
 hinschreibt, verantwortet es. Gezeichnet wird in beiden Fällen die Strecke
 zwischen `von` und `nach`.
 
+Die Beschriftung steht neben der Mitte der Linie, auf der Seite, auf die der
+`versatz` zeigt. Über oder unter einer waagerechten Linie steht sie immer
+gleich weit weg. Neben einer senkrechten rückt sie zusätzlich um ihre halbe
+Breite ab, neben einer schrägen um entsprechend weniger. So läuft die Linie
+auch bei „5 bis 6 m" nicht durch das Wort.
+
 `versatz` rückt die Linie zur Seite, ohne sie zu kürzen. Positiv heißt nach
 **links**, vom Gang `von` → `nach` aus gesehen, genau wie bei `bogen`. Zwei
 gestrichelte Maßhilfslinien halten die verschobene Linie an dem fest, was sie
@@ -531,7 +537,10 @@ Untertitel an dessen Platz, dazu weiter unten mehr. Titel und Fußzeile sitzen
 auf derselben linken Kante wie die Grundform, damit das Textwerk nicht wie ein
 zweites Blatt hinter dem ersten aussieht. Die Legendenspalte beginnt oben auf
 Höhe der Grundform. Steht jemand hinter der Grundlinie, fängt sie also unter
-diesem Marker an.
+diesem Marker an. Vor ihr bleibt immer dieselbe Gasse, so breit wie der Rand
+um das Feld, gleich ob am weitesten rechts das Feld steht, ein Marker oder das
+Wort einer Stelle, einer Zone oder eines Geräts. Ein Wort, das bis an die
+Spalte heranreicht, liest sich wie der Anfang der Zeile daneben.
 
 **Die Legende steht in Legendenblöcken.** Sie ist selten eine einzige
 Aufzählung, meist sind es mehrere: die Aufschlagseite, die Annahmeseite, das
