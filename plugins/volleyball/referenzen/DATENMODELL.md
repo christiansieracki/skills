@@ -241,6 +241,8 @@ plan_freigegeben: 2026-09-30     # null, solange der Plan nicht freigegeben ist
 textmarke: "Ausführung:"         # optional: ab hier beschreibt die Quelle ihren Ablauf
 platzhalter: "hier könnte ihr Text stehen"   # optional: was dort steht, wenn nichts dasteht
 quellgrafik_ausschneiden: true   # optional: die Quellgrafik aus dem PDF ausschneiden
+ohne: [Aufst_Pos_D, PLAYDRILL_IMPORT_LOG.md]   # optional: was der Zerlegungsplan auslässt
+in_arbeit: christian, 2026-10-02 # schreibt das Skript: wer seit wann daran arbeitet
 ---
 
 # Sammelimport playdrill
@@ -259,7 +261,8 @@ daraus gelten. Geht unverändert in jeden Auftrag.
 ```
 
 - Die Spalte **Kandidat** trägt die Nummer des Kandidaten, fortlaufend je
-  Quellenordner. Sie bleibt und benennt Entwurf und Auftrag.
+  Quellenordner. Sie bleibt und benennt Entwurf und Auftrag. Ein zweiter Lauf
+  zählt ab der höchsten Nummer in der Übersicht weiter.
 - **Dateien** stehen relativ zum Quellenordner, jede in Backticks.
 - **Ergebnis** ist eins von `uebung`, `folge`, `zurückgestellt`, `übersprungen`.
   Aus `uebung` und `folge` wird eine Karte mit diesem `typ`.
@@ -275,6 +278,22 @@ Textmarke, ohne den Platzhalter, weniger als 150 Zeichen, sagt der Auftrag
 dabei nicht. Ohne Textmarke, oder wenn eine Datei sie nicht trägt, zählt ihr
 ganzer Text. Hat eine Datei gar keinen Text, entscheidet der Agent.
 
+`ohne` ist eine Liste von Pfaden relativ zum Quellenordner, in eckigen
+Klammern. Ein Ordner gilt mit allem darunter. Was dort steht, sieht der
+Zerlegungsplan nicht: Es steht nicht in der Planeingabe, sein Text wird nicht
+gelesen, und es gilt bei keinem Lauf als neu. Bei PlayDrill sind das die
+Aufstellungen, die Vorlagen und die Logs des Trainers. Eine Liste aus
+`- `-Zeilen weist das Skript ab, der Parser läse sie als leer.
+
+`in_arbeit` trägt `sammelimport.py vorbereiten` ein, sobald es Aufträge
+schreibt: den Trainer dieses Rechners aus `trainer:` in der Wurzeldatei und
+den Tag, an dem er angefangen hat. Ohne Trainer an diesem Rechner schreibt
+`vorbereiten` keinen Auftrag. Steht dort ein anderer Trainer, endet
+`vorbereiten` mit einer Meldung, die ihn und das Datum nennt, und schreibt
+nichts. So entwerfen zwei Trainer nicht dieselben Kandidaten zweimal. Mit
+`--trotzdem` geht es weiter, etwa wenn der Eintrag von einem abgebrochenen
+Lauf stammt. Ist nichts mehr offen, löscht `uebernehmen` den Eintrag.
+
 Die Übersicht ist der freigegebene Zerlegungsplan. Bis zur Freigabe schreibt
 ihn der Skill im Gespräch mit dem Trainer. Danach schreibt nur noch
 `sammelimport.py` hinein, auch wenn mehrere Agenten parallel entwerfen. Den
@@ -285,11 +304,13 @@ Agenten zählt dabei nicht.
 
 Alles, was ein laufender Sammelimport erzeugt, liegt hier. `planeingabe.md` ist
 die Eingabe für den Zerlegungsplan: jede Datei des Quellenordners, die noch in
-keiner Zeile der Übersicht steht, bei PDFs ihr Text, und die Bibliotheksliste,
-in der die Karten aus diesem Quellenordner markiert sind. Der Rest ist nach der
-Nummer des Kandidaten benannt: `17.auftrag.md` ist der Auftrag für den Agenten,
-`17.md` der Kartenentwurf, `17.quellgrafik.png` die Quellgrafik, bei
-mehreren `17.quellgrafik-1.png`, `17.quellgrafik-2.png` und so weiter.
+keiner Zeile der Übersicht steht und die `ohne` nicht auslässt, bei PDFs ihr
+Text, die nächste freie Kandidatennummer, ohne Übersicht 1, und die
+Bibliotheksliste, in der die Karten aus diesem Quellenordner markiert sind.
+Der Rest ist nach der Nummer des Kandidaten benannt: `17.auftrag.md` ist der
+Auftrag für den Agenten, `17.md` der Kartenentwurf, `17.quellgrafik.png` die
+Quellgrafik, bei mehreren `17.quellgrafik-1.png`, `17.quellgrafik-2.png` und
+so weiter.
 
 Der Auftrag trägt unter jedem PDF des Kandidaten dessen ganzen Text, oder den
 Hinweis, dass der Agent das PDF selbst lesen muss. Er sagt, ob der Ablauf aus
@@ -329,7 +350,8 @@ Ein Vorschlag beginnt mit seinem Ziel in Backticks: dem Feld, oder der
 `sammelimport.py pruefen` weist einen Entwurf ab, wenn er das Datenmodell
 bricht oder die Form der Freigabe nicht einhält. Der Kandidat geht dann auf
 `offen`, der Grund steht in der Notiz, und der nächste Durchgang entwirft ihn
-neu. Geprüft wird:
+neu. `uebernehmen` prüft genauso, setzt aber nichts, siehe unten. Geprüft
+wird:
 
 - das Frontmatter: jedes Feld der Karte außer `id` und `angelegt`, und keine
   `id`;
@@ -339,7 +361,9 @@ neu. Geprüft wird:
 - `quelldatei`: relativ zu `quellen/`, und jede genannte Datei liegt dort.
   Anders als auf einer Karte von Hand ist das hier kein freier Text: Der
   Auftrag gibt den Wert vor, mit den Dateien des Kandidaten, bei mehreren
-  durch Komma getrennt;
+  durch Komma getrennt. Trägt ein Dateiname selbst ein Komma, fügt die
+  Prüfung benachbarte Teile wieder zusammen, bis jedes Stück eine vorhandene
+  Datei nennt. Erst wenn das nicht aufgeht, ist der Wert falsch;
 - die Quellgrafiken: nur die eigenen, jede einmal, und jede eingetragene liegt
   neben dem Entwurf;
 - `## Freigabe` mit beiden Listen, jede Rückfrage und jeder Vorschlag in der
@@ -354,19 +378,27 @@ Quellgrafiken, die er einträgt, in seiner Reihenfolge. Die Textstellen ergeben 
 der Tabelle die Spalte „aus dem Bild“.
 
 Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
-mit `angelegt` von heute und ohne `## Freigabe`. Die Quellgrafik kommt unter
-dem Namen der Karte nach `schaubilder/`, etwa `ue-000291-abwehr-vom-kasten.png`, und
-`schaubild:` zeigt darauf. Mehrere bekommen den Namen der Karte mit Nummer, in
-der Reihenfolge des Entwurfs, etwa `ue-000291-zirkel-1.png`, und `schaubild:`
-trägt sie als Liste. Eine einzelne Quellgrafik bleibt ein einzelner Name, auch
-wenn der Entwurf sie in eckigen Klammern nennt. Liegt dort schon eine Datei unter
-einem dieser Namen, wird der Kandidat nicht übernommen. Entwurf und Auftrag
-verschwinden dann. Streicht der Trainer einen Kandidaten, wird er
-`übersprungen`, mit dem Grund in der Notiz. Ergänzt er als Duplikat eine
-bestehende Karte, wird er `ergänzt`, mit deren ID in der Spalte Karte. Aus
-beiden entsteht keine Karte, aber auch ihr Entwurf und Auftrag verschwinden.
-Ist im Quellenordner nichts mehr offen, verschwindet auch
-`kartenentwuerfe/<ordner>/`.
+mit `angelegt` von heute und ohne `## Freigabe`. Entwurf und Auftrag
+verschwinden dann. Die Quellgrafik kommt unter dem Namen der Karte nach
+`schaubilder/`, etwa `ue-000291-abwehr-vom-kasten.png`, und `schaubild:` zeigt
+darauf. Mehrere bekommen den Namen der Karte mit Nummer, in der Reihenfolge
+des Entwurfs, etwa `ue-000291-zirkel-1.png`, und `schaubild:` trägt sie als
+Liste. Eine einzelne Quellgrafik bleibt ein einzelner Name, auch wenn der
+Entwurf sie in eckigen Klammern nennt. Streicht der Trainer einen Kandidaten,
+wird er `übersprungen`, mit dem Grund in der Notiz. Ergänzt er als Duplikat
+eine bestehende Karte, wird er `ergänzt`, mit deren ID in der Spalte Karte.
+Aus beiden entsteht keine Karte, aber auch ihr Entwurf und Auftrag
+verschwinden. Ist im Quellenordner nichts mehr offen, verschwinden auch
+`kartenentwuerfe/<ordner>/` und `in_arbeit`.
+
+Nicht übernommen wird ein Kandidat, unter dessen Namen in `schaubilder/` schon
+eine Datei liegt, und einer, dessen freigegebener Entwurf die Prüfung nicht
+besteht. Entwurf und Status bleiben dann, wie sie sind, denn der Entwurf trägt
+die Antworten des Trainers, und ein neuer Durchgang überschriebe sie. Die
+Ausgabe nennt den Fehler, die übrigen Kandidaten übernimmt `uebernehmen`
+trotzdem und endet mit einem Exitcode ungleich 0. Fehlt `quellen/<ordner>/`,
+etwa weil die Nextcloud ihn an diesem Rechner nicht abgleicht, bricht
+`uebernehmen` ab, bevor es etwas schreibt.
 
 Den Ordner `kartenentwuerfe/` legt `init_struktur.py` nicht an. Er entsteht mit
 dem ersten Sammelimport. `index.py` und `suche.py` lesen ihn nicht, ein

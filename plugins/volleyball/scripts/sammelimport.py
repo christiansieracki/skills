@@ -2,7 +2,7 @@
 """Führt einen Sammelimport über einen Quellenordner, Kandidat für Kandidat.
 
     <python> sammelimport.py vorbereiten --plan <ordner>
-    <python> sammelimport.py vorbereiten <ordner>
+    <python> sammelimport.py vorbereiten <ordner> [--trotzdem]
     <python> sammelimport.py pruefen <ordner> [--json]
     <python> sammelimport.py uebernehmen <ordner> --kandidat 3 "Notiz" ...
                  --uebersprungen 4 "Grund" ... --ergaenzt 5 ue-000027 ...
@@ -12,20 +12,25 @@
 Übersicht, dem freigegebenen Zerlegungsplan mit dem Stand je Kandidat.
 
 `vorbereiten --plan` legt vor dem Zerlegungsplan die Planeingabe an: jede
-Datei, die noch in keiner Zeile der Übersicht steht, bei PDFs ihr Text, dazu
-die Bibliotheksliste. Ein zweiter Lauf über denselben Ordner nimmt so nur, was
-neu ist. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
+Datei, die noch in keiner Zeile der Übersicht steht und die `ohne:` nicht
+auslässt, bei PDFs ihr Text, dazu die nächste freie Kandidatennummer und die
+Bibliotheksliste. Ein zweiter Lauf über denselben Ordner nimmt so nur, was neu
+ist, und zählt weiter. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
 
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
 nächsten offenen Kandidaten an, mit dem Text jedes PDF und der Angabe, ob der
-Ablauf aus dem Bild kommt. Wenn die Einstellungen es wollen, schneidet es
+Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein, welcher Trainer
+daran arbeitet. Arbeitet laut Eintrag ein anderer daran, geht es nur mit
+`--trotzdem` weiter. Wenn die Einstellungen es wollen, schneidet es
 daneben aus jedem PDF mit Bild die Quellgrafik aus, dafür braucht es Pillow
 (ADR-0005). `pruefen` setzt den Status aus den Kartenentwürfen, die dort auf
 der Platte liegen, und weist ab, was das Datenmodell bricht oder die Form der
 Freigabe nicht einhält. Mit `--json` gibt es aus, was die Freigabe im Chat
 braucht. `uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`,
 erst jetzt mit ID (ADR-0010), und legt die Quellgrafiken als ihre Schaubilder ab.
-Gestrichene und ergänzende Kandidaten bekommen nur ihren Status.
+Ein freigegebener Entwurf, der die Prüfung nicht besteht, bleibt mit seinem
+Status stehen. Gestrichene und ergänzende Kandidaten bekommen nur ihren Status.
+Ist nichts mehr offen, löscht es `in_arbeit`.
 
 Nach der Freigabe des Plans schreibt nur noch dieses Skript in die Übersicht.
 Mehrere Agenten entwerfen parallel, und keiner von ihnen fasst sie an.
@@ -45,7 +50,7 @@ import unicodedata
 import zlib
 from dataclasses import dataclass, field
 from datetime import date
-from functools import cached_property
+from functools import cache, cached_property
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -54,7 +59,7 @@ from bilder_aufbereiten import kandidaten as bilder_nach_gewicht  # noqa: E402
 from tpdaten import (  # noqa: E402
     DISZIPLIN_SPALTE, KARTENFELDER, TYPEN, KeineId, finde_wurzel, hole_index, interpreter,
     konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_schwerpunkte,
-    lies_uebungen, naechste_id, pruefe_felder, schaubilder,
+    lies_uebungen, naechste_id, pruefe_felder, schaubilder, trainer_dieses_rechners,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -193,12 +198,24 @@ class Kandidat:
         self.geaendert = True
 
 
+@dataclass
+class InArbeit:
+    """Wer gerade am Quellenordner arbeitet, aus `in_arbeit: christian, 2026-10-02`."""
+
+    trainer: str
+    seit: str
+
+    def ist_von(self, trainer: str) -> bool:
+        """Steht dieser Trainer im Eintrag? Von Hand geschrieben auch groß."""
+        return self.trainer.casefold() == trainer.casefold()
+
+
 class Sammelimport:
     """Die `sammelimport.md` eines Quellenordners.
 
     Gelesen werden die Einstellungen und die Übersicht. Geschrieben werden nur
-    die Zeilen der Übersicht, alles andere in der Datei bleibt, wie es ist:
-    Die Absprachen gehören dem Trainer.
+    die Zeilen der Übersicht und die Einstellung `in_arbeit`, alles andere in
+    der Datei bleibt, wie es ist: Die Absprachen gehören dem Trainer.
     """
 
     def __init__(self, wurzel: Path, ordner: str) -> None:
@@ -287,8 +304,50 @@ class Sammelimport:
                           f"quellgrafik_ausschneiden, benenn sie um.\n"
                           f"Es ist noch kein Auftrag geschrieben.")
 
+    @property
+    def in_arbeit(self) -> InArbeit | None:
+        """Wer laut Einstellungen gerade am Quellenordner arbeitet, oder None (#40)."""
+        wert = self.einstellungen.get("in_arbeit")
+        if wert is None:
+            return None
+        trainer, _, seit = str(wert).partition(",")
+        return InArbeit(trainer.strip(), seit.strip() or "unbekannt")
+
+    # `setze_in_arbeit` und `loesche_in_arbeit` ändern die Zeile im
+    # Frontmatter, geschrieben wird erst mit `speichere`. Die Zeile steht über
+    # der Übersicht, deren Grenzen rücken also mit.
+
+    def setze_in_arbeit(self, trainer: str) -> None:
+        """Trägt den Trainer mit dem Datum von heute in `in_arbeit` ein."""
+        wert = f"{trainer}, {date.today().isoformat()}"
+        alt = self._einstellungszeile("in_arbeit")
+        if alt is not None:
+            self.zeilen[alt] = f"in_arbeit: {wert}"
+        else:
+            ende = _frontmatter_ende(self.zeilen)
+            if ende is None:
+                raise Abbruch(f"quellen/{self.ordner}/{SAMMELIMPORT} hat kein Frontmatter.\n"
+                              f"Es ist noch kein Auftrag geschrieben.")
+            self.zeilen.insert(ende, f"in_arbeit: {wert}")
+            self.anfang, self.ende = self.anfang + 1, self.ende + 1
+        self.einstellungen["in_arbeit"] = wert
+
+    def loesche_in_arbeit(self) -> None:
+        """Nimmt `in_arbeit` aus den Einstellungen."""
+        alt = self._einstellungszeile("in_arbeit")
+        if alt is not None:
+            del self.zeilen[alt]
+            self.anfang, self.ende = self.anfang - 1, self.ende - 1
+        self.einstellungen["in_arbeit"] = None
+
+    def _einstellungszeile(self, name: str) -> int | None:
+        """Die Zeile im Frontmatter, auf der `name:` steht, oder None."""
+        ende = _frontmatter_ende(self.zeilen) or 0
+        return next((i for i in range(1, ende) if re.match(rf"{name}\s*:", self.zeilen[i])),
+                    None)
+
     def speichere(self) -> None:
-        """Schreibt die geänderten Zeilen der Übersicht zurück, sonst nichts.
+        """Schreibt die geänderten Zeilen der Übersicht zurück, dazu `in_arbeit`, sonst nichts.
 
         Erst daneben, dann umbenennen: Die Datei ist der Stand des ganzen
         Sammelimports, und ein Abbruch mitten im Schreiben soll sie heil
@@ -341,6 +400,43 @@ class Sammelimport:
     def platzhalter(self) -> str | None:
         """Was eine Quelle hinschreibt, wenn sie keinen Ablauf hat."""
         return self._text_einstellung("platzhalter")
+
+    @cached_property
+    def ohne(self) -> list[str]:
+        """Was `vorbereiten --plan` im Quellenordner auslässt, relativ zu ihm (#40).
+
+        Ein Ordner gilt mit allem darunter. Verglichen wird in einer
+        Unicode-Form, aus demselben Grund wie in `neue_dateien`.
+
+        Die Liste steht in eckigen Klammern. Eine aus `- `-Zeilen liest der
+        Parser als leer, und still übergangen käme jede ausgelassene Datei
+        wieder in die Planeingabe. Deshalb bricht das Skript dann ab.
+        """
+        wert = self.einstellungen.get("ohne")
+        if wert is None:
+            if self._blockliste("ohne"):
+                raise Abbruch(f"ohne in quellen/{self.ordner}/{SAMMELIMPORT} steht als Liste "
+                              f"aus `- `-Zeilen. Schreib sie in eckigen Klammern, etwa "
+                              f"ohne: [Aufst_Pos_D, PLAYDRILL_IMPORT_LOG.md].")
+            return []
+        pfade = wert if isinstance(wert, list) else [wert]
+        if not all(isinstance(p, str) for p in pfade):
+            raise Abbruch(f"ohne in quellen/{self.ordner}/{SAMMELIMPORT} ist {wert!r}, "
+                          f"erwartet ist eine Liste von Pfaden relativ zum Quellenordner.")
+        return [_nfc(p.replace("\\", "/").strip("/")) for p in pfade if p.strip("/")]
+
+    def _blockliste(self, name: str) -> bool:
+        """Folgt im Frontmatter auf `name:` eine Zeile mit `- `?"""
+        zeile = self._einstellungszeile(name)
+        if zeile is None:
+            return False
+        folgende = [z.strip() for z in self.zeilen[zeile + 1:_frontmatter_ende(self.zeilen)]
+                    if z.strip()]
+        return bool(folgende) and folgende[0].startswith("- ")
+
+    def ausgelassen(self, name: str) -> bool:
+        """Lässt `ohne:` die Datei `name` aus, relativ zum Quellenordner und in NFC?"""
+        return any(name == pfad or name.startswith(pfad + "/") for pfad in self.ohne)
 
     @property
     def absprachen(self) -> str:
@@ -518,6 +614,45 @@ def _unter_quellen(quellen: Path, wert: str) -> bool:
     return pfad.is_file() and pfad.resolve().is_relative_to(quellen.resolve())
 
 
+def quelldateien(quellen: Path, wert: str) -> list[tuple[str, bool]]:
+    """Die Dateien in `quelldatei:`, jede mit der Angabe, ob es sie unter quellen/ gibt.
+
+    Getrennt wird am Komma. Danach werden benachbarte Teile wieder
+    zusammengefügt, bis jedes Stück eine vorhandene Datei nennt, denn auch
+    ein Dateiname kann ein Komma tragen (#40). Geht das nicht auf, gilt die
+    Zerlegung mit den wenigsten Teilen ohne Datei, und Teile ohne Datei, die
+    nebeneinander stehen, kommen wieder zusammen. Fehlt genau eine Datei,
+    nennt eine Meldung so genau sie, mit Komma oder ohne, und nicht ein
+    Bruchstück.
+    """
+    teile = wert.split(",")
+
+    @cache
+    def zerlege_ab(i: int) -> tuple[int, tuple[tuple[int, int, bool], ...]]:
+        """Ab Teil `i`: wie viele Teile ohne Datei bleiben, und die Stücke als Bereiche."""
+        if i == len(teile):
+            return 0, ()
+        moeglich = []
+        for j in range(i + 1, len(teile) + 1):
+            if _unter_quellen(quellen, ",".join(teile[i:j]).strip()):
+                fehlend, rest = zerlege_ab(j)
+                moeglich.append((fehlend, ((i, j, True), *rest)))
+        # Teil `i` allein und ohne Datei. Ein leerer Teil, etwa hinter einem
+        # Komma am Ende, zählt nicht.
+        fehlend, rest = zerlege_ab(i + 1)
+        moeglich.append((fehlend + 1, ((i, i + 1, False), *rest)) if teile[i].strip()
+                        else (fehlend, rest))
+        return min(moeglich, key=lambda m: m[0])
+
+    bereiche: list[tuple[int, int, bool]] = []
+    for i, j, da in zerlege_ab(0)[1]:
+        if not da and bereiche and not bereiche[-1][2]:
+            bereiche[-1] = (bereiche[-1][0], j, False)
+        else:
+            bereiche.append((i, j, da))
+    return [(",".join(teile[i:j]).strip(), da) for i, j, da in bereiche]
+
+
 def pruefe_quelldatei(wurzel: Path, wert: object) -> None:
     """Bricht mit Formfehler ab, wenn `quelldatei:` nicht auf Dateien unter quellen/ zeigt.
 
@@ -526,24 +661,20 @@ def pruefe_quelldatei(wurzel: Path, wert: object) -> None:
     auch wenn er hier eine Datei trifft. Geprüft wird `anchor` und nicht
     `is_absolute()`, aus demselben Grund wie in `suche.py`.
 
-    Bei zwei Seiten nennt der Wert beide, durch Komma getrennt. Zuerst gilt
-    der ganze Wert als eine Datei, so besteht ein Dateiname mit Komma,
-    solange er allein steht. Erst sonst wird am Komma getrennt.
+    Bei zwei Seiten nennt der Wert beide, durch Komma getrennt. Wie er sich
+    in Dateien zerlegt, sagt `quelldateien`. Der Wert bleibt ein Text.
     """
     if not wert:
         raise Formfehler("quelldatei fehlt")
     if not isinstance(wert, str):
         raise Formfehler(f"quelldatei {wert!r} ist kein Text, zwei Dateien stehen durch "
                          f"Komma getrennt")
-    quellen = wurzel / "quellen"
-    teile = [wert] if _unter_quellen(quellen, wert) else [
-        t.strip() for t in wert.split(",") if t.strip()]
-    for teil in teile:
-        if Path(teil).anchor:
-            raise Formfehler(f"quelldatei {teil} ist absolut, erwartet ist ein Pfad "
+    for datei, da in quelldateien(wurzel / "quellen", wert):
+        if Path(datei).anchor:
+            raise Formfehler(f"quelldatei {datei} ist absolut, erwartet ist ein Pfad "
                              f"relativ zu quellen/")
-        if not _unter_quellen(quellen, teil):
-            raise Formfehler(f"quelldatei {teil} gibt es unter quellen/ nicht")
+        if not da:
+            raise Formfehler(f"quelldatei {datei} gibt es unter quellen/ nicht")
 
 
 def pruefe_frontmatter(sammelimport: Sammelimport, k: Kandidat, felder: dict) -> None:
@@ -679,28 +810,50 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
 # vorbereiten --plan
 # --------------------------------------------------------------------------
 
-def neue_dateien(wurzel: Path, ordner: str) -> dict[str, Path]:
+def vorhandener_sammelimport(wurzel: Path, ordner: str) -> Sammelimport | None:
+    """Die `sammelimport.md` des Quellenordners, oder None beim ersten Lauf.
+
+    Beim ersten Lauf gibt es noch keine Übersicht, vielleicht nicht einmal
+    die `sammelimport.md`.
+    """
+    quellordner = wurzel / "quellen" / ordner
+    if not quellordner.is_dir():
+        raise Abbruch(f"Keinen Ordner quellen/{ordner}/.")
+    if not (quellordner / SAMMELIMPORT).is_file():
+        return None
+    return Sammelimport(wurzel, ordner)
+
+
+def neue_dateien(quellordner: Path, sammelimport: Sammelimport | None) -> dict[str, Path]:
     """Die Dateien des Quellenordners, die noch in keiner Zeile der Übersicht stehen.
 
     Der Schlüssel ist der Name relativ zum Quellenordner, so wie in der Spalte
-    Dateien, samt Unterordnern. Beim ersten Lauf gibt es noch keine
-    Übersicht, vielleicht nicht einmal die `sammelimport.md`, dann ist jede
-    Datei neu. Die `sammelimport.md` selbst ist nie eine Quelle.
+    Dateien, samt Unterordnern. Ohne `sammelimport.md` ist jede Datei neu. Was `ohne:`
+    auslässt, ist nie neu, und die `sammelimport.md` selbst ist nie eine
+    Quelle.
 
     Verglichen wird in einer Unicode-Form. macOS schreibt ein Ü im Dateinamen
     als U mit zwei Punkten, Windows und die Übersicht als ein Zeichen, und
     jeder Übungsordner von PlayDrill heißt `Ü_…`. Geöffnet wird die Datei
     über ihren Pfad, wie er auf der Platte steht.
     """
-    quellordner = wurzel / "quellen" / ordner
-    if not quellordner.is_dir():
-        raise Abbruch(f"Keinen Ordner quellen/{ordner}/.")
-    im_plan: set[str] = set()
-    if (quellordner / SAMMELIMPORT).is_file():
-        im_plan = {_nfc(d) for k in Sammelimport(wurzel, ordner).kandidaten for d in k.dateien}
+    im_plan = ({_nfc(d) for k in sammelimport.kandidaten for d in k.dateien}
+               if sammelimport else set())
     alle = {_nfc(p.relative_to(quellordner).as_posix()): p for p in quellordner.rglob("*")
             if p.is_file() and p.name != SAMMELIMPORT}
-    return {name: alle[name] for name in sorted(alle) if name not in im_plan}
+    return {name: alle[name] for name in sorted(alle)
+            if name not in im_plan and not (sammelimport and sammelimport.ausgelassen(name))}
+
+
+def naechste_kandidatennummer(sammelimport: Sammelimport | None) -> int:
+    """Die höchste Nummer in der Übersicht plus eins, ohne Übersicht 1 (#40).
+
+    Die Nummer eines Kandidaten bleibt. Ein zweiter Lauf zählt deshalb ab
+    hier weiter, auch über Lücken hinweg, die beim Zusammenlegen entstehen.
+    """
+    if sammelimport is None:
+        return 1
+    return max((int(k.nummer) for k in sammelimport.kandidaten), default=0) + 1
 
 
 def _nfc(text: str) -> str:
@@ -817,21 +970,25 @@ def bibliotheksliste(wurzel: Path, ordner: str) -> list[str]:
     return zeilen
 
 
-def melde_schwere_fotos(ordner: str, quellordner: Path) -> None:
+def melde_schwere_fotos(ordner: str, quellordner: Path,
+                        sammelimport: Sammelimport | None) -> None:
     """Nennt die Fotos im Quellenordner, die zu schwer zum Lesen sind.
 
     Schwelle und Endungen kommen aus `bilder_aufbereiten.py`, damit „zu
     schwer" hier dasselbe heißt wie dort, wo es behoben wird. Genannt werden
     alle Fotos des Ordners, nicht nur die neuen: Auch ein Foto, das schon im
-    Plan steht, muss der Agent für den Entwurf öffnen können.
+    Plan steht, muss der Agent für den Entwurf öffnen können. Nur was `ohne:`
+    auslässt, öffnet kein Agent, das fehlt hier.
     """
     schwer, _leicht = bilder_nach_gewicht(quellordner)
+    namen = {pfad: _nfc(pfad.relative_to(quellordner).as_posix()) for pfad in schwer}
+    schwer = [pfad for pfad in schwer
+              if not (sammelimport and sammelimport.ausgelassen(namen[pfad]))]
     if not schwer:
         return
     print(f"{bilder(len(schwer))} über {menschenmass(SCHWELLE)}, zu schwer zum Lesen:")
     for pfad in schwer:
-        print(f"  {_nfc(pfad.relative_to(quellordner).as_posix())}  "
-              f"{menschenmass(pfad.stat().st_size)}")
+        print(f"  {namen[pfad]}  {menschenmass(pfad.stat().st_size)}")
     print(f"Vorher verkleinern, mit Rückfrage: "
           f"'{interpreter()} bilder_aufbereiten.py quellen/{ordner}'\n")
 
@@ -859,13 +1016,17 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     Der Agent liest sie in einem Aufruf: jede Datei, die noch in keiner Zeile
     der Übersicht steht, bei PDFs mit ihrem Text, und die Bibliotheksliste.
     Der Quellenordner steht einmal absolut im Kopf, denn Fotos und PDFs ohne
-    Text öffnet der Agent selbst.
+    Text öffnet der Agent selbst. Dazu die nächste freie Kandidatennummer, ab
+    der er zählt.
     """
-    dateien = neue_dateien(wurzel, ordner)
+    sammelimport = vorhandener_sammelimport(wurzel, ordner)
     quellordner = wurzel / "quellen" / ordner
-    melde_schwere_fotos(ordner, quellordner)
+    dateien = neue_dateien(quellordner, sammelimport)
+    melde_schwere_fotos(ordner, quellordner, sammelimport)
     if not dateien:
-        print(f"Keine neuen Dateien in quellen/{ordner}/, jede steht schon in der Übersicht.")
+        wo = ("in der Übersicht oder unter ohne" if sammelimport and sammelimport.ohne
+              else "in der Übersicht")
+        print(f"Keine neuen Dateien in quellen/{ordner}/, jede steht schon {wo}.")
         return 0
     pdfs = {name for name in dateien if _ist_pdf(name)}
     pdftotext = finde_pdftotext() if pdfs else None
@@ -889,6 +1050,7 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
 
     teile = [f"# Planeingabe für quellen/{ordner}/", "",
              f"Quellenordner: `{quellordner.as_posix()}/`", "",
+             f"Nächste freie Kandidatennummer: {naechste_kandidatennummer(sammelimport)}", "",
              f"{len(dateien)} Dateien, die noch in keiner Zeile der Übersicht stehen, "
              f"relativ zum Quellenordner.", *textlage, "", "## Dateien", ""]
     for datei in dateien:
@@ -1296,10 +1458,56 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
     return ziel
 
 
-def vorbereiten(wurzel: Path, ordner: str) -> int:
+def trainer_fuer_auftraege(wurzel: Path) -> str:
+    """Der Trainer dieses Rechners, oder Abbruch, bevor ein Auftrag geschrieben ist.
+
+    Ohne ihn ließe sich nicht eintragen, wer am Quellenordner arbeitet, und
+    `uebernehmen` bekäme am Ende keine ID.
+    """
+    try:
+        return trainer_dieses_rechners(wurzel)
+    except KeineId as fehler:
+        raise Abbruch(f"{fehler}\nEs ist noch kein Auftrag geschrieben.") from None
+
+
+def verlange_freien_quellenordner(sammelimport: Sammelimport, trainer: str,
+                                  trotzdem: bool) -> None:
+    """Bricht ab, wenn laut `in_arbeit` ein anderer Trainer am Quellenordner arbeitet (#40).
+
+    Zwei Trainer, die denselben Quellenordner zugleich importieren, entwürfen
+    dieselben Kandidaten zweimal. Mit getrennten Nummernbereichen entstünden
+    zwei Karten mit gleichem Inhalt und verschiedenen IDs, und der Linter
+    merkte es nicht. `trotzdem` geht über einen fremden Eintrag hinweg, etwa
+    einen von einem abgebrochenen Lauf. Der Skill fragt den Trainer vorher.
+
+    Der Eintrag ist ein Hinweis und keine Sperre. Er liegt in derselben
+    Nextcloud wie alles andere, und wer vor dem Abgleich anfängt, sieht ihn
+    nicht. Aus diesem Grund vergibt ADR-0011 die IDs nicht über eine
+    Reservierungsdatei. Hier reicht der Hinweis: Im schlimmsten Fall wird
+    doppelt entworfen, und die Freigabe zeigt es.
+    """
+    eintrag = sammelimport.in_arbeit
+    if eintrag and not eintrag.ist_von(trainer) and not trotzdem:
+        raise Abbruch(
+            f"An quellen/{sammelimport.ordner}/ arbeitet seit {eintrag.seit} {eintrag.trainer}, "
+            f"so steht es unter in_arbeit in {SAMMELIMPORT}.\n"
+            f"Stammt der Eintrag von einem abgebrochenen Lauf, geht es mit --trotzdem weiter.\n"
+            f"Es ist noch kein Auftrag geschrieben.")
+
+
+def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
+    """Legt die Aufträge für den nächsten Durchgang an.
+
+    Gibt es welche, steht danach in `in_arbeit` der Trainer dieses Rechners.
+    Arbeitete er schon daran, bleibt das Datum, seit wann. Ohne Auftrag wird
+    nichts eingetragen, sonst bliebe der Eintrag stehen, bis `uebernehmen`
+    ihn löscht, und das liefe vielleicht nie.
+    """
     sammelimport = Sammelimport(wurzel, ordner)
     sammelimport.verlange_aktuelle_einstellungen()
     sammelimport.verlange_freigabe()
+    trainer = trainer_fuer_auftraege(wurzel)
+    verlange_freien_quellenordner(sammelimport, trainer, trotzdem)
     offen = [k for k in sammelimport.kandidaten
              if k.wartet and pruefe_entwurf(sammelimport, k).fehler]
     dran = offen[:sammelimport.je_durchgang]
@@ -1313,6 +1521,10 @@ def vorbereiten(wurzel: Path, ordner: str) -> int:
         pdftotext = finde_pdftotext()
         if not pdftotext:
             melde_ohne_pdftotext("die Aufträge", "den Kartenentwurf")
+    eintrag = sammelimport.in_arbeit
+    if eintrag is None or not eintrag.ist_von(trainer):
+        sammelimport.setze_in_arbeit(trainer)
+        sammelimport.speichere()
     sammelimport.entwurfsordner.mkdir(parents=True, exist_ok=True)
     kennungen = kennungstabelle(wurzel)
     for k in dran:
@@ -1552,18 +1764,16 @@ def warum_nicht_wartend(k: Kandidat | None) -> str | None:
 def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> str | None:
     """Warum ein Kandidat nicht übernommen werden kann, oder None.
 
-    Prüft wie `pruefen` und setzt auch wie `pruefen`: Ein Entwurf, der die
-    Prüfung nicht mehr besteht, geht zurück auf `offen`, mit dem Grund in der
-    Notiz. Dann entwirft ihn der nächste Durchgang neu.
+    Prüft wie `pruefen`, setzt aber nichts (#40). Ein freigegebener Entwurf
+    trägt die Antworten des Trainers. Ginge er zurück auf `offen`, entwürfe
+    ihn der nächste Durchgang neu und überschriebe sie. Entwurf und Status
+    bleiben also, wie sie sind, die Ausgabe nennt den Fehler, und der Skill
+    bessert aus.
     """
     grund = warum_nicht_wartend(k)
     if grund or k is None:
         return grund
-    befund = pruefe_entwurf(sammelimport, k)
-    if befund.fehler:
-        setze_befund(k, befund)
-        sammelimport.speichere()
-    return befund.fehler
+    return pruefe_entwurf(sammelimport, k).fehler
 
 
 def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
@@ -1574,7 +1784,14 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
     steht in der Notiz. Ein bestätigtes Duplikat hat der Skill schon in die
     bestehende Karte eingearbeitet, der Kandidat wird `ergänzt` und zeigt auf
     sie. Aus den beiden letzten entsteht keine Karte.
+
+    Vor allem anderen muss der Quellenordner da sein (#40). Gleicht die
+    Nextcloud eines Rechners quellen/ nicht ab, liegen dort die Entwürfe,
+    aber weder Übersicht noch Quellen.
     """
+    if not (wurzel / "quellen" / ordner).is_dir():
+        raise Abbruch(f"Den Ordner quellen/{ordner}/ gibt es an diesem Rechner nicht. "
+                      f"Gleicht die Nextcloud quellen/ hier ab?\nNichts übernommen.")
     sammelimport = Sammelimport(wurzel, ordner)
     sammelimport.verlange_freigabe()
     if not (freigegeben or uebersprungen or ergaenzt):
@@ -1638,6 +1855,10 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
     if not any(k.wartet for k in sammelimport.kandidaten):
         raeume_entwurfsordner_weg(sammelimport)
         print(f"Nichts mehr offen, {ENTWUERFE}/{ordner}/ ist weg.")
+        if sammelimport.in_arbeit is not None:
+            sammelimport.loesche_in_arbeit()
+            sammelimport.speichere()
+            print(f"in_arbeit in {SAMMELIMPORT} ist gelöscht.")
     return 1 if abgewiesen else 0
 
 
@@ -1676,6 +1897,9 @@ def main() -> int:
     vor.add_argument("ordner", type=quellenordner, help=hilfe)
     vor.add_argument("--plan", action="store_true",
                      help="statt der Aufträge die Eingabe für den Zerlegungsplan anlegen")
+    vor.add_argument("--trotzdem", action="store_true",
+                     help="ohne --plan: weiter, auch wenn laut in_arbeit ein anderer Trainer "
+                          "daran arbeitet")
     pr = befehle.add_parser("pruefen", help="den Status aus den Entwürfen auf der Platte setzen")
     pr.add_argument("ordner", type=quellenordner, help=hilfe)
     pr.add_argument("--json", action="store_true",
@@ -1692,6 +1916,8 @@ def main() -> int:
                     metavar=("NR", "ID"),
                     help="ein Kandidat, der als Duplikat eine bestehende Karte ergänzt hat")
     a = ap.parse_args()
+    if a.befehl == "vorbereiten" and a.plan and a.trotzdem:
+        ap.error("--trotzdem gilt nur ohne --plan, die Planeingabe trägt nicht ein, wer arbeitet")
 
     wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
     try:
@@ -1703,7 +1929,7 @@ def main() -> int:
                                [tuple(p) for p in a.ergaenzt])
         if a.plan:
             return lege_planeingabe_an(wurzel, a.ordner)
-        return vorbereiten(wurzel, a.ordner)
+        return vorbereiten(wurzel, a.ordner, trotzdem=a.trotzdem)
     except Abbruch as fehler:
         print(fehler)
         return 1

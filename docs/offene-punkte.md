@@ -74,6 +74,19 @@ Klammern.
 Ziel: bewusst nicht. Auslöser: Eine Karte mit einer Liste in Blockform taucht
 im Arbeitsordner auf.
 
+### `vorbereiten --plan` achtet nicht auf `in_arbeit`
+
+Aus #40. `in_arbeit` trägt nur `vorbereiten` ein, wenn es Aufträge schreibt,
+und nur dort hält ein fremder Eintrag an. `vorbereiten --plan` prüft ihn nicht
+und schreibt ihn nicht. Schriebe es ihn, bliebe er nach einem Lauf ohne neue
+Dateien oder ohne Kandidaten mit Karte stehen, denn `uebernehmen` liefe nie.
+Plant ein Trainer neue Dateien, während ein anderer importiert, schreiben der
+Skill des einen und das Skript des anderen zugleich in die Übersicht, und die
+Nextcloud legt eine Konfliktdatei an. Mit einem Trainer kommt das nicht vor.
+
+Ziel: bewusst nicht. Auslöser: Ein zweiter Trainer importiert aus einem
+Quellenordner, an dem schon einer arbeitet.
+
 ### Ein Beach-Team anlegen, solange es keins gibt
 
 Beach ist seit Welle 1a im Plugin und an einer echten Beachübung abgenommen

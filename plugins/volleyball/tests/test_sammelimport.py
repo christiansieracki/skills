@@ -91,6 +91,66 @@ class VorbereitenTest(unittest.TestCase):
         self.assertEqual(fertig.returncode, 0, fertig.stdout)
         self.assertEqual(self.auftraege(), ["5.auftrag.md", "6.auftrag.md"])
 
+    def in_arbeit(self) -> str | None:
+        """Der Wert von `in_arbeit:` in den Einstellungen der sammelimport.md, oder None."""
+        text = (self.ordner.pfad / "quellen" / ORDNER / "sammelimport.md").read_text(
+            encoding="utf-8")
+        treffer = re.search(r"^in_arbeit:[ \t]*(.*)$", text.split("\n---", 1)[0], re.MULTILINE)
+        return treffer.group(1).strip('"') if treffer else None
+
+    def test_vorbereiten_traegt_ein_welcher_trainer_seit_wann_daran_arbeitet(self) -> None:
+        # Mit mehreren Trainern koennen zwei denselben Quellenordner zugleich
+        # importieren und dieselben Kandidaten zweimal entwerfen (#38). Der
+        # Eintrag sagt dem zweiten, wer schon dran ist. Die Uebersicht
+        # bleibt dabei heil, obwohl im Frontmatter eine Zeile dazukommt.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "importiert", "karte": "ue-000001"},
+            {"kandidat": 2, "dateien": ["b.pdf"]},
+        ])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(self.in_arbeit(), f"test, {date.today().isoformat()}")
+        self.assertEqual(sorted(self.ordner.uebersicht(ORDNER)), ["1", "2"])
+        self.assertEqual(self.auftraege(), ["2.auftrag.md"])
+
+    def test_arbeitet_ein_anderer_trainer_daran_geht_es_nur_mit_trotzdem_weiter(self) -> None:
+        # Ohne --trotzdem endet vorbereiten, nennt ihn und schreibt nichts,
+        # auch die sammelimport.md bleibt Zeichen fuer Zeichen. Mit
+        # --trotzdem geht es weiter, etwa wenn der Eintrag von einem
+        # abgebrochenen Lauf stammt, und der Eintrag nennt jetzt diesen.
+        datei = self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"]}], in_arbeit="anna, 2026-10-01")
+        vorher = datei.read_text(encoding="utf-8")
+
+        gestoppt = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertNotEqual(gestoppt.returncode, 0, gestoppt.stdout)
+        self.assertIn("2026-10-01", zeile_mit(gestoppt.stdout, "anna"))
+        self.assertIn("--trotzdem", gestoppt.stdout)
+        self.assertEqual(datei.read_text(encoding="utf-8"), vorher)
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
+
+        weiter = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER, "--trotzdem")
+
+        self.assertEqual(weiter.returncode, 0, weiter.stdout + weiter.stderr)
+        self.assertEqual(self.auftraege(), ["1.auftrag.md"])
+        self.assertEqual(self.in_arbeit(), f"test, {date.today().isoformat()}")
+
+    def test_gehoert_der_rechner_zu_keinem_trainer_endet_vorbereiten(self) -> None:
+        # Ohne Trainer laesst sich nicht eintragen, wer daran arbeitet, und
+        # uebernehmen bekaeme am Ende keine ID. Besser vor dem ersten Auftrag.
+        self.ordner.setze_trainer({"test": {"nummer": "00", "rechner": ["ANDERER-RECHNER"]}})
+        self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"]}])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn(socket.gethostname(), fertig.stdout)
+        self.assertIsNone(self.in_arbeit())
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
+
     def test_der_auftrag_nennt_was_der_agent_braucht(self) -> None:
         # Der Agent kann nicht nachfragen. Was nicht im Auftrag steht, muss er
         # raten oder als Rueckfrage schreiben. Eine Folge ueber zwei Seiten
@@ -785,6 +845,30 @@ class PlaneingabeTest(unittest.TestCase):
 
         self.assertEqual(self.genannte_dateien(), ["unter/seite-04.jpg"])
 
+    def naechste_nummer(self) -> int:
+        """Die naechste freie Kandidatennummer laut Planeingabe."""
+        return int(re.search(r"Kandidatennummer: (\d+)", self.planeingabe()).group(1))
+
+    def test_die_planeingabe_nennt_die_naechste_freie_kandidatennummer(self) -> None:
+        # Die Nummer bleibt und benennt Entwurf und Auftrag. Finge ein zweiter
+        # Lauf wieder bei 1 an, stuende Kandidat 1 zweimal in der Uebersicht.
+        # Gezaehlt wird ab der hoechsten, nicht ab der Zahl der Zeilen: Die
+        # Luecke entsteht, wenn der Trainer zwei Kandidaten zusammenlegt.
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-01.jpg", b"")
+        self.plane()
+        self.assertEqual(self.naechste_nummer(), 1)
+
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-01.jpg"], "status": "importiert",
+             "karte": "ue-000001"},
+            {"kandidat": 4, "dateien": ["seite-04.jpg"], "ergebnis": "übersprungen",
+             "status": "übersprungen"},
+            {"kandidat": 2, "dateien": ["seite-02.jpg"]},
+        ])
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-05.jpg", b"")
+        self.plane()
+        self.assertEqual(self.naechste_nummer(), 5)
+
     def test_ohne_neue_dateien_entsteht_keine_planeingabe(self) -> None:
         # Dann gibt es nichts zu planen, und der Skill soll keinen Agenten
         # fuer eine leere Liste starten.
@@ -810,6 +894,51 @@ class PlaneingabeTest(unittest.TestCase):
         fertig = self.plane()
 
         self.assertIn("Keine neuen Dateien", fertig.stdout)
+
+    def test_ohne_laesst_einen_ordner_mit_allem_darunter_und_eine_datei_aus(self) -> None:
+        # PlayDrill hat neben den Uebungsordnern Aufstellungen, Vorlagen und
+        # die Logs des Trainers. Ohne `ohne:` kaeme jede dieser Dateien bei
+        # jedem Lauf als neu wieder. Der Nachbarordner mit demselben Anfang
+        # bleibt drin: ausgelassen wird der Ordner, nicht jeder Name, der so
+        # beginnt.
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [], freigegeben=None, ohne=["Ü_In Bearbeitung", "IMPORT_LOG.md"])
+        for name in ("Ü_In Bearbeitung/a.pdf", "Ü_In Bearbeitung/tiefer/b.pdf",
+                     "IMPORT_LOG.md", "Ü_In Bearbeitung-alt/c.pdf", "seite-01.jpg"):
+            self.ordner.lege_quelldatei_an(f"{ORDNER}/{name}", b"")
+
+        self.plane()
+
+        self.assertEqual(sorted(self.genannte_dateien()),
+                         ["seite-01.jpg", "Ü_In Bearbeitung-alt/c.pdf"])
+
+    def test_was_ohne_auslaesst_gilt_beim_zweiten_lauf_nicht_als_neu(self) -> None:
+        # Der Plan hat keine Zeile fuer die ausgelassenen Dateien, und das
+        # soll so bleiben. Beim zweiten Lauf ist deshalb nichts neu.
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 1, "dateien": ["seite-01.jpg"]}], ohne=["Aufst_Pos_D"])
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/Aufst_Pos_D/6-2.pdf", b"")
+
+        fertig = self.plane()
+
+        self.assertIn("Keine neuen Dateien", fertig.stdout)
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
+
+    def test_ohne_als_liste_in_blockform_bricht_ab(self) -> None:
+        # Der Parser liest eine Liste aus `- `-Zeilen als leer (DATENMODELL.md).
+        # Still uebergangen kaeme jede ausgelassene Datei wieder in die
+        # Planeingabe, bei PlayDrill 85 Stueck.
+        datei = self.ordner.lege_quellenordner_an(ORDNER, [], freigegeben=None)
+        text = datei.read_text(encoding="utf-8")
+        datei.write_text(text.replace("---\n\n", "ohne:\n  - Aufst_Pos_D\n---\n\n", 1),
+                         encoding="utf-8")
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/Aufst_Pos_D/6-2.pdf", b"")
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", "--plan", ORDNER)
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("eckigen Klammern", zeile_mit(fertig.stdout, "ohne"))
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
 
     @BRAUCHT_PDFTOTEXT
     def test_bei_pdfs_steht_ihr_text_in_der_planeingabe(self) -> None:
@@ -929,6 +1058,19 @@ class PlaneingabeTest(unittest.TestCase):
         self.assertIn("bilder_aufbereiten.py", fertig.stdout)
         self.assertIn("unter/seite-01.jpg", fertig.stdout)
         self.assertNotIn("seite-02.jpg", fertig.stdout)
+
+    def test_ein_schweres_foto_unter_ohne_ergibt_keinen_hinweis(self) -> None:
+        # Was `ohne:` auslaesst, oeffnet kein Agent. Der Hinweis kaeme sonst
+        # bei jedem Lauf wieder, fuer ein Foto, das niemand lesen muss.
+        self.ordner.lege_quellenordner_an(ORDNER, [], freigegeben=None, ohne=["Vorlagen"])
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/Vorlagen/seite-01.jpg",
+                                       os.urandom(3 * 1024 * 1024))
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-02.jpg", b"klein genug")
+
+        fertig = self.plane()
+
+        self.assertNotIn("bilder_aufbereiten.py", fertig.stdout)
+        self.assertNotIn("seite-01.jpg", fertig.stdout)
 
     def test_ohne_pdftotext_gibt_es_einen_hinweis_und_die_eingabe_ohne_text(self) -> None:
         # Ein Mittrainer auf dem Mac ohne Poppler. Der Sammelimport wird fuer
@@ -1085,6 +1227,37 @@ class PruefenTest(unittest.TestCase):
         self.assertEqual(uebersicht["1"]["Status"], "bereit", uebersicht["1"]["Notiz"])
         self.assertEqual(uebersicht["2"]["Status"], "offen")
         self.assertIn("seite-27.jpg", uebersicht["2"]["Notiz"])
+
+    def test_zwei_dateien_von_denen_eine_ein_komma_im_namen_traegt(self) -> None:
+        # Am Komma getrennt hiesse die erste "stapel/a", und jeder neue
+        # Entwurf fiele wieder durch. Fehlt eine Datei, nennt die Notiz genau
+        # sie, auch wenn sie vorn steht, und nicht ein Bruchstueck der anderen.
+        # Das gilt auch, wenn die fehlende selbst ein Komma traegt.
+        self.plane({"kandidat": 1, "dateien": ["a, b.pdf", "c.pdf"]},
+                   {"kandidat": 2, "dateien": ["d, e.pdf"]},
+                   {"kandidat": 3, "dateien": ["d, e.pdf"]},
+                   {"kandidat": 4, "dateien": ["c.pdf"]})
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 1, titel="Beide da", quelldatei=f"{ORDNER}/a, b.pdf, {ORDNER}/c.pdf")
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 2, titel="Hinten fehlt eine",
+            quelldatei=f"{ORDNER}/d, e.pdf, {ORDNER}/fehlt-hinten.pdf")
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 3, titel="Vorn fehlt eine",
+            quelldatei=f"{ORDNER}/fehlt-vorn.pdf, {ORDNER}/d, e.pdf")
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 4, titel="Die mit Komma fehlt",
+            quelldatei=f"{ORDNER}/fehlt, mit komma.pdf, {ORDNER}/c.pdf")
+
+        uebersicht = self.pruefe()
+
+        self.assertEqual(uebersicht["1"]["Status"], "bereit", uebersicht["1"]["Notiz"])
+        for nr, fehlt in (("2", "fehlt-hinten.pdf"), ("3", "fehlt-vorn.pdf"),
+                          ("4", "fehlt, mit komma.pdf")):
+            with self.subTest(kandidat=nr):
+                self.assertEqual(uebersicht[nr]["Status"], "offen")
+                self.assertEqual(uebersicht[nr]["Notiz"],
+                                 f"quelldatei {ORDNER}/{fehlt} gibt es unter quellen/ nicht")
 
     def freigabe(self) -> dict[str, dict]:
         """`pruefen --json`, je Kandidat, was die Freigabe im Chat braucht."""
@@ -1374,6 +1547,23 @@ class UebernehmenTest(unittest.TestCase):
         self.assertTrue(entwurf.exists())
         self.assertEqual(self.ordner.uebersicht(ORDNER)["1"]["Status"], "bereit")
 
+    def test_fehlt_der_quellenordner_bricht_es_ab_bevor_es_etwas_schreibt(self) -> None:
+        # Ein Rechner, dessen Nextcloud quellen/ nicht abgleicht. Die
+        # Entwuerfe liegen da, die Uebersicht und die Quellen nicht. Die
+        # Meldung sagt, welcher Ordner fehlt, statt nach einer Datei darin
+        # zu fragen.
+        entwurf = self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Ohne Quellen")
+        vorher = sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir())
+
+        fertig = self.uebernimm("--kandidat", "1", "")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn(f"quellen/{ORDNER}/", zeile_mit(fertig.stdout, "gibt es"))
+        self.assertIn("Nichts übernommen", fertig.stdout)
+        self.assertTrue(entwurf.exists())
+        self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir()),
+                         vorher)
+
     def test_danach_meldet_der_linter_keine_auffaelligkeit(self) -> None:
         # Der Pruefvertrag aus test_index.py. Eine Karte, die der Linter
         # beanstandet, waere nicht fertig, obwohl sie schon in uebungen/ liegt.
@@ -1390,27 +1580,34 @@ class UebernehmenTest(unittest.TestCase):
         self.assertEqual(auffaelligkeiten(fertig.stdout), [], fertig.stdout)
         self.assertIn(f"Übungen: {len(self.ordner.ids) + 1}", fertig.stdout)
 
-    def test_ein_entwurf_der_die_pruefung_nicht_besteht_wird_nicht_uebernommen(self) -> None:
+    def test_ein_freigegebener_entwurf_der_die_pruefung_nicht_besteht_bleibt_stehen(self) -> None:
         # Zwischen pruefen und uebernehmen arbeitet der Skill die Antworten
         # des Trainers in den Entwurf ein. Geht dabei etwas kaputt, soll es
-        # nicht als Karte in der Bibliothek landen. Der andere Kandidat im
-        # selben Aufruf kommt trotzdem durch, und der Exitcode sagt, dass
-        # nicht alles geklappt hat.
+        # nicht als Karte in der Bibliothek landen. Ginge der Kandidat dafuer
+        # auf offen, entwuerfe ihn der naechste Durchgang neu, und die
+        # Antworten waeren ueberschrieben. Also bleiben Entwurf und Status,
+        # die Ausgabe nennt den Fehler, und der Skill bessert aus. Der andere
+        # Kandidat im selben Aufruf kommt trotzdem durch, und der Exitcode
+        # sagt, dass nicht alles geklappt hat.
         self.ordner.lege_quellenordner_an(ORDNER, [
-            {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "rückfrage",
+             "notiz": "1 Rückfrage ohne Vermutung"},
             {"kandidat": 2, "dateien": ["b.pdf"], "status": "bereit"},
         ])
-        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Kaputt", freigabe="")
+        entwurf = self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Kaputt", freigabe="")
+        vorher = entwurf.read_text(encoding="utf-8")
         self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Heil")
 
         fertig = self.uebernimm("--kandidat", "1", "", "--kandidat", "2", "")
 
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("## Freigabe", zeile_mit(fertig.stdout, "  1  "))
         self.assertIn("titel: \"Heil\"", self.karte("ue-000010"))
         self.assertEqual(list((self.ordner.pfad / "uebungen").glob("ue-000011-*")), [])
+        self.assertEqual(entwurf.read_text(encoding="utf-8"), vorher)
         zeile = self.ordner.uebersicht(ORDNER)["1"]
-        self.assertEqual(zeile["Status"], "offen")
-        self.assertIn("## Freigabe", zeile["Notiz"])
+        self.assertEqual((zeile["Status"], zeile["Notiz"]),
+                         ("rückfrage", "1 Rückfrage ohne Vermutung"))
 
     def test_ist_nichts_mehr_offen_verschwindet_der_entwurfsordner(self) -> None:
         self.ordner.lege_quellenordner_an(ORDNER, [
@@ -1482,6 +1679,32 @@ class UebernehmenTest(unittest.TestCase):
         self.assertEqual((uebersicht["1"]["Status"], uebersicht["2"]["Status"]),
                          ("bereit", "bereit"))
         self.assertTrue(entwurf.exists())
+
+    def test_ist_nichts_mehr_offen_ist_der_eintrag_in_arbeit_weg(self) -> None:
+        # Erst ein Durchgang, nach dem Kandidat 2 noch offen ist: Der Eintrag
+        # bleibt, denn die Arbeit am Quellenordner laeuft weiter. Dann der
+        # letzte, und danach darf ein anderer Trainer ohne --trotzdem ran.
+        # Die Uebersicht stimmt danach noch, obwohl im Frontmatter eine Zeile
+        # weggefallen ist.
+        datei = self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
+            {"kandidat": 2, "dateien": ["b.pdf"], "status": "bereit"},
+        ], in_arbeit="test, 2026-10-01")
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Erster Durchgang")
+        self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Zweiter Durchgang")
+
+        erster = self.uebernimm("--kandidat", "1", "")
+
+        self.assertEqual(erster.returncode, 0, erster.stdout + erster.stderr)
+        self.assertIn('in_arbeit: "test, 2026-10-01"\n', datei.read_text(encoding="utf-8"))
+
+        zweiter = self.uebernimm("--kandidat", "2", "")
+
+        self.assertEqual(zweiter.returncode, 0, zweiter.stdout + zweiter.stderr)
+        self.assertNotIn("in_arbeit", datei.read_text(encoding="utf-8"))
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual([(z["Status"], z["Karte"]) for z in uebersicht.values()],
+                         [("importiert", "ue-000010"), ("importiert", "ue-000011")])
 
     def test_solange_etwas_offen_ist_bleibt_der_entwurfsordner(self) -> None:
         # Die Gegenprobe: Ein Durchgang ist fertig, der naechste nicht.

@@ -375,14 +375,12 @@ def _rechner(eintrag: dict) -> set[str]:
     return {str(r).lower() for r in rechner if r}
 
 
-def trainernummer(wurzel: Path) -> str:
-    """Die Nummer des Trainers, der an diesem Rechner sitzt.
+def trainer_dieses_rechners(wurzel: Path) -> str:
+    """Der Name, unter dem der Trainer dieses Rechners unter `trainer:` steht.
 
     Erkannt wird der Rechner an seinem Namen, ohne Ruecksicht auf Gross- und
-    Kleinschreibung. Steht er bei keinem Trainer, bei mehreren, oder teilt
-    sich sein Trainer die Nummer mit einem anderen, gibt es keine: dann
-    vergaeben zwei Rechner aus demselben Bereich, und genau das soll die
-    Nummer verhindern.
+    Kleinschreibung. Steht er bei keinem Trainer oder bei mehreren, gibt es
+    keinen, und damit auch keine ID: KeineId.
 
     Die Meldung nennt den Rechner, die eingetragenen Trainer und die Nummer,
     die ein neuer bekaeme. Damit kann der Import-Skill fragen, wer da sitzt.
@@ -390,9 +388,9 @@ def trainernummer(wurzel: Path) -> str:
     rechner = rechnername()
     abschnitt = lies_trainer(wurzel)
     trainer = abschnitt or {}
-    nummern = {name: _nummer(e.get("nummer")) for name, e in trainer.items()}
     treffer = [name for name, e in trainer.items() if rechner.lower() in _rechner(e)]
     if not treffer:
+        nummern = {name: _nummer(e.get("nummer")) for name, e in trainer.items()}
         vergeben = [int(n) for n in nummern.values() if n is not None]
         neue = f"{max(vergeben) + 1:02d}" if vergeben else "00"
         eingetragen = ", ".join(f"{name} ({nummern[name] or '?'})" for name in trainer)
@@ -406,7 +404,19 @@ def trainernummer(wurzel: Path) -> str:
     if len(treffer) > 1:
         raise KeineId(f"Der Rechner {rechner} steht bei mehreren Trainern unter trainer: "
                       f"in {MARKER}: {', '.join(treffer)}.")
-    name = treffer[0]
+    return treffer[0]
+
+
+def trainernummer(wurzel: Path) -> str:
+    """Die Nummer des Trainers, der an diesem Rechner sitzt.
+
+    Gibt es keinen Trainer dieses Rechners, oder teilt sich sein Trainer die
+    Nummer mit einem anderen, gibt es keine: dann vergaeben zwei Rechner aus
+    demselben Bereich, und genau das soll die Nummer verhindern.
+    """
+    name = trainer_dieses_rechners(wurzel)
+    trainer = lies_trainer(wurzel) or {}
+    nummern = {anderer: _nummer(e.get("nummer")) for anderer, e in trainer.items()}
     nummer = nummern[name]
     if nummer is None:
         raise KeineId(f"Die Nummer von {name} unter trainer: in {MARKER} ist keine "
