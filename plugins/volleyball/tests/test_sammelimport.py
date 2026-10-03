@@ -530,18 +530,19 @@ class QuellgrafikTest(unittest.TestCase):
             schaubild=["5.quellgrafik-1.png", "5.quellgrafik-2.png"])
         self.ordner.lege_kartenentwurf_an(ORDNER, 6, titel="Kasten")
         self.ordner.lege_kartenentwurf_an(ORDNER, 7, titel="Glatt", schaubild="7.quellgrafik.png")
+        self.ordner.lege_kartenentwurf_an(ORDNER, 8, titel="Nur Text")
 
         fertig = self.ordner.starte("sammelimport.py", "pruefen", "--json", ORDNER)
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         freigabe = {k["kandidat"]: k for k in json.loads(fertig.stdout)["kandidaten"]}
-        # Die Blaetter haben kaum Text, die Entwuerfe sind deshalb `rückfrage`.
-        for kandidat in ("5", "6", "7"):
+        # Jeder Entwurf besteht. Abgewiesen stuende der Kandidat auf `offen`.
+        for kandidat in ("5", "6", "7", "8"):
             self.assertNotEqual(freigabe[kandidat]["status"], "offen", freigabe[kandidat]["notiz"])
         self.assertEqual(freigabe["5"]["quellgrafik_fehlt"], ["zirkel.pdf"])
         self.assertEqual(freigabe["6"]["quellgrafik_fehlt"], ["Ü_Abwehr/kasten, hoch.pdf"])
         self.assertEqual(freigabe["7"]["quellgrafik_fehlt"], [])
-        self.assertNotIn("8", freigabe)
+        self.assertEqual(freigabe["8"]["quellgrafik_fehlt"], [])
 
     @BRAUCHT_PILLOW
     def test_ein_bild_das_sich_nicht_lesen_laesst_nennen_ausgabe_und_auftrag(self) -> None:

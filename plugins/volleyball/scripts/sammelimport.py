@@ -600,6 +600,14 @@ def _listen(freigabe: list[str]) -> dict[str, list[str]]:
 _AUS_DEM_BILD_JA = re.compile(rf"^- {AUS_DEM_BILD}: ja\b", re.MULTILINE)
 
 
+def _auftragstext(auftrag: Path) -> str:
+    """Der Text eines Auftrags, leer, wenn es ihn nicht gibt oder er sich nicht lesen lässt."""
+    try:
+        return auftrag.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
 def laut_auftrag_aus_dem_bild(auftrag: Path) -> bool:
     """Hat `vorbereiten` in den Auftrag geschrieben, dass der Ablauf aus dem Bild kommt?
 
@@ -607,10 +615,7 @@ def laut_auftrag_aus_dem_bild(auftrag: Path) -> bool:
     gegolten, als der Agent den Entwurf schrieb, und pdftotext muss für
     `pruefen` nicht da sein.
     """
-    try:
-        return bool(_AUS_DEM_BILD_JA.search(auftrag.read_text(encoding="utf-8")))
-    except (OSError, UnicodeDecodeError):
-        return False
+    return bool(_AUS_DEM_BILD_JA.search(_auftragstext(auftrag)))
 
 
 def laut_auftrag_ohne_quellgrafik(auftrag: Path, k: Kandidat) -> list[str]:
@@ -623,11 +628,8 @@ def laut_auftrag_ohne_quellgrafik(auftrag: Path, k: Kandidat) -> list[str]:
     Kandidaten, in der Reihenfolge der Spalte Dateien, denn ein Dateiname
     kann selbst ein Komma oder einen Doppelpunkt tragen.
     """
-    try:
-        zeilen = [z for z in auftrag.read_text(encoding="utf-8").splitlines()
-                  if z.startswith((KEINE_AUSGESCHNITTEN, KEINE_QUELLGRAFIK_AUS))]
-    except (OSError, UnicodeDecodeError):
-        return []
+    zeilen = [z for z in _auftragstext(auftrag).splitlines()
+              if z.startswith((KEINE_AUSGESCHNITTEN, KEINE_QUELLGRAFIK_AUS))]
     return [d for d in k.dateien if _ist_pdf(d) and any(f"`{d}`: " in z for z in zeilen)]
 
 

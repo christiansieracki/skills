@@ -26,16 +26,19 @@ Quellenordner relativ zu `quellen/`, etwa `playdrill`.
 1. `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py`. Das gibt die Wurzel.
    Findet es keine `trainingsplanung-root.yml`, fragen wo der Ordner liegt.
    Gibt es dort kein `quellen/<ordner>/`, fragen, welcher Ordner gemeint ist.
-   Alle Aufrufe laufen aus der Wurzel, von woanders mit `--wurzel <pfad>`.
+   Alle Aufrufe laufen aus der Wurzel. Von woanders steht `--wurzel <pfad>`
+   vor dem Unterbefehl: `sammelimport.py --wurzel <pfad> pruefen <ordner>`.
 2. In `${CLAUDE_PLUGIN_ROOT}/referenzen/DATENMODELL.md` den Abschnitt „Der
    Sammelimport“ lesen: `sammelimport.md`, Ergebnis und Status eines
    Kandidaten, was die Unterbefehle tun.
 3. `${CLAUDE_PLUGIN_ROOT}/referenzen/SPRACHE.md` und die `glossary.md` der
    Wurzel lesen.
-4. Fehlt der `glossary.md` der Wurzel der Abschnitt `## Sammelimport`,
-   anbieten, ihn aus der Saat `${CLAUDE_PLUGIN_ROOT}/referenzen/start/glossary.md`
-   einzufügen, wie dort vor `## Team und Trainingsgruppe`, ohne diese
-   Überschrift vor `## Eigene Regeln`. Fehlt unter
+4. Beim ersten Start in diesem Arbeitsordner, wenn unter `quellen/` noch
+   keine `sammelimport.md` liegt: Fehlt der `glossary.md` der Wurzel der
+   Abschnitt `## Sammelimport`, anbieten, ihn aus der Saat
+   `${CLAUDE_PLUGIN_ROOT}/referenzen/start/glossary.md` einzufügen. Er kommt
+   an dieselbe Stelle wie dort, vor `## Team und Trainingsgruppe`. Gibt es
+   diese Überschrift nicht, kommt er vor `## Eigene Regeln`. Fehlt unter
    „Weitere Sprachregeln“ die Zeile zu „Feldbild“, kommt sie mit. Eingefügt
    wird nach dem Ja. Ohne Ja geht es trotzdem weiter.
 
@@ -47,11 +50,16 @@ dem Sammelimport `<ordner>`“:
 1. Liegt in `quellen/<ordner>/` keine `sammelimport.md`, die Absprachen
    anlegen.
 2. Der Zerlegungsplan für die Dateien, die neu sind.
-3. `sammelimport.py pruefen <ordner> --json`. Stehen darin Kandidaten mit
+3. In den Einstellungen der `sammelimport.md` nachsehen, wer unter
+   `in_arbeit` steht. Ist es ein anderer Trainer als der dieses Rechners laut
+   `trainer:` in der Wurzeldatei, ihn und das Datum nennen und erst nach dem
+   Ja weitermachen. Die Entwürfe, die dort liegen, sind dann seine. Das Ja
+   gilt in dieser Sitzung auch für `--trotzdem` im Durchgang.
+4. `sammelimport.py pruefen <ordner> --json`. Stehen darin Kandidaten mit
    `bereit` oder `rückfrage`, liegen ihre Entwürfe schon da, etwa nach einem
    Abbruch am Nutzungslimit des Abos. Für sie kommt zuerst die Freigabe, ab
    Schritt 4 des Durchgangs. Neu entworfen werden sie nicht.
-4. Durchgänge, bis nichts mehr offen ist oder der Trainer Schluss macht.
+5. Durchgänge, bis nichts mehr offen ist oder der Trainer Schluss macht.
 
 Ist der Zerlegungsplan noch nicht freigegeben, bricht `pruefen` mit einer
 Meldung ab. Dann ist Schritt 2 noch nicht durch.
@@ -152,12 +160,17 @@ ohne: [Vorlagen, notizen.md]
      der Kartenentwurf aus der Antwort wissen muss, kommt in „Was es ist“. Die
      Notiz eines offenen Kandidaten überschreibt `pruefen`, „Was es ist“ liest
      der Agent im Auftrag.
-   - **Verdacht auf ein Duplikat:** Ist es eine andere Übung, fällt die
-     Rückfrage weg. Ist es dieselbe und bringt nichts Neues, wird der Kandidat
-     gestrichen, mit „Dublette von ue-######“. Bringt sie etwas Neues, etwa
-     eine zweite Disziplin oder eine Variation, bleibt er `offen`, und „Was es
-     ist“ bekommt „ergänzt ue-######“ dazu. Ergänzt wird bei der Freigabe
-     des Durchgangs.
+   - **Verdacht auf ein Duplikat:** Entschieden wird nach der Tabelle unter
+     „Duplikate prüfen“ im Import-Skill.
+     - Eine andere Übung: Die Rückfrage fällt weg.
+     - Dieselbe Übung ohne etwas Neues: gestrichen, mit „Duplikat von
+       ue-######“.
+     - Nur der Untergrund ist anders: Der Kandidat bleibt `offen`, und „Was
+       es ist“ bekommt „ergänzt ue-######“ dazu. Ergänzt wird bei der
+       Freigabe des Durchgangs.
+     - Aufstellung, Spielerzahl oder Ziel sind anders: eine eigene Karte. Der
+       Kandidat bleibt `offen`, und „Was es ist“ bekommt „Variante von
+       ue-######“ dazu.
 
    Fertig ist der Plan, wenn keine Notiz mehr eine Rückfrage trägt und der
    Trainer Ja sagt.
@@ -183,10 +196,12 @@ ohne: [Vorlagen, notizen.md]
      wann, laut `in_arbeit`. Beides dem Trainer sagen und fragen, ob er
      trotzdem weitermachen will, etwa weil der Eintrag von einem abgebrochenen
      Lauf stammt. Nach dem Ja `vorbereiten <ordner> --trotzdem`.
-   - **Der Rechner gehört zu keinem Trainer, oder `uebungen/` hat noch
-     vierstellige IDs:** Es gilt „Wenn es keine ID gibt“ im Import-Skill.
+   - **Der Rechner gehört zu keinem Trainer:** Es gilt „Wenn es keine ID
+     gibt“ im Import-Skill. Danach `vorbereiten` noch einmal.
    - **Pillow fehlt:** Den Installationshinweis weitergeben und warten, bis
      Pillow da ist. Geschrieben ist noch nichts.
+   - **pdftotext fehlt:** Den Installationshinweis einmal weitergeben. Die
+     Aufträge sind geschrieben, die Agenten lesen die PDFs selbst.
 2. Je Auftrag den Agenten `volleyball:volleyball-kartenentwurf` starten. Der
    Aufruf ist der absolute Pfad des Auftrags. Vier zugleich, die nächsten
    vier, wenn alle vier zurück sind. Nach jeder Runde eine Zeile an den
@@ -223,11 +238,21 @@ ohne: [Vorlagen, notizen.md]
    Karte. Was der Trainer offengelassen hat, fehlt im Aufruf und kommt bei der
    nächsten Freigabe wieder.
 
-   Meldet es zu einem Kandidaten „nicht übernommen“, bleiben Entwurf und
-   Status stehen, wie sie sind. Den Grund im Entwurf beheben, `pruefen`, und
-   `uebernehmen` für diesen Kandidaten noch einmal. Liegt in `schaubilder/`
-   schon eine Datei unter dem Namen der neuen Karte, dem Trainer sagen,
-   welche. Was mit ihr geschieht, entscheidet er.
+   Was nicht geklappt hat, nennt die Ausgabe je Kandidat, und der Exitcode ist
+   ungleich 0. Entwurf und Status bleiben dann stehen, wie sie sind.
+   - **„nicht übernommen“:** Den Grund im Entwurf beheben, `pruefen`, und
+     `uebernehmen` für diesen Kandidaten noch einmal. Liegt in `schaubilder/`
+     schon eine Datei unter dem Namen der neuen Karte, dem Trainer sagen,
+     welche. Was mit ihr geschieht, entscheidet er.
+   - **„nicht übersprungen“ oder „nicht ergänzt“:** Die Meldung sagt, warum:
+     Der Grund fehlt, die ID gibt es nicht, oder der Kandidat ist schon
+     erledigt. Mit dem Trainer klären und den Aufruf für diesen Kandidaten
+     wiederholen.
+   - **„Nichts übernommen.“ am Ende der Meldung:** Geschrieben ist nichts.
+     Fehlt `quellen/<ordner>/` an diesem Rechner, gleicht die Nextcloud ihn
+     nicht ab, und der Trainer muss das richten. Geht es um die ID, etwa weil
+     `uebungen/` noch vierstellige IDs hat, gilt „Wenn es keine ID gibt“ im
+     Import-Skill. Danach `uebernehmen` noch einmal.
 
 ## Die Freigabe
 
@@ -242,8 +267,12 @@ Kandidat:
 - Jede Quellgrafik aus `quellgrafiken`, alle, in ihrer Reihenfolge. Gezeigt
   wird mit dem, was die Umgebung hergibt, sonst den Pfad nennen. Ist die Liste
   leer, die Quelle selbst: die Fotos unter `dateien`, oder den Pfad des PDF.
+- Steht etwas in `quellgrafik_fehlt`, dazusagen, dass sich aus diesen PDFs
+  kein Bild ausschneiden ließ, etwa aus der Übersicht eines Zirkels.
 - Bei der Frage zum Ablauf den Abschnitt `## Ablauf` aus dem Entwurf, so wie
-  er dort steht.
+  er dort steht. Das gilt auch für die Rückfrage „Stimmt der Ablauf, wie ich
+  ihn aus dem Bild gelesen habe?“. Sie kommt bei Fotos, wo der Agent selbst
+  entschieden hat, dass der Ablauf aus dem Bild kommt.
 
 Eine Frage nach der anderen. Fertig, wenn jede eine Antwort hat.
 
@@ -262,14 +291,15 @@ Eine Frage nach der anderen. Fertig, wenn jede eine Antwort hat.
   Frage und Vermutung. Der Trainer bestätigt sie wie einen Vorschlag.
 - **aus dem Bild:** nur die Stellen aus `vorschlaege.textstellen`, ohne den
   Text. Wer es genau wissen will, öffnet den Entwurf.
-- Steht in „Was es ist“ „ergänzt ue-######“, steht das in der Zeile. Mit der
-  Zeile bestätigt der Trainer die Ergänzung.
+- Steht in „Was es ist“ „ergänzt ue-######“ oder „Variante von ue-######“,
+  steht das in der Zeile. Mit der Zeile bestätigt der Trainer es.
 
 Unter der Tabelle steht:
 
-- jeder Kandidat mit einem Eintrag in `quellgrafik_fehlt`, mit diesen PDFs:
-  Aus ihnen ließ sich kein Bild ausschneiden, etwa aus der Übersicht eines
-  Zirkels. Die übrigen Quellgrafiken kommen trotzdem auf die Karte;
+- jeder Kandidat mit einem Eintrag in `quellgrafik_fehlt`, der keine
+  Einzelfrage hatte, mit diesen PDFs: Aus ihnen ließ sich kein Bild
+  ausschneiden. Hat er weitere Quellgrafiken, kommen die trotzdem auf die
+  Karte;
 - jeder Kandidat, der in diesem Durchgang `kein Entwurf` gemeldet hat, mit
   Grund und der Frage: streichen oder die Datei richten?
 
@@ -287,11 +317,13 @@ gestrichen oder ausdrücklich offengelassen ist.
 - **Eine neue Schwerpunkt-Kennung** nach dem Ja in die `schwerpunkte.md` der
   Wurzel, mit `halle`, `beach` oder `beide` in der dritten Spalte. Erst danach
   kommt sie in `schwerpunkt:` des Entwurfs.
-- **Eine bestätigte Dublette** ergänzt die bestehende Karte nach „Duplikate
-  prüfen“ im Import-Skill: Die Disziplin kommt dazu, das Neue unter
-  `## Variationen` mit der Kurzquelle. `id`, Ziel, Ablauf, `quelle` und
-  `quelldatei` bleiben. Die Ergänzung vorlegen, nach dem Ja schreiben. Beim
-  Übernehmen wird der Kandidat `--ergaenzt` mit ihrer ID.
+- **Ein bestätigtes Duplikat, das nur den Untergrund wechselt,** ergänzt die
+  bestehende Karte nach „Duplikate prüfen“ im Import-Skill: Die Disziplin
+  kommt dazu, das Neue unter `## Variationen` mit der Kurzquelle. `id`, Ziel,
+  Ablauf, `quelle` und `quelldatei` bleiben. Die Ergänzung vorlegen, nach dem
+  Ja schreiben. Beim Übernehmen wird der Kandidat `--ergaenzt` mit ihrer ID.
+- **Eine bestätigte Variante** wird eine eigene Karte. Der Entwurf bekommt
+  `variante_von: ue-######`, der Agent kennt die Bibliothek nicht.
 
 ## Am Ende eines Durchgangs
 

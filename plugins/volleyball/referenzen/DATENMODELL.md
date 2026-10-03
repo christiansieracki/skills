@@ -374,11 +374,11 @@ wird:
   Abschnitt, den der Entwurf hat.
 
 Mit `--json` gibt `pruefen` je Kandidat mit Entwurf aus, was die Freigabe im
-Chat braucht. Kandidaten ohne Entwurf stehen nur in der Übersicht. Dazu gehören
-die Felder des Entwurfs, die Vorschläge getrennt nach Feldern und Textstellen,
-die Rückfragen getrennt nach mit und ohne Vermutung, ob der Ablauf aus dem Bild
-kommt, der Pfad des Entwurfs und als Liste `quellgrafiken` die Pfade der
-Quellgrafiken, die er einträgt, in seiner Reihenfolge. Die Textstellen ergeben in
+Chat braucht: die Felder des Entwurfs, die Vorschläge getrennt nach Feldern und
+Textstellen, die Rückfragen getrennt nach mit und ohne Vermutung, ob der Ablauf
+aus dem Bild kommt, den Pfad des Entwurfs und als Liste `quellgrafiken` die
+Pfade der Quellgrafiken, die er einträgt, in seiner Reihenfolge. Kandidaten
+ohne Entwurf stehen nur in der Übersicht. Die Textstellen ergeben in
 der Tabelle die Spalte „aus dem Bild“. Als Liste `quellgrafik_fehlt` stehen die
 PDFs des Kandidaten da, deren Bild sich nicht ausschneiden ließ, relativ zum
 Quellenordner. `pruefen` liest sie aus dem Auftrag, sie sind also auch nach
