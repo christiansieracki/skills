@@ -268,9 +268,10 @@ gezeichnet.
 
 Fängt ein Weg auf einem Spieler an oder hört auf ihm auf, endet er am Rand des
 Markers. Sonst verschwände die Pfeilspitze unter dem Kreis, und mit ihr das
-Einzige, was die Richtung zeigt. An einer Stelle endet er genauso, am Rand
+Einzige, was die Richtung zeigt. Steht der Spieler auf einem Gerät, endet der
+Weg am Rand des Rahmens um ihn. An einer Stelle endet er genauso, am Rand
 ihres Wortes. Reicht er mit seiner Spitze in den Namen eines Geräts, endet er
-am Rand des Namens, siehe bei `geraete`.
+am Rand des Namens. Beides steht bei `geraete`.
 
 ### `zonen`
 
@@ -480,6 +481,49 @@ bleibt er, wie er ist. Er zeigt auf das Gerät.
 
 Auch ein Gerät ist maßstäblich. Ein Kasten von 1,6 × 0,8 m ist im Bild so
 lang wie ein Sechstel der Feldbreite.
+
+**Gerät und Spieler am selben Ort.** Der Angreifer auf der Kiste steht dort,
+wo die Kiste steht. Beide schreibt man an denselben Ort, die Kiste unter
+`geraete`, den Angreifer unter `spieler`:
+
+```yaml
+geraete:
+  - text: Kiste
+    teile:
+      - form: rechteck
+        bei: [4.0, 9.0]
+        groesse: [0.6, 0.6]
+spieler:
+  - bei: [4.0, 9.0]
+    text: A
+    hervorgehoben: true
+```
+
+Ein Gerät liegt unter einem Spieler, wenn seine Mitte in dessen Marker liegt.
+Einen eigenen Schlüssel dafür gibt es nicht, das Skript sieht es am Ort. Der
+Marker misst knapp einen Meter, eine Kiste weniger, und darunter wäre sie
+verschwunden. Das Skript zeichnet sie deshalb als **Rahmen um den Marker**,
+0,2 m über ihn hinaus, durchgezogen und in der Füllung eines Geräts. So sieht
+der Rahmen nicht aus wie eine Zone um den Spieler. Ein hervorgehobener Spieler
+bleibt gefüllt, und der Rahmen bleibt um ihn herum zu sehen.
+
+- Wo das Gerät weiter reicht als der Rahmen, reicht der Rahmen mit. Ein Kasten
+  von 1,6 m Breite behält seine Breite und wächst nur in der Tiefe.
+- Ein Gerät nur aus Kreisen, etwa ein Hütchen am Startpunkt, bekommt einen
+  runden Rahmen. Ein eckiger sähe aus wie eine Kiste.
+- Ein Gerät aus mehreren Teilen wird ein einziger Rahmen.
+
+Der Name steht auf der Seite, die **vom Netz weg** zeigt. Unter dem Gerät
+stünde er zum Netz hin, und beim Angreifer einen Meter vor dem Netz läge er
+auf dem Netzband. Auf der freien Leinwand gibt es kein Netz, dort steht er
+darunter wie an jedem Gerät.
+
+Ein Weg, der auf dem Spieler anfängt oder aufhört, endet am Rand des Rahmens.
+Spieler und Gerät sind im Bild eins, und am Rand des Markers finge der Weg
+mitten im Gerät an.
+
+Ein Gerät, dessen Mitte neben dem Marker liegt, bleibt, wie es ist. Ein
+Ballwagen gleich neben dem Zuspieler steht also als Ballwagen da.
 
 ### `abstaende`
 

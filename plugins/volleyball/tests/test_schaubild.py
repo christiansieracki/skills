@@ -75,6 +75,21 @@ spieler:
     hervorgehoben: false
 """
 
+# Der Angreifer auf der Kiste aus der Praxiseinheit des Volleyball-Magazins
+# (#28): Die Kiste steht, wo er steht, und ist kleiner als sein Marker. `{bei}`
+# ist beider Ort, die Grundform setzt der Test davor.
+AUF_DER_KISTE = """
+geraete:
+  - text: Kiste
+    teile:
+      - form: rechteck
+        bei: {bei}
+        groesse: [0.6, 0.6]
+spieler:
+  - bei: {bei}
+    text: A
+"""
+
 # Ein Legendenblock mit der Zeile aus dem Referenzbild, vor der "3-m-Linie"
 # stand und sich wie deren Anfang las. Vor ihm wird die Gasse gemessen.
 ZUSPIELZIEL = """
@@ -983,6 +998,220 @@ class SchaubildTest(unittest.TestCase):
         self.assertIn("dreieck", fertig.stdout)
         self.assertIn("rechteck", fertig.stdout, "die Meldung nennt, was es gibt")
         self.assertFalse(self.bild("dreieck").exists())
+
+    # -- Ein Spieler auf einem Geraet ---------------------------------------
+
+    def rahmen_in_metern(self, feld: Feldmass,
+                         teil: ET.Element) -> tuple[float, float, float, float]:
+        """Ein gezeichnetes Rechteck: Mitte in x und y, Breite und Hoehe in Metern."""
+        links, oben = feld.meter(float(teil.get("x")), float(teil.get("y")))
+        breite = feld.strecke(float(teil.get("width")))
+        hoehe = feld.strecke(float(teil.get("height")))
+        return links + breite / 2, oben - hoehe / 2, breite, hoehe
+
+    def test_eine_kiste_am_ort_eines_spielers_wird_ein_rahmen_um_seinen_marker(
+            self) -> None:
+        # Unter dem Marker war die Kiste nicht zu sehen: Er misst knapp einen
+        # Meter, sie weniger. Jetzt steht sie als Rahmen um ihn, etwas
+        # groesser als er.
+        baum = self.zeichne("kiste", "form: beach"
+                            + AUF_DER_KISTE.format(bei="[4.0, 9.0]"))
+
+        feld = Feldmass(baum, BEACH)
+        kreis, _ = marker_nach_beschriftung(baum)["A"]
+        durchmesser = 2 * feld.strecke(float(kreis.get("r")))
+        teile = mit_klasse(baum, "teil")
+        self.assertEqual(len(teile), 1, "die Kiste ist ein Rahmen, kein zweites Teil")
+        x, y, breite, hoehe = self.rahmen_in_metern(feld, teile[0])
+        self.assertEqual((round(x, 2), round(y, 2)), (4.0, 9.0),
+                         "der Rahmen steht um den Marker")
+        for mass in (breite, hoehe):
+            self.assertGreater(mass, durchmesser + 0.2,
+                               "um den Marker bleibt ein Rand zu sehen")
+            self.assertLess(mass, durchmesser + 1.0,
+                            "etwas groesser als der Marker, nicht viel")
+        # Gezeichnet wie ein Geraet: in dessen Farbe und durchgezogen. Sonst
+        # saehe der Rahmen aus wie eine Zone um den Spieler.
+        self.assertEqual(farbvariable(baum, teile[0], "fill"), "geraet")
+        self.assertIsNone(stilwert(baum, teile[0], "stroke-dasharray"))
+        # Und unter dem Marker, der auf ihm steht.
+        reihenfolge = list(baum.iter())
+        self.assertLess(reihenfolge.index(teile[0]), reihenfolge.index(kreis))
+
+    def test_der_name_einer_kiste_unter_einem_spieler_steht_vom_netz_weg(
+            self) -> None:
+        # Unter dem Geraet stand der Name zum Netz hin, und einen Meter vor
+        # dem Netz landete er auf dem Netzband. Das Netz liegt im Sand bei 8 m.
+        for seite, bei, ueber_der_kiste in (("jenseits", "[4.0, 9.0]", True),
+                                            ("diesseits", "[4.0, 7.0]", False)):
+            with self.subTest(seite=seite):
+                baum = self.zeichne(f"kiste-{seite}", "form: beach"
+                                    + AUF_DER_KISTE.format(bei=bei))
+
+                feld = Feldmass(baum, BEACH)
+                _, y, _, hoehe = self.rahmen_in_metern(feld, mit_klasse(baum, "teil")[0])
+                _, unten, _, oben = self.name_in_metern(baum, feld)
+                if ueber_der_kiste:
+                    self.assertGreater(unten, y + hoehe / 2,
+                                       "der Name steht ueber dem Rahmen")
+                else:
+                    self.assertLess(oben, y - hoehe / 2,
+                                    "der Name steht unter dem Rahmen")
+                self.assertTrue(oben < 8.0 - 0.15 or unten > 8.0 + 0.15,
+                                f"der Name liegt von {unten:.2f} bis {oben:.2f} m "
+                                "auf dem Netzband")
+
+        # Ohne Netz steht der Name darunter, wie an jedem Geraet.
+        baum = self.zeichne("kiste-leinwand", "form: frei\ngroesse: [12.0, 9.0]"
+                            + AUF_DER_KISTE.format(bei="[4.0, 7.0]"))
+        feld = Feldmass(baum, LEINWAND, klasse="leinwand")
+        _, y, _, hoehe = self.rahmen_in_metern(feld, mit_klasse(baum, "teil")[0])
+        _, _, _, oben = self.name_in_metern(baum, feld)
+        self.assertLess(oben, y - hoehe / 2, "der Name steht unter dem Rahmen")
+
+    def test_ein_geraet_neben_einem_spieler_sieht_aus_wie_bisher(self) -> None:
+        # Unter dem Spieler liegt ein Geraet, wenn seine Mitte im Marker
+        # liegt. Der Marker hat einen Radius von 0,45 m: 0,4 m neben der Mitte
+        # der Kiste steht der Spieler noch darauf, 0,5 m daneben nicht mehr.
+        szene = """
+            form: beach
+            geraete:
+              - text: Kiste
+                teile:
+                  - form: rechteck
+                    bei: [4.0, 9.0]
+                    groesse: [0.6, 0.6]
+            spieler:
+              - bei: [4.0, {y}]
+                text: A
+        """
+        baum = self.zeichne("darauf", szene.format(y=9.4))
+        feld = Feldmass(baum, BEACH)
+        x, y, breite, _ = self.rahmen_in_metern(feld, mit_klasse(baum, "teil")[0])
+        self.assertEqual((round(x, 2), round(y, 2)), (4.0, 9.4),
+                         "0,4 m daneben steht er darauf, der Rahmen steht um ihn")
+        self.assertGreater(breite, 0.9)
+
+        baum = self.zeichne("daneben", szene.format(y=9.5))
+        feld = Feldmass(baum, BEACH)
+        x, y, breite, hoehe = self.rahmen_in_metern(feld, mit_klasse(baum, "teil")[0])
+        self.assertEqual(tuple(round(w, 2) for w in (x, y, breite, hoehe)),
+                         (4.0, 9.0, 0.6, 0.6),
+                         "0,5 m daneben steht die Kiste, wo und wie gross sie ist")
+        _, _, _, oben = self.name_in_metern(baum, feld)
+        self.assertLess(oben, 9.0 - 0.3, "und ihr Name darunter")
+
+    def test_ein_hervorgehobener_spieler_auf_der_kiste_bleibt_hervorgehoben(
+            self) -> None:
+        # Der Angreifer auf der Kiste ist in der Praxiseinheit die Hauptfigur
+        # und deshalb hervorgehoben. Sein Marker bleibt gefuellt, und um ihn
+        # bleibt der Rahmen zu sehen.
+        baum = self.zeichne("hauptfigur", "form: beach"
+                            + AUF_DER_KISTE.format(bei="[4.0, 9.0]")
+                            + "    hervorgehoben: true\n")
+
+        feld = Feldmass(baum, BEACH)
+        kreis, kuerzel = marker_nach_beschriftung(baum)["A"]
+        self.assertEqual(farbvariable(baum, kreis, "fill"), "strich")
+        self.assertEqual(farbvariable(baum, kuerzel, "fill"), "feld")
+        rahmen = mit_klasse(baum, "teil")[0]
+        _, _, breite, hoehe = self.rahmen_in_metern(feld, rahmen)
+        radius = feld.strecke(float(kreis.get("r")))
+        self.assertGreaterEqual(min(breite, hoehe) / 2 - radius, 0.15,
+                                "neben dem Marker bleibt vom Rahmen ein Rand")
+        reihenfolge = list(baum.iter())
+        self.assertLess(reihenfolge.index(rahmen), reihenfolge.index(kreis),
+                        "der Rahmen liegt unter dem Marker und nicht darueber")
+
+    def test_ein_weg_am_spieler_auf_der_kiste_endet_am_rahmen(self) -> None:
+        # Am Rand des Markers hoerte der Weg mitten in der Kiste auf und
+        # kreuzte ihren Rand. Spieler und Kiste sind im Bild eins, der Weg
+        # endet an dem, was aussen liegt. Schraeg, damit die Ecke zaehlt.
+        baum = self.zeichne("vom-angreifer", "form: beach"
+                            + AUF_DER_KISTE.format(bei="[4.0, 9.0]") + """
+wege:
+  - art: ballweg
+    von: [4.0, 9.0]
+    nach: [6.0, 7.0]
+  - art: ballweg
+    von: [2.0, 7.0]
+    nach: [4.0, 9.0]
+""")
+
+        feld = Feldmass(baum, BEACH)
+        x, y, breite, hoehe = self.rahmen_in_metern(feld, mit_klasse(baum, "teil")[0])
+        weg_ab, weg_hin = (zahlen(e.get("d")) for e in mit_klasse(baum, "weg"))
+        for ende, punkt in (("Anfang", feld.meter(weg_ab[0], weg_ab[1])),
+                            ("Ende", feld.meter(weg_hin[2], weg_hin[3]))):
+            with self.subTest(ende=ende):
+                self.assertTrue(abs(punkt[0] - x) > breite / 2
+                                or abs(punkt[1] - y) > hoehe / 2,
+                                f"{punkt} liegt im Rahmen")
+
+    def test_ein_kasten_breiter_als_der_rahmen_behaelt_seine_breite(self) -> None:
+        # Der Angriff vom Kasten aus PlayDrill: Der Kasten ist 1,6 m breit
+        # und reicht links und rechts ueber den Marker hinaus. Nur seine Tiefe
+        # von 0,8 m verschwaende darunter. Der Rahmen nimmt seine Breite und
+        # waechst nur in der Tiefe.
+        baum = self.zeichne("kastenangriff", """
+            form: halle
+            geraete:
+              - text: Kasten
+                teile:
+                  - form: rechteck
+                    bei: [4.5, 10.0]
+                    groesse: [1.6, 0.8]
+            spieler:
+              - bei: [4.5, 10.0]
+                text: A
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        kreis, _ = marker_nach_beschriftung(baum)["A"]
+        durchmesser = 2 * feld.strecke(float(kreis.get("r")))
+        x, y, breite, hoehe = self.rahmen_in_metern(feld, mit_klasse(baum, "teil")[0])
+        self.assertEqual((round(x, 2), round(y, 2)), (4.5, 10.0))
+        self.assertAlmostEqual(breite, 1.6, places=2)
+        self.assertGreater(hoehe, durchmesser + 0.2)
+
+    def test_ein_huetchen_unter_einem_spieler_wird_ein_runder_rahmen(self) -> None:
+        # Der Verteidiger startet am Huetchen. Ein eckiger Rahmen um ihn
+        # saehe aus wie eine Kiste, auf der er steht.
+        baum = self.zeichne("huetchen", """
+            form: beach
+            geraete:
+              - text: Huetchen
+                teile:
+                  - form: kreis
+                    bei: [4.0, 3.0]
+                    groesse: 0.3
+            spieler:
+              - bei: [4.0, 3.0]
+                text: V
+        """)
+
+        feld = Feldmass(baum, BEACH)
+        kreis, _ = marker_nach_beschriftung(baum)["V"]
+        radius = feld.strecke(float(kreis.get("r")))
+        teile = mit_klasse(baum, "teil")
+        self.assertEqual([t.tag for t in teile], [SVG + "circle"])
+        mitte = feld.meter(float(teile[0].get("cx")), float(teile[0].get("cy")))
+        self.assertEqual(tuple(round(w, 2) for w in mitte), (4.0, 3.0))
+        self.assertGreater(feld.strecke(float(teile[0].get("r"))), radius + 0.1)
+
+    def test_hinter_der_grundlinie_bleibt_der_name_der_kiste_im_bild(
+            self) -> None:
+        # Jenseits des Netzes steht der Name ueber dem Rahmen. Steht die Kiste
+        # hinter der Grundlinie, reicht der Rand um das Feld dafuer nicht
+        # mehr, und das Blatt muss mit dem Namen wachsen statt mit dem
+        # Spieler allein.
+        baum = self.zeichne("grundlinie", "form: beach"
+                            + AUF_DER_KISTE.format(bei="[4.0, 16.6]"))
+
+        wort = mit_klasse(baum, "geraetname")[0]
+        _, hoch = wortkasten(baum, wort)
+        self.assertGreaterEqual(float(wort.get("y")) - hoch, 0,
+                                "der Name steht ganz im Bild")
 
     # -- Zonen -------------------------------------------------------------
 

@@ -455,6 +455,10 @@ class Geraet:
 
     teile: list[Flaeche]
     text: str
+    # Ob der Name ueber dem Geraet steht statt darunter. In der Szene gibt es
+    # dafuer keinen Schluessel: gesetzt wird es allein vom Zeichner, fuer ein
+    # Geraet unter einem Spieler jenseits des Netzes (schaubild.py).
+    name_oben: bool = False
 
     @property
     def rahmen(self) -> tuple[float, float, float, float]:
@@ -471,8 +475,12 @@ class Geraet:
         keinen Ballwagen, und halb verdeckt ist es schlechter zu lesen als
         daneben. Wer dieselbe Regel fuer alle Geraete nimmt, bekommt ausserdem
         ein Bild, in dem die Namen auf einer Hoehe stehen statt jeder woanders.
+
+        Mit `name_oben` steht er im selben Abstand darueber.
         """
-        links, unten, rechts, _ = self.rahmen
+        links, unten, rechts, oben = self.rahmen
+        if self.name_oben:
+            return ((links + rechts) / 2, oben + NAMENSABSTAND)
         return ((links + rechts) / 2, unten - NAMENSABSTAND)
 
 

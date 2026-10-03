@@ -37,12 +37,14 @@ import re
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
+from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from browser import Browser, BrowserFehler, finde_browser  # noqa: E402
-from szene import (Feldvorlage, Flaeche, Legendenblock, Ort,  # noqa: E402
-                   Szene, SzeneFehler, Weg, lies_szene, normale, scheitel)
+from szene import (Feldvorlage, Flaeche, Geraet, Legendenblock,  # noqa: E402
+                   Ort, Spieler, Szene, SzeneFehler, Weg, lies_szene, normale,
+                   scheitel)
 from tpdaten import (ID_MUSTER, finde_wurzel,  # noqa: E402
                      konsole_vorbereiten, lies_frontmatter, suche_wurzel)
 
@@ -67,6 +69,12 @@ GASSE = RAND
 # Radius eines Spielermarkers in Metern. Knapp ein Meter Durchmesser: so gross
 # wie ein Mensch von oben Platz braucht, und damit massstaeblich statt geraten.
 MARKER = 0.45
+
+# Wie weit der Rahmen um einen Spieler auf einem Geraet ueber dessen Marker
+# hinausreicht, in Metern. Genug, dass um einen gefuellten Marker ein Rand in
+# Geraetefarbe stehen bleibt; wenig genug, dass der Rahmen nicht nach einem
+# zweiten Gegenstand neben dem Spieler aussieht.
+UEBERSTAND = 0.2
 
 # Die Luft zwischen dem Ende eines Weges und dem Marker oder Wort, an dem er
 # aufhoert, in Metern. Genug, dass die Pfeilspitze frei steht.
@@ -594,16 +602,22 @@ def steuerpunkt(von: Ort, nach: Ort, bogen: float) -> Ort | None:
 
 
 def aussparungen(s: Szene) -> list[Flaeche]:
-    """Was ein Weg an seinem Ende auslaesst: die Marker und die Woerter der Stellen.
+    """Was ein Weg an seinem Ende auslaesst: Marker, Rahmen und die Woerter der Stellen.
 
     Ein Pfeil, der in der Mitte eines Spielers oder im Wort einer Stelle
     endet, verliert seine Spitze darunter, und damit das Einzige, was die
     Richtung zeigt. Beide nehmen einen Platz um ihren Ort ein, der Marker einen
     Kreis, das Wort ein Rechteck, und an dessen Rand hoert der Weg auf.
+
+    Steht ein Spieler auf einem Geraet, hoert der Weg erst am Rahmen um ihn
+    auf. Am Marker finge er mitten im Geraet an und kreuzte dessen Rand.
     """
     marker = [Flaeche("kreis", (spieler.x, spieler.y), 2 * MARKER, 2 * MARKER)
               for spieler in s.spieler]
-    return marker + [wortflaeche(stelle.text, stelle.bei) for stelle in s.stellen]
+    rahmen = [rahmen_um(geraet, spieler) for geraet in s.geraete
+              if (spieler := spieler_auf(geraet, s)) is not None]
+    return (marker + rahmen
+            + [wortflaeche(stelle.text, stelle.bei) for stelle in s.stellen])
 
 
 def geraetnamen(s: Szene) -> list[Flaeche]:
@@ -820,8 +834,82 @@ def stellen(s: Szene, blatt: Blatt) -> str:
                    for stelle in s.stellen)
 
 
+def spieler_auf(geraet: Geraet, s: Szene) -> Spieler | None:
+    """Der Spieler, der auf diesem Geraet steht, oder None.
+
+    Ein Geraet liegt unter einem Spieler, wenn seine Mitte in dessen Marker
+    liegt. In der Szene steht dafuer nichts: Geraet und Spieler stehen am
+    selben Ort, und erst hier faellt auf, dass sie uebereinanderliegen.
+    """
+    links, unten, rechts, oben = geraet.rahmen
+    mitte = ((links + rechts) / 2, (unten + oben) / 2)
+    for spieler in s.spieler:
+        if math.dist(mitte, (spieler.x, spieler.y)) <= MARKER:
+            return spieler
+    return None
+
+
+def rahmen_um(geraet: Geraet, spieler: Spieler) -> Flaeche:
+    """Das Geraet unter einem Spieler als Rahmen um dessen Marker.
+
+    Der Rahmen steht mit der Mitte auf dem Spieler und reicht auf jeder Seite
+    um UEBERSTAND ueber den Marker hinaus. Wo das Geraet weiter reicht, reicht
+    der Rahmen mit: ein Kasten von 1,6 m Breite behaelt sie und waechst nur in
+    der Tiefe, die unter dem Marker verschwaende.
+
+    Ein Geraet nur aus Kreisen, etwa ein Huetchen, bekommt einen runden
+    Rahmen. Ein eckiger saehe aus wie eine Kiste, auf der jemand steht.
+    """
+    bei = (spieler.x, spieler.y)
+    mindestens = MARKER + UEBERSTAND
+    if all(teil.form == "kreis" for teil in geraet.teile):
+        radius = max([mindestens] + [math.dist(teil.bei, bei) + teil.breite / 2
+                                     for teil in geraet.teile])
+        return Flaeche("kreis", bei, 2 * radius, 2 * radius)
+    links, unten, rechts, oben = geraet.rahmen
+    halb_breit = max(mindestens, spieler.x - links, rechts - spieler.x)
+    halb_tief = max(mindestens, spieler.y - unten, oben - spieler.y)
+    return Flaeche("rechteck", bei, 2 * halb_breit, 2 * halb_tief)
+
+
+def jenseits_des_netzes(s: Szene, spieler: Spieler) -> bool:
+    """Ob der Spieler auf der Seite des Feldes steht, die im Bild oben liegt.
+
+    Auf der freien Leinwand gibt es kein Netz und damit kein Jenseits.
+    """
+    return isinstance(s.grundform, Feldvorlage) and spieler.y > s.grundform.netz
+
+
+def rahmen_um_spieler(s: Szene) -> Szene:
+    """Die Szene, wie sie gezeichnet wird: jedes Geraet unter einem Spieler als Rahmen.
+
+    Eine Kiste unter dem Angreifer ist kleiner als sein Marker und waere
+    darunter verschwunden. Als Rahmen um ihn steht sie etwas groesser da, in
+    der Darstellung eines Geraets.
+
+    Ihr Name steht auf der Seite, die vom Netz weg zeigt. Unter dem Geraet
+    stuende er zum Netz hin, und vom Angreifer auf der Kiste, einen Meter vor
+    dem Netz, landete er auf dem Netzband.
+
+    Die Szene selbst bleibt, wie sie ist. Zurueck kommt eine neue, und alles,
+    was danach Platz bemisst oder zeichnet, liest den Rahmen statt des
+    Geraets.
+    """
+    geraete = []
+    for geraet in s.geraete:
+        spieler = spieler_auf(geraet, s)
+        if spieler is not None:
+            geraet = Geraet([rahmen_um(geraet, spieler)], geraet.text,
+                            name_oben=jenseits_des_netzes(s, spieler))
+        geraete.append(geraet)
+    return replace(s, geraete=geraete)
+
+
 def geraete(s: Szene, blatt: Blatt) -> str:
-    """Die Geraete, jedes aus seinen Teilen und mit seinem Namen darunter.
+    """Die Geraete, jedes aus seinen Teilen und mit seinem Namen.
+
+    Der Name steht darunter, bei einem Rahmen jenseits des Netzes darueber,
+    siehe rahmen_um_spieler().
 
     Die Teile stehen in derselben Gruppe, damit ein Ballwagen auf einem Kasten
     ein Geraet ist und nicht zwei Formen mit einem Namen dazwischen.
@@ -935,6 +1023,7 @@ def textwerk(spiegel: Satzspiegel) -> str:
 
 def zeichne(s: Szene) -> str:
     """Das ganze Bild als SVG-Text, in einem Stueck."""
+    s = rahmen_um_spieler(s)
     spiegel = Satzspiegel(s)
     blatt = spiegel.blatt
     teile = [
@@ -964,9 +1053,9 @@ def zeichne(s: Szene) -> str:
     ]
     # Wege unter die Marker: ein Pfeil, der einen Spieler streift, soll nicht
     # quer durch sein Kuerzel laufen. Wer auf einem Spieler oder an einer
-    # Stelle anfaengt oder aufhoert, wird dafuer bis an den Rand des Markers
-    # oder des Wortes gekuerzt, und wer in den Namen eines Geraets reicht,
-    # bis an den Rand des Namens.
+    # Stelle anfaengt oder aufhoert, wird dafuer bis an den Rand des Markers,
+    # seines Rahmens oder des Wortes gekuerzt, und wer in den Namen eines
+    # Geraets reicht, bis an den Rand des Namens.
     ausgespart, namen = aussparungen(s), geraetnamen(s)
     teile.extend(pfad(weg, blatt, ausgespart, namen) for weg in s.wege)
     teile.append(marker(s, blatt))

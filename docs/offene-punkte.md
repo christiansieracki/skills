@@ -113,6 +113,18 @@ Name käme über die Wege. In den Szenen im Arbeitsordner kommt der Fall am
 Ziel: bewusst nicht. Auslöser: Ein Schaubild zeigt einen Weg quer durch den
 Namen eines Geräts.
 
+### Zwei Geräte unter einem Spieler
+
+Aus #44. Liegt die Mitte eines Geräts im Marker eines Spielers, zeichnet das
+Skript das Gerät als Rahmen um den Marker. Liegen zwei Geräte unter demselben
+Spieler, entstehen zwei Rahmen am selben Ort, und ihre Namen stehen
+übereinander. Ein Ballwagen neben der Kiste steht in der Halle neben ihr und
+hat seine Mitte deshalb nicht im Marker. In den Szenen im Arbeitsordner kommt
+der Fall am 03.10.2026 nicht vor.
+
+Ziel: bewusst nicht. Auslöser: Ein Schaubild braucht zwei Geräte unter einem
+Spieler.
+
 ### Ein Beach-Team anlegen, solange es keins gibt
 
 Beach ist seit Welle 1a im Plugin und an einer echten Beachübung abgenommen
