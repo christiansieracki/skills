@@ -176,8 +176,9 @@ Deshalb dieselbe Trennung wie bei der Block-Regel:
 Wie viele Flächen eine Übung braucht, sagt das Feld `spielflaechen`. Es gilt
 für beide Disziplinen und je Gruppe: Sind mehr Spieler da, als die Übung fasst,
 läuft sie in mehreren Gruppen, und jede braucht ihre eigenen Flächen. Drei
-Gruppen einer Übung mit `spielflaechen: 1` brauchen drei. Gruppe meint dabei
-einen Teil der Anwesenden, nicht die Trainingsgruppe.
+Gruppen einer Übung mit `spielflaechen: 1` brauchen drei. Eine Gruppe sind
+hier die Leute, die eine Übung zusammen spielen. Die Trainingsgruppe sind alle,
+die an dem Abend in der Halle stehen.
 
 ## Weitere Sprachregeln
 

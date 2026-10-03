@@ -14,8 +14,9 @@ Der Index wird vor jeder Suche neu gebaut, die Treffer sind also immer aktuell.
 `--spieler 14` heißt "heute sind 14 da", nicht "nimm genau 14". Eine Übung
 für 8 läuft bei 14 Leuten in zwei Gruppen, das zeigt die Trefferliste an.
 `--spielflaechen 2` heißt "so viele stehen zur Verfügung". Eine Übung, die
-für eine Gruppe mehr braucht, fällt heraus. Reichen sie nur nicht für alle
-Gruppen zugleich, bleibt sie und die Zeile sagt es: `[3 Gruppen, 2 Flächen]`.
+für eine Gruppe mehr braucht, fällt heraus. Reichen die Flächen nur nicht für
+alle Gruppen zugleich, bleibt die Übung, und die Zeile sagt es:
+`[3 Gruppen, 2 Flächen]`.
 `--dauer 20` heißt entsprechend "der Teil hat 20 Minuten", kürzeres passt auch.
 Wer es strikt will, nimmt `--genau`.
 
@@ -60,20 +61,33 @@ def gruppen(hi, anwesend):
     return max(1, -(-anwesend // hi))
 
 
-def gruppenhinweis(e, anwesend, flaechen) -> str:
+def flaechen_je_gruppe(e) -> int:
+    """`spielflaechen` gilt je Gruppe. Fehlt das Feld, ist es eine."""
+    return e.get("spielflaechen") or 1
+
+
+def flaechen_text(n: int) -> str:
+    return f"{n} {'Fläche' if n == 1 else 'Flächen'}"
+
+
+def gruppenhinweis(e, anwesend, verfuegbar) -> str:
     """Der Zusatz in der Trefferzeile, wenn die Übung in Gruppen läuft.
 
-    `spielflaechen` gilt je Gruppe: drei Gruppen einer Übung für eine Fläche
-    brauchen drei. Reichen die genannten Flächen dafür nicht, steht das statt
-    „parallel" da. Die Übung bleibt ein Treffer, die Gruppen können auch
-    nacheinander spielen. Ohne `--spielflaechen` wird nicht gerechnet.
+    Drei Gruppen einer Übung für eine Fläche brauchen drei. Reichen die
+    verfügbaren dafür nicht, steht das statt „parallel" da. Die Übung bleibt
+    ein Treffer, die Gruppen können auch nacheinander spielen. Braucht eine
+    Gruppe mehr als eine Fläche, steht das dabei. Sonst läse sich
+    `[2 Gruppen, 2 Flächen]` wie eine für jede. Ohne `--spielflaechen` wird
+    nicht gerechnet.
     """
     g = gruppen(e.get("spieler_max"), anwesend)
     if g == 1:
         return ""
-    if flaechen is not None and g * (e.get("spielflaechen") or 1) > flaechen:
-        return f"  [{g} Gruppen, {flaechen} {'Fläche' if flaechen == 1 else 'Flächen'}]"
-    return f"  [{g} Gruppen parallel]"
+    je = flaechen_je_gruppe(e)
+    if verfuegbar is None or g * je <= verfuegbar:
+        return f"  [{g} Gruppen parallel]"
+    bedarf = f" je {flaechen_text(je)}" if je > 1 else ""
+    return f"  [{g} Gruppen{bedarf}, {flaechen_text(verfuegbar)}]"
 
 
 def passt_spieler(e, anwesend, genau: bool) -> bool:
@@ -138,7 +152,7 @@ def filtere(eintraege, a):
             continue
         if a.netz is not None and bool(e.get("netz")) != a.netz:
             continue
-        if a.spielflaechen is not None and (e.get("spielflaechen") or 1) > a.spielflaechen:
+        if a.spielflaechen is not None and flaechen_je_gruppe(e) > a.spielflaechen:
             continue
         if not passt_spieler(e, a.spieler, a.genau):
             continue
@@ -163,16 +177,16 @@ def filtere(eintraege, a):
     return treffer
 
 
-def zeige(e, lang: bool, wurzel: Path, anwesend=None, flaechen=None):
+def zeige(e, lang: bool, wurzel: Path, anwesend=None, verfuegbar=None):
     warn = " ⚠" if e.get("erwachsenenbelastung") else ""
     art = " (Folge)" if e.get("typ") == "folge" else ""
-    gruppiert = gruppenhinweis(e, anwesend, flaechen)
+    hinweis = gruppenhinweis(e, anwesend, verfuegbar)
     # Die Disziplin steht in jeder Trefferzeile, auch in der kurzen Liste.
     # Sonst entgeht bei einer ungefilterten Suche, dass da eine Beachübung
     # zwischen den Hallenübungen liegt. Wie sie geschrieben wird, steht in
     # `disziplin_text()`, damit `index.md` dasselbe zeigt.
     disziplin = disziplin_text(e)
-    print(f"{e['id']}  {e['titel']}{art}{warn}  [{disziplin}]{gruppiert}")
+    print(f"{e['id']}  {e['titel']}{art}{warn}  [{disziplin}]{hinweis}")
     if not lang:
         return
     def s(lo, hi, u=""):

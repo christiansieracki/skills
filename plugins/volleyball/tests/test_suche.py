@@ -7,9 +7,8 @@ tut, der die Treffer weiterverarbeitet. Die Zusagen, die hier festgehalten
 werden, sind die, die sich am leichtesten unbemerkt verlieren: dass
 `--spieler` die Anwesenden meint und keine Obergrenze, dass zu wenige
 Spielflaechen eine Uebung wirklich herausfallen lassen, dass sie je Gruppe
-zaehlen, und was der
-Disziplinfilter durchlaesst. Am letzten haengt, ob beim Planen einer
-Beacheinheit eine Hallenuebung im Ergebnis steht.
+zaehlen, und was der Disziplinfilter durchlaesst. Am letzten haengt, ob beim
+Planen einer Beacheinheit eine Hallenuebung im Ergebnis steht.
 """
 
 from __future__ import annotations
@@ -105,7 +104,9 @@ class SucheTest(unittest.TestCase):
         """Sucht nach einer Karte und gibt ihre Trefferzeile zurueck."""
         fertig = self.ordner.starte("suche.py", "--id", uid, *argumente)
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
-        return next(z for z in fertig.stdout.splitlines() if z.startswith(uid))
+        zeile = next((z for z in fertig.stdout.splitlines() if z.startswith(uid)), None)
+        self.assertIsNotNone(zeile, f"{uid} ist kein Treffer:\n{fertig.stdout}")
+        return zeile
 
     def test_zu_wenige_flaechen_fuer_die_gruppen_ergeben_einen_hinweis(self) -> None:
         # 14 Leute bei einer Uebung fuer hoechstens 6 sind drei Gruppen. Jede
@@ -115,9 +116,11 @@ class SucheTest(unittest.TestCase):
                                   spieler_min=4, spieler_max=6, spielflaechen=1)
 
         zeile = self.trefferzeile("ue-000021", "--spieler", "14", "--spielflaechen", "1")
+        gefunden = [e["id"] for e in self.treffer("--spieler", "14", "--spielflaechen", "1")]
 
         self.assertIn("[3 Gruppen, 1 Fläche]", zeile)
         self.assertNotIn("parallel", zeile)
+        self.assertIn("ue-000021", gefunden)
 
     def test_reichen_die_flaechen_laufen_die_gruppen_parallel(self) -> None:
         # Die Annahme-Challenge am 15.09.: 16 Leute, zwei Gruppen, zwei Netze.
@@ -139,14 +142,17 @@ class SucheTest(unittest.TestCase):
 
     def test_spielflaechen_gelten_je_gruppe(self) -> None:
         # ue-000003 braucht zwei Flaechen und nimmt hoechstens 16. Bei 24
-        # Leuten sind das zwei Gruppen mit je zwei Flaechen, also vier. Drei
-        # reichen nicht, vier schon.
-        with self.subTest(spielflaechen=3):
-            zeile = self.trefferzeile("ue-000003", "--spieler", "24", "--spielflaechen", "3")
-            self.assertIn("[2 Gruppen, 3 Flächen]", zeile)
-        with self.subTest(spielflaechen=4):
-            zeile = self.trefferzeile("ue-000003", "--spieler", "24", "--spielflaechen", "4")
-            self.assertIn("[2 Gruppen parallel]", zeile)
+        # Leuten sind das zwei Gruppen mit je zwei Flaechen, also vier. Zwei
+        # und drei reichen nicht, vier schon. Der Hinweis nennt dann, was eine
+        # Gruppe braucht. Ohne das laese sich "[2 Gruppen, 2 Flächen]" wie
+        # eine Flaeche fuer jede Gruppe.
+        for flaechen, hinweis in (("2", "[2 Gruppen je 2 Flächen, 2 Flächen]"),
+                                  ("3", "[2 Gruppen je 2 Flächen, 3 Flächen]"),
+                                  ("4", "[2 Gruppen parallel]")):
+            with self.subTest(spielflaechen=flaechen):
+                zeile = self.trefferzeile("ue-000003", "--spieler", "24",
+                                          "--spielflaechen", flaechen)
+                self.assertIn(hinweis, zeile)
 
     def test_mit_genau_zaehlt_die_obergrenze_dann_doch(self) -> None:
         gefunden = [e["id"] for e in self.treffer("--spieler", "12", "--genau")]

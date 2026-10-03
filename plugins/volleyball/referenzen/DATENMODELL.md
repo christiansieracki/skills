@@ -137,9 +137,8 @@ einzelne Übungen daraus gezogen.
 
 ### Spieler und Spielflächen
 
-`spieler_min` und `spieler_max` sagen, wie viele eine Gruppe der Übung fasst.
-Sind mehr da, läuft sie in mehreren Gruppen. Gruppe heißt hier ein Teil der
-Anwesenden, der die Übung für sich spielt, nicht die Trainingsgruppe.
+`spieler_max` sagt, wie viele eine Gruppe der Übung fasst. Sind mehr da, läuft
+sie in mehreren Gruppen. Was Gruppe dabei heißt, steht im Glossar.
 
 `spielflaechen` gilt je Gruppe. Drei Gruppen einer Übung mit
 `spielflaechen: 1` brauchen drei Flächen. So lief die Annahme-Challenge am
@@ -150,7 +149,8 @@ Gruppen nebeneinander, steht auf der Karte, was eine von ihnen braucht.
 mehr Flächen braucht, als da sind. Reichen die Flächen nur nicht für alle
 Gruppen zugleich, bleibt sie in den Treffern, denn die Gruppen können auch
 nacheinander spielen. Die Trefferzeile sagt dann `[3 Gruppen, 1 Fläche]` statt
-`[3 Gruppen parallel]`.
+`[3 Gruppen parallel]`. Braucht eine Gruppe zwei Flächen, steht das dabei:
+`[2 Gruppen je 2 Flächen, 3 Flächen]`.
 
 ### Belastung
 
