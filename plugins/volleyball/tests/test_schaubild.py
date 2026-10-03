@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import math
 import re
+import shutil
 import struct
 import subprocess
 import tempfile
@@ -2343,7 +2344,7 @@ KEIN_BROWSER = "weder Edge noch Chrome"
 
 
 class AnsichtAlsPngTest(unittest.TestCase):
-    """`--png` legt neben dem SVG eine Ansicht als PNG an, fuer die Vorschau.
+    """`--png` legt zusaetzlich zum SVG eine Ansicht als PNG an, fuer die Vorschau.
 
     Das Lesewerkzeug des Agenten zeigt bei einem SVG nur das Markup, beurteilt
     wird das Bild aber im Dialog. Die Ansicht nimmt Edge oder Chrome auf. Wo
@@ -2411,7 +2412,8 @@ class AnsichtAlsPngTest(unittest.TestCase):
         # Unter macOS stehen sie an festen Pfaden, die sich so nicht
         # ausblenden lassen. Dort entsteht die Ansicht eben, und der Test
         # wird uebersprungen.
-        leer = self.ordner.lege_entwurfsordner_an()
+        leer = Path(tempfile.mkdtemp(prefix="ohne-browser-"))
+        self.addCleanup(shutil.rmtree, leer, ignore_errors=True)
         ohne_browser = {name: str(leer) for name in
                         ("PATH", "ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA")}
 

@@ -135,8 +135,9 @@ def baue_html(src: Path, css_pfad: Path, ziel: Path) -> None:
 
 
 def md_to_pdf(src: Path, dest: Path, weg: tuple[str, str],
-              browser: Browser | None = None) -> bool:
-    """Eine .md als PDF. Auf dem Weg ueber den Browser druckt `browser`."""
+              browser: Browser | None) -> bool:
+    """Eine .md als PDF. Auf dem Weg ueber den Browser druckt `browser`,
+    auf den anderen Wegen ist es None."""
     art, werkzeug = weg
 
     # Haelt der Browser die HTML-Fassung noch offen, bleibt der Temp-Ordner

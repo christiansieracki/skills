@@ -84,9 +84,9 @@ ist also sofort benutzbar.
 
 Für den PDF-Export pandoc, dazu eine PDF-Maschine wie wkhtmltopdf oder
 weasyprint. Fehlt die Maschine, druckt Edge oder Chrome die HTML-Fassung, dafür
-ist keine Installation nötig. Edge oder Chrome nimmt auch die Ansicht als PNG
-auf, die `schaubild.py --png` für die Vorschau anlegt. Ohne Browser entsteht
-nur das SVG. Und eine Claude-Umgebung, die Dateien lesen und schreiben darf.
+ist keine Installation nötig. Derselbe Browser nimmt für `schaubild.py --png`
+die Ansicht als PNG auf, siehe `DATENMODELL.md`. Und eine Claude-Umgebung, die
+Dateien lesen und schreiben darf.
 
 Aufgerufen wird Python auf macOS und Linux mit `python3`, unter Windows mit
 `python`. Dort zeigt `python3` auf den Platzhalter aus dem Microsoft Store und

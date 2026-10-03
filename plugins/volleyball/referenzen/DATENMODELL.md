@@ -499,7 +499,7 @@ nur auf ausdrückliche Ansage neu gebaut (`index.py --md`).
 ## Skripte
 
 Alle liegen unter `${CLAUDE_PLUGIN_ROOT}/scripts/` und brauchen nur Python 3
-aus der Standardbibliothek. Es gibt zwei Ausnahmen:
+aus der Standardbibliothek. Es gibt drei Ausnahmen:
 
 - **Pillow:** `bilder_aufbereiten.py` braucht es, dazu `sammelimport.py
   vorbereiten`, wenn es die Quellgrafik ausschneiden soll. Beide brechen ohne es
@@ -509,8 +509,14 @@ aus der Standardbibliothek. Es gibt zwei Ausnahmen:
   unter Windows danach neben `git.exe`, denn Git für Windows bringt es mit.
   Fehlt es, sagt das Skript das einmal mit Installationshinweis und macht ohne
   Text weiter (ADR-0008).
+- **Edge oder Chrome:** `export_pdf.py` druckt damit, wenn pandoc keine
+  PDF-Maschine findet, und `schaubild.py --png` nimmt damit die Ansicht als
+  PNG auf. Gesucht und aufgerufen wird der Browser allein in `browser.py`.
+  Fehlt er, nennt `export_pdf.py` die anderen Wege zum PDF, und
+  `schaubild.py` schreibt das SVG trotzdem und sagt, dass die Ansicht als PNG
+  fehlt.
 
-Die übrigen Skripte brauchen weder Pillow noch `pdftotext`.
+Die übrigen Skripte brauchen weder Pillow noch `pdftotext` noch einen Browser.
 
 | Skript | Wofür |
 |---|---|

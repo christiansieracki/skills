@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Edge oder Chrome ohne Fenster: eine Seite als PDF drucken oder als PNG aufnehmen.
 
 Gesucht und aufgerufen wird der Browser hier und nirgends sonst.

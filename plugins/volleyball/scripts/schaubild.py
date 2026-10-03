@@ -20,11 +20,12 @@ aufgeht, hinterlaesst deshalb kein halbes SVG, sondern eine Meldung und die
 Datei von vorher.
 
 `--png` nimmt das fertige SVG zusaetzlich mit Edge oder Chrome als PNG auf,
-fuer eine Vorschau, die ein SVG nicht als Bild zeigt. Die Ansicht liegt im
-Temp-Verzeichnis und nie im Arbeitsordner. Ohne Browser entsteht das SVG
-trotzdem, und die Meldung sagt, dass die Ansicht fehlt.
+fuer eine Vorschau, die ein SVG nicht als Bild zeigt. Die Ansicht als PNG
+liegt im Temp-Verzeichnis und nie im Arbeitsordner.
 
-Nur Standardbibliothek, wie alles im Plugin ausser der Bildaufbereitung.
+Nur Standardbibliothek. Allein `--png` braucht dazu Edge oder Chrome. Fehlt
+der Browser, entsteht das SVG trotzdem, und die Meldung sagt, dass die Ansicht
+als PNG fehlt.
 """
 
 from __future__ import annotations
@@ -922,10 +923,10 @@ def kartentitel(basisname: str, wurzel: Path | None) -> str:
     return str(frontmatter.get("titel") or "")
 
 
-# Der Ordner fuer die Ansichten als PNG, im Temp-Verzeichnis. Nie neben dem
-# SVG: bei der Abnahme von 1c (#28) landete eine PNG neben dem SVG im
-# Arbeitsordner und ueberschrieb dort eine andere Datei.
-ANSICHTEN = "volleyball-schaubild"
+# Der Ordner im Temp-Verzeichnis, in dem die Ansichten als PNG liegen. Nie
+# neben dem SVG: bei der Abnahme von 1c (#28) landete eine PNG neben dem SVG
+# im Arbeitsordner und ueberschrieb dort eine andere Datei.
+PNG_ORDNER = "volleyball-schaubild"
 
 
 def ansicht_als_png(svg: Path) -> str:
@@ -941,7 +942,7 @@ def ansicht_als_png(svg: Path) -> str:
     wurzel = ET.parse(svg).getroot()
     breite = math.ceil(float(wurzel.get("width")))
     hoehe = math.ceil(float(wurzel.get("height")))
-    png = Path(tempfile.gettempdir()) / ANSICHTEN / (svg.stem + ".png")
+    png = Path(tempfile.gettempdir()) / PNG_ORDNER / (svg.stem + ".png")
     try:
         png.parent.mkdir(parents=True, exist_ok=True)
         with Browser(programm) as browser:
@@ -990,8 +991,8 @@ def main() -> int:
     datei.parent.mkdir(parents=True, exist_ok=True)
     datei.write_text(bild, encoding="utf-8")
     print(f"Geschrieben: {datei}")
-    # Fehlt die Ansicht, steht das Bild trotzdem, und der Lauf ist gelungen.
-    # Wer sie nicht sehen kann, oeffnet das SVG, so wie ohne `--png`.
+    # Fehlt die Ansicht als PNG, steht das Bild trotzdem, und der Lauf ist
+    # gelungen. Wer sie nicht sehen kann, oeffnet das SVG, so wie ohne `--png`.
     if a.png:
         print(ansicht_als_png(datei))
     # Gesagt wird es trotzdem: das Bild ist fertig, aber der Trainer soll

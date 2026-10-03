@@ -27,10 +27,8 @@ der Pfad zur Szenendatei. Geschrieben wird erst, wenn das ganze Bild steht:
 Eine Szene, die nicht aufgeht, hinterlässt eine Meldung und das Bild von
 vorher, nie ein halbes.
 
-Mit `--png` nimmt Edge oder Chrome das fertige Bild zusätzlich als PNG auf, für
-eine Vorschau, die ein SVG nicht als Bild zeigt. Diese Ansicht liegt im
-Temp-Verzeichnis und nie in `schaubilder/`. Ohne Browser entsteht das SVG
-trotzdem, und die Meldung sagt, dass die Ansicht fehlt.
+Mit `--png` entsteht zusätzlich eine Ansicht als PNG im Temp-Verzeichnis, nie
+in `schaubilder/`. Wofür und wann, steht im Skill `volleyball-schaubild`.
 
 Auf der Übungskarte steht anschließend der Dateiname des Bildes:
 `schaubild: ue-000042.svg`. `index.py` meldet, wenn er ins Leere zeigt. Hat
