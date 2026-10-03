@@ -418,11 +418,12 @@ hat die Farbe dessen, was unter dem Wort zu sehen ist: im Feld und auf der
 Leinwand die Feldfarbe, neben dem Feld die Papierfarbe, in einer Zone deren
 Farbe. Ein Weg, der nur an der Stelle vorbeiläuft, und eine Linie des Feldes
 unter dem Wort hören so an den Buchstaben auf, statt zwischen ihnen
-durchzuscheinen. Auf seinem Grund fällt der Hof nicht auf, ein Rand ist er
-nicht. Ein Hof in einer einzigen Farbe schimmerte im dunklen Schema neben dem
-Feld um die Buchstaben. Welcher Grund gilt, entscheidet die Mitte des Wortes.
-Ein Gerät oder ein Marker darunter zählt nicht: Steht dort etwas, trägt es
-selbst den Namen.
+durchzuscheinen. Auf seinem Grund fällt der Hof nicht auf. Ein Hof in einer
+einzigen Farbe schimmerte im dunklen Schema neben dem Feld um die Buchstaben.
+Welcher Grund gilt, entscheidet die Mitte des Wortes. Ein Wort neben dem Feld
+steht deshalb am besten ganz daneben: Ragt es ins Feld, liegt dort ein Hof in
+Papierfarbe, und im dunklen Schema schimmert er schwach. Ein Gerät oder ein
+Marker unter dem Wort zählt nicht: Steht dort etwas, trägt es selbst den Namen.
 
 Eine Linie des Feldes benennt man auf ihr oder neben dem Feld auf ihrer Höhe,
 wie das Netz oben. Auf der Linie unterbricht der Hof sie unter dem Wort, und
@@ -475,7 +476,7 @@ Ein Pfeil, der von unten an die Unterkante einer Zielmatte reicht, trifft mit
 seiner Spitze ihren Namen darunter, auch wenn sein letzter Punkt knapp
 darüber liegt. Er endet dann unter dem Namen. Am Anfang eines Weges gilt
 dasselbe Stück. Läuft ein Weg dagegen durch den Namen hindurch bis ins Gerät,
-bleibt er, wie er ist: Er zeigt auf das Gerät und nicht auf dessen Namen.
+bleibt er, wie er ist. Er zeigt auf das Gerät.
 
 Auch ein Gerät ist maßstäblich. Ein Kasten von 1,6 × 0,8 m ist im Bild so
 lang wie ein Sechstel der Feldbreite.

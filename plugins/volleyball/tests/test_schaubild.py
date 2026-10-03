@@ -1463,10 +1463,10 @@ stellen:
         self.assertEqual(formen(mit), formen(ohne),
                          "zum Bild kommt nichts dazu, was eine Form haette")
         wort = mit_klasse(mit, "stelle")[0]
-        # Der Hof um die Buchstaben ist kein Rand: er hat die Farbe des Feldes,
-        # auf dem das Wort steht, und hebt sich davon nicht ab.
+        # Einen Hof hat das Wort, einen sichtbaren Rand nicht: der Hof hat die
+        # Farbe des Feldes, auf dem das Wort steht, und hebt sich davon nicht ab.
         self.assertEqual(farbvariable(mit, wort, "stroke"), "feld",
-                         "und das Wort hat keinen Rand")
+                         "der Hof hebt sich vom Feld darunter ab")
         # In Strichfarbe und so gross wie das Wort einer Zone. Eine Stelle ist
         # eine Beschriftung im Feld wie jede andere, nur ohne etwas darunter.
         self.assertEqual(farbvariable(mit, wort, "fill"), "strich")
