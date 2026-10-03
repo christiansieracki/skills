@@ -468,7 +468,8 @@ Zielmatte ist ein Rechteck, ein Hütchen ist ein kleiner Kreis.
 Alle Teile eines Eintrags gehören zu einem Gerät und bekommen zusammen einen
 Namen. `text` steht **unter** dem Gerät, mittig. Ein Wort wie „Ballwagen" passt
 in keinen Ballwagen. Wer darunter noch eine Maßkette legt, gibt ihr mit
-`versatz` etwas mehr Abstand.
+`versatz` etwas mehr Abstand. Unter einem Spieler jenseits des Netzes steht der
+Name über dem Gerät, siehe „Gerät und Spieler am selben Ort".
 
 **Ein Weg hört vor dem Namen auf.** Reicht das Ende eines Weges in den Namen
 eines Geräts, endet er an dessen Rand, auf der Seite, von der er kommt, wie am
@@ -484,33 +485,38 @@ lang wie ein Sechstel der Feldbreite.
 
 **Gerät und Spieler am selben Ort.** Der Angreifer auf der Kiste steht dort,
 wo die Kiste steht. Beide schreibt man an denselben Ort, die Kiste unter
-`geraete`, den Angreifer unter `spieler`:
+`geraete`, den Angreifer unter `spieler`. In der Halle liegt das Netz bei 9 m,
+der Angreifer steht hier einen Meter dahinter:
 
 ```yaml
+form: halle
 geraete:
   - text: Kiste
     teile:
       - form: rechteck
-        bei: [4.0, 9.0]
+        bei: [4.0, 10.0]
         groesse: [0.6, 0.6]
 spieler:
-  - bei: [4.0, 9.0]
+  - bei: [4.0, 10.0]
     text: A
     hervorgehoben: true
 ```
 
 Ein Gerät liegt unter einem Spieler, wenn seine Mitte in dessen Marker liegt.
-Einen eigenen Schlüssel dafür gibt es nicht, das Skript sieht es am Ort. Der
-Marker misst knapp einen Meter, eine Kiste weniger, und darunter wäre sie
+Liegt sie in zwei Markern, zählt der Spieler, dessen Mitte näher liegt. Einen
+eigenen Schlüssel dafür gibt es nicht, das Skript sieht es am Ort. Der Marker
+misst knapp einen Meter, eine Kiste weniger, und darunter wäre sie
 verschwunden. Das Skript zeichnet sie deshalb als **Rahmen um den Marker**,
 0,2 m über ihn hinaus, durchgezogen und in der Füllung eines Geräts. So sieht
 der Rahmen nicht aus wie eine Zone um den Spieler. Ein hervorgehobener Spieler
 bleibt gefüllt, und der Rahmen bleibt um ihn herum zu sehen.
 
-- Wo das Gerät weiter reicht als der Rahmen, reicht der Rahmen mit. Ein Kasten
-  von 1,6 m Breite behält seine Breite und wächst nur in der Tiefe.
+- Der Rahmen umfasst das Gerät und den Marker. Ein Kasten von 1,6 m Breite
+  behält seine Breite und wächst nur in der Tiefe. Steht der Angreifer am Rand
+  des Kastens, wächst der Rahmen nur auf dieser Seite, so weit, dass um den
+  Marker 0,2 m Rand bleiben.
 - Ein Gerät nur aus Kreisen, etwa ein Hütchen am Startpunkt, bekommt einen
-  runden Rahmen. Ein eckiger sähe aus wie eine Kiste.
+  runden Rahmen um den Spieler. Ein eckiger sähe aus wie eine Kiste.
 - Ein Gerät aus mehreren Teilen wird ein einziger Rahmen.
 
 Der Name steht auf der Seite, die **vom Netz weg** zeigt. Unter dem Gerät
@@ -519,11 +525,9 @@ auf dem Netzband. Auf der freien Leinwand gibt es kein Netz, dort steht er
 darunter wie an jedem Gerät.
 
 Ein Weg, der auf dem Spieler anfängt oder aufhört, endet am Rand des Rahmens.
-Spieler und Gerät sind im Bild eins, und am Rand des Markers finge der Weg
-mitten im Gerät an.
+Am Rand des Markers finge er mitten im Gerät an und kreuzte dessen Rand.
 
-Ein Gerät, dessen Mitte neben dem Marker liegt, bleibt, wie es ist. Ein
-Ballwagen gleich neben dem Zuspieler steht also als Ballwagen da.
+Ein Gerät, dessen Mitte neben dem Marker liegt, bleibt, wie es ist.
 
 ### `abstaende`
 

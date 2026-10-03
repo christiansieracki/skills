@@ -21,6 +21,7 @@ Nur Standardbibliothek, wie alles im Plugin ausser der Bildaufbereitung.
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -360,18 +361,31 @@ class Flaeche:
         return (x - self.breite / 2, y - self.laenge / 2,
                 x + self.breite / 2, y + self.laenge / 2)
 
-    def rand(self, richtung: Ort) -> float:
+    def rand(self, richtung: Ort, ab: Ort | None = None) -> float:
         """Wie weit es von der Mitte in diese Richtung bis zum Rand ist, in Metern.
 
-        `richtung` hat die Laenge eins. Ein Rechteck verlaesst ein Strahl von
-        der Mitte aus an der Seite, die er zuerst trifft: ein Wort ist
-        waagerecht weit und senkrecht nur eine Schrifthoehe.
+        `richtung` hat die Laenge eins. Ein Rechteck verlaesst ein Strahl an
+        der Seite, die er zuerst trifft: ein Wort ist waagerecht weit und
+        senkrecht nur eine Schrifthoehe.
+
+        Mit `ab` zaehlt es von diesem Punkt auf der Flaeche aus statt von der
+        Mitte. Der Rahmen um einen Spieler am Rand eines Kastens steht nicht
+        mittig um ihn, und ein Weg von ihm soll trotzdem an diesem Rahmen
+        aufhoeren.
         """
+        x, y = self.bei if ab is None else ab
         if self.form == "kreis":
-            return self.breite / 2
-        dx, dy = abs(richtung[0]), abs(richtung[1])
-        return min(self.breite / 2 / dx if dx else float("inf"),
-                   self.laenge / 2 / dy if dy else float("inf"))
+            dx, dy = x - self.bei[0], y - self.bei[1]
+            nah = dx * richtung[0] + dy * richtung[1]
+            return -nah + math.sqrt(nah * nah - dx * dx - dy * dy
+                                    + (self.breite / 2) ** 2)
+        links, unten, rechts, oben = self.rahmen
+        weiten = []
+        if richtung[0]:
+            weiten.append(((rechts if richtung[0] > 0 else links) - x) / richtung[0])
+        if richtung[1]:
+            weiten.append(((oben if richtung[1] > 0 else unten) - y) / richtung[1])
+        return min(weiten)
 
     def enthaelt(self, punkt: Ort) -> bool:
         """Ob ein Punkt auf der Flaeche liegt, ihr Rand eingeschlossen."""
@@ -455,10 +469,6 @@ class Geraet:
 
     teile: list[Flaeche]
     text: str
-    # Ob der Name ueber dem Geraet steht statt darunter. In der Szene gibt es
-    # dafuer keinen Schluessel: gesetzt wird es allein vom Zeichner, fuer ein
-    # Geraet unter einem Spieler jenseits des Netzes (schaubild.py).
-    name_oben: bool = False
 
     @property
     def rahmen(self) -> tuple[float, float, float, float]:
@@ -475,12 +485,8 @@ class Geraet:
         keinen Ballwagen, und halb verdeckt ist es schlechter zu lesen als
         daneben. Wer dieselbe Regel fuer alle Geraete nimmt, bekommt ausserdem
         ein Bild, in dem die Namen auf einer Hoehe stehen statt jeder woanders.
-
-        Mit `name_oben` steht er im selben Abstand darueber.
         """
-        links, unten, rechts, oben = self.rahmen
-        if self.name_oben:
-            return ((links + rechts) / 2, oben + NAMENSABSTAND)
+        links, unten, rechts, _ = self.rahmen
         return ((links + rechts) / 2, unten - NAMENSABSTAND)
 
 
