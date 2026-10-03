@@ -87,6 +87,20 @@ Nextcloud legt eine Konfliktdatei an. Mit einem Trainer kommt das nicht vor.
 Ziel: bewusst nicht. Auslöser: Ein zweiter Trainer importiert aus einem
 Quellenordner, an dem schon einer arbeitet.
 
+### Edge druckt mal in zwei, mal in zwanzig Sekunden
+
+Aus #41. Derselbe Lauf von `export_pdf.py` über die acht Pläne unter
+`trainings/h1-h2` dauerte am 03.10.2026 einmal 21 s und einige Stunden später
+170 s, mit demselben Code. Die Zeit vergeht im Start von Edge. Ein Profilordner
+für den ganzen Lauf spart rund ein Drittel, an der Schwankung selbst ändert er
+nichts. `--no-first-run`, `--disable-extensions` und
+`--disable-component-update` haben schon vorher nichts gebracht. Woran es
+liegt, ist offen. `schaubild.py --png` trifft es genauso, mit einem Aufruf je
+Runde.
+
+Ziel: bewusst nicht. Auslöser: Ein Export oder eine Vorschau dauert dem Trainer
+zu lange.
+
 ### Ein Beach-Team anlegen, solange es keins gibt
 
 Beach ist seit Welle 1a im Plugin und an einer echten Beachübung abgenommen
