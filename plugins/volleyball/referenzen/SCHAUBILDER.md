@@ -269,7 +269,8 @@ gezeichnet.
 Fängt ein Weg auf einem Spieler an oder hört auf ihm auf, endet er am Rand des
 Markers. Sonst verschwände die Pfeilspitze unter dem Kreis, und mit ihr das
 Einzige, was die Richtung zeigt. An einer Stelle endet er genauso, am Rand
-ihres Wortes.
+ihres Wortes. Reicht er mit seiner Spitze in den Namen eines Geräts, endet er
+am Rand des Namens, siehe bei `geraete`.
 
 ### `zonen`
 
@@ -412,9 +413,21 @@ längerer Weg.
 Das Wort steht **über allem**, auch über den Wörtern der Zonen und über den
 Markern, denn außer dem Wort hat eine Stelle nichts.
 
-Eine Linie des Feldes benennt man neben dem Feld auf ihrer Höhe, wie das Netz
-oben. Auf der Linie selbst liefe sie mitten durch das Wort. Neben dem Feld
-wächst das Blatt mit, statt das Wort anzuschneiden.
+**Jeder Buchstabe hat einen schmalen Hof**, wie beim Wort einer Zone. Der Hof
+hat die Farbe dessen, was unter dem Wort zu sehen ist: im Feld und auf der
+Leinwand die Feldfarbe, neben dem Feld die Papierfarbe, in einer Zone deren
+Farbe. Ein Weg, der nur an der Stelle vorbeiläuft, und eine Linie des Feldes
+unter dem Wort hören so an den Buchstaben auf, statt zwischen ihnen
+durchzuscheinen. Auf seinem Grund fällt der Hof nicht auf, ein Rand ist er
+nicht. Ein Hof in einer einzigen Farbe schimmerte im dunklen Schema neben dem
+Feld um die Buchstaben. Welcher Grund gilt, entscheidet die Mitte des Wortes.
+Ein Gerät oder ein Marker darunter zählt nicht: Steht dort etwas, trägt es
+selbst den Namen.
+
+Eine Linie des Feldes benennt man auf ihr oder neben dem Feld auf ihrer Höhe,
+wie das Netz oben. Auf der Linie unterbricht der Hof sie unter dem Wort, und
+das Wort steht genau bei dem, was es benennt. Neben dem Feld bleibt das Feld
+frei für den Aufbau, und das Blatt wächst mit, statt das Wort anzuschneiden.
 
 Stellen gibt es auf dem Feld und auf der freien Leinwand. Eine
 Positionsnummer im Sand und eine Rolle in der Halle brechen auch hier ab.
@@ -454,6 +467,15 @@ Alle Teile eines Eintrags gehören zu einem Gerät und bekommen zusammen einen
 Namen. `text` steht **unter** dem Gerät, mittig. Ein Wort wie „Ballwagen" passt
 in keinen Ballwagen. Wer darunter noch eine Maßkette legt, gibt ihr mit
 `versatz` etwas mehr Abstand.
+
+**Ein Weg hört vor dem Namen auf.** Reicht das Ende eines Weges in den Namen
+eines Geräts, endet er an dessen Rand, auf der Seite, von der er kommt, wie am
+Wort einer Stelle. Als Ende zählt das Stück, auf dem die Pfeilspitze sitzt.
+Ein Pfeil, der von unten an die Unterkante einer Zielmatte reicht, trifft mit
+seiner Spitze ihren Namen darunter, auch wenn sein letzter Punkt knapp
+darüber liegt. Er endet dann unter dem Namen. Am Anfang eines Weges gilt
+dasselbe Stück. Läuft ein Weg dagegen durch den Namen hindurch bis ins Gerät,
+bleibt er, wie er ist: Er zeigt auf das Gerät und nicht auf dessen Namen.
 
 Auch ein Gerät ist maßstäblich. Ein Kasten von 1,6 × 0,8 m ist im Bild so
 lang wie ein Sechstel der Feldbreite.

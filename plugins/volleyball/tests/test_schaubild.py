@@ -1463,7 +1463,10 @@ stellen:
         self.assertEqual(formen(mit), formen(ohne),
                          "zum Bild kommt nichts dazu, was eine Form haette")
         wort = mit_klasse(mit, "stelle")[0]
-        self.assertIsNone(stilwert(mit, wort, "stroke"), "und das Wort hat keinen Rand")
+        # Der Hof um die Buchstaben ist kein Rand: er hat die Farbe des Feldes,
+        # auf dem das Wort steht, und hebt sich davon nicht ab.
+        self.assertEqual(farbvariable(mit, wort, "stroke"), "feld",
+                         "und das Wort hat keinen Rand")
         # In Strichfarbe und so gross wie das Wort einer Zone. Eine Stelle ist
         # eine Beschriftung im Feld wie jede andere, nur ohne etwas darunter.
         self.assertEqual(farbvariable(mit, wort, "fill"), "strich")
@@ -1509,6 +1512,49 @@ stellen:
                        "geraetname", "masslinie", "massbeschriftung", "netz"):
             with self.subTest(unter=klasse):
                 self.assertGreater(wort, reihenfolge.index(mit_klasse(baum, klasse)[-1]))
+
+    def test_das_wort_einer_stelle_hat_einen_hof_in_der_farbe_seines_grundes(
+            self) -> None:
+        # Ohne Hof scheint ein Weg, der nur vorbeilaeuft, zwischen den
+        # Buchstaben durch, und eine Stelle auf einer Linie des Feldes wird
+        # von ihr durchgestrichen. Der Hof hat die Farbe dessen, was unter
+        # dem Wort zu sehen ist. Neben dem Feld ist das das Papier: ein Hof in
+        # Feldfarbe schimmerte dort im dunklen Schema um die Buchstaben.
+        for name, kopf, bei, grund in (
+            ("im-feld", "form: halle", "[4.5, 3.0]", "feld"),
+            # Auf der Angriffslinie, drei Meter vor dem Netz.
+            ("auf-der-linie", "form: halle", "[4.5, 6.0]", "feld"),
+            ("neben-dem-feld", "form: halle", "[10.4, 6.0]", "papier"),
+            ("in-der-zone", "form: halle", "[4.5, 14.0]", "zone"),
+            ("im-kreis", "form: halle", "[7.0, 3.0]", "zone"),
+            # In der Ecke des Quadrats um den Kreis, aber nicht im Kreis.
+            ("neben-dem-kreis", "form: halle", "[7.8, 3.8]", "feld"),
+            ("auf-der-leinwand", "form: frei\ngroesse: [12.0, 9.0]",
+             "[3.0, 7.5]", "feld"),
+            ("neben-der-leinwand", "form: frei\ngroesse: [12.0, 9.0]",
+             "[13.5, 4.0]", "papier"),
+        ):
+            with self.subTest(ort=name):
+                baum = self.zeichne(f"hof-{name}", kopf + f"""
+zonen:
+  - text: Ziel
+    form: rechteck
+    bei: [4.5, 14.0]
+    groesse: [3.0, 2.0]
+  - text: Ziel
+    form: kreis
+    bei: [7.0, 3.0]
+    groesse: 2.0
+stellen:
+  - bei: {bei}
+    text: Feldmitte
+""")
+
+                wort = mit_klasse(baum, "stelle")[0]
+                self.assertEqual(farbvariable(baum, wort, "stroke"), grund)
+                self.assertEqual(stilwert(baum, wort, "paint-order"), "stroke",
+                                 "der Hof liegt hinter den Buchstaben, nicht darauf")
+                self.assertGreater(float(stilwert(baum, wort, "stroke-width")), 0)
 
     def test_eine_stelle_neben_dem_feld_bleibt_ganz_im_bild(self) -> None:
         # Rechts neben dem Feld auf Hoehe des Netzes, wo der Pfosten steht.
@@ -1628,6 +1674,118 @@ stellen:
         self.pruefe_vor_dem_wort(baum, (d[2], d[3]))
         self.assertEqual(tuple(round(w, 2) for w in feld.meter(d[0], d[1])),
                          (2.5, 5.0), "der Anfang bleibt, wo er angesagt ist")
+
+    def name_in_metern(self, baum, feld: Feldmass) -> tuple[float, float, float, float]:
+        """Der Kasten um den Namen des ersten Geraets: links, unten, rechts, oben in Metern."""
+        wort = mit_klasse(baum, "geraetname")[0]
+        breit, hoch = wortkasten(baum, wort)
+        x, y = feld.meter(float(wort.get("x")), float(wort.get("y")))
+        return (x - feld.strecke(breit), y - feld.strecke(hoch),
+                x + feld.strecke(breit), y + feld.strecke(hoch))
+
+    def test_die_spitze_eines_weges_sitzt_nicht_auf_dem_namen_eines_geraets(
+            self) -> None:
+        # Der Annahmepfeil aus dem Referenzbild: Er endet an der Unterkante
+        # der Zielmatte, und gleich darunter steht ihr Name. Das Ende selbst
+        # liegt knapp ueber dem Wort, die Spitze dahinter aber sass auf
+        # „Zielmatte". Der Weg hoert jetzt vor dem Namen auf, auf der Seite,
+        # von der er kommt.
+        baum = self.zeichne("zielmatte", """
+            form: halle
+            geraete:
+              - text: Zielmatte
+                teile:
+                  - form: rechteck
+                    bei: [5.55, 7.88]
+                    groesse: [2.85, 1.35]
+            wege:
+              - art: ballweg
+                von: [4.5, 1.8]
+                nach: [6.08, 7.05]
+                bogen: -0.6
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        d = zahlen(mit_klasse(baum, "weg")[0].get("d"))
+        _, unten, _, _ = self.name_in_metern(baum, feld)
+        _, ende = feld.meter(d[4], d[5])
+        self.assertLess(ende, unten, "der Weg endet unter dem Namen")
+        self.assertLess(unten - ende, 0.5, "und nicht weit davor")
+        self.assertEqual(tuple(round(w, 2) for w in feld.meter(d[0], d[1])),
+                         (4.5, 1.8), "der Anfang bleibt, wo er angesagt ist")
+
+    def test_ein_weg_im_namen_eines_geraets_beginnt_und_endet_an_dessen_rand(
+            self) -> None:
+        # Wie am Wort einer Stelle, an beiden Enden des Weges.
+        baum = self.zeichne("im-namen", """
+            form: halle
+            geraete:
+              - text: Zielmatte
+                teile:
+                  - form: rechteck
+                    bei: [4.5, 8.0]
+                    groesse: [2.0, 1.0]
+            wege:
+              - art: ballweg
+                von: [0.5, 6.95]
+                nach: [4.5, 6.95]
+              - art: laufweg
+                von: [4.5, 6.95]
+                nach: [4.5, 2.0]
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        links, unten, _, _ = self.name_in_metern(baum, feld)
+        ball, lauf = (zahlen(mit_klasse(baum, art)[0].get("d"))
+                      for art in ("ballweg", "laufweg"))
+        self.assertLess(feld.meter(ball[2], ball[3])[0], links,
+                        "der Ballweg endet links vor dem Namen")
+        self.assertLess(feld.meter(lauf[0], lauf[1])[1], unten,
+                        "der Laufweg beginnt unter dem Namen")
+        self.assertEqual(tuple(round(w, 2) for w in feld.meter(ball[0], ball[1])),
+                         (0.5, 6.95))
+        self.assertEqual(tuple(round(w, 2) for w in feld.meter(lauf[2], lauf[3])),
+                         (4.5, 2.0))
+
+    def test_ein_weg_der_den_namen_eines_geraets_nicht_erreicht_bleibt_ganz(
+            self) -> None:
+        # Gekuerzt wird nur, wo die Spitze im Namen saesse. Ein Weg, der kurz
+        # vor dem Namen aufhoert, einer, der von oben auf das Geraet zeigt,
+        # einer, der seitlich neben dem Namen endet, und einer, der von unten
+        # durch den Namen bis in die Mitte des Geraets laeuft, bleiben, wie
+        # sie angesagt sind. Der letzte zeigt auf das Geraet und nicht auf
+        # seinen Namen; vor dem Namen gekuerzt, zeigte er auf nichts mehr.
+        baum = self.zeichne("vor-dem-namen", """
+            form: halle
+            geraete:
+              - text: Zielmatte
+                teile:
+                  - form: rechteck
+                    bei: [5.55, 7.88]
+                    groesse: [2.85, 1.35]
+            wege:
+              - art: ballweg
+                von: [5.55, 1.8]
+                nach: [5.55, 6.0]
+              - art: ballweg
+                von: [5.55, 15.0]
+                nach: [5.55, 8.6]
+              - art: laufweg
+                von: [8.5, 6.65]
+                nach: [7.2, 6.65]
+              - art: laufweg
+                von: [5.0, 1.8]
+                nach: [5.0, 7.88]
+        """)
+
+        feld = Feldmass(baum, HALLE)
+        _, unten, rechts, oben = self.name_in_metern(baum, feld)
+        self.assertLess(6.0, unten, "der erste Weg endet wirklich vor dem Namen")
+        self.assertLess(rechts, 7.2, "der dritte wirklich rechts daneben")
+        self.assertLess(oben, 7.88, "und der vierte laeuft wirklich hindurch")
+        enden = [tuple(round(w, 2) for w in feld.meter(*zahlen(e.get("d"))[2:4]))
+                 for e in mit_klasse(baum, "weg")]
+        self.assertEqual(enden, [(5.55, 6.0), (5.55, 8.6), (7.2, 6.65), (5.0, 7.88)])
 
     # -- Abstandsangaben ---------------------------------------------------
 

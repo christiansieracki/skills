@@ -373,6 +373,14 @@ class Flaeche:
         return min(self.breite / 2 / dx if dx else float("inf"),
                    self.laenge / 2 / dy if dy else float("inf"))
 
+    def enthaelt(self, punkt: Ort) -> bool:
+        """Ob ein Punkt auf der Flaeche liegt, ihr Rand eingeschlossen."""
+        x, y = self.bei
+        if self.form == "kreis":
+            return (punkt[0] - x) ** 2 + (punkt[1] - y) ** 2 <= (self.breite / 2) ** 2
+        links, unten, rechts, oben = self.rahmen
+        return links <= punkt[0] <= rechts and unten <= punkt[1] <= oben
+
 
 @dataclass
 class Zone(Flaeche):

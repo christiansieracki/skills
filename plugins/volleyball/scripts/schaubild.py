@@ -72,6 +72,19 @@ MARKER = 0.45
 # aufhoert, in Metern. Genug, dass die Pfeilspitze frei steht.
 WEGABSTAND = 0.15
 
+# Die Strichbreite eines Weges, in Zeicheneinheiten.
+WEGSTRICH = 2.6
+
+# Wie gross eine Pfeilspitze ist, als Vielfaches der Strichbreite ihres
+# Pfades. So misst SVG eine Markierung am Ende eines Pfades: ein breiterer
+# Strich bekommt eine groessere Spitze.
+SPITZE = 4.5
+
+# Wie weit die Spitze eines Weges von seinem Ende zurueckreicht, in Metern.
+# Gerechnet wird die ganze Markierung, auch das Zehntel, das ueber das Ende
+# hinausragt: eher ein Finger zu lang als eine Spitze im Wort.
+SPITZENLAENGE = SPITZE * WEGSTRICH / MASSSTAB
+
 # Laenge eines Massstrichs quer zur Masslinie, in Metern. Ein Strich, kein
 # Balken: er markiert das Ende einer Masskette, ohne mit dem Aufbau um
 # Aufmerksamkeit zu streiten.
@@ -86,6 +99,16 @@ KLEINSCHRIFT = 13
 # und eher zu breit: ein angeschnittenes Wort ist schlimmer als ein Finger Luft
 # zu viel.
 ZEICHENBREITE = 0.6
+
+# Der Hof um ein Wort im Feld, als Strichbreite in Zeicheneinheiten. Er liegt
+# hinter den Buchstaben, in der Farbe dessen, worauf das Wort steht, und
+# unterbricht so eine Linie oder einen Weg darunter, statt sie zwischen den
+# Buchstaben durchscheinen zu lassen.
+HOF = 3
+
+# Die Farben, die unter dem Wort einer Stelle zu sehen sein koennen, siehe
+# grund().
+GRUENDE = ("feld", "papier", "zone")
 
 # Die Schriftgroessen des Textwerks, in Zeicheneinheiten. Sie stehen
 # beieinander, weil ihr Verhaeltnis die Rangfolge macht: der Titel vor dem
@@ -213,10 +236,11 @@ def wortflaeche(text: str, bei: Ort) -> Flaeche:
     """Der Platz, den eine Beschriftung im Feld um ihren Ort einnimmt, in Metern.
 
     Geschaetzt, siehe textbreite(). Dieselbe Rechnung laesst das Blatt um ein
-    Wort wachsen, einen Weg vor dem Wort einer Stelle aufhoeren, rueckt die
-    Zahl eines Abstands neben ihre Linie und sagt, ob das Wort einer Zone in
-    die Zone passt. Zwei Schaetzungen liefen auseinander, und dann stuende ein
-    Wort im Bild, das der Weg fuer kleiner haelt.
+    Wort wachsen, einen Weg vor dem Wort einer Stelle und vor dem Namen eines
+    Geraets aufhoeren, rueckt die Zahl eines Abstands neben ihre Linie und
+    sagt, ob das Wort einer Zone in die Zone passt. Zwei Schaetzungen liefen
+    auseinander, und dann stuende ein Wort im Bild, das der Weg fuer kleiner
+    haelt.
     """
     return Flaeche("rechteck", bei, wortbreite(text), KLEINSCHRIFT / MASSSTAB)
 
@@ -365,6 +389,15 @@ def farbblock(auswahl: dict[str, str]) -> str:
     return "svg{" + "".join(f"--{k}:{v};" for k, v in auswahl.items()).rstrip(";") + "}"
 
 
+def hof() -> str:
+    """Der Hof eines Wortes im Stylesheet, ohne seine Farbe.
+
+    Die Farbe setzt, wer den Hof traegt: das Zonenwort die der Zone, die
+    Stelle die ihres Grundes.
+    """
+    return f"stroke-width:{koord(HOF)};stroke-linejoin:round;paint-order:stroke"
+
+
 def stil() -> str:
     """Das Stylesheet des Bildes, mit beiden Farbschemata.
 
@@ -413,14 +446,17 @@ def stil() -> str:
         # gemalt. Auf der Zone faellt er nicht auf; ueber einem hervorgehobenen
         # Marker, der in Strichfarbe gefuellt ist, traegt er das Wort.
         + f".zonenname{{fill:var(--strich);{schriftangabe(KLEINSCHRIFT)};"
-          "stroke:var(--zone);stroke-width:3;stroke-linejoin:round;"
-          "paint-order:stroke}"
+          f"stroke:var(--zone);{hof()}}}"
         # Eine Stelle ist nur ihr Wort, voll und so gross wie das einer Zone.
-        # Den Hof des Zonenworts braucht sie nicht: er hebt das Wort von einem
-        # gefuellten Marker ab, und wo einer steht, traegt er den Namen und
-        # die Stelle entfaellt.
-        + f".stelle{{fill:var(--strich);{schriftangabe(KLEINSCHRIFT)}}}"
-        + ".weg{fill:none;stroke-width:2.6;stroke-linecap:round}"
+        # Auch sie bringt einen Hof mit, in der Farbe ihres Grundes, siehe
+        # grund(). Ein Weg, der nur vorbeilaeuft, schiene sonst zwischen den
+        # Buchstaben durch, und eine Linie des Feldes strich das Wort durch.
+        # Ein Hof in einer einzigen Farbe schimmerte neben dem Feld im
+        # dunklen Schema um die Buchstaben.
+        + f".stelle{{fill:var(--strich);{schriftangabe(KLEINSCHRIFT)};{hof()}}}"
+        + "".join(f".stelle.grund-{farbe}{{stroke:var(--{farbe})}}"
+                  for farbe in GRUENDE)
+        + f".weg{{fill:none;stroke-width:{koord(WEGSTRICH)};stroke-linecap:round}}"
         + ".laufweg{stroke:var(--laufweg)}"
         + ".ballweg{stroke:var(--ballweg);stroke-dasharray:9 6}"
         # Die Linie einer Abstandsangabe tritt zurueck, die Zahl nicht:
@@ -461,7 +497,8 @@ def spitzen() -> str:
                        ("mass", "gedaempft")):
         teile.append(
             f'<marker id="spitze-{art}" viewBox="0 0 10 10" refX="9" refY="5" '
-            f'markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse">'
+            f'markerWidth="{koord(SPITZE)}" markerHeight="{koord(SPITZE)}" '
+            f'orient="auto-start-reverse">'
             f'<path d="M0 0 L10 5 L0 10 Z" fill="var(--{farbe})"/></marker>'
         )
     teile.append("</defs>")
@@ -569,11 +606,52 @@ def aussparungen(s: Szene) -> list[Flaeche]:
     return marker + [wortflaeche(stelle.text, stelle.bei) for stelle in s.stellen]
 
 
-def _kuerzung(ende: Ort, hin: Ort, ausgespart: list[Flaeche]) -> tuple[Ort, float]:
+def geraetnamen(s: Szene) -> list[Flaeche]:
+    """Der Platz, den die Namen der Geraete einnehmen, siehe durch_den_namen()."""
+    return [wortflaeche(geraet.text, geraet.name_bei)
+            for geraet in s.geraete if geraet.text]
+
+
+def durch_den_namen(ende: Ort, richtung: Ort, name: Flaeche) -> float | None:
+    """Wie weit ein Weg von seinem Ende aus laeuft, bis er einen Namen verlaesst.
+
+    In Metern, entlang `richtung`, also vom Ende in den Weg hinein. None, wenn
+    das Ende nicht in den Namen reicht.
+
+    Als Ende zaehlt nicht nur der letzte Punkt, sondern das Stueck, auf dem
+    die Spitze sitzt. Im Referenzbild endet der Annahmepfeil an der Unterkante
+    der Zielmatte, knapp ueber ihrem Namen: der letzte Punkt liegt ausserhalb
+    des Wortes, die Spitze dahinter mitten darauf. Am Anfang eines Weges gilt
+    dasselbe Stueck, so wie Marker und Stellen an beiden Enden zaehlen.
+
+    Ein Marker und das Wort einer Stelle zaehlen dagegen nur, wenn das Ende
+    auf ihrem Ort liegt: dorthin zeigt, wer sie meint. Auf den Ort eines
+    Namens zeigt niemand, er steht unter seinem Geraet. Getroffen wird er von
+    einem Weg, der auf das Geraet zeigt und dabei mit der Spitze hineinreicht.
+    """
+    ein, aus = -math.inf, math.inf
+    links, unten, rechts, oben = name.rahmen
+    for punkt, schritt, anfang, schluss in ((ende[0], richtung[0], links, rechts),
+                                            (ende[1], richtung[1], unten, oben)):
+        if not schritt:
+            if not anfang <= punkt <= schluss:
+                return None
+            continue
+        a, b = (anfang - punkt) / schritt, (schluss - punkt) / schritt
+        ein, aus = max(ein, min(a, b)), min(aus, max(a, b))
+    if ein > aus or aus < 0 or ein > SPITZENLAENGE:
+        return None
+    return aus
+
+
+def _kuerzung(ende: Ort, hin: Ort, ausgespart: list[Flaeche],
+              namen: list[Flaeche]) -> tuple[Ort, float]:
     """In welche Richtung und wie weit ein Ende des Weges auf `hin` zu rueckt.
 
     Steht an dem Ende nichts, rueckt es nicht. Stehen dort ein Marker und ein
-    Wort, zaehlt das, was weiter reicht.
+    Wort, zaehlt das, was weiter reicht. Ein Marker und das Wort einer Stelle
+    zaehlen auf ihrem Ort, der Name eines Geraets, sobald das Ende in ihn
+    hineinreicht.
     """
     dx, dy = hin[0] - ende[0], hin[1] - ende[1]
     laenge = (dx * dx + dy * dy) ** 0.5
@@ -581,10 +659,13 @@ def _kuerzung(ende: Ort, hin: Ort, ausgespart: list[Flaeche]) -> tuple[Ort, floa
         return (0.0, 0.0), 0.0
     richtung = (dx / laenge, dy / laenge)
     raender = [f.rand(richtung) for f in ausgespart if trifft(ende, f.bei)]
+    raender += [weit for name in namen
+                if (weit := durch_den_namen(ende, richtung, name)) is not None]
     return richtung, (max(raender) + WEGABSTAND if raender else 0.0)
 
 
-def enden(weg: Weg, ausgespart: list[Flaeche]) -> tuple[Ort, Ort, Ort | None]:
+def enden(weg: Weg, ausgespart: list[Flaeche],
+          namen: list[Flaeche]) -> tuple[Ort, Ort, Ort | None]:
     """Laesst einen Weg am Rand eines Markers oder Wortes anfangen und aufhoeren.
 
     Gekuerzt wird entlang der Tangente, bei einer Kurve also zum Steuerpunkt
@@ -598,8 +679,8 @@ def enden(weg: Weg, ausgespart: list[Flaeche]) -> tuple[Ort, Ort, Ort | None]:
     """
     von, nach = weg.von, weg.nach
     steuer = steuerpunkt(von, nach, weg.bogen)
-    richtung_von, weit_von = _kuerzung(von, steuer or nach, ausgespart)
-    richtung_nach, weit_nach = _kuerzung(nach, steuer or von, ausgespart)
+    richtung_von, weit_von = _kuerzung(von, steuer or nach, ausgespart, namen)
+    richtung_nach, weit_nach = _kuerzung(nach, steuer or von, ausgespart, namen)
     # Beide Enden zusammen nie mehr als zwei Drittel: ein kurzer Weg zwischen
     # zwei Nachbarpositionen soll schrumpfen, nicht sich umdrehen. Die Grenze
     # gilt fuer beide zusammen und nicht je Seite, damit ein breites Wort am
@@ -620,9 +701,10 @@ def trifft(a: Ort, b: Ort) -> bool:
     return abs(a[0] - b[0]) < 0.05 and abs(a[1] - b[1]) < 0.05
 
 
-def pfad(weg: Weg, blatt: Blatt, ausgespart: list[Flaeche]) -> str:
+def pfad(weg: Weg, blatt: Blatt, ausgespart: list[Flaeche],
+         namen: list[Flaeche]) -> str:
     """Ein Weg, gerade oder gekruemmt, mit Pfeilspitze am Ende."""
-    (x0, y0), (x1, y1), steuer = enden(weg, ausgespart)
+    (x0, y0), (x1, y1), steuer = enden(weg, ausgespart, namen)
     anfang = f"M{koord(blatt.x(x0))} {koord(blatt.y(y0))}"
     if steuer:
         mitte = f"Q{koord(blatt.x(steuer[0]))} {koord(blatt.y(steuer[1]))} "
@@ -706,14 +788,35 @@ def zonenhinweise(s: Szene) -> list[str]:
     return hinweise
 
 
+def grund(s: Szene, bei: Ort) -> str:
+    """Welche Farbe an diesem Ort unter einem Wort zu sehen ist, aus GRUENDE.
+
+    Eine Zone, sonst die Grundform, sonst das Papier daneben. Feld und
+    Leinwand tragen beide die Feldfarbe. Was auf dem Boden steht, ein Geraet
+    oder ein Marker, zaehlt nicht: steht dort etwas, traegt es selbst den
+    Namen, und es braucht keine Stelle (ADR-0007).
+
+    Gemessen wird an der Mitte des Wortes. Ragt es ueber den Rand des Feldes,
+    gilt, worauf seine Mitte steht.
+    """
+    if any(zone.enthaelt(bei) for zone in s.zonen):
+        return "zone"
+    form = s.grundform
+    if 0 <= bei[0] <= form.breite and 0 <= bei[1] <= form.laenge:
+        return "feld"
+    return "papier"
+
+
 def stellen(s: Szene, blatt: Blatt) -> str:
     """Die Woerter der Stellen, jedes zentriert auf seinen Ort.
 
     Nur das Wort. Ein Punkt darunter liesse sich an einer Linie des Feldes
     nicht setzen, und ein Rand oder eine Flaeche machten aus der Stelle eine
-    Zone (ADR-0007).
+    Zone (ADR-0007). Der Hof um die Buchstaben ist kein Rand: er hat die Farbe
+    dessen, worauf das Wort steht, und faellt dort nicht auf.
     """
-    return "".join(beschriftung("stelle", stelle.text, stelle.bei, blatt)
+    return "".join(beschriftung(f"stelle grund-{grund(s, stelle.bei)}",
+                                stelle.text, stelle.bei, blatt)
                    for stelle in s.stellen)
 
 
@@ -862,9 +965,10 @@ def zeichne(s: Szene) -> str:
     # Wege unter die Marker: ein Pfeil, der einen Spieler streift, soll nicht
     # quer durch sein Kuerzel laufen. Wer auf einem Spieler oder an einer
     # Stelle anfaengt oder aufhoert, wird dafuer bis an den Rand des Markers
-    # oder des Wortes gekuerzt.
-    ausgespart = aussparungen(s)
-    teile.extend(pfad(weg, blatt, ausgespart) for weg in s.wege)
+    # oder des Wortes gekuerzt, und wer in den Namen eines Geraets reicht,
+    # bis an den Rand des Namens.
+    ausgespart, namen = aussparungen(s), geraetnamen(s)
+    teile.extend(pfad(weg, blatt, ausgespart, namen) for weg in s.wege)
     teile.append(marker(s, blatt))
     # Die Zonennamen ueber den Aufbau. Die Flaechen liegen ganz unten, ihre
     # Woerter ganz oben: was eine Zone bedeutet, soll nicht unter dem

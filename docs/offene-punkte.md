@@ -101,6 +101,18 @@ Runde.
 Ziel: bewusst nicht. Auslöser: Ein Export oder eine Vorschau dauert dem Trainer
 zu lange.
 
+### Ein Weg quer durch den Namen eines Geräts
+
+Aus #43. Ein Weg hört vor dem Namen eines Geräts nur auf, wenn er mit seiner
+Spitze hineinreicht. Läuft er durch den Namen hindurch, etwa bis in die Mitte
+des Geräts, kreuzt er das Wort: Der Name liegt mit dem Gerät unter den Wegen
+und hat keinen Hof. Abhilfe wäre ein Hof wie beim Wort einer Stelle, und der
+Name käme über die Wege. In den Szenen im Arbeitsordner kommt der Fall am
+03.10.2026 nicht vor.
+
+Ziel: bewusst nicht. Auslöser: Ein Schaubild zeigt einen Weg quer durch den
+Namen eines Geräts.
+
 ### Ein Beach-Team anlegen, solange es keins gibt
 
 Beach ist seit Welle 1a im Plugin und an einer echten Beachübung abgenommen
