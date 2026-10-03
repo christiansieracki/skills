@@ -84,6 +84,11 @@ WENIG_TEXT = 150
 # Der Anfang der Zeile im Auftrag, die `pruefen` wieder liest.
 AUS_DEM_BILD = "Ablauf aus dem Bild"
 
+# Die Anfänge der Zeilen im Auftrag, die ein PDF nennen, aus dem sich keine
+# Quellgrafik ausschneiden ließ. Auch die liest `pruefen` wieder.
+KEINE_AUSGESCHNITTEN = "- Quellgrafik: keine ausgeschnitten,"
+KEINE_QUELLGRAFIK_AUS = "- Keine Quellgrafik aus"
+
 SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "Notiz"]
 ERGEBNISSE = {"uebung", "folge", "zurückgestellt", "übersprungen"}
 STATUS = {"offen", "bereit", "rückfrage", "importiert", "ergänzt", "übersprungen",
@@ -606,6 +611,24 @@ def laut_auftrag_aus_dem_bild(auftrag: Path) -> bool:
         return bool(_AUS_DEM_BILD_JA.search(auftrag.read_text(encoding="utf-8")))
     except (OSError, UnicodeDecodeError):
         return False
+
+
+def laut_auftrag_ohne_quellgrafik(auftrag: Path, k: Kandidat) -> list[str]:
+    """Die PDFs des Kandidaten, aus denen sich laut Auftrag keine Quellgrafik ausschneiden ließ.
+
+    Gelesen wird der Auftrag, wie bei `laut_auftrag_aus_dem_bild`: Die
+    Ausgabe von `vorbereiten` ist nach einem Abbruch weg, der Auftrag liegt
+    bis zum Übernehmen da (#36). Ein PDF steht dort als `` `<datei>`: <grund> ``,
+    siehe `lege_quellgrafiken_an`. Gesucht wird nach den Dateien des
+    Kandidaten, in der Reihenfolge der Spalte Dateien, denn ein Dateiname
+    kann selbst ein Komma oder einen Doppelpunkt tragen.
+    """
+    try:
+        zeilen = [z for z in auftrag.read_text(encoding="utf-8").splitlines()
+                  if z.startswith((KEINE_AUSGESCHNITTEN, KEINE_QUELLGRAFIK_AUS))]
+    except (OSError, UnicodeDecodeError):
+        return []
+    return [d for d in k.dateien if _ist_pdf(d) and any(f"`{d}`: " in z for z in zeilen)]
 
 
 def _unter_quellen(quellen: Path, wert: str) -> bool:
@@ -1290,7 +1313,8 @@ def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list
     ohne Lücke weiter. Das gilt auch für das Bild der Übersicht (entschieden
     am 02.10.2026): Die Stationen bekommen ihre Quellgrafiken trotzdem, und für
     die Übersicht lässt sich danach ein Schaubild zeichnen. Der Auftrag nennt
-    das PDF, und der Agent sieht dort selbst nach.
+    das PDF, und der Agent sieht dort selbst nach. `pruefen` liest es dort
+    wieder, siehe `laut_auftrag_ohne_quellgrafik`.
     """
     for altes in sammelimport.quellgrafiken(k):
         altes.unlink()
@@ -1314,8 +1338,8 @@ def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list
 
     if not ausgeschnitten:
         grund = "; ".join(fehler) or "kein PDF des Kandidaten bettet ein Bild ein"
-        return ([f"- Quellgrafik: keine ausgeschnitten, {grund}. Sieh dir das Bild im "
-                 f"PDF selbst an."], [f"Keine Quellgrafik, {grund}."])
+        return ([f"{KEINE_AUSGESCHNITTEN} {grund}. Sieh dir das Bild im PDF selbst an."],
+                [f"Keine Quellgrafik, {grund}."])
     if len(ausgeschnitten) == 1:
         # Eine einzelne Quellgrafik trägt keine Nummer, auf der Karte wird
         # sie ein einzelner Name.
@@ -1328,7 +1352,7 @@ def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list
         zeilen = [f"- Quellgrafiken: eine je PDF mit Bild, in der Reihenfolge der Dateien. "
                   f"Trag sie im Entwurf in dieser Reihenfolge ein, als `schaubild: [{namen}]`.",
                   *(f"  - `{ziel.as_posix()}`, aus `{datei}`" for datei, ziel in ausgeschnitten)]
-    zeilen += [f"- Keine Quellgrafik aus {grund}. Sieh dir das Bild im PDF selbst an."
+    zeilen += [f"{KEINE_QUELLGRAFIK_AUS} {grund}. Sieh dir das Bild im PDF selbst an."
                for grund in fehler]
     return zeilen, [f"Keine Quellgrafik aus {grund}." for grund in fehler]
 
@@ -1571,9 +1595,14 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
 
     `quellgrafiken` sind die, die der Entwurf in `schaubild:` nennt, in seiner
     Reihenfolge, so wie sie auf die Karte kommen. Nennt er keine, ist die
-    Liste leer.
+    Liste leer. `quellgrafik_fehlt` nennt die PDFs, deren Bild sich nicht
+    ausschneiden ließ, relativ zum Quellenordner wie `dateien`. Der Skill sagt
+    es bei der Freigabe dazu und nennt am Ende des Durchgangs die Karten, denen
+    deshalb eine Quellgrafik fehlt.
+
+    Gefragt wird nur nach einem Kandidaten, dessen Entwurf auf der Platte
+    liegt, siehe `pruefen`.
     """
-    entwurf = sammelimport.entwurf(k)
     return {
         "kandidat": k.nummer,
         "was": k.was,
@@ -1581,9 +1610,10 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
         "dateien": k.dateien,
         "status": k.status,
         "notiz": k.notiz,
-        "entwurf": entwurf.as_posix() if entwurf.is_file() else None,
+        "entwurf": sammelimport.entwurf(k).as_posix(),
         "quellgrafiken": [(sammelimport.entwurfsordner / name).as_posix()
                           for name in schaubilder(befund.felder.get("schaubild"))],
+        "quellgrafik_fehlt": laut_auftrag_ohne_quellgrafik(sammelimport.auftrag(k), k),
         "ablauf_aus_dem_bild": befund.aus_dem_bild,
         "felder": befund.felder,
         "vorschlaege": {
@@ -1605,6 +1635,10 @@ def pruefen(wurzel: Path, ordner: str, als_json: bool = False) -> int:
 
     Mit `als_json` kommt statt der Zeilen für den Trainer, was der Skill für
     die Freigabe braucht. Die Übersicht wird in beiden Fällen geschrieben.
+
+    Ein Kandidat ohne Entwurf hat für die Freigabe nichts und fehlt im JSON
+    (#36). Bei PlayDrill warten nach dem ersten Durchgang über 200 davon, und
+    der Skill liest die Ausgabe in jedem Durchgang zweimal.
     """
     sammelimport = Sammelimport(wurzel, ordner)
     sammelimport.verlange_freigabe()
@@ -1616,7 +1650,8 @@ def pruefen(wurzel: Path, ordner: str, als_json: bool = False) -> int:
         befund = pruefe_entwurf(sammelimport, k)
         setze_befund(k, befund)
         stand[k.status] = stand.get(k.status, 0) + 1
-        freigabe.append(fuer_die_freigabe(sammelimport, k, befund))
+        if sammelimport.entwurf(k).is_file():
+            freigabe.append(fuer_die_freigabe(sammelimport, k, befund))
         if not als_json:
             print(f"  {k.nummer}  {k.status}{': ' + k.notiz if k.notiz else ''}")
     sammelimport.speichere()

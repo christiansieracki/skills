@@ -38,6 +38,12 @@ Leute warten.
 Eine Datei, die noch nicht in `quellen/` liegt, gehört dorthin, bevor Karten
 daraus entstehen. Die Karten verweisen mit `quelldatei:` darauf zurück.
 
+Ist das Material ein Ordner mit mehr als etwa zehn Dateien, den Sammelimport
+anbieten. `volleyball-sammelimport` legt für den ganzen Ordner einen
+Zerlegungsplan an, lässt die Kartenentwürfe von Agenten schreiben und legt sie
+gesammelt zur Freigabe vor, statt Übung für Übung zu fragen. Der Trainer
+entscheidet. Bleibt er hier, geht es hier weiter.
+
 ### Fotos, die sich nicht öffnen lassen
 
 Abfotografierte Seiten kommen oft mit 50 Megapixeln und 7 MB je Datei aus dem

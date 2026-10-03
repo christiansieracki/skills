@@ -1,8 +1,9 @@
 # skills
 
 Claude-Code-Plugin-Marketplace. Enthält das Plugin `volleyball` unter
-`plugins/volleyball/` — vier Skills für Saisonplanung, Trainingsdesign,
-Übungsimport und Schaubilder, dazu die Referenzen in
+`plugins/volleyball/` — fünf Skills für Saisonplanung, Trainingsdesign,
+Übungsimport, Sammelimport und Schaubilder, die beiden Agenten des
+Sammelimports in `plugins/volleyball/agents/`, dazu die Referenzen in
 `plugins/volleyball/referenzen/` und die Python-Skripte in
 `plugins/volleyball/scripts/`.
 

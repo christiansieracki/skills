@@ -1,6 +1,6 @@
 # Datenmodell
 
-Verbindlich für alle vier Skills. Wer hier abweicht, produziert Karten, die
+Verbindlich für alle fünf Skills. Wer hier abweicht, produziert Karten, die
 `suche.py` nicht findet.
 
 ## Ordner
@@ -373,12 +373,17 @@ wird:
   Form oben. Ein Vorschlag nennt ein Feld aus dem Frontmatter oder einen
   Abschnitt, den der Entwurf hat.
 
-Mit `--json` gibt `pruefen` je Kandidat aus, was die Freigabe im Chat braucht:
+Mit `--json` gibt `pruefen` je Kandidat mit Entwurf aus, was die Freigabe im
+Chat braucht. Kandidaten ohne Entwurf stehen nur in der Übersicht. Dazu gehören
 die Felder des Entwurfs, die Vorschläge getrennt nach Feldern und Textstellen,
 die Rückfragen getrennt nach mit und ohne Vermutung, ob der Ablauf aus dem Bild
-kommt, den Pfad des Entwurfs und als Liste `quellgrafiken` die Pfade der
+kommt, der Pfad des Entwurfs und als Liste `quellgrafiken` die Pfade der
 Quellgrafiken, die er einträgt, in seiner Reihenfolge. Die Textstellen ergeben in
-der Tabelle die Spalte „aus dem Bild“.
+der Tabelle die Spalte „aus dem Bild“. Als Liste `quellgrafik_fehlt` stehen die
+PDFs des Kandidaten da, deren Bild sich nicht ausschneiden ließ, relativ zum
+Quellenordner. `pruefen` liest sie aus dem Auftrag, sie sind also auch nach
+einem Abbruch noch da. Mit dem Übernehmen verschwindet der Auftrag und mit ihm
+diese Angabe.
 
 Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
 mit `angelegt` von heute und ohne `## Freigabe`. Entwurf und Auftrag

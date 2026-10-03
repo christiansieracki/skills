@@ -500,6 +500,50 @@ class QuellgrafikTest(unittest.TestCase):
         self.assertIn("zirkel.pdf", zeile_mit(fertig.stdout, "Keine Quellgrafik"))
 
     @BRAUCHT_PILLOW
+    def test_pruefen_nennt_die_pdfs_ohne_quellgrafik_auch_ohne_die_ausgabe_von_vorbereiten(
+            self) -> None:
+        # Nach einem Abbruch ist die Ausgabe von vorbereiten weg, und am Ende
+        # des Durchgangs nennt der Skill die Karten, denen eine Quellgrafik
+        # fehlt, mit dem PDF (#36). Er liest sie aus `pruefen --json`, und das
+        # liest sie aus dem Auftrag. Bei 5 fehlt nur das Bild der Uebersicht,
+        # bei 6 das einzige, 7 hat seins, und 8 hat ein PDF ohne Bild: Dort
+        # fehlt nichts, es gab nichts auszuschneiden.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 5, "dateien": ["zirkel.pdf", "station-1.pdf", "station-2.pdf"],
+             "ergebnis": "folge"},
+            {"kandidat": 6, "dateien": ["Ü_Abwehr/kasten, hoch.pdf"]},
+            {"kandidat": 7, "dateien": ["glatt.pdf"]},
+            {"kandidat": 8, "dateien": ["nur-text.pdf"]},
+        ], quellgrafik_ausschneiden=True)
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/zirkel.pdf", ["Übersicht"], bilder=[
+            PdfBild(50, 40, deckend=(5, 5, 45, 35), kaputt=True)])
+        for name in ("station-1.pdf", "station-2.pdf", "glatt.pdf"):
+            self.ordner.lege_quell_pdf_an(f"{ORDNER}/{name}", [name], bilder=[
+                PdfBild(30, 20, deckend=(0, 0, 30, 20))])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/Ü_Abwehr/kasten, hoch.pdf", ["Kasten"], bilder=[
+            PdfBild(90, 60, deckend=(12, 5, 80, 51), kaputt=True)])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/nur-text.pdf", ["Nur Text"])
+        vorbereitet = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+        self.assertEqual(vorbereitet.returncode, 0, vorbereitet.stdout + vorbereitet.stderr)
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 5, typ="folge", titel="Zirkel",
+            schaubild=["5.quellgrafik-1.png", "5.quellgrafik-2.png"])
+        self.ordner.lege_kartenentwurf_an(ORDNER, 6, titel="Kasten")
+        self.ordner.lege_kartenentwurf_an(ORDNER, 7, titel="Glatt", schaubild="7.quellgrafik.png")
+
+        fertig = self.ordner.starte("sammelimport.py", "pruefen", "--json", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        freigabe = {k["kandidat"]: k for k in json.loads(fertig.stdout)["kandidaten"]}
+        # Die Blaetter haben kaum Text, die Entwuerfe sind deshalb `rückfrage`.
+        for kandidat in ("5", "6", "7"):
+            self.assertNotEqual(freigabe[kandidat]["status"], "offen", freigabe[kandidat]["notiz"])
+        self.assertEqual(freigabe["5"]["quellgrafik_fehlt"], ["zirkel.pdf"])
+        self.assertEqual(freigabe["6"]["quellgrafik_fehlt"], ["Ü_Abwehr/kasten, hoch.pdf"])
+        self.assertEqual(freigabe["7"]["quellgrafik_fehlt"], [])
+        self.assertNotIn("8", freigabe)
+
+    @BRAUCHT_PILLOW
     def test_ein_bild_das_sich_nicht_lesen_laesst_nennen_ausgabe_und_auftrag(self) -> None:
         # Sonst saehe der Agent im Auftrag keine Quellgrafik und wuesste nicht,
         # ob es keine gibt oder ob er sie im PDF suchen muss.
@@ -1338,6 +1382,22 @@ class PruefenTest(unittest.TestCase):
                          [(entwuerfe / name).resolve().as_posix()
                           for name in ("1.quellgrafik-1.png", "1.quellgrafik-2.png")])
         self.assertEqual(freigabe["2"]["quellgrafiken"], [])
+        # Ohne Auftrag, wie hier, fehlt auch keine.
+        self.assertEqual(freigabe["2"]["quellgrafik_fehlt"], [])
+
+    def test_json_nennt_nur_kandidaten_mit_entwurf(self) -> None:
+        # Bei PlayDrill warten nach dem ersten Durchgang ueber 200 Kandidaten
+        # ohne Entwurf. Fuer die Freigabe haben sie nichts, im Chat kosteten sie
+        # bei jedem Aufruf zehntausende Tokens (#36). Die Uebersicht traegt sie
+        # trotzdem.
+        self.plane({"kandidat": 1, "dateien": ["a.pdf"]}, {"kandidat": 2, "dateien": ["b.pdf"]})
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Mit Entwurf")
+
+        freigabe = self.freigabe()
+
+        self.assertEqual(list(freigabe), ["1"])
+        zeile = self.ordner.uebersicht(ORDNER)["2"]
+        self.assertEqual((zeile["Status"], zeile["Notiz"]), ("offen", "kein Entwurf"))
 
     def test_json_setzt_den_status_wie_ohne_json(self) -> None:
         # Der Skill ruft nach einem Durchgang nur `pruefen --json` auf. Auch
