@@ -31,8 +31,13 @@ class IdsUmstellenTest(unittest.TestCase):
         self.ordner = Arbeitsordner(vor_der_umstellung=True)
         self.addCleanup(self.ordner.raeume_auf)
         self.ordner.lege_schaubild_an("ue-0006-aufbau.png")
+        # Erst die Szene, dann das Bild aus ihr: Ein Bild, das aelter ist als
+        # seine Szene, meldet der Linter (#47).
+        self.ordner.lege_szene_an("ue-0006", """
+            form: halle
+            titel: Variante mit Schaubild
+        """)
         self.ordner.lege_schaubild_an("ue-0006.svg")
-        self.ordner.lege_szene_an("ue-0006", "titel: Variante mit Schaubild")
         self.ordner.lege_karte_an(id="ue-0006", titel="Variante mit Schaubild",
                                   schaubild="ue-0006-aufbau.png", variante_von="ue-0002")
         plan = self.ordner.lege_trainingsplan_an(PLAN, "ue-0001", "ue-0006")

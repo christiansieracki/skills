@@ -535,6 +535,18 @@ class Arbeitsordner:
         datei.write_text(textwrap.dedent(text).strip() + "\n", encoding="utf-8")
         return datei
 
+    def lege_konfliktkopie_an(self, datei: Path,
+                              marke: str = " (conflicted copy christian 2026-10-03 101500)") -> Path:
+        """Legt neben `datei` eine Konfliktkopie an, wie der Nextcloud-Client sie benennt.
+
+        Die Marke steht vor der letzten Endung, der Inhalt ist der von `datei`.
+        Aus `2026-09-15.md` wird so `2026-09-15 (conflicted copy christian
+        2026-10-03 101500).md`.
+        """
+        kopie = datei.with_name(datei.stem + marke + datei.suffix)
+        kopie.write_bytes(datei.read_bytes())
+        return kopie
+
     def lege_entwurfsordner_an(self) -> Path:
         """Ein Ordner neben dem Arbeitsordner, ohne Wurzeldatei ueber sich.
 

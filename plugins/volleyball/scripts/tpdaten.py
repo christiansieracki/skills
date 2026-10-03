@@ -15,6 +15,9 @@ import socket
 import sys
 from pathlib import Path
 
+from szene import ENDUNG as SZENE_ENDUNG
+from szene import SzeneFehler, bild_zur_szene, lies_szene
+
 MARKER = "trainingsplanung-root.yml"
 
 ELEMENTE = {
@@ -205,6 +208,30 @@ def lies_frontmatter(pfad: Path) -> tuple[dict, str]:
 # Einlesen
 # --------------------------------------------------------------------------
 
+# Die Marken, mit denen der Nextcloud-Client eine Konfliktkopie benennt,
+# nachgesehen am 03.10.2026 in src/common/utility.cpp des Clients. Die Marke
+# steht vor der letzten Endung: aus `plan.md` wird
+# `plan (conflicted copy 2026-10-03 101500).md`, mit dem Namen des Nutzers vor
+# dem Datum, wenn der Client ihn kennt. Klammern in diesem Namen ersetzt der
+# Client, die Marke endet also an der ersten schliessenden Klammer. Aeltere
+# Clients schrieben `plan_conflict-20261003-101500.md`. `(case clash from ...)`
+# bekommt eine Datei, die neben einer zweiten mit demselben Namen in anderer
+# Schreibung keinen Platz hat, etwa unter Windows.
+KONFLIKTMARKE = re.compile(
+    r" \((?:conflicted copy|case clash from) [^()]*\)|_conflict-\d{8}-\d{6}")
+
+
+def ausgelassen(pfad: Path) -> bool:
+    """Eine Datei unter uebungen/ oder trainings/, die keine Karte und kein Plan ist.
+
+    Eine Vorlage mit `_` vorn, die README und eine Konfliktkopie. Die
+    Konfliktkopie meldet der Linter, gelesen wird sie nicht: Sonst stuende
+    eine Uebung zweimal in der Suche, und ein Training zaehlte doppelt.
+    """
+    return (pfad.name.startswith("_") or pfad.name.upper() == "README.MD"
+            or KONFLIKTMARKE.search(pfad.name) is not None)
+
+
 _KENNUNG = re.compile(r"`([a-z0-9-]+)`")
 
 
@@ -268,7 +295,7 @@ def lies_uebungen(wurzel: Path) -> list[dict]:
     if not ordner.is_dir():
         return karten
     for pfad in sorted(ordner.glob("*.md")):
-        if pfad.name.startswith("_") or pfad.name.upper() == "README.MD":
+        if ausgelassen(pfad):
             continue
         fm, rumpf = lies_frontmatter(pfad)
         if not fm.get("id"):
@@ -479,7 +506,7 @@ def lies_trainings(wurzel: Path) -> list[dict]:
     if not ordner.is_dir():
         return einheiten
     for pfad in sorted(ordner.rglob("*.md")):
-        if pfad.name.startswith("_") or pfad.name.upper() == "README.MD":
+        if ausgelassen(pfad):
             continue
         fm, rumpf = lies_frontmatter(pfad)
         fm["datei"] = pfad.relative_to(wurzel).as_posix()
@@ -571,6 +598,64 @@ def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
             w.append(f"{t['datei']}: nennt noch vierstellige IDs "
                      f"({', '.join(t['vierstellig'])}), {HINWEIS_UMSTELLEN}")
 
+    w += pruefe_szenen(wurzel)
+    w += pruefe_konfliktkopien(wurzel)
+    return w
+
+
+def pruefe_szenen(wurzel: Path) -> list[str]:
+    """Was an den Szenen in schaubilder/ nicht stimmt.
+
+    Gelesen wird jede Szene, gezeichnet keine. Mit mehreren Trainern aendert
+    einer die Szene, und keiner zeichnet neu (#47). Dass sie nicht mehr
+    aufgeht, faellt sonst erst dem auf, der das naechste Mal zeichnen will.
+    """
+    w: list[str] = []
+    for szene in sorted((wurzel / "schaubilder").glob(f"*{SZENE_ENDUNG}")):
+        datei = szene.relative_to(wurzel).as_posix()
+        try:
+            lies_szene(szene.read_text(encoding="utf-8"))
+        except SzeneFehler as fehler:
+            w.append(f"{datei}: {fehler}")
+            continue
+        bild = bild_zur_szene(szene)
+        aufruf = f"{interpreter()} schaubild.py {bild.stem}"
+        if not bild.is_file():
+            w.append(f"{datei}: {bild.name} fehlt, zeichnen mit {aufruf}")
+        # Nextcloud gibt einer Datei beim Abgleich die Zeit mit, zu der sie
+        # geschrieben wurde. Was ein anderer Trainer an der Szene geaendert
+        # hat, ist darum auch hier juenger als das Bild aus der Zeit davor.
+        elif bild.stat().st_mtime < szene.stat().st_mtime:
+            w.append(f"{datei}: {bild.name} ist aelter als die Szene, "
+                     f"neu zeichnen mit {aufruf}")
+    return w
+
+
+def pruefe_konfliktkopien(wurzel: Path) -> list[str]:
+    """Jede Konfliktkopie im Arbeitsordner, auch unter quellen/.
+
+    Aendern zwei Trainer dieselbe Datei, behaelt der Server eine Fassung unter
+    dem alten Namen und der Client legt die andere daneben (#47). Gemerkt
+    wird das sonst nie: Was in der Kopie steht, liest kein Skript.
+    """
+    w: list[str] = []
+    for pfad in sorted(wurzel.rglob("*")):
+        # Eine Kopie einer Kopie traegt zwei Marken. Wie der Client selbst
+        # zaehlt die hintere, uebrig bleibt dann die erste Kopie.
+        marken = list(KONFLIKTMARKE.finditer(pfad.name))
+        if not marken or not pfad.is_file():
+            continue
+        marke = marken[-1]
+        original = pfad.name[:marke.start()] + pfad.name[marke.end():]
+        datei = pfad.relative_to(wurzel).as_posix()
+        # Bei einem case clash sind es zwei Dateien und nicht zwei Fassungen
+        # einer Datei. Zusammenzufuehren ist da nichts.
+        if marke.group().startswith(" (case clash"):
+            w.append(f"{datei}: auf dem Server liegt daneben {original} in anderer "
+                     f"Gross- und Kleinschreibung, eine der beiden umbenennen")
+        else:
+            w.append(f"{datei}: Konfliktkopie von Nextcloud zu {original}, "
+                     f"beide zusammenfuehren und die Kopie loeschen")
     return w
 
 

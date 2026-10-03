@@ -136,6 +136,18 @@ den Rand einer Zone.
 
 Ziel: bewusst nicht. Auslöser: Jemand liest den Rand einer Zone als Ballweg.
 
+### Eine Datei, die nicht UTF-8 ist, bricht den Linter ab
+
+Aus #47. Der Linter liest jetzt auch die Szenen. Ist eine nicht als UTF-8
+gespeichert, bricht `index.py` mit `UnicodeDecodeError` ab, und mit ihm
+`suche.py` und `sammelimport.py uebernehmen`, die den Index bauen. Für Karten
+und Trainingspläne galt das schon vorher. Szenen schreibt der Skill, Karten
+schreiben Skill und Skripte, beide in UTF-8. Abhilfe wäre eine Meldung je
+Datei, die sich nicht lesen lässt, wie bei `ids_umstellen.py`.
+
+Ziel: bewusst nicht. Auslöser: Eine Datei im Arbeitsordner, die nicht UTF-8 ist,
+lässt `index.py` abbrechen.
+
 ### Ein Beach-Team anlegen, solange es keins gibt
 
 Beach ist seit Welle 1a im Plugin und an einer echten Beachübung abgenommen

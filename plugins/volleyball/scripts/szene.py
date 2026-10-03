@@ -3,7 +3,8 @@
 Die Szene ist die Quelle, das SVG ist das Erzeugnis (ADR-0004). Dieses Modul
 kennt die Quelle: es liest die YAML-Teilmenge, in der eine Szene geschrieben
 ist, prueft sie und gibt Punkte in **Metern** zurueck. Wie daraus
-Zeichenkoordinaten werden, weiss allein schaubild.py.
+Zeichenkoordinaten werden, weiss allein schaubild.py. Hier steht auch, wie die
+Datei einer Szene heisst und wo ihr Bild liegt.
 
 Die Trennung liegt genau hier, weil die beiden Seiten verschiedene Einheiten
 sprechen. Alles, was ein Mensch in eine Szene schreibt, steht in Metern; alles,
@@ -25,10 +26,30 @@ import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 class SzeneFehler(Exception):
     """Die Szene geht nicht auf. Der Text ist fuer den Trainer geschrieben."""
+
+
+# Eine Szene heisst <basisname>.szene.yml und liegt in schaubilder/, neben dem
+# Bild, das aus ihr entsteht. Danach fragen schaubild.py, das sie zeichnet,
+# und der Linter, der sie liest, ohne zu zeichnen.
+ENDUNG = ".szene.yml"
+
+
+def bild_zur_szene(szene: Path) -> Path:
+    """Das SVG liegt neben der Szene, unter demselben Basisnamen.
+
+    Der Basisname ist der Dateiname ohne `.yml` beziehungsweise `.yaml` und
+    ohne das `.szene` davor. Eine Regel statt einer Liste von Schreibweisen:
+    `ue-000042.szene.yml` und `ue-000042.szene.yaml` ergeben beide `ue-000042.svg`.
+    """
+    stamm = szene.with_suffix("").name
+    if stamm.endswith(".szene"):
+        stamm = stamm[: -len(".szene")]
+    return szene.with_name(stamm + ".svg")
 
 
 # Ein Ort auf dem Feld, in Metern. Der Name steht in jeder Signatur, die einen

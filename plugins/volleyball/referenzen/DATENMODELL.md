@@ -464,8 +464,16 @@ Angriffslinien und Beach 8×16 m mit Netz und sonst nichts. Die freie Leinwand
 trägt ihr Maß in Metern und hat kein Feld darunter. Sie ist für den
 Stationsaufbau da, der auf kein Feld passt.
 
-Die Szene wird **nicht vom Linter geprüft.** Sie prüft sich beim Rendern
-selbst, und was nicht rendert, wird nicht geschrieben.
+Was nicht rendert, schreibt `schaubild.py` nicht. Mit mehreren Trainern ändert
+aber einer die Szene, und keiner zeichnet neu. Deshalb liest `index.py` jede
+`*.szene.yml` in `schaubilder/`, ohne zu zeichnen. Es meldet:
+
+- eine Szene, die nicht aufgeht, mit dem Grund, den auch `schaubild.py` nennt;
+- eine Szene ohne ihr SVG;
+- ein SVG, das älter ist als seine Szene.
+
+Die beiden letzten Meldungen nennen den Aufruf, der das Bild zeichnet. Ein Bild
+ohne Szene meldet `index.py` nicht.
 
 Was Szene, Feldvorlage und Rolle bedeuten, steht im Glossar. Wie eine Szene
 aufgebaut ist, steht in `referenzen/SCHAUBILDER.md`.
@@ -513,6 +521,23 @@ Sync legte Konfliktkopien an.
 `index.md` ist die Lesebrille für Menschen und gehört in die Wurzel, wird aber
 nur auf ausdrückliche Ansage neu gebaut (`index.py --md`).
 
+## Konfliktkopien
+
+Ändern zwei Trainer dieselbe Datei, bevor Nextcloud abgleicht, behält der
+Server eine Fassung unter dem alten Namen. Die andere legt der Nextcloud-Client
+daneben, etwa als `2026-09-15 (conflicted copy christian 2026-10-03 101500).md`.
+
+`index.py` meldet jede solche Datei im Arbeitsordner, auch unter `quellen/`,
+und nennt die Datei, zu der sie gehört. Als Karte oder Trainingsplan zählt sie
+nicht. Erkannt werden die Namen, die der Client schreibt:
+
+- `(conflicted copy …)`, bei älteren Clients `_conflict-` mit Datum und
+  Uhrzeit. Das sind zwei Fassungen einer Datei. Wer die Meldung bekommt, führt
+  sie zusammen und löscht die Kopie.
+- `(case clash from …)`. Auf dem Server liegen zwei Dateien, deren Namen sich
+  nur in Groß- und Kleinschreibung unterscheiden, und unter Windows hat nur
+  eine davon Platz. Eine der beiden bekommt einen anderen Namen.
+
 ## Skripte
 
 Alle liegen unter `${CLAUDE_PLUGIN_ROOT}/scripts/` und brauchen nur Python 3
@@ -550,5 +575,6 @@ Die übrigen Skripte brauchen weder Pillow noch `pdftotext` noch einen Browser.
 auf Karten und in Trainingsplänen, fehlende oder unbekannte `disziplin`,
 unbekannte Schwerpunkte, fehlende Level, ins Leere zeigende `variante_von`,
 jeder Eintrag in `schaubild` auf eine Datei, die es unter `schaubilder/` nicht
-gibt, Trainingspläne mit unbekannten IDs. Vor größeren Änderungen und nach jedem
-Import laufen lassen.
+gibt, Szenen, die nicht aufgehen, Szenen ohne SVG oder mit einem älteren,
+Trainingspläne mit unbekannten IDs, Konfliktkopien von Nextcloud. Vor größeren
+Änderungen und nach jedem Import laufen lassen.

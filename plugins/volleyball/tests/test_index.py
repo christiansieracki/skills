@@ -13,6 +13,7 @@ Verhalten geaendert haette.
 
 from __future__ import annotations
 
+import os
 import unittest
 
 from arbeitsordner import OHNE, Arbeitsordner, auffaelligkeiten
@@ -317,6 +318,153 @@ class LinterTest(unittest.TestCase):
         self.assertIn("trainings/gruppe/2026-09-15.md", gemeldet[0])
         self.assertIn("ue-0003", gemeldet[0])
         self.assertIn("ids_umstellen.py", gemeldet[0])
+
+
+class SzenenTest(unittest.TestCase):
+    """Die Szenen in `schaubilder/`, gelesen und nicht gezeichnet (#47)."""
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def test_eine_szene_mit_fehler_wird_mit_datei_und_grund_gemeldet(self) -> None:
+        self.ordner.lege_szene_an("ue-000030", """
+            form: halle
+            spieler:
+              - bei: 9
+        """)
+        self.ordner.lege_schaubild_an("ue-000030.svg")
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertIn("schaubilder/ue-000030.szene.yml", gemeldet[0])
+        # Der Grund ist der des Lesers, so wie schaubild.py ihn auch nennt.
+        self.assertIn("Spieler 1: 9 ist keine Position", gemeldet[0])
+
+    def test_ein_bild_aelter_als_seine_szene_wird_gemeldet_und_nach_dem_neuzeichnen_nicht_mehr(
+            self) -> None:
+        szene = self.ordner.lege_szene_an("ue-000031", "form: halle")
+        bild = self.ordner.lege_schaubild_an("ue-000031.svg")
+        # Die Szene ist nach dem Bild geaendert worden, eine Stunde spaeter.
+        stand = bild.stat().st_mtime
+        os.utime(bild, (stand - 3600, stand - 3600))
+
+        vorher = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+        gezeichnet = self.ordner.starte("schaubild.py", "ue-000031")
+        nachher = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(gezeichnet.returncode, 0, gezeichnet.stdout)
+
+        self.assertEqual(len(vorher), 1, vorher)
+        self.assertIn(szene.relative_to(self.ordner.pfad).as_posix(), vorher[0])
+        self.assertIn("ue-000031.svg", vorher[0])
+        # Der Aufruf, der es behebt, steht in der Meldung.
+        self.assertIn("schaubild.py ue-000031", vorher[0])
+        self.assertEqual(nachher, [])
+
+    def test_eine_szene_ohne_bild_wird_gemeldet(self) -> None:
+        self.ordner.lege_szene_an("ue-000032-2", "form: beach")
+
+        fertig = self.ordner.starte("index.py")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        gemeldet = auffaelligkeiten(fertig.stdout)
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertIn("schaubilder/ue-000032-2.szene.yml", gemeldet[0])
+        self.assertIn("ue-000032-2.svg", gemeldet[0])
+        self.assertIn("schaubild.py ue-000032-2", gemeldet[0])
+
+    def test_eine_szene_mit_juengerem_bild_meldet_nichts(self) -> None:
+        # Die Reihenfolge, in der volleyball-schaubild beide schreibt: erst
+        # die Szene, dann das Bild aus ihr.
+        self.ordner.lege_szene_an("ue-000033", "form: halle")
+        gezeichnet = self.ordner.starte("schaubild.py", "ue-000033")
+
+        fertig = self.ordner.starte("index.py")
+
+        self.assertEqual(gezeichnet.returncode, 0, gezeichnet.stdout)
+        self.assertEqual(auffaelligkeiten(fertig.stdout), [])
+
+
+class KonfliktkopienTest(unittest.TestCase):
+    """Konfliktkopien von Nextcloud, irgendwo im Arbeitsordner (#47).
+
+    Welche Namen der Client schreibt, steht in DATENMODELL.md unter
+    "Konfliktkopien".
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def test_eine_konfliktkopie_irgendwo_im_arbeitsordner_wird_gemeldet(self) -> None:
+        schwerpunkte = self.ordner.pfad / "schwerpunkte.md"
+        uebersicht = self.ordner.lege_quellenordner_an(
+            "playdrill", [{"kandidat": 1, "dateien": ["a.pdf"]}])
+        plan = self.ordner.lege_trainingsplan_an("gruppe/2026-09-15.md", "ue-000001")
+        erste = self.ordner.lege_konfliktkopie_an(
+            plan, " (conflicted copy anna 2026-10-03 101500)")
+        kopien = {
+            self.ordner.lege_konfliktkopie_an(schwerpunkte): schwerpunkte,
+            # So hiessen sie bei aelteren Clients, hier unter quellen/.
+            self.ordner.lege_konfliktkopie_an(uebersicht, "_conflict-20261003-101500"):
+                uebersicht,
+            erste: plan,
+            # Die Kopie einer Kopie gehoert zur ersten Kopie, wie beim Client.
+            self.ordner.lege_konfliktkopie_an(erste): erste,
+        }
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), len(kopien), gemeldet)
+        for kopie, original in kopien.items():
+            name = kopie.relative_to(self.ordner.pfad).as_posix()
+            with self.subTest(name=name):
+                (zeile,) = [z for z in gemeldet if z.startswith(f"{name}: ")]
+                self.assertIn("Konfliktkopie", zeile)
+                # Womit sie zusammenzufuehren ist, steht dabei.
+                self.assertIn(original.name, zeile.removeprefix(name))
+
+    def test_ein_name_in_anderer_schreibung_wird_zum_umbenennen_gemeldet(self) -> None:
+        # Zwei Dateien auf dem Server, deren Namen sich nur in Gross- und
+        # Kleinschreibung unterscheiden. Unter Windows hat nur eine Platz,
+        # die andere legt der Client unter neuem Namen ab. Zusammenzufuehren
+        # ist da nichts, es sind zwei verschiedene Dateien.
+        bild = self.ordner.lege_schaubild_an("ue-000001.svg")
+        kopie = self.ordner.lege_konfliktkopie_an(bild, " (case clash from 2026-10-03 101500)")
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        name = f"schaubilder/{kopie.name}"
+        self.assertTrue(gemeldet[0].startswith(f"{name}: "), gemeldet[0])
+        self.assertIn("ue-000001.svg", gemeldet[0].removeprefix(name))
+        self.assertIn("umbenennen", gemeldet[0])
+        self.assertNotIn("zusammenfuehren", gemeldet[0])
+
+    def test_ein_name_mit_conflict_ohne_die_marke_des_clients_meldet_nichts(self) -> None:
+        # Der Client selbst saehe hier `_conflict-` und hielte die Datei fuer
+        # eine Konfliktkopie. Geschrieben hat er so einen Namen nie: Zur Marke
+        # gehoeren Datum und Uhrzeit.
+        self.ordner.lege_quelldatei_an("artikel/team_conflict-loesen.pdf", b"")
+
+        fertig = self.ordner.starte("index.py")
+
+        self.assertEqual(auffaelligkeiten(fertig.stdout), [])
+
+    def test_die_konfliktkopie_einer_karte_ist_keine_zweite_karte(self) -> None:
+        # Sonst stuende dieselbe Uebung zweimal in der Suche, und der Linter
+        # meldete zu der einen Ursache dazu die doppelte ID.
+        self.ordner.lege_konfliktkopie_an(
+            next((self.ordner.pfad / "uebungen").glob("ue-000001-*.md")))
+
+        fertig = self.ordner.starte("index.py")
+
+        self.assertIn(f"Übungen: {len(self.ordner.ids)}", fertig.stdout)
+        gemeldet = auffaelligkeiten(fertig.stdout)
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertIn("Konfliktkopie", gemeldet[0])
 
 
 class IndexMdTest(unittest.TestCase):

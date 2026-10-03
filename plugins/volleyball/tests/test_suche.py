@@ -342,6 +342,16 @@ class SucheTest(unittest.TestCase):
             zeile)
         self.assertEqual(1, zeile.count("quellen/"))
 
+    def test_die_konfliktkopie_eines_trainingsplans_zaehlt_keinen_einsatz(self) -> None:
+        # Die Kopie meldet der Linter (#47). Gelesen wird sie nicht, sonst
+        # zaehlte derselbe Abend zweimal.
+        plan = self.ordner.lege_trainingsplan_an("gruppe/2026-09-15.md", "ue-000001")
+        self.ordner.lege_konfliktkopie_an(plan)
+
+        (treffer,) = self.treffer("--id", "ue-000001")
+
+        self.assertEqual(treffer["anzahl_einsaetze"], 1)
+
 
 class NaechsteIdTest(unittest.TestCase):
     """`suche.py --naechste-id`: die ID fuer die naechste Karte dieses Rechners.

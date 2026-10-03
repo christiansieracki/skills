@@ -42,9 +42,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from browser import Browser, BrowserFehler, finde_browser  # noqa: E402
-from szene import (ABSTANDSARTEN, NAMENSABSTAND, WEGARTEN,  # noqa: E402
+from szene import (ABSTANDSARTEN, ENDUNG, NAMENSABSTAND, WEGARTEN,  # noqa: E402
                    Feldvorlage, Flaeche, Geraet, Legendenblock, Ort, Spieler,
-                   Szene, SzeneFehler, Weg, lies_szene, normale, scheitel)
+                   Szene, SzeneFehler, Weg, bild_zur_szene, lies_szene, normale,
+                   scheitel)
 from tpdaten import (ID_MUSTER, finde_wurzel,  # noqa: E402
                      konsole_vorbereiten, lies_frontmatter, suche_wurzel)
 
@@ -1194,9 +1195,6 @@ def zeichne(s: Szene) -> str:
 # Die Dateien
 # --------------------------------------------------------------------------
 
-ENDUNG = ".szene.yml"
-
-
 def finde_szene(angabe: str, wurzel: Path | None) -> Path:
     """Findet die Szenendatei zu dem, was auf der Kommandozeile stand.
 
@@ -1219,19 +1217,6 @@ def finde_szene(angabe: str, wurzel: Path | None) -> Path:
     if kandidat.parent == Path("."):
         kandidat = Path("schaubilder") / kandidat
     return (wurzel or finde_wurzel()) / kandidat
-
-
-def ziel(quelle: Path) -> Path:
-    """Das SVG liegt neben der Szene, unter demselben Basisnamen.
-
-    Der Basisname ist der Dateiname ohne `.yml` beziehungsweise `.yaml` und
-    ohne das `.szene` davor. Eine Regel statt einer Liste von Schreibweisen:
-    `ue-000042.szene.yml` und `ue-000042.szene.yaml` ergeben beide `ue-000042.svg`.
-    """
-    stamm = quelle.with_suffix("").name
-    if stamm.endswith(".szene"):
-        stamm = stamm[: -len(".szene")]
-    return quelle.with_name(stamm + ".svg")
 
 
 def kartentitel(basisname: str, wurzel: Path | None) -> str:
@@ -1324,7 +1309,7 @@ def main() -> int:
         print("Es wurde nichts geschrieben.")
         return 1
 
-    datei = ziel(quelle)
+    datei = bild_zur_szene(quelle)
     datei.parent.mkdir(parents=True, exist_ok=True)
     datei.write_text(bild, encoding="utf-8")
     print(f"Geschrieben: {datei}")
@@ -1337,7 +1322,7 @@ def main() -> int:
     # Wort daraus einen `titel:` machen koennen, wenn er will.
     if s.textwerk.untertitel_steht_oben:
         print("Ohne `titel:` steht der Untertitel oben, in der Schrift des Titels.")
-        # `ziel()` hat den Basisnamen schon freigelegt. Gehoert die Szene zu
+        # `bild_zur_szene()` hat den Basisnamen schon freigelegt. Gehoert die Szene zu
         # einer Uebung, ist er deren ID.
         #
         # Gesucht wird der Arbeitsordner zuerst ueber der Szene: dieselbe ID
