@@ -88,7 +88,7 @@ an einem geratenen Platz steht in der Halle falsch.
 | `material` | `geraete` |
 | `titel` der Karte | `titel`, wo das Bild für sich steht |
 | Besetzung, Ziel und Wertung, in kurzen Zeilen | `legende` |
-| `quelle` und Zeichenerklärung | `fusszeile` |
+| `quelle` | `fusszeile`, die Zeichenerklärung setzt das Skript |
 
 Trägt die Karte `[halle, beach]`, fragen, für welches Feld das Bild gilt. Ein
 Bild zeigt ein Feld.

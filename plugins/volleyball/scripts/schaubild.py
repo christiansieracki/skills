@@ -313,6 +313,58 @@ def legendensatz(bloecke: list[Legendenblock],
     return satz, y
 
 
+def zeichenerklaerung(s: Szene) -> str:
+    """Die Zeile, die sagt, wie man die Wege und Abstaende im Bild liest.
+
+    Genannt wird genau, was in der Szene vorkommt. Bei der Abnahme von 1c
+    (#28) entstand die Zeile zweimal von Hand, und beim zweiten Bild musste
+    man daran denken, den Laufweg wegzulassen. Der Wortlaut ist der von
+    damals: "Durchgezogen ist ein Laufweg, gestrichelt ein Ballweg."
+
+    Massketten und Pfeile sind beide ein Abstand und teilen sich deshalb einen
+    Satzteil. Ohne Wege und Abstaende gibt es nichts zu erklaeren, und es kommt
+    eine leere Zeichenkette zurueck.
+    """
+    wegarten = {weg.art for weg in s.wege}
+    satzteile = [(merkmal, bedeutung) for art, merkmal, bedeutung in (
+        ("laufweg", "durchgezogen", "ein Laufweg"),
+        ("ballweg", "gestrichelt", "ein Ballweg"),
+    ) if art in wegarten]
+    abstandsarten = {abstand.art for abstand in s.abstaende}
+    enden = [ende for art, ende in (("masskette", "Maßstrichen"),
+                                    ("pfeil", "zwei Spitzen"))
+             if art in abstandsarten]
+    if enden:
+        satzteile.append(("mit " + " oder ".join(enden), "ein Abstand"))
+    if not satzteile:
+        return ""
+    (merkmal, bedeutung), *weitere = satzteile
+    satz = f"{merkmal} ist {bedeutung}" + "".join(f", {m} {b}" for m, b in weitere)
+    return satz[0].upper() + satz[1:] + "."
+
+
+# Woran eine geschriebene Zeichenerklaerung in der Fusszeile zu erkennen ist:
+# an " = " wie in "Gestrichelter Pfeil = Ballweg", oder daran, dass sie einen
+# Laufweg, Ballweg oder Abstand nennt, auch in der Mehrzahl. Die Zeile, die
+# zeichenerklaerung() setzt, nennt immer eines davon. Wer sie aus dem Bild in
+# die Szene uebernimmt, um sie umzuformulieren, bekommt keine zweite dazu.
+GESCHRIEBENE_ERKLAERUNG = re.compile(r" = |laufweg|ballweg|abst[aä]nd", re.IGNORECASE)
+
+
+def fusszeile(s: Szene) -> list[str]:
+    """Die Zeilen unter dem Bild, notfalls mit der Zeichenerklaerung vorneweg.
+
+    Hat die Szene eine geschriebene Zeichenerklaerung, bleibt die Fusszeile,
+    wie sie ist. Sonst setzt das Skript seine als erste Zeile, und die Quelle
+    rueckt darunter. In der Szene aendert sich nichts.
+    """
+    zeilen = s.textwerk.fusszeile
+    if any(GESCHRIEBENE_ERKLAERUNG.search(zeile) for zeile in zeilen):
+        return zeilen
+    erklaerung = zeichenerklaerung(s)
+    return [erklaerung, *zeilen] if erklaerung else zeilen
+
+
 class Satzspiegel:
     """Wo auf dem Blatt das Bild steht und wo das Textwerk daneben.
 
@@ -363,7 +415,7 @@ class Satzspiegel:
         if self.legende:
             unten = max(unten, spaltenende + SEITENRAND)
         self.fusszeilen, unten = zeilensatz(
-            [("fusszeile", zeile) for zeile in self.werk.fusszeile], unten)
+            [("fusszeile", zeile) for zeile in fusszeile(s)], unten)
         self.hoehe = unten + (SEITENRAND if self.fusszeilen else 0.0)
 
         # Breit genug fuer alles, was rechts am weitesten hinausragt: der

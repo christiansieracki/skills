@@ -90,6 +90,19 @@ spieler:
     text: A
 """
 
+# Ein Laufweg und ein Ballweg wie in ue-0037, fuer die Zeichenerklaerung. Die
+# Fusszeile setzt der Test dahinter.
+LAUF_UND_BALL = """
+form: halle
+wege:
+  - art: laufweg
+    von: 4
+    nach: [3.0, 8.4]
+  - art: ballweg
+    von: [4.5, 16.5]
+    nach: 6
+"""
+
 # Ein Legendenblock mit der Zeile aus dem Referenzbild, vor der "3-m-Linie"
 # stand und sich wie deren Anfang las. Vor ihm wird die Gasse gemessen.
 ZUSPIELZIEL = """
@@ -2768,6 +2781,129 @@ geraete:
                 for wort in gesucht:
                     self.assertIn(wort, fertig.stdout)
                 self.assertFalse(self.bild(name).exists())
+
+    # -- Die Zeichenerklaerung ---------------------------------------------
+
+    def fusszeilen(self, name: str, szene: str) -> list[str]:
+        """Zeichnet eine Szene und gibt die Zeilen unter dem Bild zurueck."""
+        return [e.text for e in mit_klasse(self.zeichne(name, szene), "fusszeile")]
+
+    def test_ohne_zeichenerklaerung_setzt_das_skript_sie_vor_die_quelle(self) -> None:
+        # Bei der Abnahme von 1c (#28) entstand die Zeile fuer ue-0037 von
+        # Hand. Das Skript setzt jetzt dieselbe, und die Quelle rueckt eine
+        # Zeile tiefer, an ihrem Platz unter der Erklaerung.
+        self.assertEqual(self.fusszeilen(
+            "lauf-und-ball",
+            LAUF_UND_BALL + 'fusszeile: "Quelle: Volleyball-Magazin 09/2026, Seite 28"'),
+            ["Durchgezogen ist ein Laufweg, gestrichelt ein Ballweg.",
+             "Quelle: Volleyball-Magazin 09/2026, Seite 28"])
+
+    def test_die_zeichenerklaerung_nennt_nur_was_im_bild_vorkommt(self) -> None:
+        # Die Zeile von ue-0039. Beim zweiten Bild der Abnahme musste man
+        # daran denken, den Laufweg wegzulassen.
+        self.assertEqual(self.fusszeilen("nur-ball", """
+            form: halle
+            wege:
+              - art: ballweg
+                von: [4.5, 16.5]
+                nach: 6
+              - art: ballweg
+                von: 6
+                nach: 3
+            fusszeile: "Quelle: Volleyball-Magazin 09/2026, Seite 29"
+        """), ["Gestrichelt ist ein Ballweg.",
+               "Quelle: Volleyball-Magazin 09/2026, Seite 29"])
+
+    def test_ohne_wege_und_abstaende_kommt_keine_zeichenerklaerung(self) -> None:
+        # Spieler, Zonen und Geraete erklaeren sich selbst oder ueber ihr Wort.
+        aufbau = """
+            form: halle
+            spieler:
+              - bei: 3
+                text: Z
+            zonen:
+              - text: Ziel
+                form: kreis
+                bei: [2.0, 3.0]
+                groesse: 2.0
+            geraete:
+              - text: Kasten
+                teile:
+                  - form: rechteck
+                    bei: [2.0, 7.0]
+                    groesse: [1.6, 0.8]
+            stellen:
+              - bei: [4.5, 4.5]
+                text: Feldmitte
+        """
+        self.assertEqual(
+            self.fusszeilen("ohne-wege", aufbau + '    fusszeile: "Quelle: Magazin"'),
+            ["Quelle: Magazin"])
+        self.assertEqual(self.fusszeilen("ohne-wege-ohne-fuss", aufbau), [],
+                         "und ohne Quelle bleibt das Blatt unter dem Bild leer")
+
+    def test_eine_geschriebene_zeichenerklaerung_bleibt_wie_sie_ist(self) -> None:
+        # Die Zeilen aus dem Arbeitsordner: 2026-09-15 mit " = ", ue-0037 im
+        # Wortlaut, den das Skript jetzt selbst setzt. Keine bekommt eine
+        # zweite dazu, und keine rueckt von ihrem Platz, auch nicht hinter
+        # der Quelle.
+        for name, zeilen in (
+            ("mit-gleich", ["Gestrichelter Pfeil = Ballweg (Aufschlag → Annahme → "
+                            "Zielmatte → Zuspielziel)."]),
+            ("im-wortlaut", ["Durchgezogen ist ein Laufweg, gestrichelt ein Ballweg.",
+                             "Quelle: Volleyball-Magazin 09/2026, Seite 28"]),
+            ("hinter-der-quelle", ["Quelle: Magazin", "Kreis = Spieler"]),
+            ("in-der-mehrzahl", ["Laufwege durchgezogen, Ballwege gestrichelt",
+                                 "Quelle: Magazin"]),
+        ):
+            with self.subTest(fall=name):
+                self.assertEqual(self.fusszeilen(name, LAUF_UND_BALL + "fusszeile:\n" + "".join(
+                    f'  - "{zeile}"\n' for zeile in zeilen)), zeilen)
+
+    def test_auch_abstaende_bekommen_eine_zeichenerklaerung(self) -> None:
+        # Ein Pfeil mit zwei Spitzen ist kein Weg, und eine Linie mit
+        # Massstrichen auch nicht. Die Zahl daneben sagt, wie weit; die
+        # Erklaerung sagt, dass es um einen Abstand geht. Die letzte Szene ist
+        # die von ue-0020.
+        masskette = """
+  - art: masskette
+    von: [6.0, 2.0]
+    nach: [9.0, 2.0]
+    versatz: -0.9"""
+        pfeil = """
+  - art: pfeil
+    von: 4
+    nach: [1.5, 12.0]
+    text: gut 4 m"""
+        for name, szene, erwartet in (
+            ("masskette", "form: halle\nabstaende:" + masskette,
+             "Mit Maßstrichen ist ein Abstand."),
+            ("pfeil", "form: halle\nabstaende:" + pfeil,
+             "Mit zwei Spitzen ist ein Abstand."),
+            ("beide-abstaende", "form: halle\nabstaende:" + masskette + pfeil,
+             "Mit Maßstrichen oder zwei Spitzen ist ein Abstand."),
+            ("wege-und-masskette", LAUF_UND_BALL + "abstaende:" + masskette,
+             "Durchgezogen ist ein Laufweg, gestrichelt ein Ballweg, "
+             "mit Maßstrichen ein Abstand."),
+        ):
+            with self.subTest(fall=name):
+                self.assertEqual(self.fusszeilen(name, szene), [erwartet])
+                # Wer die Zeile aus dem Bild in die Szene uebernimmt, etwa um
+                # sie umzuformulieren, bekommt keine zweite dazu.
+                self.assertEqual(self.fusszeilen(
+                    f"{name}-uebernommen", f'{szene}\nfusszeile: "{erwartet}"'),
+                    [erwartet])
+
+    def test_eine_geschriebene_erklaerung_der_abstaende_bleibt_allein(self) -> None:
+        zeile = "Linien mit Maßstrichen zeigen Abstände"
+        self.assertEqual(self.fusszeilen("abstaende-geschrieben", f"""
+            form: halle
+            abstaende:
+              - art: masskette
+                von: [6.0, 2.0]
+                nach: [9.0, 2.0]
+            fusszeile: "{zeile}"
+        """), [zeile])
 
     def test_das_feld_bleibt_massstaeblich_neben_dem_textwerk(self) -> None:
         # Das Textwerk rueckt das Bild, es verzerrt es nicht. Ohne diese

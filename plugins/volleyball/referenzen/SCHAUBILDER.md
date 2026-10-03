@@ -90,7 +90,7 @@ Auf oberster Ebene gibt es zwölf Schlüssel, mehr nicht:
 | `titel` | die Überschrift über dem Bild |
 | `untertitel` | die zweite Zeile darunter, ohne `titel` die erste |
 | `legende` | die Legendenspalte neben dem Bild, in Legendenblöcken |
-| `fusszeile` | die Zeilen unter dem Bild: Zeichenerklärung und Quelle |
+| `fusszeile` | die Zeilen unter dem Bild: die Quelle, die Zeichenerklärung setzt das Skript |
 | `spieler` | Marker mit Beschriftung |
 | `wege` | Lauf- und Ballwege |
 | `zonen` | Flächen, die etwas bedeuten: Zielzone, Aufschlagbereich |
@@ -591,9 +591,7 @@ legende:
       - 3 Punkte in der Zielzone
       - 1 Punkt spielbar daneben
 
-fusszeile:
-  - Durchgezogen ist ein Laufweg, gestrichelt ein Ballweg
-  - "Quelle: Volleyball-Magazin 09/2026, Seite 12"
+fusszeile: "Quelle: Volleyball-Magazin 09/2026, Seite 12"
 ```
 
 Alle vier sind freiwillig. Die meisten Schaubilder tragen keinen Titel, eine
@@ -630,6 +628,32 @@ untereinander, in der Reihenfolge der Szene. Leere Einträge fallen weg, wie in
 einem Legendenblock. Stehen unter `fusszeile` Schlüssel mit Werten oder eine
 Liste in der Liste, bricht die Szene ab, statt deren Schreibweise ins Bild zu
 setzen.
+
+**Die Zeichenerklärung setzt das Skript.** Welche Wege und Abstände im Bild
+stehen, weiß es aus der Szene. Steht in der `fusszeile` keine
+Zeichenerklärung, setzt es eine als erste Zeile der Fußzeile, mit genau den
+Arten, die vorkommen. Die Quelle rückt darunter. Ohne Wege und Abstände kommt
+keine Zeile dazu. In der Szene ändert sich nichts.
+
+| In der Szene | In der Zeichenerklärung |
+|---|---|
+| `laufweg` | durchgezogen ist ein Laufweg |
+| `ballweg` | gestrichelt ein Ballweg |
+| `masskette` | mit Maßstrichen ein Abstand |
+| `pfeil` | mit zwei Spitzen ein Abstand |
+
+Daraus wird ein Satz, in dieser Reihenfolge. Die Szene unter „Der Aufbau einer
+Szene" bekommt „Durchgezogen ist ein Laufweg, gestrichelt ein Ballweg.", eine
+nur mit Ballwegen „Gestrichelt ist ein Ballweg.", eine mit Maßkette und Pfeil
+„Mit Maßstrichen oder zwei Spitzen ist ein Abstand."
+
+Als Zeichenerklärung gilt eine Zeile der Fußzeile, die „ = " enthält, wie
+„Gestrichelter Pfeil = Ballweg", oder die einen Laufweg, Ballweg oder Abstand
+nennt, auch in der Mehrzahl. Steht eine da, bleibt die Fußzeile, wie sie ist,
+und es kommt keine zweite dazu. Wer die Zeile anders will, übernimmt sie aus
+dem Bild in die Szene und ändert sie dort. Nennt die Quelle eines dieser
+Wörter, etwa im Titel eines Artikels, setzt das Skript keine Zeile. Dann
+schreibt man sie selbst hin.
 
 **Das Blatt wächst mit.** Eine lange Zeile macht das Bild breiter, eine lange
 Spalte oder eine Fußzeile aus mehreren Zeilen macht es höher. Abgeschnitten
