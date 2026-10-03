@@ -242,9 +242,6 @@ Kandidat:
 - Jede Quellgrafik aus `quellgrafiken`, alle, in ihrer Reihenfolge. Gezeigt
   wird mit dem, was die Umgebung hergibt, sonst den Pfad nennen. Ist die Liste
   leer, die Quelle selbst: die Fotos unter `dateien`, oder den Pfad des PDF.
-- Steht etwas in `quellgrafik_fehlt`, dazusagen, dass sich aus diesen PDFs
-  kein Bild ausschneiden ließ, etwa aus der Übersicht eines Zirkels. Die
-  übrigen Quellgrafiken kommen trotzdem auf die Karte.
 - Bei der Frage zum Ablauf den Abschnitt `## Ablauf` aus dem Entwurf, so wie
   er dort steht.
 
@@ -268,9 +265,13 @@ Eine Frage nach der anderen. Fertig, wenn jede eine Antwort hat.
 - Steht in „Was es ist“ „ergänzt ue-######“, steht das in der Zeile. Mit der
   Zeile bestätigt der Trainer die Ergänzung.
 
-Unter der Tabelle stehen die Kandidaten, die in diesem Durchgang
-`kein Entwurf` gemeldet haben, je mit Grund und der Frage: streichen oder die
-Datei richten?
+Unter der Tabelle steht:
+
+- jeder Kandidat mit einem Eintrag in `quellgrafik_fehlt`, mit diesen PDFs:
+  Aus ihnen ließ sich kein Bild ausschneiden, etwa aus der Übersicht eines
+  Zirkels. Die übrigen Quellgrafiken kommen trotzdem auf die Karte;
+- jeder Kandidat, der in diesem Durchgang `kein Entwurf` gemeldet hat, mit
+  Grund und der Frage: streichen oder die Datei richten?
 
 Der Trainer gibt pauschal frei, zeilenweise, oder korrigiert direkt, etwa
 „alles frei außer 14, 12 mit 8 bis 12 Spielern, 14 streichen, ist eine
@@ -301,7 +302,8 @@ Was der Trainer hört:
 - das Angebot, `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py --md` laufen
   zu lassen, damit `index.md` die neuen Karten kennt;
 - die neuen Karten ohne Schaubild, mit ID und Titel, als Liste für
-  `volleyball-schaubild`. Das sind die, bei denen `quellgrafiken` leer war;
+  `volleyball-schaubild`. Das sind die, bei denen `quellgrafiken` leer war.
+  Steht bei einer etwas in `quellgrafik_fehlt`, kommt das PDF dazu;
 - die neuen Karten, denen eine Quellgrafik fehlt, weil sie sich nicht
   ausschneiden ließ, mit dem PDF aus `quellgrafik_fehlt`. Sie haben andere
   Bilder und stehen deshalb nicht in der Liste davor. Für das fehlende lässt
