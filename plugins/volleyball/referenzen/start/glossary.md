@@ -174,7 +174,10 @@ Deshalb dieselbe Trennung wie bei der Block-Regel:
 | Räumliche Aufteilung der Halle | **Hallenteil** | „zwei Hallenteile mit je einem Netz" |
 
 Wie viele Flächen eine Übung braucht, sagt das Feld `spielflaechen`. Es gilt
-für beide Disziplinen.
+für beide Disziplinen und je Gruppe: Sind mehr Spieler da, als die Übung fasst,
+läuft sie in mehreren Gruppen, und jede braucht ihre eigenen Flächen. Drei
+Gruppen einer Übung mit `spielflaechen: 1` brauchen drei. Gruppe meint dabei
+einen Teil der Anwesenden, nicht die Trainingsgruppe.
 
 ## Weitere Sprachregeln
 

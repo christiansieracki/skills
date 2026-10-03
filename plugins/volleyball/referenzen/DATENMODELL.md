@@ -50,7 +50,7 @@ spieler_min: 5
 spieler_max: 8                   # null heißt: nach oben offen
 dauer_min: 15
 dauer_max: 25
-spielflaechen: 1                 # wie viele die Übung braucht
+spielflaechen: 1                 # wie viele eine Gruppe braucht
 netz: true
 erwachsenenbelastung: false
 belastungshinweis: ""            # Klartext, wenn erwachsenenbelastung true ist
@@ -134,6 +134,23 @@ Prüffrage beim Import: lässt sich das Teil aus dem Zusammenhang reißen und
 einzeln einsetzen? Dann Übung. Nur als Ganzes? Dann Folge. Ist es ein
 kompletter Trainingsabend? Dann gehört es nach `quellen/` und es werden
 einzelne Übungen daraus gezogen.
+
+### Spieler und Spielflächen
+
+`spieler_min` und `spieler_max` sagen, wie viele eine Gruppe der Übung fasst.
+Sind mehr da, läuft sie in mehreren Gruppen. Gruppe heißt hier ein Teil der
+Anwesenden, der die Übung für sich spielt, nicht die Trainingsgruppe.
+
+`spielflaechen` gilt je Gruppe. Drei Gruppen einer Übung mit
+`spielflaechen: 1` brauchen drei Flächen. So lief die Annahme-Challenge am
+15.09.2026: 16 Leute, zwei Gruppen, zwei Netze. Zeigt die Quelle mehrere
+Gruppen nebeneinander, steht auf der Karte, was eine von ihnen braucht.
+
+`suche.py --spielflaechen` sortiert eine Übung aus, die schon für eine Gruppe
+mehr Flächen braucht, als da sind. Reichen die Flächen nur nicht für alle
+Gruppen zugleich, bleibt sie in den Treffern, denn die Gruppen können auch
+nacheinander spielen. Die Trefferzeile sagt dann `[3 Gruppen, 1 Fläche]` statt
+`[3 Gruppen parallel]`.
 
 ### Belastung
 

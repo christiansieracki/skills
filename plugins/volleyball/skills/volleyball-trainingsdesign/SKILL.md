@@ -63,7 +63,10 @@ Bibliothek zuerst:
 
 `--spieler 14` heißt „heute sind 14 da". Eine Übung für 8 läuft dann in zwei
 Gruppen, die Trefferliste sagt es dazu. Genau deshalb passen Karten mit
-kleiner Obergrenze trotzdem.
+kleiner Obergrenze trotzdem. `spielflaechen` gilt je Gruppe. Steht statt
+„parallel" etwa `[3 Gruppen, 1 Fläche]` da, reichen die Flächen nicht für
+alle zugleich: die Gruppen spielen nacheinander, oder eine andere Übung passt
+besser.
 
 Findet die Bibliothek nichts Passendes, `volleyball-uebungsimport` benutzen
 statt eine Übung frei zu erfinden.

@@ -192,7 +192,7 @@ spieler_min: 2
 spieler_max: null             # null heißt nach oben offen
 dauer_min: 10
 dauer_max: 15
-spielflaechen: 1
+spielflaechen: 1              # je Gruppe, nicht für alle zusammen
 netz: true
 erwachsenenbelastung: false   # true nur bei Sprungvolumen, Zusatzlast, Maximalkraft in der Quelle
 belastungshinweis: ""

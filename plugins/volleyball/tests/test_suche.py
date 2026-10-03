@@ -6,7 +6,8 @@ Gesucht wird ueber die Kommandozeile und mit `--json`, so wie ein Skill es
 tut, der die Treffer weiterverarbeitet. Die Zusagen, die hier festgehalten
 werden, sind die, die sich am leichtesten unbemerkt verlieren: dass
 `--spieler` die Anwesenden meint und keine Obergrenze, dass zu wenige
-Spielflaechen eine Uebung wirklich herausfallen lassen, und was der
+Spielflaechen eine Uebung wirklich herausfallen lassen, dass sie je Gruppe
+zaehlen, und was der
 Disziplinfilter durchlaesst. Am letzten haengt, ob beim Planen einer
 Beacheinheit eine Hallenuebung im Ergebnis steht.
 """
@@ -99,6 +100,53 @@ class SucheTest(unittest.TestCase):
         self.assertEqual(fertig.returncode, 0, fertig.stderr)
         self.assertIn("[3 Gruppen parallel]", fertig.stdout)
         self.assertIn("Spielflächen 1", fertig.stdout)
+
+    def trefferzeile(self, uid: str, *argumente: str) -> str:
+        """Sucht nach einer Karte und gibt ihre Trefferzeile zurueck."""
+        fertig = self.ordner.starte("suche.py", "--id", uid, *argumente)
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        return next(z for z in fertig.stdout.splitlines() if z.startswith(uid))
+
+    def test_zu_wenige_flaechen_fuer_die_gruppen_ergeben_einen_hinweis(self) -> None:
+        # 14 Leute bei einer Uebung fuer hoechstens 6 sind drei Gruppen. Jede
+        # braucht ihre Flaeche, da ist aber nur eine. Die Uebung bleibt ein
+        # Treffer: die Gruppen koennen auch nacheinander spielen.
+        self.ordner.lege_karte_an(id="ue-000021", titel="Annahme zu sechst",
+                                  spieler_min=4, spieler_max=6, spielflaechen=1)
+
+        zeile = self.trefferzeile("ue-000021", "--spieler", "14", "--spielflaechen", "1")
+
+        self.assertIn("[3 Gruppen, 1 Fläche]", zeile)
+        self.assertNotIn("parallel", zeile)
+
+    def test_reichen_die_flaechen_laufen_die_gruppen_parallel(self) -> None:
+        # Die Annahme-Challenge am 15.09.: 16 Leute, zwei Gruppen, zwei Netze.
+        self.ordner.lege_karte_an(id="ue-000022", titel="Annahme-Challenge",
+                                  spieler_min=5, spieler_max=8, spielflaechen=1)
+
+        zeile = self.trefferzeile("ue-000022", "--spieler", "16", "--spielflaechen", "2")
+
+        self.assertIn("[2 Gruppen parallel]", zeile)
+
+    def test_ohne_spielflaechen_bleibt_die_trefferzeile_wie_sie_war(self) -> None:
+        # Wer die Flaechen nicht nennt, bekommt keine Pruefung gegen sie.
+        self.ordner.lege_karte_an(id="ue-000021", titel="Annahme zu sechst",
+                                  spieler_min=4, spieler_max=6, spielflaechen=1)
+
+        zeile = self.trefferzeile("ue-000021", "--spieler", "14")
+
+        self.assertIn("[3 Gruppen parallel]", zeile)
+
+    def test_spielflaechen_gelten_je_gruppe(self) -> None:
+        # ue-000003 braucht zwei Flaechen und nimmt hoechstens 16. Bei 24
+        # Leuten sind das zwei Gruppen mit je zwei Flaechen, also vier. Drei
+        # reichen nicht, vier schon.
+        with self.subTest(spielflaechen=3):
+            zeile = self.trefferzeile("ue-000003", "--spieler", "24", "--spielflaechen", "3")
+            self.assertIn("[2 Gruppen, 3 Flächen]", zeile)
+        with self.subTest(spielflaechen=4):
+            zeile = self.trefferzeile("ue-000003", "--spieler", "24", "--spielflaechen", "4")
+            self.assertIn("[2 Gruppen parallel]", zeile)
 
     def test_mit_genau_zaehlt_die_obergrenze_dann_doch(self) -> None:
         gefunden = [e["id"] for e in self.treffer("--spieler", "12", "--genau")]

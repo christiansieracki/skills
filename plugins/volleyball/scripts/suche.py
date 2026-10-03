@@ -13,6 +13,9 @@
 Der Index wird vor jeder Suche neu gebaut, die Treffer sind also immer aktuell.
 `--spieler 14` heißt "heute sind 14 da", nicht "nimm genau 14". Eine Übung
 für 8 läuft bei 14 Leuten in zwei Gruppen, das zeigt die Trefferliste an.
+`--spielflaechen 2` heißt "so viele stehen zur Verfügung". Eine Übung, die
+für eine Gruppe mehr braucht, fällt heraus. Reichen sie nur nicht für alle
+Gruppen zugleich, bleibt sie und die Zeile sagt es: `[3 Gruppen, 2 Flächen]`.
 `--dauer 20` heißt entsprechend "der Teil hat 20 Minuten", kürzeres passt auch.
 Wer es strikt will, nimmt `--genau`.
 
@@ -55,6 +58,22 @@ def gruppen(hi, anwesend):
     if not isinstance(hi, int) or not isinstance(anwesend, int) or hi <= 0:
         return 1
     return max(1, -(-anwesend // hi))
+
+
+def gruppenhinweis(e, anwesend, flaechen) -> str:
+    """Der Zusatz in der Trefferzeile, wenn die Übung in Gruppen läuft.
+
+    `spielflaechen` gilt je Gruppe: drei Gruppen einer Übung für eine Fläche
+    brauchen drei. Reichen die genannten Flächen dafür nicht, steht das statt
+    „parallel" da. Die Übung bleibt ein Treffer, die Gruppen können auch
+    nacheinander spielen. Ohne `--spielflaechen` wird nicht gerechnet.
+    """
+    g = gruppen(e.get("spieler_max"), anwesend)
+    if g == 1:
+        return ""
+    if flaechen is not None and g * (e.get("spielflaechen") or 1) > flaechen:
+        return f"  [{g} Gruppen, {flaechen} {'Fläche' if flaechen == 1 else 'Flächen'}]"
+    return f"  [{g} Gruppen parallel]"
 
 
 def passt_spieler(e, anwesend, genau: bool) -> bool:
@@ -144,17 +163,16 @@ def filtere(eintraege, a):
     return treffer
 
 
-def zeige(e, lang: bool, wurzel: Path, anwesend=None):
+def zeige(e, lang: bool, wurzel: Path, anwesend=None, flaechen=None):
     warn = " ⚠" if e.get("erwachsenenbelastung") else ""
     art = " (Folge)" if e.get("typ") == "folge" else ""
-    g = gruppen(e.get("spieler_max"), anwesend)
-    parallel = f"  [{g} Gruppen parallel]" if g > 1 else ""
+    gruppiert = gruppenhinweis(e, anwesend, flaechen)
     # Die Disziplin steht in jeder Trefferzeile, auch in der kurzen Liste.
     # Sonst entgeht bei einer ungefilterten Suche, dass da eine Beachübung
     # zwischen den Hallenübungen liegt. Wie sie geschrieben wird, steht in
     # `disziplin_text()`, damit `index.md` dasselbe zeigt.
     disziplin = disziplin_text(e)
-    print(f"{e['id']}  {e['titel']}{art}{warn}  [{disziplin}]{parallel}")
+    print(f"{e['id']}  {e['titel']}{art}{warn}  [{disziplin}]{gruppiert}")
     if not lang:
         return
     def s(lo, hi, u=""):
@@ -276,7 +294,7 @@ def main() -> int:
 
     print(f"{len(treffer)} von {daten['anzahl']} Übungen:\n")
     for e in sorted(treffer, key=lambda x: x["id"]):
-        zeige(e, a.lang or len(treffer) <= 3, wurzel, a.spieler)
+        zeige(e, a.lang or len(treffer) <= 3, wurzel, a.spieler, a.spielflaechen)
 
     if a.jugend:
         heikel = [e for e in treffer if e.get("erwachsenenbelastung")]
