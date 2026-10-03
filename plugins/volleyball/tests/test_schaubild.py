@@ -1762,7 +1762,7 @@ stellen:
                     float(mit_klasse(gruppe, "massbeschriftung")[0].get("y")),
                     (float(linie.get("y1")) + float(linie.get("y2"))) / 2, places=1)
 
-    def test_die_zahl_eines_waagerechten_abstands_steht_wie_bisher_darueber(
+    def test_ueber_einer_waagerechten_linie_steht_jede_zahl_gleich_weit_weg(
             self) -> None:
         # Ueber einer waagerechten Linie ist die Breite des Wortes gleich: es
         # steht mittig darueber, so weit weg wie jedes andere, ob kurz oder
@@ -2114,16 +2114,21 @@ stellen:
         feld = mit_klasse(baum, "feld")[0]
         return self.gasse(baum, float(feld.get("x")) + float(feld.get("width")))
 
-    def gasse_vor_dem_wort(self, baum, klasse: str) -> float:
-        """Die Gasse vor der Legendenspalte, gemessen am Wort dieser Klasse.
+    def pruefe_gasse_vor_dem_wort(self, baum, klasse: str, soll: float) -> None:
+        """Vor dem Wort dieser Klasse bleibt die Gasse `soll`, in Metern.
 
         Gemessen wird am knappen Wortkasten. Das Wort im Bild ist breiter,
         die Gasse davor also schmaler: ist sie hier schon zu schmal, ist sie
-        es im Bild erst recht.
+        es im Bild erst recht. Breiter als ein halbes Wort darueber wird sie
+        aber auch nicht, sonst stuende die Spalte vor einem Wort weiter weg
+        als vor dem Feld.
         """
         wort = mit_klasse(baum, klasse)[0]
         halb, _ = wortkasten(baum, wort)
-        return self.gasse(baum, float(wort.get("x")) + halb)
+        gasse = self.gasse(baum, float(wort.get("x")) + halb)
+        self.assertGreaterEqual(gasse, soll, f"zu schmal vor {wort.text!r}")
+        self.assertLess(gasse, soll + Feldmass(baum, HALLE).strecke(halb),
+                        f"zu breit vor {wort.text!r}")
 
     def test_vor_dem_wort_einer_stelle_bleibt_dieselbe_gasse_wie_vor_einem_marker(
             self) -> None:
@@ -2147,7 +2152,7 @@ stellen:
         vor_dem_marker = self.gasse(marker,
                                     float(kreis.get("cx")) + float(kreis.get("r")))
         self.assertAlmostEqual(vor_dem_marker, neben_dem_feld, places=2)
-        self.assertGreaterEqual(self.gasse_vor_dem_wort(stelle, "stelle"), neben_dem_feld)
+        self.pruefe_gasse_vor_dem_wort(stelle, "stelle", neben_dem_feld)
 
     def test_vor_dem_namen_einer_zone_oder_eines_geraets_bleibt_die_gasse(self) -> None:
         # Dasselbe Wort, nur an etwas anderem: eine Zone traegt ihren Namen in
@@ -2175,8 +2180,7 @@ geraete:
                 baum = self.zeichne(f"gasse-{klasse}",
                                     "form: halle" + ZUSPIELZIEL + aufbau)
 
-                self.assertGreaterEqual(self.gasse_vor_dem_wort(baum, klasse),
-                                        neben_dem_feld)
+                self.pruefe_gasse_vor_dem_wort(baum, klasse, neben_dem_feld)
 
     def test_ein_legendenblock_ohne_ueberschrift_oder_ohne_zeilen_bricht_ab(self) -> None:
         # Ein Block ohne Ueberschrift ist eine Liste, von der niemand weiss,

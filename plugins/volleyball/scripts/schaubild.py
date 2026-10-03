@@ -199,7 +199,7 @@ def rechte_kante(s: Szene) -> float:
     kanten = [s.grundform.breite]
     kanten += [x for x, _ in s.punkte()]
     kanten += [spieler.x + MARKER for spieler in s.spieler]
-    kanten += [wortflaeche(text, bei).rahmen[2]
+    kanten += [bei[0] + wortbreite(text) / 2
                for text, bei in s.beschriftungen(wortbreite)]
     return max(kanten)
 
@@ -698,8 +698,7 @@ def zonenhinweise(s: Szene) -> list[str]:
     """
     hinweise = []
     for nummer, zone in enumerate(s.zonen, 1):
-        wortbreite = wortflaeche(zone.text, zone.name_bei).breite
-        if wortbreite <= zone.breite:
+        if wortbreite(zone.text) <= zone.breite:
             continue
         hinweise.append(
             f'Zone {nummer} "{zone.text}": das Wort ist breiter als die Zone.\n'
