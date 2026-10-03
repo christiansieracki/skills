@@ -74,3 +74,13 @@ er bestätigt. Drei Stellen oben gelten so nicht mehr.
   brachen erst bei der Rückmeldung ab. Den Status in der Übersicht setzt deshalb
   ein Prüfskript aus den Entwürfen, die auf der Platte liegen. Die Rückmeldung
   des Agenten zeigt nur den Fortschritt.
+
+## Nachtrag, 03.10.2026
+
+Mit der Spec (#29) kam ein zweiter Agent dazu, `volleyball-zerlegungsplan`. Er
+legt den Zerlegungsplan über den ganzen Quellenordner in einem Aufruf an und
+ist gebaut wie der Kartenentwurf: nur `Read` und `Write`, Sonnet, eine Zeile
+Rückmeldung. Seinen Plan schreibt er als `zerlegungsplan.md` neben die
+Planeingabe. Beide Definitionen schreiben die kontrollierten Werte aus.
+`test_agenten.py` prüft sie gegen `tpdaten.py`, dazu Modell und Werkzeuge,
+und beim Kartenentwurf die Felder der Karte gegen `KARTENFELDER` (#35).

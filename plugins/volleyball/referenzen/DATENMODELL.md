@@ -294,8 +294,9 @@ nichts. So entwerfen zwei Trainer nicht dieselben Kandidaten zweimal. Mit
 `--trotzdem` geht es weiter, etwa wenn der Eintrag von einem abgebrochenen
 Lauf stammt. Ist nichts mehr offen, löscht `uebernehmen` den Eintrag.
 
-Die Übersicht ist der freigegebene Zerlegungsplan. Bis zur Freigabe schreibt
-ihn der Skill im Gespräch mit dem Trainer. Danach schreibt nur noch
+Die Übersicht ist der freigegebene Zerlegungsplan. Bis zur Freigabe ist er ein
+Entwurf des Agenten unter `kartenentwuerfe/<ordner>/`, den der Skill mit dem
+Trainer bespricht und dann in die Übersicht schreibt. Danach schreibt nur noch
 `sammelimport.py` hinein, auch wenn mehrere Agenten parallel entwerfen. Den
 Status setzt das Skript aus den Dateien auf der Platte. Die Rückmeldung eines
 Agenten zählt dabei nicht.
@@ -307,10 +308,12 @@ die Eingabe für den Zerlegungsplan: jede Datei des Quellenordners, die noch in
 keiner Zeile der Übersicht steht und die `ohne` nicht auslässt, bei PDFs ihr
 Text, die nächste freie Kandidatennummer, ohne Übersicht 1, und die
 Bibliotheksliste, in der die Karten aus diesem Quellenordner markiert sind.
-Der Rest ist nach der Nummer des Kandidaten benannt: `17.auftrag.md` ist der
-Auftrag für den Agenten, `17.md` der Kartenentwurf, `17.quellgrafik.png` die
-Quellgrafik, bei mehreren `17.quellgrafik-1.png`, `17.quellgrafik-2.png` und
-so weiter.
+Daneben schreibt der Agent `volleyball-zerlegungsplan` den Plan als
+`zerlegungsplan.md`, in der Form der Übersicht. Daraus wird nach der Freigabe
+die Übersicht. Der Rest ist nach der Nummer des Kandidaten benannt:
+`17.auftrag.md` ist der Auftrag für den Agenten `volleyball-kartenentwurf`,
+`17.md` der Kartenentwurf, `17.quellgrafik.png` die Quellgrafik, bei mehreren
+`17.quellgrafik-1.png`, `17.quellgrafik-2.png` und so weiter.
 
 Der Auftrag trägt unter jedem PDF des Kandidaten dessen ganzen Text, oder den
 Hinweis, dass der Agent das PDF selbst lesen muss. Er sagt, ob der Ablauf aus
