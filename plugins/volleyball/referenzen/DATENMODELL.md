@@ -518,7 +518,7 @@ Die übrigen Skripte brauchen weder Pillow noch `pdftotext`.
 | `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek. Mit `--naechste-id` die ID für die nächste Karte |
 | `leseansicht.py` | aus einem Trainingsplan die HTML-Fassung fürs Handy erzeugen, samt den Schaubildern der verwendeten Übungen |
 | `export_pdf.py` | PDF zum Ausdrucken |
-| `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen |
+| `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen, mit `--png` dazu eine Ansicht als PNG im Temp-Verzeichnis |
 | `bilder_aufbereiten.py` | Quellbilder verkleinern und nach EXIF geradedrehen |
 | `sammelimport.py` | Sammelimport über einen Quellenordner: `vorbereiten --plan` legt die Eingabe für den Zerlegungsplan an, `vorbereiten` die Aufträge, `pruefen` setzt den Status aus den Entwürfen und gibt mit `--json` aus, was die Freigabe braucht, `uebernehmen` macht freigegebene Entwürfe zu Karten und trägt gestrichene und ergänzende Kandidaten ein |
 | `ids_umstellen.py` | einen Arbeitsordner von vierstelligen auf sechsstellige IDs umstellen, einmal je Arbeitsordner |

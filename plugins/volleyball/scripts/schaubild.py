@@ -4,6 +4,7 @@
     <python> schaubild.py ue-000042                       # schaubilder/ue-000042.szene.yml
     <python> schaubild.py schaubilder/ue-000042.szene.yml
     <python> schaubild.py ue-000042 --wurzel <pfad>
+    <python> schaubild.py ue-000042 --png                 # dazu eine Ansicht als PNG
 
 Die Szene ist die Quelle, das SVG ist das Erzeugnis (ADR-0004). Beide liegen
 unter demselben Basisnamen in `schaubilder/`, damit eine Korrektur ein halbes
@@ -18,6 +19,11 @@ Geschrieben wird erst, wenn das ganze Bild steht. Eine Szene, die nicht
 aufgeht, hinterlaesst deshalb kein halbes SVG, sondern eine Meldung und die
 Datei von vorher.
 
+`--png` nimmt das fertige SVG zusaetzlich mit Edge oder Chrome als PNG auf,
+fuer eine Vorschau, die ein SVG nicht als Bild zeigt. Die Ansicht liegt im
+Temp-Verzeichnis und nie im Arbeitsordner. Ohne Browser entsteht das SVG
+trotzdem, und die Meldung sagt, dass die Ansicht fehlt.
+
 Nur Standardbibliothek, wie alles im Plugin ausser der Bildaufbereitung.
 """
 
@@ -25,11 +31,15 @@ from __future__ import annotations
 
 import argparse
 import html
+import math
 import re
 import sys
+import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from browser import Browser, BrowserFehler, finde_browser  # noqa: E402
 from szene import (Feldvorlage, Flaeche, Legendenblock, Ort,  # noqa: E402
                    Szene, SzeneFehler, Weg, lies_szene, normale, scheitel)
 from tpdaten import (ID_MUSTER, finde_wurzel,  # noqa: E402
@@ -912,6 +922,35 @@ def kartentitel(basisname: str, wurzel: Path | None) -> str:
     return str(frontmatter.get("titel") or "")
 
 
+# Der Ordner fuer die Ansichten als PNG, im Temp-Verzeichnis. Nie neben dem
+# SVG: bei der Abnahme von 1c (#28) landete eine PNG neben dem SVG im
+# Arbeitsordner und ueberschrieb dort eine andere Datei.
+ANSICHTEN = "volleyball-schaubild"
+
+
+def ansicht_als_png(svg: Path) -> str:
+    """Nimmt das fertige Bild als PNG auf und sagt, wo es liegt oder warum nicht.
+
+    Die Ansicht ist so gross, wie das SVG selbst sagt, auf ganze Pixel
+    aufgerundet. Sie traegt den Basisnamen des Bildes, eine neue Runde
+    ueberschreibt also die Ansicht der vorigen und keine fremde Datei.
+    """
+    programm = finde_browser()
+    if programm is None:
+        return "Die Ansicht als PNG fehlt: weder Edge noch Chrome gefunden."
+    wurzel = ET.parse(svg).getroot()
+    breite = math.ceil(float(wurzel.get("width")))
+    hoehe = math.ceil(float(wurzel.get("height")))
+    png = Path(tempfile.gettempdir()) / ANSICHTEN / (svg.stem + ".png")
+    try:
+        png.parent.mkdir(parents=True, exist_ok=True)
+        with Browser(programm) as browser:
+            browser.nimm_auf(svg, png, breite, hoehe)
+    except (OSError, BrowserFehler) as fehler:
+        return f"Die Ansicht als PNG fehlt: {fehler}"
+    return f"Ansicht als PNG: {png}"
+
+
 def main() -> int:
     konsole_vorbereiten()
     ap = argparse.ArgumentParser(
@@ -920,6 +959,9 @@ def main() -> int:
                     help="Szenendatei oder Basisname, dann unter schaubilder/ "
                          "gesucht (etwa ue-000042)")
     ap.add_argument("--wurzel", type=Path, default=None)
+    ap.add_argument("--png", action="store_true",
+                    help="dazu eine Ansicht als PNG im Temp-Verzeichnis, fuer "
+                         "eine Vorschau, die ein SVG nicht als Bild zeigt")
     a = ap.parse_args()
 
     # Gesucht wird der Arbeitsordner erst dort, wo er gebraucht wird: beim
@@ -948,6 +990,10 @@ def main() -> int:
     datei.parent.mkdir(parents=True, exist_ok=True)
     datei.write_text(bild, encoding="utf-8")
     print(f"Geschrieben: {datei}")
+    # Fehlt die Ansicht, steht das Bild trotzdem, und der Lauf ist gelungen.
+    # Wer sie nicht sehen kann, oeffnet das SVG, so wie ohne `--png`.
+    if a.png:
+        print(ansicht_als_png(datei))
     # Gesagt wird es trotzdem: das Bild ist fertig, aber der Trainer soll
     # wissen, dass seine Zeile oben in der Titelschrift steht, und mit einem
     # Wort daraus einen `titel:` machen koennen, wenn er will.

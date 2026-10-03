@@ -111,6 +111,19 @@ sagt, was anders soll.
 Der Pfad zur Entwurfsszene, ganz ausgeschrieben. Das Bild entsteht daneben,
 unter demselben Basisnamen.
 
+Zeigt die Umgebung ein SVG nicht als Bild, etwa weil das Lesewerkzeug nur das
+Markup liefert, kommt `--png` dazu:
+
+```
+<python> ${CLAUDE_PLUGIN_ROOT}/scripts/schaubild.py <entwurf>.szene.yml --png
+```
+
+Dann nimmt Edge oder Chrome das fertige Bild zusätzlich als PNG auf. Wo die
+PNG liegt, steht in der Zeile `Ansicht als PNG:`, immer im Temp-Verzeichnis.
+Diese Datei ansehen, nicht das SVG. Die PNG ist nur für die Vorschau und kommt
+nie nach `schaubilder/`. Sagt die Meldung stattdessen, dass die Ansicht fehlt,
+ist das SVG trotzdem geschrieben.
+
 Geht die Szene nicht auf, steht der Grund in der Meldung. Die genannte Zeile
 ändern und neu rendern. Gezeigt wird das Bild, das aus der geänderten Szene
 entstanden ist.
@@ -119,11 +132,11 @@ entstanden ist.
 Werkzeug, das Dateien anzeigt, ein Fenster. Dazu zwei, drei Zeilen, was in
 dieser Runde drinsteht oder sich geändert hat.
 
-Hat das Skript beim Rendern mehr gesagt als `Geschrieben:`, gehört das in
-diese Zeilen, samt dem Ausweg, den es nennt. Der Trainer liest die Konsole
-nicht. Das gilt etwa für den vorgeschlagenen `titel:` und für ein Zonenwort,
-das breiter ist als seine Zone. Welcher Ausweg beim Zonenwort meist der
-bessere ist, steht in `SCHAUBILDER.md` unter `zonen`.
+Hat das Skript beim Rendern mehr gesagt als `Geschrieben:` und die Zeile zur
+Ansicht, gehört das in diese Zeilen, samt dem Ausweg, den es nennt. Der
+Trainer liest die Konsole nicht. Das gilt etwa für den vorgeschlagenen
+`titel:` und für ein Zonenwort, das breiter ist als seine Zone. Welcher Ausweg
+beim Zonenwort meist der bessere ist, steht in `SCHAUBILDER.md` unter `zonen`.
 
 Zeigt die Umgebung nichts an, den Pfad zur SVG-Datei nennen und weitermachen.
 Der Trainer öffnet sie selbst, die Schleife läuft genauso.

@@ -19,14 +19,15 @@ nachinstallieren. Fehlt auch das, sagt das Skript, was zu holen waere.
 
 import argparse
 import importlib.util
-import os
 import shutil
 import subprocess
 import sys
 import tempfile
+from contextlib import nullcontext
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from browser import Browser, finde_browser  # noqa: E402
 from tpdaten import finde_wurzel, konsole_vorbereiten  # noqa: E402
 
 VON = "markdown+pipe_tables+yaml_metadata_block+hard_line_breaks"
@@ -36,9 +37,6 @@ VON = "markdown+pipe_tables+yaml_metadata_block+hard_line_breaks"
 # er ignoriert das CSS, liefert aber immer noch ein brauchbares PDF.
 PDF_MASCHINEN = ("wkhtmltopdf", "weasyprint", "prince", "pagedjs-cli",
                  "typst", "xelatex", "lualatex", "pdflatex", "tectonic")
-
-BROWSER_NAMEN = ("msedge", "microsoft-edge", "google-chrome",
-                 "google-chrome-stable", "chromium", "chromium-browser")
 
 CSS = """
 @page { size: A4; margin: 16mm 14mm; }
@@ -73,37 +71,6 @@ def pdf_maschine() -> str | None:
     return None
 
 
-def browser_orte() -> list[Path]:
-    """Die ueblichen Installationsorte von Edge und Chrome.
-
-    Unter Windows steht keiner der beiden im PATH, deshalb die festen Pfade.
-    """
-    if sys.platform == "win32":
-        ordner = [os.environ.get("ProgramFiles"),
-                  os.environ.get("ProgramFiles(x86)"),
-                  os.environ.get("LOCALAPPDATA")]
-        return [Path(o) / rest
-                for o in ordner if o
-                for rest in (r"Microsoft\Edge\Application\msedge.exe",
-                             r"Google\Chrome\Application\chrome.exe")]
-    if sys.platform == "darwin":
-        return [Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
-                Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")]
-    return []
-
-
-def browser() -> str | None:
-    """Ein Browser, der eine HTML-Datei drucken kann."""
-    for name in BROWSER_NAMEN:
-        pfad = shutil.which(name)
-        if pfad:
-            return pfad
-    for pfad in browser_orte():
-        if pfad.exists():
-            return str(pfad)
-    return None
-
-
 def hat_markdown() -> bool:
     """Das Python-Paket markdown, der Ersatz fuer pandoc beim HTML-Bauen."""
     return importlib.util.find_spec("markdown") is not None
@@ -116,7 +83,7 @@ def waehle_weg() -> tuple[str, str] | None:
         return ("pandoc", maschine)
 
     nach_html = shutil.which("pandoc") or hat_markdown()
-    gefunden = browser()
+    gefunden = finde_browser()
     if gefunden and nach_html:
         return ("browser", gefunden)
 
@@ -167,30 +134,18 @@ def baue_html(src: Path, css_pfad: Path, ziel: Path) -> None:
     )
 
 
-def ohne_kompatibilitaetsschicht() -> dict[str, str]:
-    """Die Umgebung ohne __COMPAT_LAYER, fuer den Aufruf des Browsers.
-
-    Windows setzt die Variable fuer Prozesse, die aus manchen Anwendungen
-    heraus starten, etwa `DetectorsAppHealth` aus der Claude-App. Edge startet
-    sich dann ohne sie neu, und der Prozess, auf den das Skript wartet, kehrt
-    sofort zurueck. Das PDF kommt Sekunden spaeter, wenn der Temp-Ordner mit
-    der HTML-Fassung schon weg ist. Ohne die Variable bleibt Edge ein einziger
-    Prozess und kehrt erst zurueck, wenn das PDF geschrieben ist.
-    """
-    return {k: v for k, v in os.environ.items() if k.upper() != "__COMPAT_LAYER"}
-
-
-def md_to_pdf(src: Path, dest: Path, weg: tuple[str, str]) -> bool:
-    dest.parent.mkdir(parents=True, exist_ok=True)
+def md_to_pdf(src: Path, dest: Path, weg: tuple[str, str],
+              browser: Browser | None = None) -> bool:
+    """Eine .md als PDF. Auf dem Weg ueber den Browser druckt `browser`."""
     art, werkzeug = weg
-    umgebung = None
 
-    # Haelt ein Browser den Profilordner noch, bleibt der Temp-Ordner eben
-    # liegen. Sonst braeche das Aufraeumen einer Datei den ganzen Lauf ab.
+    # Haelt der Browser die HTML-Fassung noch offen, bleibt der Temp-Ordner
+    # eben liegen. Sonst braeche das Aufraeumen einer Datei den ganzen Lauf ab.
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         css_pfad = Path(tmp) / "druck.css"
         css_pfad.write_text(CSS, encoding="utf-8")
         try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
             if art == "pandoc":
                 cmd = ["pandoc", str(src), "-o", str(dest), "--from", VON,
                        "--pdf-engine", werkzeug, "--css", str(css_pfad),
@@ -199,23 +154,15 @@ def md_to_pdf(src: Path, dest: Path, weg: tuple[str, str]) -> bool:
                 html = Path(tmp) / "druck.html"
                 baue_html(src, css_pfad, html)
                 if art == "browser":
-                    cmd = [werkzeug, "--headless", "--disable-gpu",
-                           "--no-pdf-header-footer",
-                           "--user-data-dir=" + str(Path(tmp) / "profil"),
-                           "--print-to-pdf=" + str(dest), html.as_uri()]
-                    umgebung = ohne_kompatibilitaetsschicht()
-                else:
-                    cmd = ["wkhtmltopdf", "--quiet", "--encoding", "utf-8",
-                           str(html), str(dest)]
+                    browser.drucke(html, dest)
+                    return True
+                cmd = ["wkhtmltopdf", "--quiet", "--encoding", "utf-8",
+                       str(html), str(dest)]
 
             ergebnis = subprocess.run(cmd, capture_output=True, text=True,
-                                      timeout=180, env=umgebung)
+                                      timeout=180)
             if ergebnis.returncode != 0:
                 print(f"  FEHLER bei {src.name}: {ergebnis.stderr.strip()[:200]}")
-                return False
-            if not dest.exists():
-                # Der Browser meldet auch dann Erfolg, wenn nichts entstanden ist.
-                print(f"  FEHLER bei {src.name}: es ist kein PDF entstanden")
                 return False
             return True
         except Exception as exc:  # noqa: BLE001
@@ -258,13 +205,29 @@ def main():
 
     print(f"Weg: {beschreibe(weg)} | {len(dateien)} Dokument(e) -> {ausgabe}/")
     ok = 0
-    for src in dateien:
-        rel = src.relative_to(basis) if src.is_relative_to(basis) else Path(src.name)
-        dest = ausgabe / rel.with_suffix(".pdf")
-        if md_to_pdf(src, dest, weg):
-            print(f"  ok: {rel.with_suffix('.pdf')}")
-            ok += 1
+    # Ein Profilordner fuer den ganzen Lauf statt einem je Datei (#41).
+    # Gemessen am 03.10.2026 mit Edge 154 unter Windows, immer abwechselnd,
+    # damit beide Seiten denselben Zustand des Rechners treffen:
+    #   - derselbe Plan sechsmal: Median 15,2 s je Druck mit frischem Profil,
+    #     10,8 s mit geteiltem;
+    #   - die acht Plaene unter trainings/h1-h2 als ganzer Lauf: 169,5 s und
+    #     119,8 s mit einem Profil je Datei, 124,5 s und 82,6 s mit einem
+    #     Profil fuer alle.
+    # Wie lange Edge braucht, schwankt von Stunde zu Stunde stark: am selben
+    # Tag dauerte derselbe Lauf mit einem Profil je Datei auch nur 21 s.
+    # Verglichen wird deshalb nur, was unmittelbar nacheinander lief.
+    art, werkzeug = weg
+    with Browser(werkzeug) if art == "browser" else nullcontext() as browser:
+        for src in dateien:
+            rel = src.relative_to(basis) if src.is_relative_to(basis) else Path(src.name)
+            dest = ausgabe / rel.with_suffix(".pdf")
+            if md_to_pdf(src, dest, weg, browser):
+                print(f"  ok: {rel.with_suffix('.pdf')}")
+                ok += 1
     print(f"Fertig: {ok}/{len(dateien)} exportiert.")
+    # Wer das Skript aufruft, liest den Rueckgabewert, nicht die letzte Zeile.
+    # Eine einzige fehlende Datei ist deshalb schon ein Fehlschlag.
+    sys.exit(0 if ok == len(dateien) else 1)
 
 
 if __name__ == "__main__":

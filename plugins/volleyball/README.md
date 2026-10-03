@@ -40,7 +40,7 @@ plugins/volleyball/
 ├── referenzen/        DATENMODELL, SPRACHE, VORLAGEN, METHODIK, ...
 ├── scripts/           index.py, suche.py, leseansicht.py, export_pdf.py,
 │                      bilder_aufbereiten.py, schaubild.py, szene.py,
-│                      sammelimport.py, ids_umstellen.py
+│                      browser.py, sammelimport.py, ids_umstellen.py
 └── tests/             Linter, Suche, Leseansicht, Bildaufbereitung,
                        Schaubilder, PDF-Export, Sammelimport und das
                        Umstellen der IDs gegen einen künstlichen Arbeitsordner,
@@ -66,9 +66,10 @@ Bibliothek wird nie angefasst und muss dafür nicht einmal existieren.
 Die Prüfungen der Bildaufbereitung werden übersprungen, wenn Pillow fehlt.
 Die Begründung steht im Kopf von `tests/test_bilder.py`.
 
-Der Test des PDF-Exports läuft nur, wo das Skript über Edge oder Chrome
-druckt, und braucht dann zehn bis zwanzig Sekunden. Warum, steht im Kopf von
-`tests/test_export.py`.
+Der Test des Drucks über Edge oder Chrome läuft nur, wo der PDF-Export diesen
+Weg wählt. Warum, steht im Kopf von `tests/test_export.py`. Die Prüfungen der
+Ansicht als PNG werden übersprungen, wenn es weder Edge noch Chrome gibt. Jeder
+Aufruf des Browsers kostet einige Sekunden.
 
 ## Voraussetzungen
 
@@ -83,8 +84,9 @@ ist also sofort benutzbar.
 
 Für den PDF-Export pandoc, dazu eine PDF-Maschine wie wkhtmltopdf oder
 weasyprint. Fehlt die Maschine, druckt Edge oder Chrome die HTML-Fassung, dafür
-ist keine Installation nötig. Und eine Claude-Umgebung, die Dateien lesen und
-schreiben darf.
+ist keine Installation nötig. Edge oder Chrome nimmt auch die Ansicht als PNG
+auf, die `schaubild.py --png` für die Vorschau anlegt. Ohne Browser entsteht
+nur das SVG. Und eine Claude-Umgebung, die Dateien lesen und schreiben darf.
 
 Aufgerufen wird Python auf macOS und Linux mit `python3`, unter Windows mit
 `python`. Dort zeigt `python3` auf den Platzhalter aus dem Microsoft Store und

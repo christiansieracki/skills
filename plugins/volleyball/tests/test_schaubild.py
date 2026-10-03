@@ -20,8 +20,11 @@ zusichern will, und nicht die Zahl, mit der es zustande kam.
 
 from __future__ import annotations
 
+import math
 import re
+import struct
 import subprocess
+import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -2332,6 +2335,95 @@ stellen:
         unterkante = float(kreis.get("cy")) + float(kreis.get("r"))
         self.assertLess(unterkante, hoehe, "der Marker liegt ganz im Bild")
         self.assertGreater(breite, 0)
+
+
+# Was schaubild.py sagt, wenn es keinen Browser findet, der die Ansicht
+# aufnimmt. Danach zu fragen ist billiger, als die Suche hier nachzubauen.
+KEIN_BROWSER = "weder Edge noch Chrome"
+
+
+class AnsichtAlsPngTest(unittest.TestCase):
+    """`--png` legt neben dem SVG eine Ansicht als PNG an, fuer die Vorschau.
+
+    Das Lesewerkzeug des Agenten zeigt bei einem SVG nur das Markup, beurteilt
+    wird das Bild aber im Dialog. Die Ansicht nimmt Edge oder Chrome auf. Wo
+    keiner von beiden da ist, wird uebersprungen, was eine Ansicht braucht.
+
+    Gezeichnet wird hier die freigegebene Szene unter schaubilder/. Dort hat
+    bei der Abnahme von 1c eine PNG neben dem SVG eine andere Datei
+    ueberschrieben.
+    """
+
+    SZENE = """
+        form: halle
+        spieler:
+          - bei: 3
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+        self.ordner.lege_szene_an("ue-000042", self.SZENE)
+
+    def ansicht(self, fertig: subprocess.CompletedProcess) -> Path:
+        """Der Pfad, den das Skript fuer die Ansicht nennt.
+
+        Uebersprungen wird nur, wenn das Skript sagt, dass es keinen Browser
+        gefunden hat. Scheitert ein Browser, der da ist, faellt der Test.
+        """
+        if KEIN_BROWSER in fertig.stdout:
+            self.skipTest("auf diesem Rechner gibt es weder Edge noch Chrome")
+        treffer = re.search(r"^Ansicht als PNG: (.+)$", fertig.stdout, re.MULTILINE)
+        self.assertIsNotNone(treffer, fertig.stdout + fertig.stderr)
+        pfad = Path(treffer.group(1).strip())
+        self.addCleanup(pfad.unlink, missing_ok=True)
+        return pfad
+
+    def test_die_ansicht_liegt_im_temp_verzeichnis_und_nie_im_arbeitsordner(self) -> None:
+        fertig = self.ordner.starte("schaubild.py", "ue-000042", "--png")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        png = self.ansicht(fertig)
+        self.assertTrue(png.is_file(), fertig.stdout)
+        self.assertTrue(png.is_relative_to(Path(tempfile.gettempdir()).resolve()), png)
+        self.assertEqual(list(self.ordner.pfad.rglob("*.png")), [],
+                         "im Arbeitsordner entsteht keine PNG")
+        self.assertTrue((self.ordner.pfad / "schaubilder" / "ue-000042.svg").is_file())
+
+    def test_die_ansicht_zeigt_das_ganze_bild(self) -> None:
+        # Das SVG nennt seine Groesse selbst. Die Ansicht hat genau diese
+        # Groesse, auf ganze Pixel aufgerundet: nichts ist abgeschnitten, und
+        # es steht kein leerer Rand daneben.
+        fertig = self.ordner.starte("schaubild.py", "ue-000042", "--png")
+
+        png = self.ansicht(fertig)
+        daten = png.read_bytes()
+        self.assertEqual(daten[:8], b"\x89PNG\r\n\x1a\n", "die Ansicht ist eine PNG")
+        breite, hoehe = struct.unpack(">II", daten[16:24])
+        svg = ET.parse(self.ordner.pfad / "schaubilder" / "ue-000042.svg").getroot()
+        self.assertEqual((breite, hoehe), (math.ceil(float(svg.get("width"))),
+                                           math.ceil(float(svg.get("height")))))
+
+    def test_ohne_browser_entsteht_das_svg_und_die_meldung_sagt_dass_die_ansicht_fehlt(
+            self) -> None:
+        # Ausgeblendet wird der Browser ueber die Umgebung: ein leerer PATH und
+        # leere Ordner dort, wo unter Windows Edge und Chrome installiert sind.
+        # Unter macOS stehen sie an festen Pfaden, die sich so nicht
+        # ausblenden lassen. Dort entsteht die Ansicht eben, und der Test
+        # wird uebersprungen.
+        leer = self.ordner.lege_entwurfsordner_an()
+        ohne_browser = {name: str(leer) for name in
+                        ("PATH", "ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA")}
+
+        fertig = self.ordner.starte("schaubild.py", "ue-000042", "--png",
+                                    umgebung=ohne_browser)
+
+        if re.search(r"^Ansicht als PNG: ", fertig.stdout, re.MULTILINE):
+            self.skipTest("der Browser laesst sich auf diesem Rechner nicht ausblenden")
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertTrue((self.ordner.pfad / "schaubilder" / "ue-000042.svg").is_file())
+        self.assertRegex(fertig.stdout, r"(?m)^.*Ansicht.*fehlt.*$")
+        self.assertIn(KEIN_BROWSER, fertig.stdout)
 
 
 if __name__ == "__main__":
