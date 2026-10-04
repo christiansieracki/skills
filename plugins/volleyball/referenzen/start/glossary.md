@@ -7,21 +7,42 @@ volleyball-Skills halten sich daran.
 
 | Begriff | Was es ist | Wo es liegt |
 |---|---|---|
-| **Übung** | Eine einzelne Karte. Lässt sich allein in einen Programmpunkt setzen, meist 8 bis 25 Minuten. | `uebungen/ue-######-*.md` |
+| **Übung** | Eine einzelne Übungskarte. Lässt sich allein in einen Programmpunkt setzen, meist 8 bis 25 Minuten. | `uebungen/ue-######-*.md` |
 | **Übungsfolge** | Ein fertiger Ablauf, der nur als Ganzes Sinn ergibt, weil Reihenfolge und Dosierung dazugehören. Ein DVV-Athletikplan ist so eine. | `uebungen/`, mit `typ: folge` |
-| **Übungsquelle** | Ein Fremddokument, aus dem Übungen gezogen wurden. Bleibt als Datei liegen, wird nie selbst zur Karte. | `quellen/` |
+| **Wissenskarte** | Hintergrund aus einer Fremdquelle, in eigenen Worten: die Kernaussagen und was das fürs Training heißt. Etwa warum sich einarmige Abwehr lohnt oder was Schlaf mit der Reaktion zu tun hat. Hängt an keinem Team. | `wissen/wi-######-*.md` |
+| **Übungsquelle** | Ein Fremddokument, aus dem Übungen oder Wissenskarten gezogen wurden. Bleibt als Datei liegen, wird nie selbst zur Karte. | `quellen/` |
 | **Prinzip** | Eine Regel, die über Übungen hinweg gilt, zum Beispiel „maximal drei Annahmespieler im Riegel". Hängt am Team, nicht an der Übung. | `teams/<team>/team-profil.md` |
 
 Die Grenze beim Importieren: Lässt sich das Teil aus dem Zusammenhang reißen
 und einzeln einsetzen? Dann Übung. Nur als Ganzes sinnvoll? Dann Folge. Ist es
 ein kompletter Trainingsabend? Dann Quelle, aus der Übungen gezogen werden.
+Ist es keine Übung, lässt sich aber sagen, was es fürs Training heißt, ohne
+etwas zu erfinden? Dann Wissenskarte. Sonst bleibt es liegen, etwa ein
+Spielbericht oder ein Porträt.
+
+Eine Wissenskarte beantwortet eine Frage, die sich ein Trainer stellt, etwa
+„Wann lohnt sich einarmige Abwehr?“, und diese Frage ist ihr Titel. Drei kurze
+Tipps zu Schlaf, Trinken und Aufwärmen sind drei Karten. Ein Heft über alle
+Techniken wird eine Karte je Technik. Beantwortet die Fortsetzung eines
+Beitrags im nächsten Heft dieselbe Frage, ergänzt sie die Karte, die es schon
+gibt. Sonst wird sie eine eigene.
+
+**Karte oder Übungskarte?** „Karte“ allein meint beide Sorten, Übungskarte und
+Wissenskarte. Wo es darauf ankommt, steht die Sorte dabei. Ebenso meint
+„Bibliothek“ `uebungen/` und `wissen/` zusammen, „Übungsbibliothek“ nur
+`uebungen/`.
+
+**Wissenskarte oder Prinzip?** Ein Prinzip ist eine Regel und hängt am Team.
+Eine Wissenskarte ist Hintergrund und hängt an niemandem. Aus einer
+Wissenskarte kann ein Prinzip werden, die Karte bleibt dann als Begründung
+stehen.
 
 ## Die ID und die Nummer des Trainers
 
 | Begriff | Was es ist | Wo es liegt |
 |---|---|---|
-| **Nummer des Trainers** | Zwei Ziffern für jeden Trainer, der Übungen anlegt. Sie stehen vorn in jeder ID, die er vergibt: `ue-010001` ist die erste Übung von Trainer 01. Die Karten aus der Zeit vor den sechsstelligen IDs tragen `00`. | `trainingsplanung-root.yml`, unter `trainer:` |
-| **Bereich** | Alle IDs mit derselben Nummer des Trainers vorn. Jeder Trainer vergibt nur in seinem eigenen Bereich, die höchste Nummer darin plus eins. So vergeben zwei Trainer nie dieselbe ID, auch wenn Nextcloud ihre Rechner noch nicht abgeglichen hat. | `uebungen/ue-01####-*.md` für Trainer 01 |
+| **Nummer des Trainers** | Zwei Ziffern für jeden Trainer, der Karten anlegt. Sie stehen vorn in jeder ID, die er vergibt: `ue-010001` ist die erste Übung von Trainer 01, `wi-010001` seine erste Wissenskarte. Die Karten aus der Zeit vor den sechsstelligen IDs tragen `00`. | `trainingsplanung-root.yml`, unter `trainer:` |
+| **Bereich** | Alle IDs mit derselben Nummer des Trainers vorn. Jeder Trainer vergibt nur in seinem eigenen Bereich, die höchste Nummer darin plus eins. Übungen und Wissenskarten zählen dabei getrennt. So vergeben zwei Trainer nie dieselbe ID, auch wenn Nextcloud ihre Rechner noch nicht abgeglichen hat. | `uebungen/ue-01####-*.md` und `wissen/wi-01####-*.md` für Trainer 01 |
 
 Unter `trainer:` steht auch, an welchen Rechnern ein Trainer sitzt. Erkannt
 wird ein Rechner an seinem Namen. Ein Rechner, der dort fehlt, bekommt keine
@@ -39,11 +60,12 @@ Aufschlagbereich heißt.
 | **Sammelimport** | Der Import über einen ganzen Quellenordner: erst der Zerlegungsplan, dann die Kartenentwürfe, dann die Freigabe. Läuft über mehrere Sitzungen und macht dort weiter, wo er aufgehört hat. | `sammelimport.md` im Quellenordner |
 | **Zerlegungsplan** | Die Liste, welche Dateien welche Karte ergeben, ob daraus eine Übung oder eine Folge wird und was liegen bleibt. Wird freigegeben, bevor der erste Kartenentwurf entsteht. | bis zur Freigabe `kartenentwuerfe/<ordner>/zerlegungsplan.md`, danach in `sammelimport.md` |
 | **Kandidat** | Eine Zeile im Zerlegungsplan: die Dateien, aus denen eine Karte werden soll. Aus jedem Kandidaten entsteht ein Kartenentwurf. | in `sammelimport.md` |
-| **Kartenentwurf** | Eine Karte, die noch nicht freigegeben ist. Hat keine ID, liegt nicht in `uebungen/`, und die Suche findet sie nicht. | `kartenentwuerfe/<ordner>/` |
-| **Quellgrafik** | Das Bild aus der Übungsquelle selbst, etwa die Feldskizze eines PlayDrill-Blatts oder ein Stationsaufbau. Der Sammelimport schneidet sie aus dem PDF aus, bei der Freigabe wird sie das Schaubild der Karte. Ein Kandidat aus mehreren Blättern, etwa ein Zirkel, hat eine je Blatt mit Bild. Anders als ein gezeichnetes Schaubild hat sie keine Szene und wird nie neu erzeugt. | `kartenentwuerfe/<ordner>/17.quellgrafik.png`, bei mehreren `17.quellgrafik-1.png` und weiter, danach `schaubilder/ue-######-*.png` |
+| **Kartenentwurf** | Eine Karte, die noch nicht freigegeben ist, Übungskarte oder Wissenskarte. Hat keine ID, liegt weder in `uebungen/` noch in `wissen/`, und die Suche findet sie nicht. | `kartenentwuerfe/<ordner>/` |
+| **Quellgrafik** | Das Bild aus der Übungsquelle selbst, etwa die Feldskizze eines PlayDrill-Blatts, ein Stationsaufbau oder die Bildreihe zu einer Technik. Der Sammelimport nimmt sie bei PlayDrill aus dem PDF, sonst schneidet er sie als Ausschnitt aus. Bei der Freigabe wird sie das Schaubild einer Übungskarte oder ein Bild im Text einer Wissenskarte. Ein Kandidat aus mehreren Blättern, etwa ein Zirkel, hat eine je Blatt mit Bild. Anders als ein gezeichnetes Schaubild hat sie keine Szene und wird nie neu erzeugt. | `kartenentwuerfe/<ordner>/17.quellgrafik.png`, bei mehreren `17.quellgrafik-1.png` und weiter, danach `schaubilder/ue-######-*.png` oder `schaubilder/wi-######-*.png` |
+| **Ausschnitt** | Wo auf einer Seite die Quellgrafik liegt: die Datei, bei einem PDF die Seite, und ein Rechteck in Prozent der Seite. Der Kartenentwurf nennt ihn, ein Skript schneidet danach aus dem Foto oder aus der gezeichneten PDF-Seite aus. | im Kartenentwurf |
 | **Rückfrage** | Was ein Kartenentwurf vom Trainer wissen muss, bevor er Karte werden kann. Etwa ein Ablauf, der nur aus dem Bild gelesen ist, oder ein Verdacht auf ein Duplikat. | im Kartenentwurf |
 | **Vermutung** | Wie der Kartenentwurf eine Rückfrage vorläufig beantwortet. Sie steht im Text des Entwurfs, und die Rückfrage nennt sie. Nicht jede Rückfrage hat eine. | im Kartenentwurf |
-| **Freigabe** | Das Ja des Trainers. Damit wird aus dem Kartenentwurf eine Karte mit ID. | danach `uebungen/` |
+| **Freigabe** | Das Ja des Trainers. Damit wird aus dem Kartenentwurf eine Karte mit ID. | danach `uebungen/` oder `wissen/` |
 
 Ein Kartenentwurf trägt, was die Quelle belegt. Was er deutet, steht als
 Vorschlag mit kurzer Begründung drin, und der Trainer bestätigt oder kippt es

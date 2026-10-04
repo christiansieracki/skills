@@ -22,8 +22,9 @@ ist, und die Liste „Bewusst nicht gebaut". Was nach dem Ende einer Welle mit
 
 Bei der Durchsicht am 02.10.2026 vor der Abnahme von Welle 1d hat jeder Punkt
 ein Ticket bekommen, siehe den Nachtrag in #29: #40 als Slice 1d/9, #38, #39
-und #41 bis #48 vor der Abnahme, dazu Ergänzungen in #35, #36 und #37. Der
-Punkt hier kam danach aus dem Interview zur Welle zur Leseansicht.
+und #41 bis #48 vor der Abnahme, dazu Ergänzungen in #35, #36 und #37. Die
+Punkte hier kamen danach aus den Interviews zur Welle zur Leseansicht und zur
+Welle zur Wissenskarte.
 
 ### DVV Plan 1 als Übungsfolge mit ID
 
@@ -34,6 +35,19 @@ zeigen, statt die Übungen in jeden Plan zu kopieren. Fiel im Interview zur Well
 zur Leseansicht auf, ist aber Arbeit an der Bibliothek.
 
 Ziel: Welle 2.
+
+### Quellgrafik aus PDFs, die nicht wie PlayDrill aufgebaut sind
+
+Der Sammelimport nimmt aus einem PDF das größte eingebettete Bild. Das passt
+nur zu PlayDrill. In den PDFs des Jugendtrainerlehrgangs liegen Bildreihen als
+Einzelbilder, auf jeder Seite steht dieselbe Kopfleiste, und Gezeichnetes ist
+gar kein Bild (ADR-0013). Lösung ist der Ausschnitt aus der gezeichneten
+Seite mit `pypdfium2`, für Übungskarten wie für Wissenskarten. Fiel im
+Interview zur Welle zur Wissenskarte am 04.10.2026 auf. Bis er gebaut ist,
+läuft kein Sammelimport über PDFs, die nicht wie PlayDrill aufgebaut sind.
+
+Ziel: Welle zur Wissenskarte, als erster Schnitt. Nach der Abnahme von 1d
+(#37) prüfen, ob er vorher kommt, etwa vor die Welle zur Leseansicht.
 
 ## Bewusst nicht gebaut
 
@@ -164,6 +178,17 @@ wäre, Übersicht, Entwurf und Karte beim Umbenennen mitzuziehen.
 Ziel: bewusst nicht. Auslöser: Ein TIFF oder HEIC steht schon in einer
 Übersicht, einem Kartenentwurf oder auf einer Karte, und jemand muss es lesen.
 
+### Alter oder Level auf der Wissenskarte
+
+Viel aus dem Jugendtrainerlehrgang gilt nur für Kinder und Jugendliche, etwa
+Förderstufen oder sensible Phasen. Die Wissenskarte hat dafür kein Feld, für
+wen etwas gilt, steht in den Kernaussagen. Abhilfe wäre ein freiwilliges Feld
+mit eigenem Vokabular, etwa `kinder`, `jugend`, `erwachsene`. Aus dem Interview
+zur Welle zur Wissenskarte.
+
+Ziel: bewusst nicht. Auslöser: Die Suche aus Welle 2 bringt für eine
+Jugendgruppe die falschen Wissenskarten.
+
 ### Ein Beach-Team anlegen, solange es keins gibt
 
 Beach ist seit Welle 1a im Plugin und an einer echten Beachübung abgenommen
@@ -179,7 +204,8 @@ Die Reihenfolge stammt aus #10 und ist dort begründet. Der Sammelimport kam am
 #48, die Reihenfolge steht im Nachtrag von #29. Die PlayDrill-Bibliothek
 braucht die Wissenskarte nicht, und die Wissenskarte kann danach den
 Sammelimport um ihre Kartensorte erweitern. Zwischen 1d und die Wissenskarte
-kommt die Welle zur Leseansicht, beschlossen am 02.10.2026.
+kommt die Welle zur Leseansicht, beschlossen am 02.10.2026. Die Welle zur
+Wissenskarte ist am 04.10.2026 im Interview festgelegt worden.
 
 ### Welle zur Leseansicht
 
@@ -239,21 +265,123 @@ System. Beschlossen im Interview am 02.10.2026. Kommt nach der Abnahme von 1d
     hierher.
 - **Version**: ein kleiner Sprung, alte Pläne bleiben gültig.
 
-### Der zweite Ast von Welle 1b: die Wissenskarte
+### Welle zur Wissenskarte
 
-Die Wissenskarte als eigene Kartensorte mit eigenem Ordner und Schema
-(ADR-0002), und damit der Import der Theorie- und Ratgeberseiten des
-Volleyball-Magazins. Braucht eine eigene Spec. Die Bildaufbereitung aus Welle
-1b war die Vorbedingung dafür und ist erledigt.
+Bisher „der zweite Ast von Welle 1b". Die Wissenskarte als eigene Kartensorte
+(ADR-0002 mit Nachtrag), dazu der Ausschnitt als Quellgrafik für beide Sorten
+(ADR-0013). Beschlossen im Interview am 04.10.2026. Kommt nach der Welle zur
+Leseansicht. Ob der erste Schnitt vorher kommt, wird nach der Abnahme von 1d
+geprüft, siehe „Quellgrafik aus PDFs, die nicht wie PlayDrill aufgebaut sind".
+Tickets mit WK/ vorn.
 
-Kommt nach dem Sammelimport (#29) und erweitert ihn um die Wissenskarte. Was ein
-Sammelimport als Theorie zurückgestellt hat, steht in der Übersicht seiner
-`sammelimport.md` und wird von dort geholt.
+- **Begriffe** stehen im Glossar: Wissenskarte, Ausschnitt, „Karte oder
+  Übungskarte?", „Wissenskarte oder Prinzip?". „Karte" meint beide Sorten,
+  „Bibliothek" `uebungen/` und `wissen/`.
+- **Wofür:** Beim Planen begründet sie eine Übungswahl oder ein Prinzip. Dafür
+  muss sie über Thema und Schwerpunkt zu finden sein.
+- **Was Wissenskarte wird:** was keine Übung ist, aber sagen lässt, was es
+  fürs Training heißt, ohne etwas zu erfinden. Bericht, Porträt, Werbung
+  werden übersprungen. Eine Karte beantwortet eine Frage, ihr Titel ist diese
+  Frage. Eine Fortsetzung, die dieselbe Frage beantwortet, ergänzt die Karte,
+  ein langes Dokument wird eine Karte je Kapitel.
+- **Die Karte:** `wissen/wi-######-<slug>.md`, die ID mit der Nummer des
+  Trainers vorn und eigenem Zähler, vergeben bei der Freigabe.
+  - Abschnitte `## Kernaussagen` und `## Was das fürs Training heißt`. Was die
+    Quelle sagt, steht darin ohne Weiteres. Was der Entwurf ableitet, ist ein
+    Vorschlag, den der Trainer bestätigt.
+  - `thema`: Liste, Pflicht, aus `trainingslehre`, `methodik`, `psychologie`,
+    `physiologie`, `ernaehrung`, `regelkunde`, `technik`, `taktik`.
+  - `schwerpunkt`: freiwillig, inhaltliche und Steuerungsschwerpunkte, Abgleich
+    mit der Disziplin wie bei der Übungskarte. Eine neue Kennung nur für
+    Trainierbares, nach dem Ja des Trainers.
+  - `disziplin` Pflicht ohne Vorgabe, `quelle` nie leer, `quelldatei`,
+    `autor`, `angelegt` wie bei der Übungskarte.
+  - `uebungen`: freiwillig, IDs der Übungen, die dazugehören. Der Linter meldet
+    eine ID, die es nicht gibt. Die Übungskarte trägt nichts, die Gegenrichtung
+    rechnet `index.py` aus.
+  - Bilder stehen als Verweis im Text, an der Kernaussage, die sie zeigen. Kein
+    Feld `schaubild`. Der Linter meldet einen Verweis ins Leere.
+    `volleyball-schaubild` schlägt für Wissenskarten nichts vor.
+  - Kein Feld für Alter oder Level.
+- **Ausschnitt** (ADR-0013): Der Agent nennt Datei, bei einem PDF die Seite,
+  und ein Rechteck in Prozent. Ein Skript schneidet aus dem Foto mit Pillow oder
+  aus der mit `pypdfium2` gezeichneten PDF-Seite. Für Übungskarten und
+  Wissenskarten, der Trainer sieht ihn bei der Freigabe.
+  - `sammelimport.md` bekommt `quellgrafik: eingebettet | ausschnitt | keine`.
+    `quellgrafik_ausschneiden: true` gilt weiter als `eingebettet`. Für einen
+    neuen Quellenordner schlägt der Skill `ausschnitt` vor.
+  - Fehlt `pypdfium2` oder Pillow, wo Ausschnitte gebraucht werden, bricht
+    `vorbereiten` vor dem ersten Auftrag ab und schreibt nichts.
+  - Bestehende Karten fasst die Welle nicht an.
+- **Seitenbereich:** In der Spalte Dateien darf hinter einer Datei ein
+  Seitenbereich stehen: `` `TechnikGuidelines.pdf` S. 12–15 ``. Der Auftrag
+  bekommt nur diese Seiten, die Seiten kommen in `quelle`. Gilt für beide
+  Sorten.
+- **Sammelimport:**
+  - Neues Ergebnis `wissen`, mit denselben Status wie Übungen.
+  - `zurückgestellt` bleibt: kann später Karte werden, aber jetzt gibt es keine
+    Sorte dafür, oder der Trainer holt es bewusst später. Der Zerlegungsplan
+    schreibt es mit Grund, der Trainer kann bei der Freigabe zurückstellen.
+    `übersprungen` bleibt für das, was nie Karte wird.
+  - Zurückgestellte Zeilen kommen nur auf Ansage wieder dran („hol die
+    zurückgestellten aus vm_09_2026"), mit ihrer alten Notiz in der
+    Planeingabe. Die erste neue Zeile behält die alte Nummer.
+  - Die Bibliotheksliste der Planeingabe führt die Wissenskarten mit.
+  - Ein dritter Agent, `volleyball-wissenskarte`, gebaut wie der Kartenentwurf.
+    `test_agenten.py` prüft ihn. Der Zerlegungsplan lernt nur das neue
+    Ergebnis.
+  - Die Zeile einer Wissenskarte nennt die Kandidaten der Übungen aus
+    demselben Beitrag. `uebernehmen` trägt deren IDs in `uebungen` ein, sobald
+    es sie gibt, egal was zuerst übernommen wird.
+  - `ergänzt`: Nach dem Ja zu „Fortsetzung von wi-…" trägt der Skill neue
+    Kernaussagen und Punkte fürs Training ohne Doppeltes ein und erweitert
+    `quelle`, `quelldatei`, `thema`, `schwerpunkt`, `uebungen` und die
+    Bildverweise. Er zeigt vorher, was dazukommt. ID und `angelegt` bleiben.
+- **Einzelimport:** `volleyball-uebungsimport` lernt die Wissenskarte, der Name
+  bleibt, die Beschreibung nennt beides. Duplikate prüft er über
+  `suche.py --wissen --json`, das alle Wissenskarten ohne Filter auflistet.
+- **Sonst:** Der Linter prüft Wissenskarten, `index.md` listet sie,
+  `init_struktur.py` legt `wissen/` an.
+- **Schnitte:**
+  1. Ausschnitt, `quellgrafik:`, Seitenbereich, zuerst für Übungskarten,
+     allein auslieferbar.
+  2. Kartensorte: Schema, ID, Linter, `index.md`, `suche.py --wissen`,
+     `init_struktur.py`, Datenmodell.
+  3. Der Einzelimport.
+  4. Der Zerlegungsplan mit `wissen`, dem Nachholen und der Bibliotheksliste.
+  5. Agent, `pruefen` und `uebernehmen` für Wissenskarten, `uebungen`,
+     Freigabe und Ergänzen im Skill.
+  6. Abnahme.
+- **Abnahme:**
+  - Version installiert. In der `glossary.md` des Arbeitsordners sind die
+    neuen Begriffe von Hand nachgezogen.
+  - Ein Sammelimport über `jugendtrainerlehrgang/04_So_Vo` ergibt
+    Übungskarten mit Ausschnitten aus PDF-Seiten.
+  - Der erste Sammelimport über `vm_08_2026`: `ue-000030` bis `ue-000034`
+    stehen als importiert, „Einarmig gehts auch, Teil 1" wird eine
+    Wissenskarte mit Ausschnitt aus dem Foto.
+  - In `vm_09_2026` werden die zurückgestellten Seiten 26 und 27 geholt. Sie
+    ergänzen die Karte aus vm_08 oder werden eine eigene, in beiden Fällen
+    mit `uebungen` `ue-000037` bis `ue-000041`.
+  - `jugendtrainerlehrgang/03_Sa_Na` ergibt Wissenskarten mit Bildreihen als
+    Ausschnitt.
+  - Die Technik-Guidelines bekommen einen Plan mit Seitenbereichen je Technik
+    und einen Durchgang über drei Techniken.
+  - `Taktische_Aufschlaege.pdf` wird über den Einzelimport eine Wissenskarte
+    mit `thema: [taktik]` und `schwerpunkt: [aufschlag]`. Beim zweiten
+    Versuch erkennt er das Duplikat.
+  - Der Linter meldet nichts, `index.md` listet die Wissenskarten,
+    `suche.py --wissen` findet sie.
+  - Die Tokens je Entwurf einer Wissenskarte stehen als Nachtrag in ADR-0009.
+- **Version:** ein kleiner Sprung, kein Arbeitsordner bricht.
 
 ### Welle 2
 
 Das Trainingsdesign auf Disziplin umstellen. Der Zugriff auf Wissenskarten über
-die Suche und über die Trainingsplanung.
+die Suche, mit Filtern nach Thema und Schwerpunkt, und über die
+Trainingsplanung. Wie eine Leseansicht die Bilder einer Wissenskarte zeigt,
+deren Verweise im Text stehen. Die Verbindung von Prinzip und Wissenskarte im
+Saisonplaner.
 
 In Welle 1b wurde am Trainingsdesign nur der Abschnitt zum Schaubild angefasst,
 der Rest des Skills blieb liegen und gehört hierher.
