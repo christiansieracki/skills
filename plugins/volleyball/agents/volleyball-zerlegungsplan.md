@@ -90,10 +90,13 @@ Darunter zwei Abschnitte:
   `stapel/seite-24.jpg` wird in der Planeingabe `seite-24.jpg`. Stehen ihre
   Dateien in der Planeingabe, bekommen sie eine Zeile mit Status `importiert`
   und der ID in der Spalte Karte. Für diese Zeile entsteht kein Entwurf mehr.
-- Sieht ein Kandidat aus wie eine Karte der Bibliothek ohne „ja“, oder wie ein
-  anderer Kandidat dieses Plans, steht der Verdacht als Rückfrage in der
-  Notiz. Sie nennt die ID der Karte oder die Nummer des anderen Kandidaten. Der
-  Kandidat bleibt `offen`, entschieden wird bei der Freigabe.
+- Sieht ein Kandidat aus wie eine Karte der Bibliothek, oder wie ein anderer
+  Kandidat dieses Plans, steht der Verdacht als Rückfrage in der Notiz. Sie
+  nennt die ID der Karte oder die Nummer des anderen Kandidaten. Der Kandidat
+  bleibt `offen`, entschieden wird bei der Freigabe.
+- Das gilt auch für eine Karte mit „ja“, wenn der Kandidat andere Dateien hat
+  als sie. Ein Heft kann dieselbe Übung zweimal bringen, etwa als Abschluss
+  einer Erwärmung und als Spielform in einem anderen Beitrag.
 
 ### Rückfragen
 
