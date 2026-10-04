@@ -18,6 +18,9 @@ Das Testfoto entsteht **zur Laufzeit**, nicht als eingecheckte Datei. Wenn
 diese Pruefungen ueberhaupt laufen, ist Pillow da; also baut der Aufbau das
 JPEG mit EXIF-Orientierung 6 selbst. Kein Binaermaterial im Repo, und die
 Bedingung des Tests steht als Code da, statt in einer Datei versteckt zu sein.
+
+Fuer HEIC gilt dasselbe mit pillow-heif: Die Pruefung, die ein HEIC baut und
+aufbereitet, wird uebersprungen, wo das Paket fehlt.
 """
 
 from __future__ import annotations
@@ -36,7 +39,31 @@ try:
 except ImportError:  # pragma: no cover - haengt an der Installation, nicht am Code
     HAT_PILLOW = False
 
+try:
+    import pillow_heif  # noqa: F401
+    HAT_PILLOW_HEIF = HAT_PILLOW
+except ImportError:  # pragma: no cover - haengt an der Installation, nicht am Code
+    HAT_PILLOW_HEIF = False
+
 BRAUCHT_PILLOW = unittest.skipUnless(HAT_PILLOW, "Pillow ist nicht installiert")
+BRAUCHT_PILLOW_HEIF = unittest.skipUnless(HAT_PILLOW_HEIF, "pillow-heif ist nicht installiert")
+
+
+def blende_aus(test: unittest.TestCase, modul: str) -> dict[str, str]:
+    """Die Umgebung fuer einen Aufruf, in dem sich `modul` nicht importieren laesst.
+
+    Ein `<modul>.py`, das beim Import abbricht, verdeckt das echte Paket: der
+    PYTHONPATH kommt vor den site-packages. Das Skript sieht damit denselben
+    ImportError, den es auf einer Installation ohne das Paket saehe, und es
+    muss dafuer nichts deinstalliert werden.
+    """
+    schatten = Path(tempfile.mkdtemp(prefix=f"ohne-{modul}-"))
+    test.addCleanup(shutil.rmtree, schatten, True)
+    (schatten / f"{modul}.py").write_text(
+        f'raise ImportError("{modul} ist fuer diesen Test ausgeblendet")\n',
+        encoding="utf-8",
+    )
+    return {"PYTHONPATH": str(schatten)}
 
 # Reicht ueber die Schwelle von 2 MB, ohne dass ein Bild dafuer noetig waere.
 # Zufallsbytes, weil eine Datei aus Nullen je nach Dateisystem gar nicht so
@@ -180,26 +207,218 @@ class BilderTest(unittest.TestCase):
         self.assertEqual(datei.read_bytes(), ZU_SCHWER)
 
     def test_ohne_pillow_bricht_es_mit_installationshinweis_ab(self) -> None:
-        # Laeuft auch dort, wo Pillow installiert ist. Ein `PIL.py`, das beim
-        # Import abbricht, verdeckt das echte Paket: der PYTHONPATH kommt vor
-        # den site-packages. Das Skript sieht damit denselben ImportError, den
-        # es auf einer Installation ohne Pillow saehe, und es muss dafuer
-        # nichts deinstalliert werden.
-        schatten = Path(tempfile.mkdtemp(prefix="ohne-pillow-"))
-        self.addCleanup(shutil.rmtree, schatten, True)
-        (schatten / "PIL.py").write_text(
-            'raise ImportError("Pillow ist fuer diesen Test ausgeblendet")\n',
-            encoding="utf-8",
-        )
+        # Laeuft auch dort, wo Pillow installiert ist, siehe blende_aus().
         datei = self.ordner.lege_quelldatei_an("seite-01.jpg", ZU_SCHWER)
 
         fertig = self.ordner.starte(
-            "bilder_aufbereiten.py", "--ja", umgebung={"PYTHONPATH": str(schatten)})
+            "bilder_aufbereiten.py", "--ja", umgebung=blende_aus(self, "PIL"))
 
         self.assertNotEqual(fertig.returncode, 0)
         self.assertIn("Pillow", fertig.stdout)
         self.assertIn("pip install Pillow", fertig.stdout)
         self.assertEqual(datei.read_bytes(), ZU_SCHWER)
+
+
+class FremdeFormateTest(unittest.TestCase):
+    """TIFF und HEIC werden zu JPEG, auch unter der Schwelle.
+
+    Das Lesewerkzeug des Agenten zeigt nur PNG und JPEG. Ein TIFF oder HEIC
+    bliebe ohne Aufbereitung unlesbar, egal wie klein es ist.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+        self.quellen = self.ordner.pfad / "quellen"
+
+    def starte(self, umgebung: dict[str, str] | None = None):
+        """Ruft die Aufbereitung mit `--ja` auf. Wie der Lauf ausgeht, prueft der Test."""
+        return self.ordner.starte("bilder_aufbereiten.py", "--ja", umgebung=umgebung)
+
+    def pruefe_jpeg(self, datei: Path, groesse: tuple[int, int]) -> None:
+        with Image.open(datei) as bild:
+            self.assertEqual(bild.format, "JPEG")
+            self.assertEqual(bild.size, groesse)
+
+    def lege_tiff_an(self, name: str, bild) -> Path:
+        """Legt ein TIFF in `quellen/` ab, ohne Kompression wie vom Scanner."""
+        datei = self.quellen / name
+        datei.parent.mkdir(parents=True, exist_ok=True)
+        bild.save(datei, "TIFF")
+        return datei
+
+    @BRAUCHT_PILLOW
+    def test_ein_tiff_unter_der_schwelle_wird_zu_jpeg_mit_der_endung_jpg(self) -> None:
+        tiff = self.ordner.lege_quellbild_an("scans/scan.tif", (400, 300))
+        self.assertLess(tiff.stat().st_size, 2 * 1024 * 1024)
+
+        fertig = self.starte()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual([p.name for p in (self.quellen / "scans").iterdir()], ["scan.jpg"],
+                         "das Original ist weg, und es entsteht nichts daneben")
+        self.pruefe_jpeg(self.quellen / "scans" / "scan.jpg", (400, 300))
+
+    @BRAUCHT_PILLOW
+    def test_ein_schweres_tiff_wird_dabei_verkleinert(self) -> None:
+        self.ordner.lege_quellbild_an("scan.tiff", (3000, 2250))
+
+        fertig = self.starte()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertFalse((self.quellen / "scan.tiff").exists())
+        self.pruefe_jpeg(self.quellen / "scan.jpg", (2000, 1500))
+
+    @BRAUCHT_PILLOW
+    def test_ein_graues_tiff_ohne_kompression_ist_danach_weg(self) -> None:
+        # So scannt ein Buerogeraet eine Textseite. Pillow bildet ein solches
+        # TIFF in den Speicher ab, statt es zu lesen. Haelt das Bild die Datei
+        # offen, laesst Windows sie nicht loeschen, und neben dem JPEG bliebe
+        # das Original liegen.
+        tiff = self.lege_tiff_an("grau.tif", Image.new("L", (400, 300), 128))
+
+        fertig = self.starte()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertFalse(tiff.exists())
+        self.pruefe_jpeg(self.quellen / "grau.jpg", (400, 300))
+
+    @BRAUCHT_PILLOW
+    def test_ein_tiff_mit_16_bit_graustufen_bleibt_grau(self) -> None:
+        # Ein JPEG fasst 8 Bit je Pixel. Schnitte die Umwandlung alles ueber
+        # 255 ab, kaeme der Scan fast weiss heraus, und das Original waere weg.
+        self.lege_tiff_an("tief.tif", Image.new("I;16", (400, 300), 20000))
+
+        fertig = self.starte()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        with Image.open(self.quellen / "tief.jpg") as jpeg:
+            grau = jpeg.convert("L").getpixel((200, 150))
+        self.assertAlmostEqual(grau, 20000 // 256, delta=3)
+
+    @BRAUCHT_PILLOW
+    def test_ein_tiff_in_cmyk_wird_ein_jpeg_in_rgb(self) -> None:
+        # Ein JPEG in CMYK zeigt mancher Betrachter falsch oder gar nicht.
+        self.lege_tiff_an("druck.tif", Image.new("CMYK", (400, 300), (0, 0, 0, 0)))
+
+        fertig = self.starte()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        with Image.open(self.quellen / "druck.jpg") as jpeg:
+            self.assertEqual(jpeg.mode, "RGB")
+
+    @BRAUCHT_PILLOW_HEIF
+    def test_ein_heic_wird_mit_pillow_heif_zu_jpeg(self) -> None:
+        # So kommt ein Foto vom iPhone.
+        self.ordner.lege_quellbild_an("IMG_0001.HEIC", (400, 300))
+
+        fertig = self.starte()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual([p.name for p in self.quellen.iterdir()], ["IMG_0001.jpg"])
+        self.pruefe_jpeg(self.quellen / "IMG_0001.jpg", (400, 300))
+
+    @BRAUCHT_PILLOW
+    def test_ohne_pillow_heif_bleibt_das_heic_liegen_und_der_rest_wird_aufbereitet(self) -> None:
+        # Laeuft auch dort, wo pillow-heif installiert ist, siehe blende_aus().
+        # Das HEIC muss dafuer nicht echt sein, geoeffnet wird es nicht.
+        heic = self.ordner.lege_quelldatei_an("IMG_0001.heic", b"kein echtes HEIC")
+        tiff = self.ordner.lege_quellbild_an("scan.tif", (400, 300))
+
+        fertig = self.starte(umgebung=blende_aus(self, "pillow_heif"))
+
+        self.assertNotEqual(fertig.returncode, 0,
+                            "das HEIC bleibt unlesbar, gruen waere geschoent")
+        self.assertIn("IMG_0001.heic", fertig.stdout)
+        self.assertIn("pip install pillow-heif", fertig.stdout)
+        self.assertEqual(heic.read_bytes(), b"kein echtes HEIC")
+        self.assertFalse(tiff.exists())
+        self.pruefe_jpeg(self.quellen / "scan.jpg", (400, 300))
+
+    @BRAUCHT_PILLOW
+    def test_eine_datei_auf_die_eine_karte_zeigt_bleibt_liegen(self) -> None:
+        # Als .jpg braeche der Verweis. Die Angabe ist freier Text, hier mit
+        # Seitenzahl dahinter.
+        self.ordner.lege_karte_an(id="ue-000006", titel="Aus dem Scan",
+                                  quelldatei="magazin/scan.tif, S. 12")
+        tiff = self.ordner.lege_quellbild_an("magazin/scan.tif", (400, 300))
+        vorher = tiff.read_bytes()
+
+        fertig = self.starte()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(tiff.read_bytes(), vorher)
+        self.assertFalse((self.quellen / "magazin" / "scan.jpg").exists())
+        self.assertIn("magazin/scan.tif", fertig.stdout)
+        self.assertIn("ue-000006", fertig.stdout)
+
+    @BRAUCHT_PILLOW
+    def test_ein_heic_mit_karte_nennt_die_karte_auch_ohne_pillow_heif(self) -> None:
+        # Mit dem Paket bliebe es genauso liegen. Der Hinweis gehoert der
+        # Karte, und der Lauf ist gruen.
+        self.ordner.lege_karte_an(id="ue-000006", titel="Vom iPhone",
+                                  quelldatei="IMG_0001.heic")
+        self.ordner.lege_quelldatei_an("IMG_0001.heic", b"kein echtes HEIC")
+
+        fertig = self.starte(umgebung=blende_aus(self, "pillow_heif"))
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertIn("ue-000006", fertig.stdout)
+        self.assertNotIn("pillow-heif", fertig.stdout)
+
+    @BRAUCHT_PILLOW
+    def test_ein_jpeg_auf_das_eine_karte_zeigt_wird_trotzdem_verkleinert(self) -> None:
+        # Sein Name bleibt, der Verweis also auch.
+        self.ordner.lege_karte_an(id="ue-000006", titel="Von der Seite",
+                                  quelldatei="seite-01.jpg")
+        datei = self.ordner.lege_quellbild_an("seite-01.jpg", (3000, 2250))
+
+        fertig = self.starte()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        with Image.open(datei) as bild:
+            self.assertEqual(max(bild.size), 2000)
+
+    @BRAUCHT_PILLOW
+    def test_ein_tiff_neben_einem_jpeg_gleichen_namens_bleibt_liegen(self) -> None:
+        # Das JPEG aus dem TIFF ueberschriebe das, das schon da liegt.
+        tiff = self.ordner.lege_quellbild_an("scan.tif", (400, 300))
+        jpeg = self.ordner.lege_quellbild_an("scan.jpg", (200, 100))
+        vorher = jpeg.read_bytes()
+
+        fertig = self.starte()
+
+        self.assertNotEqual(fertig.returncode, 0, "das TIFF bleibt unlesbar")
+        self.assertTrue(tiff.exists())
+        self.assertEqual(jpeg.read_bytes(), vorher)
+        self.assertIn("scan.tif", fertig.stdout)
+
+    @BRAUCHT_PILLOW
+    def test_ein_mehrseitiges_tiff_bleibt_liegen(self) -> None:
+        # Ein JPEG fasst eine Seite. Ab der zweiten ginge alles verloren.
+        tiff = self.quellen / "zwei-seiten.tif"
+        tiff.parent.mkdir(parents=True, exist_ok=True)
+        seite = Image.new("RGB", (400, 300), "white")
+        seite.save(tiff, "TIFF", save_all=True, append_images=[seite.copy()])
+        vorher = tiff.read_bytes()
+
+        fertig = self.starte()
+
+        self.assertNotEqual(fertig.returncode, 0)
+        self.assertIn("FEHLER", fertig.stdout)
+        self.assertEqual(tiff.read_bytes(), vorher)
+        self.assertFalse((self.quellen / "zwei-seiten.jpg").exists())
+
+    @BRAUCHT_PILLOW
+    def test_die_rueckfrage_nennt_die_neue_endung(self) -> None:
+        # Wer zustimmt, soll wissen, dass aus scan.tif ein scan.jpg wird.
+        tiff = self.ordner.lege_quellbild_an("scan.tif", (400, 300))
+
+        fertig = self.ordner.starte("bilder_aufbereiten.py")
+
+        self.assertEqual(fertig.stdout.count("Weiter? [j/N]"), 1)
+        self.assertIn("als JPEG mit .jpg", fertig.stdout)
+        self.assertTrue(tiff.exists(), "ohne Zustimmung bleibt das Original")
 
 
 if __name__ == "__main__":

@@ -707,6 +707,9 @@ class Arbeitsordner:
 
         `orientierung` schreibt den EXIF-Eintrag 0x0112. 6 heisst "fuer die
         Anzeige um 90 Grad drehen", der Wert, den die Magazinseiten tragen.
+
+        Das Format folgt der Endung: PNG, TIFF, HEIC oder sonst JPEG. HEIC
+        braucht dazu pillow-heif.
         """
         from PIL import Image  # nur hier noetig, der Rest der Suite laeuft ohne
 
@@ -714,13 +717,21 @@ class Arbeitsordner:
         bild = Image.frombytes("RGB", groesse, os.urandom(breite * hoehe * 3))
         datei = self.pfad / "quellen" / name
         datei.parent.mkdir(parents=True, exist_ok=True)
-        if datei.suffix.lower() == ".png":
+        endung = datei.suffix.lower()
+        if endung == ".png":
             bild.save(datei, "PNG")
             return datei
         exif = Image.Exif()
         if orientierung is not None:
             exif[ORIENTIERUNG] = orientierung
-        bild.save(datei, "JPEG", quality=95, exif=exif)
+        if endung in (".tif", ".tiff"):
+            bild.save(datei, "TIFF", exif=exif)
+        elif endung in (".heic", ".heif"):
+            from pillow_heif import register_heif_opener
+            register_heif_opener()
+            bild.save(datei, "HEIF", exif=exif)
+        else:
+            bild.save(datei, "JPEG", quality=95, exif=exif)
         return datei
 
     def starte(self, skript: str, *argumente: str,

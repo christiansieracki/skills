@@ -148,6 +148,22 @@ Datei, die sich nicht lesen lässt, wie bei `ids_umstellen.py`.
 Ziel: bewusst nicht. Auslöser: Eine Datei im Arbeitsordner, die nicht UTF-8 ist,
 lässt `index.py` abbrechen.
 
+### Ein HEIC, das schon im Zerlegungsplan steht
+
+Aus #48. `bilder_aufbereiten.py` macht aus einem TIFF oder HEIC ein JPEG mit
+`.jpg` und lässt nur liegen, worauf eine Karte zeigt. Steht die Datei schon in
+der Übersicht einer `sammelimport.md` oder in einem Kartenentwurf, zeigen beide
+danach ins Leere. Die Übersicht führt den Kandidaten mit der alten Datei, das
+JPEG gilt als neue Datei, und `pruefen` weist den Entwurf ab, weil es seine
+`quelldatei` nicht mehr gibt. Der Hinweis von `vorbereiten --plan` nennt das
+HEIC trotzdem, denn er nennt jedes unlesbare Foto des Ordners. Im Ablauf kommt
+der Hinweis vor dem Plan, das HEIC wird also aufbereitet, bevor es in eine
+Zeile kommt. Ebenso bleibt ein HEIC unlesbar, auf das eine Karte zeigt. Abhilfe
+wäre, Übersicht, Entwurf und Karte beim Umbenennen mitzuziehen.
+
+Ziel: bewusst nicht. Auslöser: Ein TIFF oder HEIC steht schon in einer
+Übersicht, einem Kartenentwurf oder auf einer Karte, und jemand muss es lesen.
+
 ### Ein Beach-Team anlegen, solange es keins gibt
 
 Beach ist seit Welle 1a im Plugin und an einer echten Beachübung abgenommen

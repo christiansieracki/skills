@@ -1104,6 +1104,24 @@ class PlaneingabeTest(unittest.TestCase):
         self.assertIn("unter/seite-01.jpg", fertig.stdout)
         self.assertNotIn("seite-02.jpg", fertig.stdout)
 
+    def test_heic_und_tiff_ergeben_den_hinweis_auch_unter_2_mb(self) -> None:
+        # Das Lesewerkzeug des Agenten zeigt nur JPEG und PNG. Ein Foto vom
+        # iPhone ist ein HEIC und wiegt oft weniger als 2 MB, lesen kann der
+        # Agent es trotzdem nicht. Geoeffnet wird keine der Dateien, der Test
+        # laeuft also auch ohne Pillow.
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/IMG_0001.HEIC", os.urandom(3 * 1024 * 1024))
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/IMG_0002.heic", b"klein")
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/scan.tif", b"klein")
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-02.jpg", b"klein genug")
+
+        fertig = self.plane()
+
+        self.assertIn("bilder_aufbereiten.py", fertig.stdout)
+        hinweis = fertig.stdout.split("bilder_aufbereiten.py", 1)[0]
+        for name in ("IMG_0001.HEIC", "IMG_0002.heic", "scan.tif"):
+            self.assertIn(name, hinweis)
+        self.assertNotIn("seite-02.jpg", hinweis)
+
     def test_ein_schweres_foto_unter_ohne_ergibt_keinen_hinweis(self) -> None:
         # Was `ohne:` auslaesst, oeffnet kein Agent. Der Hinweis kaeme sonst
         # bei jedem Lauf wieder, fuer ein Foto, das niemand lesen muss.

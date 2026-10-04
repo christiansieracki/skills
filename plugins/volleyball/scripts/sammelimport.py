@@ -55,7 +55,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
-from bilder_aufbereiten import kandidaten as bilder_nach_gewicht  # noqa: E402
+from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
     DISZIPLIN_SPALTE, KARTENFELDER, TYPEN, KeineId, finde_wurzel, hole_index, interpreter,
     konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_schwerpunkte,
@@ -995,26 +995,28 @@ def bibliotheksliste(wurzel: Path, ordner: str) -> list[str]:
     return zeilen
 
 
-def melde_schwere_fotos(ordner: str, quellordner: Path,
-                        sammelimport: Sammelimport | None) -> None:
-    """Nennt die Fotos im Quellenordner, die zu schwer zum Lesen sind.
+def melde_unlesbare_fotos(ordner: str, quellordner: Path,
+                          sammelimport: Sammelimport | None) -> None:
+    """Nennt die Fotos im Quellenordner, die der Agent so nicht lesen kann.
 
-    Schwelle und Endungen kommen aus `bilder_aufbereiten.py`, damit „zu
-    schwer" hier dasselbe heißt wie dort, wo es behoben wird. Genannt werden
-    alle Fotos des Ordners, nicht nur die neuen: Auch ein Foto, das schon im
-    Plan steht, muss der Agent für den Entwurf öffnen können. Nur was `ohne:`
-    auslässt, öffnet kein Agent, das fehlt hier.
+    Das sind die über der Schwelle und jedes TIFF und HEIC, auch ein kleines,
+    denn das Lesewerkzeug zeigt nur JPEG und PNG. Welche das sind, sagt
+    `bilder_aufbereiten.py`, damit es hier dasselbe heißt wie dort, wo es
+    behoben wird. Genannt werden alle Fotos des Ordners, nicht nur die neuen:
+    Auch ein Foto, das schon im Plan steht, muss der Agent für den Entwurf
+    öffnen können. Nur was `ohne:` auslässt, öffnet kein Agent, das fehlt hier.
     """
-    schwer, _leicht = bilder_nach_gewicht(quellordner)
-    namen = {pfad: _nfc(pfad.relative_to(quellordner).as_posix()) for pfad in schwer}
-    schwer = [pfad for pfad in schwer
-              if not (sammelimport and sammelimport.ausgelassen(namen[pfad]))]
-    if not schwer:
+    unlesbar, _lesbar = bilder_zum_aufbereiten(quellordner)
+    namen = {pfad: _nfc(pfad.relative_to(quellordner).as_posix()) for pfad in unlesbar}
+    unlesbar = [pfad for pfad in unlesbar
+                if not (sammelimport and sammelimport.ausgelassen(namen[pfad]))]
+    if not unlesbar:
         return
-    print(f"{bilder(len(schwer))} über {menschenmass(SCHWELLE)}, zu schwer zum Lesen:")
-    for pfad in schwer:
+    print(f"{bilder(len(unlesbar))} so nicht lesbar, über {menschenmass(SCHWELLE)} "
+          f"oder weder JPEG noch PNG:")
+    for pfad in unlesbar:
         print(f"  {namen[pfad]}  {menschenmass(pfad.stat().st_size)}")
-    print(f"Vorher verkleinern, mit Rückfrage: "
+    print(f"Vorher aufbereiten, mit Rückfrage: "
           f"'{interpreter()} bilder_aufbereiten.py quellen/{ordner}'\n")
 
 
@@ -1047,7 +1049,7 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     sammelimport = vorhandener_sammelimport(wurzel, ordner)
     quellordner = wurzel / "quellen" / ordner
     dateien = neue_dateien(quellordner, sammelimport)
-    melde_schwere_fotos(ordner, quellordner, sammelimport)
+    melde_unlesbare_fotos(ordner, quellordner, sammelimport)
     if not dateien:
         wo = ("in der Übersicht oder unter ohne" if sammelimport and sammelimport.ohne
               else "in der Übersicht")

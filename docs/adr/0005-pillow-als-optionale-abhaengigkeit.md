@@ -60,3 +60,22 @@ der Standardbibliothek. Eine mit Flate gepackte Quellgrafik, wie PlayDrill sie
 einbettet, ließe sich auch ohne Pillow als PNG schreiben. Eine als JPEG
 eingebettete nicht, wie oben. Die Spec hat Pillow gewählt, so wie die Vorlage
 im PlayDrill-Log.
+
+## Nachtrag zu HEIC und TIFF, 04.10.2026
+
+Oben steht, HEIC und TIFF würden bewusst nicht mitgenommen. Seit #48 werden
+sie aufbereitet. iPhones fotografieren in HEIC, und mit mehreren Trainern (#38)
+kommen solche Fotos. Das Lesewerkzeug des Agenten zeigt nur PNG und JPEG. Ein
+TIFF oder HEIC wird deshalb immer zu JPEG, auch unter 2 MB, unter demselben
+Namen mit `.jpg`.
+
+TIFF öffnet Pillow selbst. HEIC öffnet es erst mit dem Zusatzpaket
+`pillow-heif`, und das ist optional wie Pillow. Fehlt es, nennt
+`bilder_aufbereiten.py` die HEIC-Dateien samt Installationshinweis, lässt sie
+liegen und bereitet die übrigen auf. Der Lauf endet dann rot. So bricht die
+Zusage nicht still, wie oben befürchtet. Kein anderes Skript braucht
+`pillow-heif`.
+
+Mit dem neuen Namen gilt nicht mehr ganz, was oben über `quelldatei:` steht.
+Zeigt eine Karte auf die Datei, bleibt sie liegen, und das Skript nennt die
+Karte. Sonst bräche der Verweis.

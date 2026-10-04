@@ -140,8 +140,9 @@ ohne: [Vorlagen, notizen.md]
    - **„Keine neuen Dateien“:** Kein Agent, und kein Plan wird vorgelegt.
      Eine ältere Planeingabe und ein älterer Plan bleiben liegen. Weiter mit
      Schritt 3 des Ablaufs.
-   - **Fotos über 2 MB:** Die Bildaufbereitung anbieten, vor dem Agenten, wie
-     im Import-Skill unter „Fotos, die sich nicht öffnen lassen“
+   - **Bilder, die sich so nicht lesen lassen**, über 2 MB, TIFF oder HEIC:
+     Die Bildaufbereitung anbieten, vor dem Agenten, wie im Import-Skill unter
+     „Fotos, die sich nicht öffnen lassen“
      (`${CLAUDE_PLUGIN_ROOT}/skills/volleyball-uebungsimport/SKILL.md`).
    - **pdftotext fehlt:** Den Installationshinweis einmal weitergeben. Es geht
      weiter, der Agent liest die PDFs dann selbst.

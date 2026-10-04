@@ -63,8 +63,9 @@ die Skills sie aufrufen: über die Kommandozeile mit `--wurzel`. Die echte
 Bibliothek wird nie angefasst und muss dafür nicht einmal existieren.
 `unittest` kommt aus der Standardbibliothek, installiert werden muss nichts.
 
-Die Prüfungen der Bildaufbereitung werden übersprungen, wenn Pillow fehlt.
-Die Begründung steht im Kopf von `tests/test_bilder.py`.
+Die Prüfungen der Bildaufbereitung werden übersprungen, wenn Pillow fehlt, die
+mit einem echten HEIC, wenn `pillow-heif` fehlt. Die Begründung steht im Kopf
+von `tests/test_bilder.py`.
 
 Der Test des Drucks über Edge oder Chrome läuft nur, wo der PDF-Export diesen
 Weg wählt. Warum, steht im Kopf von `tests/test_export.py`. Die Prüfungen der
@@ -77,10 +78,12 @@ Python 3 für die Skripte, nur Standardbibliothek. Begrenzte Ausnahmen sind
 Pillow und `pdftotext`. Pillow braucht `bilder_aufbereiten.py`, dazu
 `sammelimport.py`, wenn es Quellgrafiken aus PDFs ausschneiden soll. Fehlt es,
 sagen beide im Klartext, wie es zu installieren ist, und schreiben nichts.
-`pdftotext` liest im Sammelimport den Text der PDFs. Ohne es geht es weiter,
-die Agenten lesen die PDFs dann selbst. Unter Windows bringt Git für Windows es
-mit. Die übrigen Skripte hängen an keinem der beiden, eine frische Installation
-ist also sofort benutzbar.
+Fotos im HEIC-Format vom iPhone öffnet Pillow erst mit `pillow-heif`. Fehlt
+es, lässt `bilder_aufbereiten.py` sie liegen, sagt, wie es zu installieren ist,
+und bereitet die übrigen auf. `pdftotext` liest im Sammelimport den Text der
+PDFs. Ohne es geht es weiter, die Agenten lesen die PDFs dann selbst. Unter
+Windows bringt Git für Windows es mit. Die übrigen Skripte hängen an keinem der
+beiden, eine frische Installation ist also sofort benutzbar.
 
 Für den PDF-Export pandoc, dazu eine PDF-Maschine wie wkhtmltopdf oder
 weasyprint. Fehlt die Maschine, druckt Edge oder Chrome die HTML-Fassung, dafür
