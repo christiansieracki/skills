@@ -102,3 +102,16 @@ beiden Plugin-Agenten auf Sonnet 5.5.
   70 Rückfragen. 35 davon galten Kopien desselben Blatts in einem anderen
   Ordner, mit gleichem Text und pixelgleicher Grafik, 31 eines anderen
   Kandidaten und vier einer fertigen Karte.
+- **Zerlegungsplan über `vm_09_2026`:** 88 864 Tokens, 18 Werkzeugaufrufe,
+  knapp zwei Minuten, für 15 Fotos von Magazinseiten. Der Plan hatte 13
+  Kandidaten: die sieben Karten von Hand als `importiert`, Übung 3 und 4 des
+  Warm-ups offen, vier Zeilen Theorie und Bericht `zurückgestellt`. Die
+  Rückfrage zu Übung 4 als Dublettenverdacht zu `ue-000041` fehlte. Die Regel
+  verglich nur mit Karten aus anderen Quellenordnern, seit c965ffc mit jeder
+  Karte.
+- **Kartenentwurf über `vm_09_2026`:** 42 376 und 46 260 Tokens für Übung 3
+  und 4. Die Sonnet-Entwürfe des Probelaufs, `vm-w3.md` und `vm-w4.md`, hatten
+  vier und zwei Rückfragen ohne Vermutung. Die Plugin-Agenten hatten keine,
+  dafür eine und zwei mit Vermutung. Unter „Was die Quelle nicht sagt“ standen
+  in den Absprachen „Gewechselt wird nach Ansage“ und kein Rückweg der Bälle,
+  und der zweite Entwurf hat die erste Antwort übernommen.

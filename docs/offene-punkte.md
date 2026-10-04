@@ -55,7 +55,9 @@ Bei der Abnahme von 1d war `trainings/h1-h2/2026-09-17.html` gesperrt. In den
 Dateirechten stand ein Verweigern-Eintrag, wie ihn der Nextcloud-Client für
 Dateien ohne Schreibrecht auf dem Server setzt. `leseansicht.py` brach mit
 einem Traceback ab (`PermissionError`). Abhilfe wäre eine Meldung, die die
-Datei nennt und sagt, dass sie gesperrt ist.
+Datei nennt und sagt, dass sie gesperrt ist. Die Datei trägt deshalb noch
+vierstellige IDs. Neu gebaut wird sie, sobald der Trainer sie in Nextcloud
+entsperrt hat.
 
 Ziel: Welle zur Leseansicht, die `leseansicht.py` ohnehin neu baut.
 
@@ -71,8 +73,25 @@ Rückfragen gebündelt zu stellen und anzubieten, eine Antwort, die für den
 ganzen Quellenordner gilt, in die Absprachen der `sammelimport.md` zu
 schreiben. Dann fragt der nächste Durchgang nicht mehr danach.
 
+Am 04.10.2026 kamen die beiden Antworten von Hand in die Absprachen von
+`playdrill` und `vm_09_2026`, unter „Was die Quelle nicht sagt“. Die beiden
+Entwürfe über `vm_09_2026` fragten danach nicht mehr, einer schrieb „Gewechselt
+wird nach Ansage“ selbst in den Ablauf (ADR-0009, Nachtrag nach der Abnahme).
+
 Ziel: Welle zur Wissenskarte, Schnitt 5, der die Freigabe im Skill ohnehin
 anfasst.
+
+### Ein neues Schaubild erreicht die Leseansicht erst nach einem Neubau
+
+Die Leseansicht bettet das Schaubild einer Karte ein. Bekommt die Karte ein
+neues Bild, zeigt jede Leseansicht, die schon gebaut ist, weiter das alte. Bei
+der Abnahme von 1d bekam `ue-000015` ein SVG statt der PNG aus Ricos PDF, und
+`trainings/h1-h2/2026-10-01.html` trug noch die PNG, bis sie von Hand neu
+gebaut wurde. Weder der Skill `volleyball-schaubild` noch der Linter sagen
+das. Abhilfe wäre, dass der Skill nach der Freigabe die Pläne nennt, die die
+Karte benutzen, und anbietet, ihre Leseansichten neu zu bauen.
+
+Ziel: Welle zur Leseansicht, die `leseansicht.py` ohnehin neu baut.
 
 ## Bewusst nicht gebaut
 
@@ -268,6 +287,29 @@ fehlte in der Liste. Die Aufrufe stehen außerdem ohne Pfad zum Skript da,
 Arbeitsordner ist seit dem 04.10.2026 umgestellt.
 
 Ziel: bewusst nicht. Auslöser: Ein zweiter Arbeitsordner wird umgestellt.
+
+### Einen Kandidaten im Sammelimport vorziehen
+
+`sammelimport.py vorbereiten` nimmt immer die nächsten offenen Kandidaten der
+Reihe nach. Bei der Abnahme von 1d sollte der Sprungkraftzirkel (Kandidat 182
+über PlayDrill) seine Karte bekommen, davor waren aber 149 Kandidaten offen.
+Dass alle neun Blätter eine Quellgrafik hergeben, wurde deshalb in einer Kopie
+geprüft, und die Karte entsteht im Durchgang, der bei 182 ankommt. Abhilfe wäre
+`vorbereiten <ordner> --kandidat 182`.
+
+Ziel: bewusst nicht. Auslöser: Ein Trainer braucht eine bestimmte Karte aus
+einem laufenden Sammelimport früher, als die Reihe sie bringt.
+
+### Ein Verweis im Trainingsplan auf eine Datei, die es nicht gibt
+
+`trainings/h1-h2/2026-09-15.md` verwies im Text auf
+`schaubilder/2026-09-15-annahme-zielzone.png`. Gezeichnet ist das Bild aber
+als `.svg`. Der Linter prüft `schaubild:` auf den Karten, Pfade im Text eines
+Plans liest er nicht. Bei der Abnahme von 1d ist der Verweis von Hand berichtigt
+worden.
+
+Ziel: bewusst nicht. Auslöser: Ein zweiter Verweis ins Leere fällt in einem
+Plan auf.
 
 ## Was als Nächstes ansteht
 
