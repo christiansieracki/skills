@@ -68,3 +68,34 @@ gelten so nicht mehr.
   Stationsliste abgeschnitten. Die Schwelle liegt bei 400 000 Zeichen, rund
   100 000 Tokens. Gemessen: `quellen/playdrill` hat 310 000 Zeichen in 343 PDFs
   und kommt ganz, die 260 PDFs aus den Übungsordnern haben 190 000.
+
+## Nachtrag nach der Abnahme, 04.10.2026
+
+Gemessen bei der Abnahme von Welle 1d (#37) im echten Arbeitsordner.
+
+- **Wenig Text:** Die Regel trifft 15 der 260 PDFs aus den Übungsordnern, nicht
+  40 von 258 wie oben geschätzt. Den Platzhalter trägt auf der Textebene nur
+  `Ü_Abwehr/#12P+_Kat1_Abwehr_Bewegung-Reaktion.pdf`, nicht 27. Von den 15 sind
+  sechs Stationsblätter aus `Ü_Zirkelübung`, drei Fassungen von „Einspielen
+  über 2+4" und zwei Blätter zur Beinarbeit des Zuspielers. 22 PDFs tragen die
+  Textmarke „Ausführung:" nicht, bei ihnen zählt der ganze Text.
+- **Die richtigen Blätter:** Im ersten Durchgang über 30 Kandidaten traf die
+  Regel zwei, und bei beiden stand der Ablauf nur in der Grafik. Bei einem hat
+  der Trainer die Lesart des Entwurfs deutlich korrigiert. Übersehen kann die
+  Regel ein Blatt mit knapper Ausführung, wenn danach Ziel, Varianten und
+  Hinweise stehen, denn sie zählt alles nach der Textmarke. 29 Blätter haben
+  zwischen „Ausführung" und der nächsten Rubrik weniger als 150 Zeichen, meist
+  knappe Stationsblätter. Ob ihr Ablauf aus der Grafik kommt, zeigt sich erst
+  bei ihren Entwürfen, siehe `docs/offene-punkte.md`.
+- **Die Schwelle trägt:** Mit `ohne:` hat die Planeingabe über PlayDrill
+  221 242 Zeichen und bekommt je PDF den ganzen Text. Die Übersichtsblätter
+  behalten ihre Stationslisten, der Baggerzirkel alle acht, der
+  Sprungkraftzirkel ebenso.
+- **Quellgrafik:** Angesehen sind die von sechs Kandidaten aus dem Durchgang und
+  das Übersichtsblatt des Sprungkraftzirkels, dazu ausgeschnitten alle neun
+  Blätter des Zirkels. Alle sind sauber ausgeschnitten, ohne durchsichtigen
+  Rand. Das Übersichtsblatt zeigt eine neunte Station, die sein Text nicht
+  nennt.
+- **Neben `git.exe`:** Aus PowerShell ohne `mingw64\bin` im PATH findet
+  `vorbereiten --plan` das `pdftotext` unter `Git\mingw64\bin`, wie oben unter
+  Consequences beschrieben.

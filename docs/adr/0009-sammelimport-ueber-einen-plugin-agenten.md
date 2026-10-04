@@ -84,3 +84,21 @@ Rückmeldung. Seinen Plan schreibt er als `zerlegungsplan.md` neben die
 Planeingabe. Beide Definitionen schreiben die kontrollierten Werte aus.
 `test_agenten.py` prüft sie gegen `tpdaten.py`, dazu Modell und Werkzeuge,
 und beim Kartenentwurf die Felder der Karte gegen `KARTENFELDER` (#35).
+
+## Nachtrag nach der Abnahme, 04.10.2026
+
+Gemessen bei der Abnahme von Welle 1d (#37) im echten Arbeitsordner, mit den
+beiden Plugin-Agenten auf Sonnet 5.5.
+
+- **Kartenentwurf:** im Median 55 840 Tokens je Entwurf, über 29 Entwürfe
+  zwischen 40 787 und 91 198. Der allgemeine Subagent im Probelauf brauchte im
+  Median 91 000. Ein Durchgang über 30 Kandidaten kostete so rund 1,6 Millionen
+  Tokens und lief in acht Runden zu vier gut 45 Minuten. Ein Aufruf schrieb wie im
+  Probelauf seinen Entwurf und brach erst bei der Rückmeldung am Nutzungslimit
+  ab. `pruefen` hat den Entwurf von der Platte genommen.
+- **Zerlegungsplan über PlayDrill:** 312 653 Tokens in einem Aufruf, 16
+  Werkzeugaufrufe, 15 Minuten, für 260 PDFs mit 221 242 Zeichen Planeingabe.
+  #29 rechnete mit rund 40 000 Tokens Text. Der Plan hatte 239 Kandidaten und
+  70 Rückfragen. 35 davon galten Kopien desselben Blatts in einem anderen
+  Ordner, mit gleichem Text und pixelgleicher Grafik, 31 eines anderen
+  Kandidaten und vier einer fertigen Karte.

@@ -24,7 +24,7 @@ Bei der Durchsicht am 02.10.2026 vor der Abnahme von Welle 1d hat jeder Punkt
 ein Ticket bekommen, siehe den Nachtrag in #29: #40 als Slice 1d/9, #38, #39
 und #41 bis #48 vor der Abnahme, dazu Ergänzungen in #35, #36 und #37. Die
 Punkte hier kamen danach aus den Interviews zur Welle zur Leseansicht und zur
-Welle zur Wissenskarte.
+Welle zur Wissenskarte und aus der Abnahme von 1d (#37).
 
 ### DVV Plan 1 als Übungsfolge mit ID
 
@@ -48,6 +48,31 @@ läuft kein Sammelimport über PDFs, die nicht wie PlayDrill aufgebaut sind.
 
 Ziel: Welle zur Wissenskarte, als erster Schnitt. Nach der Abnahme von 1d
 (#37) prüfen, ob er vorher kommt, etwa vor die Welle zur Leseansicht.
+
+### Eine schreibgeschützte Leseansicht bricht `leseansicht.py` ab
+
+Bei der Abnahme von 1d war `trainings/h1-h2/2026-09-17.html` gesperrt. In den
+Dateirechten stand ein Verweigern-Eintrag, wie ihn der Nextcloud-Client für
+Dateien ohne Schreibrecht auf dem Server setzt. `leseansicht.py` brach mit
+einem Traceback ab (`PermissionError`). Abhilfe wäre eine Meldung, die die
+Datei nennt und sagt, dass sie gesperrt ist.
+
+Ziel: Welle zur Leseansicht, die `leseansicht.py` ohnehin neu baut.
+
+### Wiederkehrende Antworten bei der Freigabe in die Absprachen
+
+Im ersten Durchgang über PlayDrill hatten 26 von 30 Entwürfen zusammen 45
+Rückfragen ohne Vermutung. Zwölf fragten, wann die Rollen wechseln, vier, wohin
+die Bälle zurückkommen, neun nach einer Kennung für den Angriff. Der Trainer hat
+jede Gruppe einmal beantwortet: „Gewechselt wird nach Ansage", der Rückweg der
+Bälle kommt nicht auf die Karte, die Kennung heißt `angriff`. Der Skill fragt
+laut Anleitung eine Rückfrage nach der anderen. Abhilfe wäre, gleiche
+Rückfragen gebündelt zu stellen und anzubieten, eine Antwort, die für den
+ganzen Quellenordner gilt, in die Absprachen der `sammelimport.md` zu
+schreiben. Dann fragt der nächste Durchgang nicht mehr danach.
+
+Ziel: Welle zur Wissenskarte, Schnitt 5, der die Freigabe im Skill ohnehin
+anfasst.
 
 ## Bewusst nicht gebaut
 
@@ -196,6 +221,53 @@ Beach ist seit Welle 1a im Plugin und an einer echten Beachübung abgenommen
 Code, und ohne echtes Beach-Team gibt es nichts anzulegen. Steht so seit #10.
 
 Ziel: bewusst nicht. Auslöser: Es gibt ein echtes Beach-Team.
+
+### Lange Titel aus dem Kartenentwurf
+
+Die Titel der 30 Karten aus dem ersten Durchgang über PlayDrill beschreiben
+ganze Abläufe, etwa „Dankeball auf der Abwehrposition hoch in die Feldmitte
+spielen und dann zuspielen". Die Dateinamen von Karte und Quellgrafik werden
+damit bis zu 95 Zeichen lang. Die Karten von Hand haben kurze Titel. Der
+Trainer hat alle 30 so freigegeben. Abhilfe wäre eine Längengrenze im
+Agenten oder ein gekürzter Name beim Übernehmen.
+
+Ziel: bewusst nicht. Auslöser: Der Trainer kürzt Titel bei der Freigabe
+regelmäßig, oder ein Pfad wird für Windows oder Nextcloud zu lang.
+
+### Die Regel „wenig Text" zählt Ziel und Varianten mit
+
+Die Regel zählt alles nach der Textmarke, bei PlayDrill also auch Ziel,
+Varianten und Hinweise. Ein Blatt mit knapper Ausführung und langem Rest trifft
+sie nicht. 29 der 260 Blätter haben zwischen „Ausführung" und der nächsten
+Rubrik weniger als 150 Zeichen, meist knappe Stationsblätter. Ob ihr Text
+reicht, zeigt sich bei ihren Entwürfen (ADR-0008, Nachtrag vom 04.10.2026).
+Abhilfe wäre, nur bis zur nächsten Rubrik zu zählen, mit den Rubriken als
+weiterer Einstellung in der `sammelimport.md`.
+
+Ziel: bewusst nicht. Auslöser: Ein Entwurf liest seinen Ablauf aus der
+Grafik, ohne dass die Regel ihn getroffen hat, und der Trainer muss die
+Lesart korrigieren.
+
+### Kopien desselben Blatts im Zerlegungsplan
+
+35 der 70 Rückfragen im Zerlegungsplan über PlayDrill galten Kopien desselben
+Blatts in einem anderen Ordner, mit gleichem Text und pixelgleicher Grafik.
+Entschieden hat sie der Trainer in einem Zug: gestrichen als Duplikat.
+Abhilfe wäre, dass `vorbereiten --plan` gleiche Texte mit gleicher Grafik in
+der Planeingabe markiert. Der Plan über PlayDrill ist freigegeben.
+
+Ziel: bewusst nicht. Auslöser: Ein weiterer Quellenordner bringt viele Kopien
+in den Zerlegungsplan.
+
+### `ids_umstellen.py` nennt nicht jede Leseansicht
+
+Das Skript nennt am Ende die Aufrufe, die das Erzeugte neu bauen, sucht
+Leseansichten aber nur unter `trainings/`. `_test-beach/2026-09-29.html`
+fehlte in der Liste. Die Aufrufe stehen außerdem ohne Pfad zum Skript da,
+`python index.py --md`, obwohl die Skripte nicht im Arbeitsordner liegen. Der
+Arbeitsordner ist seit dem 04.10.2026 umgestellt.
+
+Ziel: bewusst nicht. Auslöser: Ein zweiter Arbeitsordner wird umgestellt.
 
 ## Was als Nächstes ansteht
 
