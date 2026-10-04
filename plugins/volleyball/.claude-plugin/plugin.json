@@ -1,7 +1,7 @@
 {
   "name": "volleyball",
   "description": "Saisonplanung, Trainingsdesign, Uebungsimport, Sammelimport und Schaubilder fuer Volleyballteams. Fuenf Skills auf einer gemeinsamen Uebungsbibliothek im Markdown-Format.",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "author": { "name": "Christian Sieracki" },
   "license": "MIT"
 }
