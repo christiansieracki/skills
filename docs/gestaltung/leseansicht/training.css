@@ -1,0 +1,73 @@
+.tv {
+  --paper:#f4f7f1; --surface:#e8eee4; --ink:#263c35; --muted:#53695f; --accent:#315c4d; --line:#cbd7cc;
+  min-height:100dvh; background:var(--paper); color:var(--ink);
+  font-family:"Trebuchet MS",Verdana,sans-serif; font-size:16px; line-height:1.55;
+  padding:0 20px 36px; color-scheme:light; isolation:isolate;
+}
+.tv *, .tv *::before, .tv *::after {box-sizing:border-box}
+.tv button,.tv summary {font:inherit;color:inherit;cursor:pointer;min-height:44px}
+.tv button {background:transparent;border:1px solid var(--line);border-radius:7px;padding:10px 14px;text-align:left}
+.tv button:hover {background:var(--surface)}
+.tv button:disabled {opacity:.4;cursor:default}
+.tv :focus-visible {outline:3px solid var(--accent);outline-offset:3px}
+.tv h1,.tv h2,.tv h3,.tv p {margin:0}
+.tv h1 {font-size:29px;line-height:1.15;letter-spacing:-1px}
+.tv h2 {font-size:22px;line-height:1.25}
+.tv h3 {font-size:18px;line-height:1.4;margin:24px 0 10px}
+.tv .wrap {max-width:760px;margin:auto}
+.tv .mast {display:flex;justify-content:space-between;gap:12px;align-items:center;padding:22px 0 16px;border-bottom:1px solid var(--line)}
+.tv .date {font-weight:700;font-size:19px;letter-spacing:-.4px}
+.tv .meta {color:var(--muted);font-size:12px;margin-top:3px}
+.tv .duration {font:700 15px ui-monospace,monospace;text-align:right}
+.tv .duration small {display:block;font:11px "Trebuchet MS",sans-serif;color:var(--muted)}
+.tv .tools {display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 25px}
+.tv .tools button {font-size:13px;flex:1;text-align:center}
+.tv .section-head {display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 12px}
+.tv .section-head span,.tv .eyebrow {font-size:11px;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted)}
+.tv .time {font-family:ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.tv .phase {font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted)}
+.tv .details-body {padding:8px 0 20px}
+.tv .today {background:var(--surface);border-left:3px solid var(--accent);padding:14px 16px;margin:10px 0 22px}
+.tv .today b {display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+.tv .rich p {margin:12px 0}
+.tv .rich ul,.tv .rich ol {padding-left:22px;margin:14px 0}
+.tv .rich li {padding-left:3px;margin:10px 0}
+.tv .rich strong {font-weight:700}
+.tv .rich pre {background:var(--surface);padding:14px;overflow:auto;font:11px/1.5 ui-monospace,monospace;border-radius:6px}
+.tv .rich table {display:block;overflow-x:auto;border-collapse:collapse;width:100%;margin:18px 0;font-size:13px}
+.tv .rich th,.tv .rich td {border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top;min-width:65px}
+.tv .rich th {background:var(--surface)}
+.tv .rich code {font-size:.85em;overflow-wrap:anywhere}
+.tv .exercise {border-bottom:1px solid var(--line)}
+.tv .exercise summary {display:flex;gap:12px;justify-content:space-between;align-items:center;padding:13px 0;list-style:none}
+.tv .exercise summary::-webkit-details-marker {display:none}
+.tv .exercise summary span {display:block;font-size:14px}
+.tv .exercise summary small {color:var(--muted);display:block;font:12px ui-monospace,monospace;margin-top:4px}
+.tv .exercise summary::after {content:"+";font-size:22px;flex-shrink:0}
+.tv .exercise[open] summary::after {content:"−"}
+.tv .exercise>p {padding:0 0 18px;font-size:16px}
+.tv .diagram {display:block;width:100%;padding:10px;margin:16px 0;background:var(--surface)}
+.tv .diagram img {width:100%;height:auto;display:block;border-radius:4px}
+.tv .diagram span {display:block;text-align:center;font-size:12px;margin-top:8px}
+.tv .reference-links {display:flex;gap:7px;flex-wrap:wrap;margin-top:24px}
+.tv .reference-links button {font-size:13px}
+.tv .why {margin-top:24px;border-top:1px solid var(--line)}
+.tv .why summary {color:var(--muted);font-size:13px;padding-top:10px}
+.tv .why p {font-size:14px;color:var(--muted)}
+.tv dialog {padding:0;max-height:90dvh;width:calc(100% - 24px);max-width:760px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:16px;margin:auto;box-shadow:0 20px 70px #1e30252b}
+.tv dialog::backdrop {background:#192c2ba6}
+.tv .dialog-head {display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 20px;background:var(--paper);position:sticky;top:0;z-index:2;border-bottom:1px solid var(--line)}
+.tv .dialog-head h2 {font-size:19px}
+.tv .dialog-head button {flex-shrink:0;font-size:13px}
+.tv .dialog-content {padding:4px 20px 28px;overflow-wrap:anywhere}
+.tv .reference-tabs {display:flex;gap:8px;padding-top:16px;flex-wrap:wrap;margin-bottom:20px}
+.tv .reference-tabs button {font-size:13px}
+.tv button[aria-pressed="true"] {background:var(--accent);color:var(--paper);border-color:var(--accent)}
+.tv .preparation details {border-bottom:1px solid var(--line)}
+.tv .preparation summary {font-weight:700;padding:14px 0}
+.tv .zoom img {display:block;width:100%;max-width:none}
+.tv .zoom pre {font:14px/1.7 ui-monospace,monospace;overflow:auto;padding:20px}
+.tv .zoom-help {font-size:13px;color:var(--muted);padding:12px 0}
+.tv .note {font-size:11px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px;margin-top:30px}
+@media(min-width:900px){.tv {padding:0 36px 48px}.tv .mast {padding-top:32px}}
+@media(prefers-reduced-motion:no-preference){.tv dialog[open] {animation:tv-reveal .15s ease-out}@keyframes tv-reveal {from {opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}}

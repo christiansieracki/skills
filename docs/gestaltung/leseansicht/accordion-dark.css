@@ -1,0 +1,56 @@
+.tv.accordion.accordion-dark {
+  --paper: #14241e;
+  --surface: #21382c;
+  --ink: #e6eee3;
+  --muted: #a9beab;
+  --accent: #b3d5a0;
+  --line: #3b5141;
+  color-scheme: dark;
+}
+.accordion-dark .tools button {
+  background: #1a2d23;
+  border-color: #45604b;
+}
+.accordion-dark .tools button:hover,
+.accordion-dark .reference-links button:hover {
+  background: var(--surface);
+}
+.accordion-dark .schedule-toggle:hover {
+  background: #1b3025;
+}
+.accordion-dark .schedule-toggle[aria-expanded="true"] strong {
+  color: #d9edca;
+}
+.accordion-dark .schedule-toggle .mark {
+  color: var(--accent);
+}
+.accordion-dark .today {
+  background: #233a2b;
+}
+.accordion-dark .today b {
+  color: var(--accent);
+}
+.accordion-dark dialog {
+  box-shadow: 0 24px 70px #07110ccc;
+}
+.accordion-dark dialog::backdrop {
+  background: #08140dd1;
+}
+.accordion-dark .diagram {
+  background: #dce4d7;
+  border-color: #82997d;
+  color: #243d32;
+}
+.accordion-dark .diagram:hover {
+  background: #e5edde;
+}
+.accordion-dark .diagram img,
+.accordion-dark .zoom img {
+  background: #edf1e8;
+}
+@media (forced-colors: active) {
+  .accordion-dark .schedule-item,
+  .accordion-dark button {
+    border-color: CanvasText;
+  }
+}
