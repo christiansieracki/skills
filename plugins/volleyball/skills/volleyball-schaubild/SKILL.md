@@ -179,9 +179,11 @@ Die Leseansicht eines Trainingsplans trägt die Schaubilder seiner Karten in
 sich. Eine schon gebaute zeigt nach der Freigabe weiter das alte Bild oder
 keins, bis sie neu gebaut wird.
 
-Jede Karte, auf der Schritt 3 `schaubild:` geändert hat, merkst du dir: ein
-neues Bild, ein ersetztes, eins, das zu einer Liste dazukommt. Ein Bild für
-einen Trainingsabend ohne Karte zählt nicht.
+Jede Karte, für die in dieser Sitzung ein Bild freigegeben wurde, merkst du
+dir: ein neues Bild, ein ersetztes, eins, das zu einer Liste dazukommt. Auch
+ein Bild, das aus seiner Szene unter demselben Namen neu gezeichnet wurde,
+zählt, obwohl `schaubild:` dabei gleich bleibt. Ein Bild für einen
+Trainingsabend ohne Karte zählt nicht.
 
 Kommt in dieser Sitzung kein Bild mehr, einmal für alle gemerkten IDs
 zusammen:
