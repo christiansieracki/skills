@@ -279,6 +279,32 @@ def _vierstellig(uid: str) -> str:
     return uid[:len("ue-")] + uid[len("ue-00"):]
 
 
+@dataclass
+class Zeile:
+    """Eine Zeile der Ablauftabelle eines Trainingsplans, also ein Programmpunkt.
+
+    Die Felder folgen den Spalten der Vorlage:
+    `Zeit | Programmpunkt | Übung | ID | Anpassung heute | Warum hier`.
+    `zeit` ist meist eine Zeitangabe wie "46–93", kann aber alles sein, was
+    ein Trainer dort hinschreibt. Was leer bleibt, wird eine leere Zelle.
+    """
+
+    zeit: str
+    name: str
+    uebung: str = ""
+    id: str = ""
+    heute: str = ""
+    warum: str = ""
+
+    def zellen(self) -> list[str]:
+        return [self.zeit, self.name, self.uebung, self.id, self.heute, self.warum]
+
+
+def _markdown(text: str) -> str:
+    """Ein Stueck Markdown aus einem Test, ohne die Einrueckung des Quelltexts."""
+    return textwrap.dedent(text).strip()
+
+
 # Die Spalten der Uebersicht in sammelimport.md, in der Reihenfolge aus #29.
 UEBERSICHT_SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "Notiz"]
 
@@ -479,18 +505,45 @@ class Arbeitsordner:
 
         `name` ist der Pfad unter `trainings/`, etwa `gruppe/2026-09-15.md`.
         Jede ID steht in einer eigenen Zeile der Ablauftabelle, in der Spalte
-        ID, so wie die Vorlage es vorsieht.
+        ID, so wie die Vorlage es vorsieht. Die Tabelle hat die Spalte `Teil`
+        wie die Plaene seit September. Wer mehr braucht als die IDs, nimmt
+        `lege_plan_an`.
         """
-        zeilen = ["| Zeit | Teil | Übung | ID | Anpassung | Warum hier |",
-                  "|---|---|---|---|---|---|"]
-        zeilen += [f"| 18:00 | Hauptteil | Übung aus dem Test | {uid} | | |" for uid in ids]
+        zeilen = [Zeile("18:00", "Hauptteil", "Übung aus dem Test", uid) for uid in ids]
+        return self.lege_plan_an(name, zeilen, spalte="Teil")
+
+    def lege_plan_an(self, name: str, zeilen: list[Zeile], *,
+                     vorher: str = "", neben_der_tabelle: str = "", nachher: str = "",
+                     spalte: str = "Programmpunkt", titel: str = "Training",
+                     **frontmatter) -> Path:
+        """Legt unter `trainings/` einen Trainingsplan aus Zeilen und freien Abschnitten an.
+
+        Das Geruest ist das der Vorlage: Frontmatter, `#`-Ueberschrift,
+        `## Ablauf` mit der Tabelle, eine Zeile je Programmpunkt. Die freien
+        Abschnitte sind Markdown, so wie der Trainer es schreibt, mit eigenen
+        Ueberschriften: `vorher` steht zwischen Titel und Ablauf,
+        `neben_der_tabelle` im Abschnitt Ablauf unter der Tabelle und
+        `nachher` hinter dem Ablauf. Die Einrueckung aus dem Test faellt weg.
+
+        `spalte` ist die Ueberschrift der zweiten Spalte. Aeltere Plaene sagen
+        dort `Teil` oder `Block`.
+
+        Im Frontmatter stehen `datum` aus dem Dateinamen, `gruppe` und
+        `status`. Weitere Felder kommen als Schluesselwort dazu, etwa
+        `teilnehmer=18`, in dieser Reihenfolge. Ein Feld auf `OHNE` fehlt.
+        """
+        felder = {"datum": Path(name).stem, "gruppe": "gruppe", "status": "geplant",
+                  **frontmatter}
+        kopf = "".join(f"{k}: {_yaml(v)}\n" for k, v in felder.items() if v is not OHNE)
+        tabelle = [f"| Zeit | {spalte} | Übung | ID | Anpassung heute | Warum hier |",
+                   "|---|---|---|---|---|---|"]
+        tabelle += ["| " + " | ".join(z.zellen()) + " |" for z in zeilen]
+        teile = [f"# {titel}", _markdown(vorher), "## Ablauf", "\n".join(tabelle),
+                 _markdown(neben_der_tabelle), _markdown(nachher)]
         datei = self.pfad / "trainings" / name
         datei.parent.mkdir(parents=True, exist_ok=True)
-        datei.write_text(
-            f"---\ndatum: {Path(name).stem}\ngruppe: gruppe\nstatus: geplant\n---\n\n"
-            "# Training\n\n## Ablauf\n\n" + "\n".join(zeilen) + "\n",
-            encoding="utf-8",
-        )
+        datei.write_text(f"---\n{kopf}---\n\n" + "\n\n".join(t for t in teile if t) + "\n",
+                         encoding="utf-8")
         return datei
 
     def ergaenze_schwerpunkt(self, kennung: str, disziplin: str) -> None:
