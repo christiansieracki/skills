@@ -108,7 +108,10 @@ beiden Plugin-Agenten auf Sonnet 5.5.
   Warm-ups offen, vier Zeilen Theorie und Bericht `zurückgestellt`. Die
   Rückfrage zu Übung 4 als Dublettenverdacht zu `ue-000041` fehlte. Die Regel
   verglich nur mit Karten aus anderen Quellenordnern, seit c965ffc mit jeder
-  Karte.
+  Karte. Am 05.10.2026 mit 3.0.1 nachgeprüft, in einer Kopie des
+  Arbeitsordners auf dem Stand vor dem Plan: 84 632 Tokens, derselbe Plan,
+  und genau eine Rückfrage, die zu Übung 4 mit `ue-000041`. Übung 3 teilt sich
+  ein Foto mit `ue-000020` und bekam keine.
 - **Kartenentwurf über `vm_09_2026`:** 42 376 und 46 260 Tokens für Übung 3
   und 4. Die Sonnet-Entwürfe des Probelaufs, `vm-w3.md` und `vm-w4.md`, hatten
   vier und zwei Rückfragen ohne Vermutung. Die Plugin-Agenten hatten keine,
