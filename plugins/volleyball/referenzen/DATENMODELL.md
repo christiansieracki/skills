@@ -267,7 +267,9 @@ in_arbeit: christian, 2026-10-02 # schreibt das Skript: wer seit wann daran arbe
 ## Absprachen
 
 Freitext: wie sich die Quelle liest und welche Feldregeln für jede Karte
-daraus gelten. Geht unverändert in jeden Auftrag.
+daraus gelten. Geht unverändert in jeden Auftrag. Antworten aus der Freigabe,
+die für jede Karte gelten, stehen zuletzt unter
+`### Was die Quelle nicht sagt`.
 
 ## Übersicht
 
@@ -285,9 +287,9 @@ daraus gelten. Geht unverändert in jeden Auftrag.
   Aus `uebung` und `folge` wird eine Karte mit diesem `typ`.
 - **Status** ist eins von `offen`, `bereit`, `rückfrage`, `importiert`,
   `ergänzt`, `übersprungen`, `zurückgestellt`. Die ersten drei warten noch auf
-  ihre Karte. `rückfrage` heißt: Hier muss einzeln gefragt werden. Entweder
-  hat der Entwurf eine Rückfrage ohne Vermutung, oder sein Ablauf kommt laut
-  Auftrag aus dem Bild.
+  ihre Karte. `rückfrage` heißt: Hier muss der Trainer eine Frage
+  beantworten, bevor er freigibt. Entweder hat der Entwurf eine Rückfrage
+  ohne Vermutung, oder sein Ablauf kommt laut Auftrag aus dem Bild.
 
 `textmarke` und `platzhalter` sind für die Regel „wenig Text“. Stehen nach der
 Textmarke, ohne den Platzhalter, weniger als 150 Zeichen, sagt der Auftrag

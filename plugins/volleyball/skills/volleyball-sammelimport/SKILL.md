@@ -123,6 +123,12 @@ ohne: [Vorlagen, notizen.md]
 - **schaubild:** …
 - **autor:** …
 
+### Was die Quelle nicht sagt
+
+Festgelegt bei der Freigabe am TT.MM.JJJJ.
+
+- Nennt die Quelle nicht, …, steht ….
+
 ## Übersicht
 ```
 
@@ -130,7 +136,28 @@ ohne: [Vorlagen, notizen.md]
 - `ohne` steht in eckigen Klammern auf einer Zeile.
 - Unter `## Absprachen` stehen Zwischenüberschriften mit `###`. Eine mit `##`
   beendete den Abschnitt, und was danach kommt, fehlte in jedem Auftrag.
+- `### Was die Quelle nicht sagt` ist optional und fehlt beim Anlegen meist.
+  Er wächst bei der Freigabe, siehe „Die Freigabe“.
 - `in_arbeit` trägt nur das Skript ein.
+
+## Gebündelt fragen
+
+Im Zerlegungsplan wie bei der Freigabe kommen Rückfragen zu Dutzenden, und
+viele fragen dasselbe. Sie kommen deshalb gebündelt, in einem Zug:
+
+1. **Gruppen:** Gleiche Rückfragen bilden eine Gruppe mit einem Namen. Jede
+   Gruppe nennt die Kandidaten, die dazugehören, und hat genau eine
+   empfohlene Antwort.
+2. **Der Rest:** Was in keine Gruppe passt, steht danach als Liste mit
+   Buchstaben, je Frage der Kandidat und ein Vorschlag.
+3. **Annehmen:** Eine Frage mit zwei Antworten: Alles gilt so, oder es gibt
+   Ausnahmen.
+4. **Ausnahmen:** Gibt es welche, kommt eine eigene Frage nach ihnen. Der
+   Trainer schreibt sie frei hinein, etwa „c anders: …, 14 gehört nicht zu
+   den Kopien“. Freitext zu einer gewählten Option geht verloren.
+
+Fertig, wenn jede Rückfrage eine Antwort hat: aus ihrer Gruppe, als
+angenommener Vorschlag oder als Ausnahme.
 
 ## Der Zerlegungsplan
 
@@ -148,9 +175,26 @@ ohne: [Vorlagen, notizen.md]
      weiter, der Agent liest die PDFs dann selbst.
 2. Den Agenten `volleyball:volleyball-zerlegungsplan` starten. Der Aufruf ist
    der absolute Pfad der Planeingabe. Von der Antwort zählt die erste Zeile.
-3. `kartenentwuerfe/<ordner>/zerlegungsplan.md` lesen und vorlegen: zuerst
-   jede Rückfrage aus der Spalte Notiz mit Kandidat, Dateien und „Was es ist“,
-   dann den ganzen Plan als Tabelle. Der Trainer korrigiert:
+3. `kartenentwuerfe/<ordner>/zerlegungsplan.md` lesen und vorlegen.
+
+   Einen Verdacht auf ein Duplikat erst mechanisch prüfen, wo das geht:
+   - **Text:** Steht unter beiden PDFs in der Planeingabe derselbe Text? Ist
+     er dort gekürzt, sind es nur die ersten Zeilen. Das gehört dann zum
+     Befund.
+   - **Quellgrafik:** Sind die Quellgrafiken pixelgleich, untereinander oder
+     mit der einer Karte unter `schaubilder/`? Ausgeschnitten wird wie bei
+     `vorbereiten`, mit `schneide_quellgrafik_aus(pdf, ziel)` aus
+     `${CLAUDE_PLUGIN_ROOT}/scripts/sammelimport.py`, ins Temp-Verzeichnis
+     der Sitzung. Ausschneiden und Vergleichen brauchen Pillow.
+
+   Vorgelegt werden zuerst die Rückfragen aus der Spalte Notiz, gebündelt wie
+   unter „Gebündelt fragen“. Gruppen sind etwa „Kopie desselben Blatts“,
+   „Duplikat einer Karte“, „Variante“ und „Folge oder Übung“. Zu jedem
+   Kandidaten stehen die Dateien und „Was es ist“. Eine Gruppe mit Duplikaten
+   sagt, was geprüft ist und was dabei herauskam. Bestätigt die Prüfung einen
+   Verdacht nicht, steht der Kandidat beim Rest. Lässt er sich nicht prüfen,
+   etwa bei Fotos, bleibt er in seiner Gruppe, mit „nicht geprüft“. Danach
+   kommt der ganze Plan als Tabelle. Der Trainer korrigiert:
    - **Zusammenlegen:** eine Zeile mit allen Dateien, die kleinere Nummer
      bleibt. Die Lücke bleibt auch.
    - **Trennen:** Die neue Zeile bekommt die Nummer über der höchsten im Plan.
@@ -258,11 +302,28 @@ ohne: [Vorlagen, notizen.md]
 ## Die Freigabe
 
 Über alle Kandidaten mit `bereit` oder `rückfrage` aus der letzten Ausgabe von
-`pruefen --json`. Erst die Einzelfragen, dann die Tabelle.
+`pruefen --json`. Erst die Rückfragen, gebündelt und einzeln, dann die
+Tabelle.
 
-**Einzeln** kommt jede Rückfrage aus `rueckfragen.ohne_vermutung`, und bei
-`ablauf_aus_dem_bild: true` die Frage, ob der Ablauf stimmt. Dazu je
-Kandidat:
+**Gebündelt** kommt jede Rückfrage aus `rueckfragen.ohne_vermutung`, die sich
+ohne Bild beantworten lässt, wie unter „Gebündelt fragen“. Gruppen sind etwa
+„wann gewechselt wird“, „wohin die Bälle zurückkommen“ und „fehlende
+Kennung“. Zu jedem Kandidaten steht „Was es ist“ dabei.
+
+**In die Absprachen:** Gilt die Antwort auf eine Gruppe für jede Karte aus
+diesem Quellenordner, bietet der Skill an, sie in die Absprachen der
+`sammelimport.md` zu schreiben. Dann steht sie in jedem neuen Auftrag, und
+der Agent nimmt sie als belegt. Nach dem Ja kommt sie unter
+`### Was die Quelle nicht sagt`, in der Form aus „Die Absprachen anlegen“:
+ein Absatz „Festgelegt bei der Freigabe am …“ mit dem Datum von heute, die
+Antworten als Punkte darunter. Was schon dort steht, bleibt, der neue Absatz
+kommt ans Ende. Gibt es den Abschnitt noch nicht, kommt er direkt vor
+`## Übersicht`.
+
+**Einzeln** kommt, wofür der Trainer das Bild braucht: bei
+`ablauf_aus_dem_bild: true` die Frage, ob der Ablauf stimmt, und jede
+Rückfrage, die sich nur mit der Quellgrafik oder dem Foto beantworten lässt.
+Dazu je Kandidat:
 
 - „Was es ist“ und die Dateien.
 - Jede Quellgrafik aus `quellgrafiken`, alle, in ihrer Reihenfolge. Gezeigt
@@ -275,7 +336,9 @@ Kandidat:
   ihn aus dem Bild gelesen habe?“. Sie kommt bei Fotos, wo der Agent selbst
   entschieden hat, dass der Ablauf aus dem Bild kommt.
 
-Eine Frage nach der anderen. Fertig, wenn jede eine Antwort hat.
+Die Einzelfragen kommen eine nach der anderen. Fertig sind die Rückfragen,
+wenn jede eine Antwort hat und jedes Angebot für die Absprachen ein Ja oder
+Nein.
 
 **Die Tabelle** hat eine Zeile je Kandidat:
 

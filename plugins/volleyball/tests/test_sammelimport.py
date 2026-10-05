@@ -178,6 +178,31 @@ class VorbereitenTest(unittest.TestCase):
             (self.ordner.pfad / "kartenentwuerfe" / ORDNER / "8.md").resolve().as_posix(),
             zeile_mit(auftrag, "Zielpfad"))
 
+    def test_was_die_quelle_nicht_sagt_kommt_in_jeden_auftrag(self) -> None:
+        # Der Skill schreibt Antworten aus der Freigabe, die fuer den ganzen
+        # Quellenordner gelten, als letzten Teil der Absprachen auf. Nur weil
+        # sie in jedem Auftrag stehen, kennt der Agent sie beim naechsten Entwurf.
+        # Endete der Abschnitt an einer `###`, fehlten sie still.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"]},
+            {"kandidat": 2, "dateien": ["b.pdf"]},
+        ], absprachen=(
+            "### So liest sich die Quelle\n\n- Eine Übung je PDF.\n\n"
+            "### Felder\n\n- **autor:** test\n\n"
+            "### Was die Quelle nicht sagt\n\n"
+            "Festgelegt bei der Freigabe am 04.10.2026.\n\n"
+            "- Nennt die Quelle nicht, wann die Rollen wechseln, steht im Ablauf\n"
+            "  „Gewechselt wird nach Ansage“.\n"))
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout)
+        for nummer in (1, 2):
+            with self.subTest(nummer):
+                auftrag = auftrag_von(self.ordner, nummer)
+                self.assertIn("### Was die Quelle nicht sagt", auftrag)
+                self.assertIn("„Gewechselt wird nach Ansage“", auftrag)
+
     def test_eine_doppelte_nummer_bricht_ab_und_schreibt_nichts(self) -> None:
         # Die Nummer benennt Entwurf und Auftrag. Zwei Zeilen mit derselben
         # Nummer teilten sich eine Datei, und die zweite ueberschriebe still

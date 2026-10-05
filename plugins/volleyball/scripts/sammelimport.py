@@ -1571,11 +1571,12 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
 def setze_befund(k: Kandidat, befund: Befund) -> None:
     """Der Status eines Kandidaten, wie ihn sein Entwurf auf der Platte ergibt.
 
-    `rückfrage` heißt: Hier muss einzeln gefragt werden. Entweder hat der
-    Entwurf für mindestens eine Rückfrage keine Vermutung, oder der Ablauf
-    kommt laut Auftrag aus dem Bild. Dann ist er als Ganzes eine Vermutung,
-    und der Trainer prüft ihn mit der Quellgrafik vor sich. Eine Rückfrage mit
-    Vermutung bestätigt er sonst in der Tabelle wie einen Vorschlag.
+    `rückfrage` heißt: Hier muss der Trainer eine Frage beantworten, bevor er
+    freigibt. Entweder hat der Entwurf für mindestens eine Rückfrage keine
+    Vermutung, oder der Ablauf kommt laut Auftrag aus dem Bild. Dann ist er
+    als Ganzes eine Vermutung, und der Trainer prüft ihn mit der Quellgrafik
+    vor sich. Eine Rückfrage mit Vermutung bestätigt er sonst in der Tabelle
+    wie einen Vorschlag.
     """
     if befund.fehler:
         k.setze("offen", befund.fehler)

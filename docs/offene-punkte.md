@@ -37,6 +37,18 @@ zur Leseansicht auf, ist aber Arbeit an der Bibliothek.
 
 Ziel: Welle 2.
 
+### Der Kartenentwurf sagt bei `rückfrage` noch „einzeln gefragt“
+
+Aus #77. Seit 3.0.2 kommen Rückfragen ohne Vermutung bei der Freigabe
+gebündelt, einzeln nur noch die, für die der Trainer das Bild braucht.
+`DATENMODELL.md` und `sammelimport.py` sagen jetzt, der Trainer muss eine Frage
+beantworten, bevor er freigibt. `agents/volleyball-kartenentwurf.md` sagt bei
+der Rückmeldung `rückfrage` weiter „Der Trainer muss einzeln gefragt werden“.
+Am Status, den der Agent meldet, ändert das nichts. Die Agenten waren in #77
+ausgenommen.
+
+Ziel: Welle zur Wissenskarte, mit #63, das den Kartenentwurf ohnehin anfasst.
+
 ## Bewusst nicht gebaut
 
 ### Das PDF sieht aus wie die Leseansicht
