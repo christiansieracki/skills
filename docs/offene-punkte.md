@@ -21,10 +21,11 @@ ist, und die Liste „Bewusst nicht gebaut". Was nach dem Ende einer Welle mit
 ## Offen
 
 Bei der Durchsicht am 02.10.2026 vor der Abnahme von Welle 1d hat jeder Punkt
-ein Ticket bekommen, siehe den Nachtrag in #29: #40 als Slice 1d/9, #38, #39
-und #41 bis #48 vor der Abnahme, dazu Ergänzungen in #35, #36 und #37. Die
-Punkte hier kamen danach aus den Interviews zur Welle zur Leseansicht und zur
-Welle zur Wissenskarte und aus der Abnahme von 1d (#37).
+ein Ticket bekommen, siehe den Nachtrag in #29. Bei der Durchsicht am
+05.10.2026 nach der Abnahme (#37) ebenso: #75 und #76 kommen in die Welle zur
+Leseansicht, #77 davor. Der Ausschnitt für PDFs, die nicht wie PlayDrill
+aufgebaut sind, bleibt in der Welle zur Wissenskarte (#62 bis #65), nach der
+Welle zur Leseansicht.
 
 ### DVV Plan 1 als Übungsfolge mit ID
 
@@ -35,62 +36,6 @@ zeigen, statt die Übungen in jeden Plan zu kopieren. Fiel im Interview zur Well
 zur Leseansicht auf, ist aber Arbeit an der Bibliothek.
 
 Ziel: Welle 2.
-
-### Quellgrafik aus PDFs, die nicht wie PlayDrill aufgebaut sind
-
-Der Sammelimport nimmt aus einem PDF das größte eingebettete Bild. Das passt
-nur zu PlayDrill. In den PDFs des Jugendtrainerlehrgangs liegen Bildreihen als
-Einzelbilder, auf jeder Seite steht dieselbe Kopfleiste, und Gezeichnetes ist
-gar kein Bild (ADR-0013). Lösung ist der Ausschnitt aus der gezeichneten
-Seite mit `pypdfium2`, für Übungskarten wie für Wissenskarten. Fiel im
-Interview zur Welle zur Wissenskarte am 04.10.2026 auf. Bis er gebaut ist,
-läuft kein Sammelimport über PDFs, die nicht wie PlayDrill aufgebaut sind.
-
-Ziel: Welle zur Wissenskarte, als erster Schnitt. Nach der Abnahme von 1d
-(#37) prüfen, ob er vorher kommt, etwa vor die Welle zur Leseansicht.
-
-### Eine schreibgeschützte Leseansicht bricht `leseansicht.py` ab
-
-Bei der Abnahme von 1d war `trainings/h1-h2/2026-09-17.html` gesperrt. In den
-Dateirechten stand ein Verweigern-Eintrag, wie ihn der Nextcloud-Client für
-Dateien ohne Schreibrecht auf dem Server setzt. `leseansicht.py` brach mit
-einem Traceback ab (`PermissionError`). Abhilfe wäre eine Meldung, die die
-Datei nennt und sagt, dass sie gesperrt ist. Am 05.10.2026 hat der Trainer die
-Datei in Nextcloud entsperrt, danach ist sie neu gebaut worden.
-
-Ziel: Welle zur Leseansicht, die `leseansicht.py` ohnehin neu baut.
-
-### Wiederkehrende Antworten bei der Freigabe in die Absprachen
-
-Im ersten Durchgang über PlayDrill hatten 26 von 30 Entwürfen zusammen 45
-Rückfragen ohne Vermutung. Zwölf fragten, wann die Rollen wechseln, vier, wohin
-die Bälle zurückkommen, neun nach einer Kennung für den Angriff. Der Trainer hat
-jede Gruppe einmal beantwortet: „Gewechselt wird nach Ansage", der Rückweg der
-Bälle kommt nicht auf die Karte, die Kennung heißt `angriff`. Der Skill fragt
-laut Anleitung eine Rückfrage nach der anderen. Abhilfe wäre, gleiche
-Rückfragen gebündelt zu stellen und anzubieten, eine Antwort, die für den
-ganzen Quellenordner gilt, in die Absprachen der `sammelimport.md` zu
-schreiben. Dann fragt der nächste Durchgang nicht mehr danach.
-
-Am 04.10.2026 kamen die beiden Antworten von Hand in die Absprachen von
-`playdrill` und `vm_09_2026`, unter „Was die Quelle nicht sagt“. Die beiden
-Entwürfe über `vm_09_2026` fragten danach nicht mehr, einer schrieb „Gewechselt
-wird nach Ansage“ selbst in den Ablauf (ADR-0009, Nachtrag nach der Abnahme).
-
-Ziel: Welle zur Wissenskarte, Schnitt 5, der die Freigabe im Skill ohnehin
-anfasst.
-
-### Ein neues Schaubild erreicht die Leseansicht erst nach einem Neubau
-
-Die Leseansicht bettet das Schaubild einer Karte ein. Bekommt die Karte ein
-neues Bild, zeigt jede Leseansicht, die schon gebaut ist, weiter das alte. Bei
-der Abnahme von 1d bekam `ue-000015` ein SVG statt der PNG aus Ricos PDF, und
-`trainings/h1-h2/2026-10-01.html` trug noch die PNG, bis sie von Hand neu
-gebaut wurde. Weder der Skill `volleyball-schaubild` noch der Linter sagen
-das. Abhilfe wäre, dass der Skill nach der Freigabe die Pläne nennt, die die
-Karte benutzen, und anbietet, ihre Leseansichten neu zu bauen.
-
-Ziel: Welle zur Leseansicht, die `leseansicht.py` ohnehin neu baut.
 
 ## Bewusst nicht gebaut
 
@@ -313,19 +258,29 @@ Plan auf.
 ## Was als Nächstes ansteht
 
 Die Reihenfolge stammt aus #10 und ist dort begründet. Der Sammelimport kam am
-30.09.2026 davor und ist Welle 1d (#29). Vor ihrer Abnahme (#37) kommen #38 bis
-#48, die Reihenfolge steht im Nachtrag von #29. Die PlayDrill-Bibliothek
-braucht die Wissenskarte nicht, und die Wissenskarte kann danach den
-Sammelimport um ihre Kartensorte erweitern. Zwischen 1d und die Wissenskarte
-kommt die Welle zur Leseansicht, beschlossen am 02.10.2026. Die Welle zur
-Wissenskarte ist am 04.10.2026 im Interview festgelegt worden.
+30.09.2026 davor und ist Welle 1d (#29), abgenommen und geschlossen am
+05.10.2026. Die PlayDrill-Bibliothek braucht die Wissenskarte nicht, und die
+Wissenskarte kann danach den Sammelimport um ihre Kartensorte erweitern.
+Zwischen 1d und die Wissenskarte kommt die Welle zur Leseansicht, beschlossen
+am 02.10.2026. Die Welle zur Wissenskarte ist am 04.10.2026 im Interview
+festgelegt worden.
+
+Reihenfolge seit der Durchsicht am 05.10.2026:
+
+1. #77, gleiche Rückfragen gebündelt, als 3.0.2. Davon hat jeder weitere
+   Durchgang über PlayDrill etwas.
+2. Die Welle zur Leseansicht (#50): #51 bis #59, #75, #76, Abnahme #60.
+3. Die Welle zur Wissenskarte (#61): zuerst der Ausschnitt mit #62 bis #65,
+   dann #66 bis #74.
 
 ### Welle zur Leseansicht
 
 Die Leseansicht bekommt die freigegebene Gestaltung vom Branch
 `overhaul/html-generation-display`: den Ablauf zum Aufklappen, Hell, Dunkel und
 System. Beschlossen im Interview am 02.10.2026. Kommt nach der Abnahme von 1d
-(#37) und setzt auf #39 auf, weil beide `leseansicht.py` ändern.
+(#37) und setzt auf #39 auf, weil beide `leseansicht.py` ändern. Aus der
+Abnahme von 1d kamen #75 (eine gesperrte Leseansicht wird gemeldet) und #76
+(nach einem neuen Schaubild die Leseansichten neu bauen) dazu.
 
 - **Technik** steht in ADR-0012. `leseansicht.py` baut die Gestaltung nach,
   eine einzige Datei, ohne JavaScript ganz lesbar. Umschalter Hell, Dunkel,
@@ -383,9 +338,9 @@ System. Beschlossen im Interview am 02.10.2026. Kommt nach der Abnahme von 1d
 Bisher „der zweite Ast von Welle 1b". Die Wissenskarte als eigene Kartensorte
 (ADR-0002 mit Nachtrag), dazu der Ausschnitt als Quellgrafik für beide Sorten
 (ADR-0013). Beschlossen im Interview am 04.10.2026. Kommt nach der Welle zur
-Leseansicht. Ob der erste Schnitt vorher kommt, wird nach der Abnahme von 1d
-geprüft, siehe „Quellgrafik aus PDFs, die nicht wie PlayDrill aufgebaut sind".
-Tickets mit WK/ vorn.
+Leseansicht, auch der Ausschnitt (#62 bis #65), entschieden am 05.10.2026 nach
+der Abnahme von 1d. Bis dahin läuft kein Sammelimport über PDFs, die nicht wie
+PlayDrill aufgebaut sind. Tickets mit WK/ vorn.
 
 - **Begriffe** stehen im Glossar: Wissenskarte, Ausschnitt, „Karte oder
   Übungskarte?", „Wissenskarte oder Prinzip?". „Karte" meint beide Sorten,
