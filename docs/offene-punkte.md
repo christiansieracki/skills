@@ -55,9 +55,8 @@ Bei der Abnahme von 1d war `trainings/h1-h2/2026-09-17.html` gesperrt. In den
 Dateirechten stand ein Verweigern-Eintrag, wie ihn der Nextcloud-Client für
 Dateien ohne Schreibrecht auf dem Server setzt. `leseansicht.py` brach mit
 einem Traceback ab (`PermissionError`). Abhilfe wäre eine Meldung, die die
-Datei nennt und sagt, dass sie gesperrt ist. Die Datei trägt deshalb noch
-vierstellige IDs. Neu gebaut wird sie, sobald der Trainer sie in Nextcloud
-entsperrt hat.
+Datei nennt und sagt, dass sie gesperrt ist. Am 05.10.2026 hat der Trainer die
+Datei in Nextcloud entsperrt, danach ist sie neu gebaut worden.
 
 Ziel: Welle zur Leseansicht, die `leseansicht.py` ohnehin neu baut.
 
