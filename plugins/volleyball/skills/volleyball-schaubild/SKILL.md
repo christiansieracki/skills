@@ -173,6 +173,41 @@ Vier Schritte, in dieser Reihenfolge:
 Gehört das Bild zu einem Trainingsabend und zu keiner Übung, heißt es nach
 Datum und Thema, etwa `2026-09-15-annahme-zielzone`, und Schritt 3 entfällt.
 
+## Die Leseansichten neu bauen
+
+Die Leseansicht eines Trainingsplans trägt die Schaubilder seiner Karten in
+sich. Eine schon gebaute zeigt nach der Freigabe weiter das alte Bild oder
+keins, bis sie neu gebaut wird.
+
+Jede Karte, auf der Schritt 3 `schaubild:` geändert hat, merkst du dir: ein
+neues Bild, ein ersetztes, eins, das zu einer Liste dazukommt. Ein Bild für
+einen Trainingsabend ohne Karte zählt nicht.
+
+Kommt in dieser Sitzung kein Bild mehr, einmal für alle gemerkten IDs
+zusammen:
+
+```
+<python> ${CLAUDE_PLUGIN_ROOT}/scripts/suche.py --plaene-mit-leseansicht <id> <id> …
+```
+
+Jede Zeile ist ein Trainingsplan, der eine der Karten nennt und neben dem
+seine Leseansicht liegt, jeder einmal, relativ zur Wurzel. Welche Pläne eine
+Karte nennen, entscheidet dieselbe Regel wie der Einsatz im Index. Die Liste
+kommt deshalb allein aus diesem Aufruf.
+
+- Ist die Ausgabe leer, fällt der Schritt weg, ohne ein Wort dazu.
+- Sonst die Pläne nennen und anbieten, ihre Leseansichten neu zu bauen.
+  Gebaut wird nach dem Ja des Trainers, je Plan ein Aufruf:
+
+  ```
+  <python> ${CLAUDE_PLUGIN_ROOT}/scripts/leseansicht.py <plan>
+  ```
+
+  Jede gebaute Datei nennen, sie steht in der Zeile `Leseansicht:`.
+- Endet ein Aufruf nicht mit 0, etwa weil die Datei gerade offen oder gesperrt
+  ist, die Meldung von `leseansicht.py` an den Trainer weitergeben und mit den
+  übrigen Plänen weitermachen.
+
 ## Eine Karte, die schon ein Bild hat
 
 Liegt neben dem Bild eine `<basisname>.szene.yml`, ist sie der Anfang des
@@ -201,11 +236,14 @@ einer Freigabe an. Nach jedem Bild sagen, wie viele der gewählten Karten noch
 offen sind.
 
 Fünfzehn Bilder sind eine Sitzung für sich, und die kann eng werden. Dann die
-IDs der offenen Karten nennen und Schluss machen. Die nächste Sitzung findet
-sie über dieselbe Suche wieder, weil auf ihnen noch kein `schaubild:` steht.
+IDs der offenen Karten nennen und Schluss machen, zusammen mit dem Angebot zu
+den Leseansichten der Karten, die bis dahin ein Bild bekommen haben. Die
+nächste Sitzung findet die offenen über dieselbe Suche wieder, weil auf ihnen
+noch kein `schaubild:` steht.
 
 ## Was der Trainer am Ende hört
 
 Welche Bilder entstanden sind und unter welchen Dateinamen, auf welchen Karten
 `schaubild:` jetzt steht, und was du aus dem Ablauf gedeutet hast, wo er nicht
-eindeutig war. Dazu die Karten, die offen geblieben sind.
+eindeutig war. Dazu die Karten, die offen geblieben sind, die neu gebauten
+Leseansichten und jede, die sich nicht schreiben ließ.

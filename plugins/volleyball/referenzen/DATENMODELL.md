@@ -568,7 +568,7 @@ Die übrigen Skripte brauchen weder Pillow noch `pdftotext` noch einen Browser.
 | Skript | Wofür |
 |---|---|
 | `index.py` | Index neu bauen, Bibliothek prüfen, mit `--md` die Lesebrille schreiben |
-| `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek. Mit `--naechste-id` die ID für die nächste Karte |
+| `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek. Mit `--naechste-id` die ID für die nächste Karte, mit `--plaene-mit-leseansicht` die Trainingspläne, die eine Karte nennen und schon eine Leseansicht haben |
 | `leseansicht.py` | aus einem Trainingsplan die HTML-Fassung fürs Handy erzeugen, samt den Schaubildern der verwendeten Übungen |
 | `export_pdf.py` | PDF zum Ausdrucken |
 | `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen, mit `--png` dazu eine Ansicht als PNG im Temp-Verzeichnis |

@@ -478,6 +478,111 @@ class NaechsteIdTest(unittest.TestCase):
         self.assertIn(socket.gethostname(), meldung)
 
 
+class PlaeneMitLeseansichtTest(unittest.TestCase):
+    """`suche.py --plaene-mit-leseansicht`: welche Leseansichten ein neues Bild veraltet.
+
+    Die Leseansicht bettet die Schaubilder einer Karte ein. Bekommt die Karte
+    ein neues Bild, zeigt jede schon gebaute Leseansicht weiter das alte
+    (#76). Der Skill volleyball-schaubild fragt hier nach den Plaenen, deren
+    Leseansicht er neu bauen kann: Sie nennen die Karte und haben neben der
+    `.md` schon eine `.html`.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def plan(self, name: str, *ids: str, leseansicht: bool = True):
+        """Legt einen Trainingsplan an, der diese IDs nennt, und daneben seine Leseansicht.
+
+        Was in der `.html` steht, zaehlt nicht, nur dass es sie gibt.
+        """
+        datei = self.ordner.lege_trainingsplan_an(name, *ids)
+        if leseansicht:
+            datei.with_suffix(".html").write_text("<!DOCTYPE html>", encoding="utf-8")
+        return datei
+
+    def plaene(self, *ids: str) -> list[str]:
+        """Die genannten Plaene, je Zeile einer, so wie der Skill sie liest."""
+        fertig = self.ordner.starte("suche.py", "--plaene-mit-leseansicht", *ids)
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        return fertig.stdout.splitlines()
+
+    def test_ein_plan_mit_leseansicht_wird_genannt(self) -> None:
+        self.plan("gruppe/2026-09-15.md", "ue-000001", "ue-000002")
+
+        self.assertEqual(self.plaene("ue-000001"), ["trainings/gruppe/2026-09-15.md"])
+
+    def test_ein_plan_ohne_leseansicht_wird_nicht_genannt(self) -> None:
+        # Gebaut wird nur, was schon gebaut war. Ob ein Plan eine Leseansicht
+        # bekommt, entscheidet der Trainer beim Planen, nicht ein neues Bild.
+        self.plan("gruppe/2026-09-15.md", "ue-000001")
+        self.plan("gruppe/2026-09-22.md", "ue-000001", leseansicht=False)
+
+        self.assertEqual(self.plaene("ue-000001"), ["trainings/gruppe/2026-09-15.md"])
+
+    def test_ohne_betroffenen_plan_bleibt_die_ausgabe_leer(self) -> None:
+        # Dann faellt der Schritt im Skill weg. Kein Plan ist kein Fehler.
+        self.plan("gruppe/2026-09-15.md", "ue-000002")
+        self.plan("gruppe/2026-09-22.md", "ue-000001", leseansicht=False)
+
+        self.assertEqual(self.plaene("ue-000001"), [])
+
+    def test_mehrere_karten_nennen_jeden_plan_einmal(self) -> None:
+        # Zeichnet der Trainer mehrere Karten in einer Sitzung, kommt das
+        # Angebot einmal am Ende, fuer alle Plaene zusammen. Ein Plan, der zwei
+        # der Karten nennt, wird dabei nur einmal gebaut.
+        self.plan("gruppe/2026-09-15.md", "ue-000001", "ue-000002")
+        self.plan("gruppe/2026-09-22.md", "ue-000002")
+        self.plan("andere/2026-09-16.md", "ue-000003")
+        self.plan("andere/2026-09-23.md", "ue-000004")
+
+        self.assertEqual(self.plaene("ue-000001", "ue-000002", "ue-000003"),
+                         ["trainings/andere/2026-09-16.md",
+                          "trainings/gruppe/2026-09-15.md",
+                          "trainings/gruppe/2026-09-22.md"])
+
+    def test_es_gilt_die_regel_der_einsatzhistorie(self) -> None:
+        # Ob ein Plan die Karte nennt, entscheidet dieselbe Regel wie der
+        # Einsatz im Index: Die ID steht im Text eines Plans unter trainings/.
+        # Was dort als Einsatz zaehlt, wird genannt, was nicht zaehlt, nicht.
+        plan = self.plan("gruppe/2026-09-15.md", "ue-000001")
+        # Die ID im Text und nicht in der Ablauftabelle zaehlt auch.
+        im_text = self.ordner.pfad / "trainings" / "gruppe" / "2026-09-22.md"
+        im_text.write_text("---\ndatum: 2026-09-22\n---\n\n# Training\n\n"
+                           "## Nachbereitung\n\nNaechstes Mal ue-000001 laenger.\n",
+                           encoding="utf-8")
+        im_text.with_suffix(".html").write_text("<!DOCTYPE html>", encoding="utf-8")
+        # Eine Konfliktkopie, die Vorlage und ein Plan neben trainings/ zaehlen nicht.
+        kopie = self.ordner.lege_konfliktkopie_an(plan)
+        kopie.with_suffix(".html").write_text("<!DOCTYPE html>", encoding="utf-8")
+        self.plan("gruppe/_vorlage.md", "ue-000001")
+        daneben = self.ordner.pfad / "_test-beach" / "2026-09-16.md"
+        daneben.parent.mkdir()
+        daneben.write_bytes(plan.read_bytes())
+        daneben.with_suffix(".html").write_text("<!DOCTYPE html>", encoding="utf-8")
+
+        genannt = self.plaene("ue-000001")
+        fertig = self.ordner.starte("suche.py", "--json", "--id", "ue-000001")
+        (karte,) = json.loads(fertig.stdout)
+
+        self.assertEqual(genannt, ["trainings/gruppe/2026-09-15.md",
+                                   "trainings/gruppe/2026-09-22.md"])
+        self.assertEqual(karte["anzahl_einsaetze"], len(genannt))
+
+    def test_eine_id_ohne_karte_wird_gemeldet(self) -> None:
+        # Sonst sagte eine vertippte ID still "kein Plan", und der Skill liesse
+        # den Schritt weg, obwohl eine Leseansicht das alte Bild zeigt.
+        self.plan("gruppe/2026-09-15.md", "ue-000001")
+
+        fertig = self.ordner.starte("suche.py", "--plaene-mit-leseansicht",
+                                    "ue-000001", "ue-000099")
+
+        self.assertNotEqual(fertig.returncode, 0)
+        self.assertEqual(fertig.stdout, "")
+        self.assertIn("ue-000099", fertig.stderr)
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,6 +9,7 @@
     <python> suche.py --nie-benutzt
     <python> suche.py --seit 180          # seit über 180 Tagen nicht eingesetzt
     <python> suche.py --naechste-id       # die ID für die nächste Karte
+    <python> suche.py --plaene-mit-leseansicht ue-000042 ue-000043
 
 Der Index wird vor jeder Suche neu gebaut, die Treffer sind also immer aktuell.
 `--spieler 14` heißt "heute sind 14 da", nicht "nimm genau 14". Eine Übung
@@ -37,6 +38,14 @@ sie anpasst.
 Rechner als nächste vergibt, und sonst nichts. Gehört der Rechner zu keinem
 Trainer unter `trainer:` in der Wurzeldatei, steht stattdessen auf stderr,
 warum, und der Aufruf endet mit 1 (ADR-0011).
+
+`--plaene-mit-leseansicht` sucht auch keine Übung. Es nennt je Zeile einen
+Trainingsplan, der eine der Karten nennt und neben dem schon seine Leseansicht
+liegt, die `.html` zur `.md`. Deren Leseansicht zeigt noch das alte Bild, wenn
+eine der Karten ein neues bekommen hat (#76). Ob ein Plan eine Karte nennt,
+entscheidet dieselbe Regel wie der Einsatz im Index. Gibt es keinen solchen
+Plan, bleibt die Ausgabe leer. Trägt keine Karte eine der IDs, steht das auf
+stderr, und der Aufruf endet mit 1.
 """
 
 from __future__ import annotations
@@ -177,6 +186,15 @@ def filtere(eintraege, a):
     return treffer
 
 
+def plaene_mit_leseansicht(eintraege, ids: list[str], wurzel: Path) -> list[str]:
+    """Die Trainingspläne, die eine dieser Karten nennen und neben denen ihre Leseansicht liegt.
+
+    Jeder Plan einmal, auch wenn er mehrere der Karten nennt.
+    """
+    plaene = {p for e in eintraege if e["id"] in ids for p in e.get("plaene") or []}
+    return sorted(p for p in plaene if (wurzel / p).with_suffix(".html").is_file())
+
+
 def zeige(e, lang: bool, wurzel: Path, anwesend=None, verfuegbar=None):
     warn = " ⚠" if e.get("erwachsenenbelastung") else ""
     art = " (Folge)" if e.get("typ") == "folge" else ""
@@ -284,6 +302,9 @@ def main() -> int:
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--naechste-id", action="store_true",
                     help="nur die ID ausgeben, die der Trainer an diesem Rechner als nächste vergibt")
+    ap.add_argument("--plaene-mit-leseansicht", nargs="+", metavar="ID",
+                    help="nur die Trainingspläne ausgeben, die eine dieser Karten nennen "
+                         "und schon eine Leseansicht haben")
     a = ap.parse_args()
 
     wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
@@ -296,6 +317,15 @@ def main() -> int:
         return 0
 
     daten = hole_index(wurzel)
+    if a.plaene_mit_leseansicht:
+        bekannt = {e["id"] for e in daten["uebungen"]}
+        fehlen = [uid for uid in a.plaene_mit_leseansicht if uid not in bekannt]
+        if fehlen:
+            print(f"Keine Karte in uebungen/ trägt die ID {', '.join(fehlen)}.", file=sys.stderr)
+            return 1
+        for plan in plaene_mit_leseansicht(daten["uebungen"], a.plaene_mit_leseansicht, wurzel):
+            print(plan)
+        return 0
     treffer = filtere(daten["uebungen"], a)
 
     if a.json:

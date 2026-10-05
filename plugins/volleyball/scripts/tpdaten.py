@@ -534,12 +534,17 @@ def baue_index(wurzel: Path) -> dict:
     trainings = lies_trainings(wurzel)
     schwerpunkte, schwerpunkt_warnungen = lies_schwerpunkte(wurzel)
 
-    # Einsatzhistorie aus den Trainingsplaenen, statt sie auf den Karten zu pflegen
+    # Einsatzhistorie aus den Trainingsplaenen, statt sie auf den Karten zu pflegen.
+    # Dieselbe Schleife merkt sich, welche Plaene eine Karte nennen: Welche
+    # Leseansicht ein neues Bild veraltet, entscheidet dieselbe Regel wie der
+    # Einsatz (#76), und eine zweite soll nicht neben ihr entstehen.
     einsaetze: dict[str, list[str]] = {}
+    plaene: dict[str, list[str]] = {}
     for t in trainings:
         datum = str(t.get("datum") or "")
         for uid in t.get("verwendet", []):
             einsaetze.setdefault(uid, []).append(datum)
+            plaene.setdefault(uid, []).append(t["datei"])
 
     bekannt = {k["id"] for k in karten}
     eintraege = []
@@ -549,6 +554,7 @@ def baue_index(wurzel: Path) -> dict:
         e["eingesetzt"] = hist
         e["zuletzt"] = hist[-1] if hist else None
         e["anzahl_einsaetze"] = len(hist)
+        e["plaene"] = sorted(plaene.get(k["id"], []))
         eintraege.append(e)
 
     warnungen = schwerpunkt_warnungen + pruefe(
