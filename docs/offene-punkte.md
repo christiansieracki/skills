@@ -277,12 +277,11 @@ Zwischen 1d und die Wissenskarte kommt die Welle zur Leseansicht, beschlossen
 am 02.10.2026. Die Welle zur Wissenskarte ist am 04.10.2026 im Interview
 festgelegt worden.
 
-Reihenfolge seit der Durchsicht am 05.10.2026:
+Reihenfolge seit der Durchsicht am 05.10.2026. Davor kam #77, gleiche
+Rückfragen gebündelt, erledigt am 05.10.2026 mit 3.0.2.
 
-1. #77, gleiche Rückfragen gebündelt, als 3.0.2. Davon hat jeder weitere
-   Durchgang über PlayDrill etwas.
-2. Die Welle zur Leseansicht (#50): #51 bis #59, #75, #76, Abnahme #60.
-3. Die Welle zur Wissenskarte (#61): zuerst der Ausschnitt mit #62 bis #65,
+1. Die Welle zur Leseansicht (#50): #51 bis #59, #75, #76, Abnahme #60.
+2. Die Welle zur Wissenskarte (#61): zuerst der Ausschnitt mit #62 bis #65,
    dann #66 bis #74.
 
 ### Welle zur Leseansicht
