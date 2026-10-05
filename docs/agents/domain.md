@@ -4,7 +4,7 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-This repo has **no `CONTEXT.md` and no `CONTEXT-MAP.md`**, by decision — see `docs/adr/0003-kein-context-md.md`. Its domain documentation is the plugin's own reference set, which is also what ships to users:
+This repo has **no `GLOSSARY.md` and no `GLOSSARY-MAP.md`** (formerly `CONTEXT.md` / `CONTEXT-MAP.md`), by decision — see `docs/adr/0003-kein-context-md.md`. Its domain documentation is the plugin's own reference set, which is also what ships to users:
 
 - **`plugins/volleyball/referenzen/start/glossary.md`** — the glossary, and the single source of truth for terminology. Defines Übung, Übungsfolge, Übungsquelle, Prinzip, Team, Trainingsgruppe, Trainingsplan, Leseansicht, plus the naming rules (the Block-Regel). `init_struktur.py` copies this file into every new workspace, so a user's live `glossary.md` is this file plus their club's own additions and history.
 - **`plugins/volleyball/referenzen/DATENMODELL.md`** — the binding schema: card frontmatter, controlled values, the ID contract, folder layout. Deviating from it produces cards `suche.py` cannot find.
@@ -13,7 +13,7 @@ This repo has **no `CONTEXT.md` and no `CONTEXT-MAP.md`**, by decision — see `
 
 If a file doesn't exist, **proceed silently**. Don't flag its absence.
 
-**Don't create a `CONTEXT.md`.** A new term belongs in the glossary above. A second glossary is exactly what `DATENMODELL.md` warns against with *"Zweimal pflegen heißt einmal vergessen."*
+**Don't create a `GLOSSARY.md` or `CONTEXT.md`**, even where a skill says to create one lazily. A new term belongs in the glossary above. A second glossary is exactly what `DATENMODELL.md` warns against with *"Zweimal pflegen heißt einmal vergessen."*
 
 ## Use the glossary's vocabulary
 

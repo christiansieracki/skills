@@ -16,3 +16,9 @@ CONTEXT.md. Vereinsspezifische Regeln und die Umsetzungshistorie bleiben in
 der lebenden `glossary.md` des jeweiligen Arbeitsordners; allgemeingültige
 Regeln wandern von dort in die Saat hoch, so wie es mit der Block-Regel
 bereits geschehen ist.
+
+## Nachtrag 05.10.2026
+
+Seit mattpocock-skills 1.3.0 heißt die Datei `GLOSSARY.md` statt
+`CONTEXT.md`. Die Entscheidung gilt für den neuen Namen genauso: Auch ein
+`GLOSSARY.md` im Repo-Wurzelverzeichnis wäre ein zweites Glossar.
