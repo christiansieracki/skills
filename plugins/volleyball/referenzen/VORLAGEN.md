@@ -123,9 +123,11 @@ einem Trainingsdatum bestimmt.
 
 Die gepflegte Fassung liegt als `trainings/<gruppe>/_vorlage.md` im
 Arbeitsordner, damit auch jemand ohne Claude eine Einheit eintragen kann.
-Gerüst:
+`init_struktur.py` kopiert sie aus `referenzen/start/_vorlage.md`. Sie zeigt
+dasselbe Gerüst wie dieses hier und erklärt nur mehr dazu. Wer eins ändert,
+ändert das andere mit.
 
-```markdown
+````markdown
 ---
 datum: JJJJ-MM-TT
 gruppe: <gruppe>
@@ -139,7 +141,7 @@ trainer: <name>
 status: entwurf | geplant | absolviert
 ---
 
-# Training <Datum> — <Kurztitel>
+# Training JJJJ-MM-TT — Kurztitel
 
 ## Schwerpunkte dieser Einheit
 Ein bis zwei, mit Bezug zum Trainingsblock.
@@ -147,8 +149,35 @@ Ein bis zwei, mit Bezug zum Trainingsblock.
 ## Rahmenbedingungen
 
 ## Ablauf
-| Zeit | Teil | Übung | ID | Anpassung heute | Warum hier |
+| Zeit | Programmpunkt | Übung | ID | Anpassung heute | Warum hier |
 |---|---|---|---|---|---|
+| 0–15 | Erwärmung | | | | |
+| 15–45 | Technik | | | | |
+| 45–75 | Spielform | | | | |
+| 75–90 | Abschluss | | | | |
+
+## 45–75 Name der Übung
+Der Ablauf, ausgeschrieben. Was mehrere Programmpunkte brauchen, per Link:
+[Thema](#thema).
+
+### 45–75 Hallenskizze
+```
++-----------+-----------+
+|           |           |
++-----------+-----------+
+```
+
+## Athletik
+
+### 0–15 Athletik
+| Nr | Übung | Worauf es ankommt | Heute |
+|---|---|---|---|
+| 1 | | | |
+
+## Zum Nachschlagen
+
+### Thema
+Was mehrere Programmpunkte brauchen, etwa die Sechser oder die Regeln.
 
 ## Material gesamt
 
@@ -161,11 +190,39 @@ Ein bis zwei, mit Bezug zum Trainingsblock.
 **Belastung und Auffälligkeiten:**
 **Haben sich Anpassungen bewährt?**
 **Konsequenz für die nächste Einheit oder den Trainingsblock:**
-```
+````
 
-Zur Ablauftabelle: **ID** verweist auf die Karte, **Anpassung heute** ist
-alles, was an diesem Abend anders war. Keine Spalte Quelle und keine Spalte
-Material, beides steht auf der Karte.
+Der **Kurztitel** nach dem Gedankenstrich sagt, worum es an dem Abend geht.
+Die Leseansicht zeigt ihn oben als Überschrift.
+
+Zur Ablauftabelle: Jede Zeile ist ein **Programmpunkt**, auch Pause und
+Umbau. **Zeit** ist seine Zeitangabe, von–bis in Minuten ab Beginn. Laufen zwei
+Programmpunkte zur selben Zeit, einer je Hallenteil, kommt der Hallenteil zum
+Namen: „Zuspiel, Hallenteil A". **ID** verweist auf die Karte, **Anpassung
+heute** ist alles, was an diesem Abend anders war. Keine Spalte Quelle und
+keine Spalte Material, beides steht auf der Karte.
+
+Zu den Abschnitten:
+
+- Was zu einem Programmpunkt ausgeschrieben gehört, bekommt einen Abschnitt,
+  dessen Überschrift mit seiner Zeitangabe beginnt:
+  `## 46–93 Drei Sechser mit Zweierserie`. In der Leseansicht steht er im
+  aufgeklappten Programmpunkt.
+- Kein „siehe unten". Die Zeitangabe verbindet Zeile und Abschnitt.
+- Je Programmpunkt mit einem Aufbau eine eigene **Hallenskizze** als
+  `### 46–93 Hallenskizze`, die Zeichnung in einem Codeblock. Bei zwei
+  Programmpunkten zur selben Zeit mit dem Hallenteil:
+  `### 69–89 Hallenteil A: Hallenskizze`.
+- Die **Athletik** als Tabelle `Nr | Übung | Worauf es ankommt | Heute`,
+  `Heute` ist die Dosierung dieses Abends. Gehört Athletik zu mehreren
+  Programmpunkten, bekommt jeder unter `## Athletik` einen eigenen
+  `### <Zeitangabe> Athletik`.
+- **`## Zum Nachschlagen`** ist fest. Jede `###` darunter ist ein Thema, das
+  mehrere Programmpunkte brauchen. Ein Programmpunkt verweist mit einem
+  Markdown-Link auf ihre Überschrift: `[die Sechser](#die-sechser)`.
+- Alles andere steht in der Leseansicht unter Vorbereitung.
+
+Die genauen Regeln stehen in `DATENMODELL.md` unter „Der Trainingsplan".
 
 Die Frage „Haben sich Anpassungen bewährt?" in der Nachbereitung ist der
 Moment, in dem die Bibliothek wächst: was getaugt hat, wandert als Variation

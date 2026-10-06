@@ -110,14 +110,50 @@ heißt das Bild nach Datum und Thema und landet auf keiner Karte.
 
 ## Schreiben
 
-`trainings/<gruppe>/JJJJ-MM-TT.md` nach der Vorlage in
-`${CLAUDE_PLUGIN_ROOT}/referenzen/VORLAGEN.md`. In der Ablauftabelle steht in
-der Spalte **ID** die Kennung der Karte, zum Beispiel `ue-000042`. Darüber
-findet `index.py` später, wann welche Übung gelaufen ist.
+`trainings/<gruppe>/JJJJ-MM-TT.md` nach dem Gerüst in
+`${CLAUDE_PLUGIN_ROOT}/referenzen/VORLAGEN.md`. Die Regeln dazu stehen in
+`DATENMODELL.md` unter „Der Trainingsplan". Daran hängt, was die Leseansicht
+wohin stellt:
+
+- Die Überschrift ist `# Training <Datum> — <Kurztitel>`. Der Kurztitel sagt,
+  worum es an dem Abend geht.
+- Die Ablauftabelle hat die Spalten
+  `Zeit | Programmpunkt | Übung | ID | Anpassung heute | Warum hier`. In der
+  Spalte **Zeit** steht die Zeitangabe, `46–93`. In der Spalte **ID** steht die
+  Kennung der Karte, zum Beispiel `ue-000042`. Darüber findet `index.py`
+  später, wann welche Übung gelaufen ist. Laufen zwei Programmpunkte zur
+  selben Zeit, kommt der Hallenteil zum Namen: „Zuspiel, Hallenteil A".
+- Was zu einem Programmpunkt ausgeschrieben gehört, kommt in einen Abschnitt,
+  dessen Überschrift mit seiner Zeitangabe beginnt:
+  `## 46–93 Drei Sechser mit Zweierserie`. Kein „siehe unten", die Zeitangabe
+  verbindet Zeile und Abschnitt.
+- Je Programmpunkt mit einem Aufbau eine eigene Hallenskizze als
+  `### 46–93 Hallenskizze`, die Zeichnung in einem Codeblock. Bei zwei
+  Programmpunkten zur selben Zeit mit dem Hallenteil:
+  `### 69–89 Hallenteil A: Hallenskizze`.
+- Was mehrere Programmpunkte brauchen, etwa die Sechser, die Läufer oder die
+  Regeln, steht einmal unter `## Zum Nachschlagen`, je Thema ein `###`. Ein
+  Programmpunkt verweist darauf mit einem Markdown-Link auf die Überschrift:
+  `[die Sechser](#die-sechser)`.
+- Athletik als Tabelle `Nr | Übung | Worauf es ankommt | Heute`, mit der
+  Dosierung des Abends in `Heute`. Je Programmpunkt ein
+  `### <Zeitangabe> Athletik` unter `## Athletik`.
+
+Verschiebt sich beim Planen eine Zeit, ziehst du jede Überschrift mit, die mit
+der alten Zeitangabe beginnt, auch die mit Hallenteil. Das gilt für jede Zeit,
+die sich dabei mitverschiebt. Sonst rutscht ein Abschnitt unbemerkt aus seinem
+Programmpunkt unter Vorbereitung.
+
+Einen älteren Plan mit der Spalte „Teil" und ohne Zeitangaben in den
+Überschriften baust du nicht um, solange der Trainer es nicht will. Er gilt
+weiter, die Leseansicht zeigt ihn vollständig, das Ausgeschriebene unter
+Vorbereitung.
 
 Fertig ist der Plan, wenn jede Zeile mit Übung auch eine ID trägt oder im Text
-steht, warum nicht (etwa weil die Karte noch fehlt), und
-`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py` keine unbekannten IDs meldet.
+steht, warum nicht (etwa weil die Karte noch fehlt),
+`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py` keine unbekannten IDs meldet
+und jede Zeitangabe in einer Überschrift zu einer Zeile der Ablauftabelle
+passt.
 
 ## Leseansicht
 
@@ -132,12 +168,53 @@ Die HTML ist fürs Handy in der Halle, das PDF zum Ausdrucken. Beide werden aus
 der Markdown-Datei erzeugt und tragen das Datum ihrer Erzeugung. Änderungen
 gehören in die Markdown-Datei.
 
+In der HTML findet der Trainer:
+
+- Oben den Kurztitel, Wochentag und Datum, den Namen der Gruppe, Teilnehmer,
+  Dauer und die Zahl der Hallenteile.
+- Den **Ablauf zum Aufklappen**: je Programmpunkt eine Zeile mit Zeitangabe,
+  Dauer, Name und Übung. Aufgeklappt stehen darin „Heute", die Abschnitte mit
+  seiner Zeitangabe, das Schaubild der Karte mit Quelle und ID, die Verweise
+  zum Nachschlagen und zugeklappt „Warum hier?". Mehrere Programmpunkte dürfen
+  zugleich offen sein. Pause und Umbau stehen gedämpft.
+- Die Knöpfe **Nachschlagen**, mit einem Reiter je Thema, und
+  **Vorbereitung**, mit allem, was keinem Programmpunkt gehört, auch Material
+  und Nachbereitung. Jeder öffnet eine Ansicht über dem Ablauf. „Zurück" oder
+  ein Tipp daneben schließt sie, die offenen Programmpunkte bleiben offen. Ein
+  Verweis im Programmpunkt öffnet gleich sein Thema.
+- „Skizze vergrößern" unter jeder Hallenskizze. Ein Schaubild vergrößert sich
+  beim Antippen, darin stellt „2× vergrößern" es noch einmal doppelt so groß.
+- Den Umschalter **Hell, Dunkel, System**. Voreingestellt ist System, das
+  folgt der Einstellung des Handys. Eine andere Wahl merkt sich der Browser,
+  wo er darf, sonst gilt sie für diesen Besuch.
+
+Aufs Handy kommt die Datei auf zwei Wegen: per WhatsApp vom Rechner, oder aus
+der Nextcloud, im Browser geöffnet. Auf Android zeigt der Browser alles. Auf dem
+iPhone öffnen WhatsApp und die Dateien-App sie zuerst in einer Vorschau, und ob
+dort JavaScript läuft, ist nicht sicher. Ohne JavaScript bleibt alles lesbar:
+Die Programmpunkte klappen auf, Nachschlagen und Vorbereitung stehen unten auf
+der Seite, die Knöpfe springen dorthin, und die Farben folgen dem Gerät. Es
+fehlen nur die Ansichten, das Vergrößern und der Umschalter, der dann gar
+nicht erst erscheint.
+
 Hat eine Übung im Ablauf ein `schaubild:` auf ihrer Karte, steckt das Bild mit
-in der HTML, bei einer Liste alle Bilder in ihrer Reihenfolge. Eingebettet, damit die Datei allein läuft, wenn man sie sich aufs
-Handy schickt. Das macht sie groß. Bei vielen Schaubildern in einer Einheit
-stattdessen `--bilder verweis` anbieten, dann steht nur ein Pfad nach
-`schaubilder/` drin und die Datei bleibt klein, funktioniert aber nur im
-Ordner.
+in der HTML, bei einer Liste alle Bilder in ihrer Reihenfolge. Eingebettet
+(`--bilder einbetten`, der Standard), damit die Datei auf beiden Wegen allein
+läuft. Das macht sie groß. Bei vielen Schaubildern in einer Einheit stattdessen
+`--bilder verweis` anbieten, dann steht nur ein Pfad nach `schaubilder/` drin
+und die Datei bleibt klein, funktioniert aber nur im Ordner, also nicht auf dem
+Handy. `--bilder aus` lässt die Schaubilder weg.
+
+Steht nach der Zeile `Leseansicht:` noch eine Meldung, etwa
+
+```
+Kein Programmpunkt mit der Zeitangabe 50–60 für den Abschnitt „50–60 Spiel“. Er steht unter Vorbereitung.
+```
+
+dann gib sie dem Trainer weiter. Die Leseansicht ist geschrieben, nur steht der
+Abschnitt unter Vorbereitung statt im Programmpunkt. Meist ist die Zeit in der
+Überschrift vertippt oder hat sich in der Tabelle verschoben. Schlag vor,
+welche der beiden du angleichst, und baue nach seinem Ja neu.
 
 Endet `leseansicht.py` nicht mit 0, etwa weil die HTML gesperrt oder
 schreibgeschützt ist, gib seine Meldung dem Trainer weiter. Gebaut wird erst

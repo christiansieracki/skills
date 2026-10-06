@@ -484,17 +484,141 @@ aufgebaut ist, steht in `referenzen/SCHAUBILDER.md`.
 
 `trainings/<gruppe>/JJJJ-MM-TT.md`, Frontmatter mit `datum`, `gruppe`,
 `leitteam`, `mesozyklus`, `teilnehmer`, `dauer`, `spielflaechen`, `trainer`,
-`status`.
+`status`. Das Gerüst steht in `VORLAGEN.md`. Hier steht, woran `leseansicht.py`
+erkennt, was wohin gehört.
 
-Die Ablauftabelle hat die Spalten Zeit, Teil, Übung, ID, Anpassung, Warum hier.
+### Kopf
 
+Die Überschrift heißt `# Training <Datum> — <Kurztitel>`. Oben in der
+Leseansicht steht der Kurztitel, also was nach dem Gedankenstrich kommt. Fehlt
+der Gedankenstrich, steht dort die ganze Überschrift. Darunter stehen Wochentag
+und Datum aus `datum`, der Name der Gruppe, `teilnehmer`, `dauer` und die Zahl
+der Hallenteile aus `spielflaechen`. Was im Frontmatter fehlt oder leer ist,
+fällt weg.
+
+Den Namen der Gruppe liest die Leseansicht aus der Wurzeldatei, unter
+`gruppen.<gruppe>.name`. Steht dort keiner, oder liegt der Plan außerhalb eines
+Arbeitsordners, steht das Kürzel aus `gruppe`.
+
+### Die Ablauftabelle
+
+Die erste Tabelle unter `## Ablauf`, mit diesen Spalten:
+
+```
+| Zeit | Programmpunkt | Übung | ID | Anpassung heute | Warum hier |
+```
+
+Jede Zeile ist ein Programmpunkt, auch Pause und Umbau.
+
+- **Zeit** ist die Zeitangabe: von–bis in ganzen Minuten ab Beginn, mit
+  Halbgeviertstrich geschrieben, `46–93`. Ein Bindestrich wird auch erkannt.
+  Daraus ergibt sich die Dauer des Programmpunkts. Steht etwas anderes da, etwa
+  `18:00`, bleibt es als Text stehen, der Programmpunkt hat keine Dauer, und
+  kein Abschnitt kann ihm zugeordnet werden.
+- **Programmpunkt** ist sein Name. Laufen zwei zur selben Zeit, einer je
+  Hallenteil, steht der Hallenteil im Namen: „Zuspiel, Hallenteil A".
+  Zeitangabe und Hallenteil zusammen bestimmen einen Programmpunkt. Beginnt
+  der Name mit „Pause" oder „Umbau", erscheint er in der Leseansicht gedämpft.
 - **ID** verweist auf die Karte. Was die Übung ist, steht dort, nicht hier.
-- **Anpassung** ist alles, was an diesem Abend anders war als auf der Karte:
-  Gruppengrößen, welches Netz, veränderte Regeln, Anpassung an eine
-  Altersklasse. Die Karte bleibt dabei unberührt.
+- **Anpassung heute** ist alles, was an diesem Abend anders war als auf der
+  Karte: Gruppengrößen, welches Netz, veränderte Regeln, Anpassung an eine
+  Altersklasse. Die Karte bleibt dabei unberührt. „—" heißt: nichts anders.
+- **Warum hier** ist ein Satz, warum die Übung an dieser Stelle steht.
+
+Ältere Pläne nennen die zweite Spalte „Teil", noch ältere „Block", und die
+Spalte Anpassung oft ohne „heute". Die Leseansicht versteht alle diese Namen,
+die Pläne gelten weiter.
 
 Es gibt keine Spalte Quelle und keine Spalte Material mehr. Beides steht auf
 der Karte, Material zusätzlich gesammelt als eigener Abschnitt.
+
+### Abschnitte und ihr Programmpunkt
+
+Ein Abschnitt reicht von seiner Überschrift `##` oder `###` bis zur nächsten
+derselben oder einer höheren Ebene. Beginnt die Überschrift mit einer
+Zeitangabe, gehört der Abschnitt zu dem Programmpunkt mit dieser Zeitangabe.
+In der Leseansicht steht er dort, wo man den Programmpunkt aufklappt:
+
+```markdown
+## 46–93 Drei Sechser mit Zweierserie
+### 46–93 Hallenskizze
+```
+
+- Folgt auf die Zeitangabe ein Hallenteil, gehört der Abschnitt nur zum
+  Programmpunkt in diesem Hallenteil: `### 69–89 Hallenteil A: Hallenskizze`.
+  Ohne Hallenteil gehört er zu jedem Programmpunkt mit dieser Zeitangabe.
+- Ein `###` ohne Zeitangabe folgt seinem `##`. Ein `###` mit eigener
+  Zeitangabe entscheidet selbst, wohin er gehört, unter einem `##` mit
+  Zeitangabe genauso wie unter einem ohne. Unter `## 69–89 Zuspiel` landet
+  `### 69–89 Hallenteil A: Hallenskizze` nur bei Hallenteil A, und unter
+  `## Athletik` wandert jeder `### <Zeitangabe> Athletik` zu seinem
+  Programmpunkt.
+- Im Programmpunkt steht die Überschrift ohne Zeitangabe und Hallenteil.
+  Gleicht der Rest dem Namen der Übung, fällt sie weg.
+- Eine Überschrift, die mit einer Uhrzeit wie `18:00` beginnt, trägt keine
+  Zeitangabe.
+
+Alles ohne Zeitangabe außer „Zum Nachschlagen" steht in der Leseansicht unter
+**Vorbereitung**, in der Reihenfolge des Plans, auch die Nachbereitung. Was im
+Abschnitt „Ablauf" neben der Tabelle steht, kommt dort unter „Ablauf". Ein
+Abschnitt, der leer ist oder leer wird, weil alle seine `###` zu
+Programmpunkten gewandert sind, fehlt.
+
+Der Plan schreibt kein „siehe unten". Die Zeitangabe verbindet Zeile und
+Abschnitt. `leseansicht.py` ändert keinen Text, auch nicht in alten Plänen:
+Dort steht alles Ausgeschriebene unter Vorbereitung.
+
+**Eine Zeitangabe ohne Programmpunkt.** Passt die Zeitangabe einer Überschrift
+auf keinen Programmpunkt, bleibt der Abschnitt unter Vorbereitung.
+`leseansicht.py` schreibt die Leseansicht trotzdem, endet mit 0 und meldet
+jeden solchen Abschnitt auf der Konsole, unter der Zeile `Leseansicht:`:
+
+```
+Kein Programmpunkt mit der Zeitangabe 50–60 für den Abschnitt „50–60 Spiel“. Er steht unter Vorbereitung.
+```
+
+Mit Hallenteil heißt es „mit der Zeitangabe 69–89 in Hallenteil C". Meist ist
+es ein Tippfehler oder eine Zeit, die sich beim Planen verschoben hat.
+
+### Zum Nachschlagen
+
+`## Zum Nachschlagen` ist ein fester Abschnitt für Themen, die mehrere
+Programmpunkte brauchen: die Sechser, die Läufer im 5-1, die Regeln. Jede `###`
+darunter wird in der Leseansicht ein Reiter mit ihrer Überschrift als Namen.
+Text vor der ersten `###` steht über den Reitern. Eine `###` ohne Text fällt
+weg, ein Abschnitt ohne Text auch.
+
+Ein **Verweis** ist ein gewöhnlicher Markdown-Link auf den Anker einer
+Überschrift unter „Zum Nachschlagen": `[die Sechser](#die-sechser)`. Der Anker
+entsteht wie bei GitHub: klein geschrieben, Satzzeichen fallen weg, jedes
+Leerzeichen wird ein Bindestrich, Umlaute bleiben. Aus
+`### Die Läufer im 5-1 (Rotation)` wird `#die-läufer-im-5-1-rotation`. So
+führt der Link auch in der `.md` zur Überschrift.
+
+Steht ein Verweis in „Anpassung heute", in einem Abschnitt des Programmpunkts
+oder in „Warum hier", bekommt der Programmpunkt in der Leseansicht einen Knopf,
+der den Reiter öffnet, je Reiter einen. Ohne JavaScript springt er zum Thema
+unten auf der Seite. Ein Link auf etwas anderes bleibt ein gewöhnlicher Link.
+
+### Athletik
+
+Eine Tabelle, deren erste beiden Spalten `Nr` und `Übung` heißen, wird in der
+Leseansicht eine Liste zum Aufklappen. Gedacht ist sie für die Athletik:
+
+```markdown
+| Nr | Übung | Worauf es ankommt | Heute |
+|---|---|---|---|
+| 1 | Ausfallschritt mit Drehung | Blick zur hinteren Hand | 3–5 Wdh. je Seite |
+```
+
+Zugeklappt steht „1. Ausfallschritt mit Drehung" und darunter, was in `Heute`
+steht, die Dosierung dieses Abends. Die übrigen Spalten stehen im
+aufgeklappten Eintrag, eine einzelne ohne Beschriftung, mehrere jede unter
+ihrer Spaltenüberschrift. Jede andere Tabelle bleibt eine Tabelle, die man auf
+dem Handy seitlich wischt.
+
+Gehört Athletik zu mehreren Programmpunkten, bekommt jeder unter `## Athletik`
+einen eigenen `### <Zeitangabe> Athletik` mit seiner Tabelle.
 
 ## Korrigieren ja, umschreiben nein
 
@@ -569,7 +693,7 @@ Die übrigen Skripte brauchen weder Pillow noch `pdftotext` noch einen Browser.
 |---|---|
 | `index.py` | Index neu bauen, Bibliothek prüfen, mit `--md` die Lesebrille schreiben |
 | `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek. Mit `--naechste-id` die ID für die nächste Karte, mit `--plaene-mit-leseansicht` die Trainingspläne, die eine Karte nennen und schon eine Leseansicht haben |
-| `leseansicht.py` | aus einem Trainingsplan die HTML-Fassung fürs Handy erzeugen, samt den Schaubildern der verwendeten Übungen |
+| `leseansicht.py` | aus einem Trainingsplan die HTML-Fassung fürs Handy erzeugen, samt den Schaubildern der verwendeten Übungen. Meldet jede Überschrift, deren Zeitangabe auf keinen Programmpunkt passt |
 | `export_pdf.py` | PDF zum Ausdrucken |
 | `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen, mit `--png` dazu eine Ansicht als PNG im Temp-Verzeichnis |
 | `bilder_aufbereiten.py` | Quellbilder verkleinern, nach EXIF geradedrehen und aus TIFF und HEIC ein JPEG machen |

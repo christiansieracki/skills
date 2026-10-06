@@ -18,7 +18,8 @@ für 8 läuft bei 14 Leuten in zwei Gruppen, das zeigt die Trefferliste an.
 für eine Gruppe mehr braucht, fällt heraus. Reichen die Flächen nur nicht für
 alle Gruppen zugleich, bleibt die Übung, und die Zeile sagt es:
 `[3 Gruppen, 2 Flächen]`.
-`--dauer 20` heißt entsprechend "der Teil hat 20 Minuten", kürzeres passt auch.
+`--dauer 20` heißt entsprechend "der Programmpunkt hat 20 Minuten", kürzeres
+passt auch.
 Wer es strikt will, nimmt `--genau`.
 
 `--disziplin beach` zeigt die Beachübungen und die, die für beides taugen,
@@ -120,7 +121,7 @@ def passt_spieler(e, anwesend, genau: bool) -> bool:
 
 
 def passt_dauer(e, minuten, genau: bool) -> bool:
-    """`--dauer 20` heißt: der Teil hat 20 Minuten. Kürzeres passt auch rein."""
+    """`--dauer 20` heißt: der Programmpunkt hat 20 Minuten. Kürzeres passt auch rein."""
     if minuten is None:
         return True
     lo, hi = e.get("dauer_min"), e.get("dauer_max")
@@ -288,7 +289,7 @@ def main() -> int:
     ap.add_argument("--typ", choices=["uebung", "folge"])
     ap.add_argument("--level", choices=LEVEL)
     ap.add_argument("--spieler", type=int, help="so viele sind heute da")
-    ap.add_argument("--dauer", type=int, help="so viele Minuten hat der Teil")
+    ap.add_argument("--dauer", type=int, help="so viele Minuten hat der Programmpunkt")
     ap.add_argument("--genau", action="store_true",
                     help="Spieler und Dauer exakt treffen statt Gruppen bilden zu dürfen")
     ap.add_argument("--spielflaechen", type=int, help="so viele stehen zur Verfügung")
