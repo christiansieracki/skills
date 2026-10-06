@@ -24,7 +24,9 @@ bei einer Liste alle in ihrer Reihenfolge. Standardmaessig als Data-URI
 eingebettet, damit die Datei allein lauffaehig ist und auch dann noch Bilder
 zeigt, wenn man sie sich aufs Handy schickt. Das macht sie gross. Wer sie
 klein braucht, nimmt --bilder verweis, dann steht ein relativer Pfad nach
-schaubilder/ drin.
+schaubilder/ drin. Mit Skript laesst sich jedes Schaubild, wie jede
+Hallenskizze, in einer Ansicht vergroessern. Die nimmt das Bild beim Oeffnen
+aus dem Programmpunkt, eingebettet steht es nur einmal in der Datei.
 
 Der Trainingsplan bleibt die Quelle. Die Leseansicht traegt unten das Datum
 ihrer Erzeugung, damit man sieht, ob sie zur aktuellen Fassung passt. Wer in
@@ -554,10 +556,11 @@ border-bottom:2px solid var(--akzent)}
 .reiterleiste,.verweise{display:flex;gap:8px;flex-wrap:wrap}
 .reiterleiste{padding-top:16px;margin-bottom:20px}
 .verweise{margin-top:24px}
-.reiterleiste a,.verweise a,.ansicht-kopf button{display:flex;align-items:center;min-height:44px;
-padding:10px 14px;font:inherit;font-size:13px;color:inherit;text-decoration:none;cursor:pointer;
-background:var(--knopf);border:1px solid var(--knopf-rand);border-radius:7px}
-.reiterleiste a:hover,.verweise a:hover,.ansicht-kopf button:hover{background:var(--flaeche)}
+.reiterleiste a,.verweise a,.ansicht-kopf button,.vergroessern{display:flex;align-items:center;
+min-height:44px;padding:10px 14px;font:inherit;font-size:13px;color:inherit;text-decoration:none;
+cursor:pointer;background:var(--knopf);border:1px solid var(--knopf-rand);border-radius:7px}
+.reiterleiste a:hover,.verweise a:hover,.ansicht-kopf button:hover,.vergroessern:hover{
+background:var(--flaeche)}
 .verweise a::after{content:"\\2009↗"}
 .reiterleiste a[aria-current]{background:var(--akzent);color:var(--papier);
 border-color:var(--akzent)}
@@ -574,6 +577,16 @@ border-bottom:1px solid var(--linie)}
 .ansicht-kopf button{flex-shrink:0}
 .ansicht-inhalt{padding:4px 20px 28px;overflow-wrap:anywhere}
 .ansicht-inhalt>section{margin:0}
+.bildknopf{display:block;width:100%;padding:0;font:inherit;color:inherit;background:none;
+border:0;cursor:zoom-in}
+.bildknopf span{display:block;text-align:center;font-size:12px;margin-top:8px}
+.vergroesserung .vergroessern{margin-top:16px}
+.vergroesserung pre{margin:16px 0 0;padding:20px;overflow:auto;background:var(--flaeche);
+border-radius:6px;font:14px/1.7 ui-monospace,monospace}
+.bildflaeche{margin-top:16px;padding:10px;overflow:auto;background:var(--bildgrund);
+border:1px solid var(--bildrand);border-radius:4px}
+.bildflaeche img{display:block;width:100%;max-width:none;height:auto;background:var(--bild)}
+.bildflaeche.doppelt img{width:200%}
 @media (prefers-reduced-motion:no-preference){.ansicht[open]{animation:aufgehen .15s ease-out}}
 @keyframes aufgehen{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .fuss{font-size:11px;color:var(--gedaempft);border-top:1px solid var(--linie);
@@ -592,7 +605,10 @@ padding-top:16px;margin-top:30px}
 #
 # `ansicht(titel, zurueck)` baut eine leere Ansicht. Was sie zeigt, kommt in
 # ihr Feld .ansicht-inhalt, hier ein Abschnitt der Seite, beim Vergroessern
-# ein Bild.
+# eine Hallenskizze in groesserer Schrift oder ein Schaubild in voller
+# Breite, das sich auf doppelte Breite stellen laesst. Die Knoepfe dazu
+# entstehen erst hier. Ohne Skript stehen Skizze und Bild im Programmpunkt,
+# und der Browser zoomt wie gewohnt.
 SKRIPT_ANSICHTEN = """
 (function () {
   "use strict";
@@ -666,6 +682,63 @@ SKRIPT_ANSICHTEN = """
     e.preventDefault();
     zeigeReiter(ziel.closest(".reiter") || dialog.querySelector(".reiter"));
     oeffne(dialog);
+  });
+
+  // Vergroessern (#57). Die Ansicht entsteht beim Oeffnen und verschwindet
+  // beim Schliessen wieder.
+  function vergroessere(titel, inhalt) {
+    var kopf = document.createElement("h2");
+    kopf.textContent = titel;
+    var dialog = ansicht(kopf, "Zurück");
+    dialog.classList.add("vergroesserung");
+    inhalt.forEach(function (teil) { dialog.querySelector(".ansicht-inhalt").append(teil); });
+    dialog.addEventListener("close", function () { dialog.remove(); });
+    document.body.append(dialog);
+    oeffne(dialog);
+  }
+
+  function knopf(text, beiKlick) {
+    var k = document.createElement("button");
+    k.type = "button";
+    k.className = "vergroessern";
+    k.textContent = text;
+    k.addEventListener("click", beiKlick);
+    return k;
+  }
+
+  // Unter jedem Codeblock im Ablauf, also jeder Hallenskizze, ein Knopf.
+  document.querySelectorAll(".programmpunkt pre").forEach(function (skizze) {
+    skizze.after(knopf("Skizze vergrößern", function () {
+      var gross = document.createElement("pre");
+      gross.textContent = skizze.textContent;
+      vergroessere("Hallenskizze", [gross]);
+    }));
+  });
+
+  // Jedes Schaubild der Karte wird selbst ein Knopf. Die Ansicht nimmt das
+  // Bild beim Oeffnen von ihm, eingebettet steht es nur einmal in der Datei.
+  document.querySelectorAll(".programmpunkt .schaubild img").forEach(function (bild) {
+    var k = document.createElement("button");
+    k.type = "button";
+    k.className = "bildknopf";
+    k.setAttribute("aria-label", bild.alt + ", vergrößern");
+    var hinweis = document.createElement("span");
+    hinweis.textContent = "Schaubild vergrößern ↗";
+    bild.before(k);
+    k.append(bild, hinweis);
+    k.addEventListener("click", function () {
+      var flaeche = document.createElement("div");
+      flaeche.className = "bildflaeche";
+      var gross = document.createElement("img");
+      gross.src = bild.src;
+      gross.alt = bild.alt;
+      flaeche.append(gross);
+      var breite = knopf("2× vergrößern", function () {
+        var doppelt = flaeche.classList.toggle("doppelt");
+        breite.textContent = doppelt ? "Gesamtansicht" : "2× vergrößern";
+      });
+      vergroessere(bild.alt, [breite, flaeche]);
+    });
   });
 })();
 """

@@ -13,9 +13,11 @@ Leerzeichen, so wie es im Browser dasteht.
 
 from __future__ import annotations
 
+import base64
 import re
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
+from pathlib import Path
 from urllib.parse import unquote
 
 # Elemente ohne schliessendes Tag.
@@ -220,6 +222,8 @@ class Leseansicht:
     nachgeladen: list[str] = field(default_factory=list)
     """Was die Seite von anderswo holt: Skripte und Stile mit eigener Quelle,
     jede Adresse ins Netz in einem Skript oder Stil."""
+    vergroessern: list[str] = field(default_factory=list)
+    """Was ohne Skript zu sehen ist und zum Vergroessern einlaedt, je sein Text."""
 
 
 def _text(knoten: Knoten | None) -> str | None:
@@ -357,6 +361,38 @@ def _nachgeladen(seite: Knoten) -> list[str]:
     return gefunden
 
 
+def _vergroessern(seite: Knoten) -> list[str]:
+    """Jeder Knopf, der ohne Skript zu sehen ist, und jeder Link, der "vergrößern" verspricht.
+
+    Ein `<button>` tut ohne Skript nichts, auf dieser Seite gibt es kein
+    Formular. Verborgen ist, was `hidden` traegt oder in einem `<dialog>`
+    steht, der erst durch Skript aufgeht.
+    """
+    gefunden = []
+
+    def suche(knoten: Knoten) -> None:
+        for kind in knoten.elemente():
+            if kind.tag in ("script", "style", "template", "dialog") or "hidden" in kind.attribute:
+                continue
+            text = kind.text() or kind.attribute.get("aria-label") or ""
+            if (kind.tag == "button" or kind.attribute.get("role") == "button"
+                    or (kind.tag == "a" and "vergrößer" in text.casefold())):
+                gefunden.append(text)
+            else:
+                suche(kind)
+
+    suche(seite)
+    return gefunden
+
+
+def wie_oft_eingebettet(html: str, datei: Path) -> int:
+    """Wie oft der Inhalt dieser Datei in der Leseansicht steht.
+
+    Eingebettet wird ein Bild als Data-URI, sein Inhalt steht darin in Base64.
+    """
+    return html.count(base64.b64encode(datei.read_bytes()).decode("ascii"))
+
+
 def lies_leseansicht(html: str) -> Leseansicht:
     seite = baum(html)
     kopf = seite.erstes(klasse="ablauf-kopf")
@@ -377,4 +413,5 @@ def lies_leseansicht(html: str) -> Leseansicht:
         ereignisse=_ereignisse(seite),
         nachschlagen=_nachschlagen(nachschlagen),
         nachgeladen=_nachgeladen(seite),
+        vergroessern=_vergroessern(seite),
     )
