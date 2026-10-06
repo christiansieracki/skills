@@ -543,8 +543,9 @@ def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
 
     Die erste Tabelle unter `## Ablauf` ist die Ablauftabelle. Was dort
     daneben steht, bleibt im Abschnitt Ablauf und kommt mit ihm unter
-    Vorbereitung. `## Zum Nachschlagen` steht fuer sich, nicht unter
-    Vorbereitung.
+    Vorbereitung, unter der Ueberschrift "Ablauf", auch wenn der Plan etwa
+    `## Ablauf (90 min)` schreibt. `## Zum Nachschlagen` steht fuer sich,
+    nicht unter Vorbereitung.
     """
     felder, rumpf = lies_frontmatter(plan)
     titel, abschnitte = zerlege(rumpf)
@@ -561,6 +562,7 @@ def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
     for abschnitt in abschnitte:
         if abschnitt.ist_ablauf:
             punkte += programmpunkte(nimm_tabelle(abschnitt.zeilen))
+            abschnitt.ueberschrift = "Ablauf"
     karten = lies_karten(wurzel)
     for punkt in punkte:
         punkt.karte = karten.get(punkt.id)

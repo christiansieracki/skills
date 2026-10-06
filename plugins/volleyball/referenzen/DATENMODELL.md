@@ -563,7 +563,8 @@ In der Leseansicht steht er dort, wo man den Programmpunkt aufklappt:
 
 Alles ohne Zeitangabe außer „Zum Nachschlagen" steht in der Leseansicht unter
 **Vorbereitung**, in der Reihenfolge des Plans, auch die Nachbereitung. Was im
-Abschnitt „Ablauf" neben der Tabelle steht, kommt dort unter „Ablauf". Ein
+Abschnitt „Ablauf" neben der Tabelle steht, kommt dort unter „Ablauf", auch
+wenn die Überschrift im Plan mehr sagt, etwa `## Ablauf (90 min)`. Ein
 Abschnitt, der leer ist oder leer wird, weil alle seine `###` zu
 Programmpunkten gewandert sind, fehlt.
 

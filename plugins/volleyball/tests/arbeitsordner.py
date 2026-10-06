@@ -545,7 +545,7 @@ class Arbeitsordner:
     def lege_plan_an(self, name: str, zeilen: list[Zeile], *,
                      vorher: str = "", neben_der_tabelle: str = "", nachher: str = "",
                      spalte: str = "Programmpunkt", titel: str = "Training",
-                     **frontmatter) -> Path:
+                     ablauf: str = "Ablauf", **frontmatter) -> Path:
         """Legt unter `trainings/` einen Trainingsplan aus Zeilen und freien Abschnitten an.
 
         Das Geruest ist das der Vorlage: Frontmatter, `#`-Ueberschrift,
@@ -556,7 +556,8 @@ class Arbeitsordner:
         `nachher` hinter dem Ablauf. Die Einrueckung aus dem Test faellt weg.
 
         `spalte` ist die Ueberschrift der zweiten Spalte. Aeltere Plaene sagen
-        dort `Teil` oder `Block`.
+        dort `Teil` oder `Block`. `ablauf` ist die Ueberschrift des Abschnitts
+        mit der Tabelle, manche Plaene schreiben etwa `Ablauf (90 min)`.
 
         Im Frontmatter stehen `datum` aus dem Dateinamen, `gruppe` und
         `status`. Weitere Felder kommen als Schluesselwort dazu, etwa
@@ -568,7 +569,7 @@ class Arbeitsordner:
         tabelle = [f"| Zeit | {spalte} | Übung | ID | Anpassung heute | Warum hier |",
                    "|---|---|---|---|---|---|"]
         tabelle += ["| " + " | ".join(z.zellen()) + " |" for z in zeilen]
-        teile = [f"# {titel}", _markdown(vorher), "## Ablauf", "\n".join(tabelle),
+        teile = [f"# {titel}", _markdown(vorher), f"## {ablauf}", "\n".join(tabelle),
                  _markdown(neben_der_tabelle), _markdown(nachher)]
         datei = self.pfad / "trainings" / name
         datei.parent.mkdir(parents=True, exist_ok=True)

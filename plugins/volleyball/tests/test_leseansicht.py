@@ -265,6 +265,15 @@ class VorbereitungTest(LeseansichtTest):
              ("Material gesamt", "Hütchen Für den Hauptteil Zwei Wagen Bälle.", True),
              ("Nachbereitung", "Lief gut.", True)])
 
+    def test_was_neben_der_ablauftabelle_steht_heisst_dort_ablauf(self) -> None:
+        # Gleich, was die Ueberschrift des Plans noch dazuschreibt.
+        ansicht = self.ansicht(self.ZEILEN, ablauf="Ablauf (90 min)",
+                               neben_der_tabelle="Zwei Netze ab 18:30.")
+
+        self.assertEqual(len(ansicht.programmpunkte), 2)
+        self.assertEqual([(a.ueberschrift, a.text) for a in ansicht.vorbereitung],
+                         [("Ablauf", "Zwei Netze ab 18:30.")])
+
     def test_der_knopf_vorbereitung_steht_nur_da_wenn_es_sie_gibt(self) -> None:
         mit = self.ansicht(self.ZEILEN, nachher="## Material gesamt\n\nBälle")
         ohne = self.ansicht(self.ZEILEN)
