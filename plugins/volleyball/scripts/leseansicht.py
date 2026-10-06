@@ -467,15 +467,15 @@ def _hier(abschnitt: Abschnitt, punkt: Programmpunkt) -> Abschnitt:
 
     Zeitangabe und Hallenteil fallen aus der Ueberschrift, auch aus der eines
     mitgenommenen Unterabschnitts, wenn sie auf diesen Programmpunkt zeigen.
-    Gleicht der Rest dem Namen der Uebung, faellt die Ueberschrift ganz weg.
+    Gleicht der Rest dem Namen der Uebung, faellt die Ueberschrift ganz weg,
+    oben wie in einem Unterabschnitt.
     """
     def ohne(ueberschrift: str) -> str:
         zu = zuordnung(ueberschrift)
-        return zu.rest if zu and punkt.gehoert_dazu(zu) else ueberschrift
+        rest = zu.rest if zu and punkt.gehoert_dazu(zu) else ueberschrift
+        return "" if _gleich(rest, punkt.uebung) else rest
 
-    ueberschrift = ohne(abschnitt.ueberschrift)
-    return replace(abschnitt,
-                   ueberschrift="" if _gleich(ueberschrift, punkt.uebung) else ueberschrift,
+    return replace(abschnitt, ueberschrift=ohne(abschnitt.ueberschrift),
                    unterabschnitte=[replace(u, ueberschrift=ohne(u.ueberschrift))
                                     for u in abschnitt.unterabschnitte])
 
@@ -1127,11 +1127,15 @@ def nach_html(zeilen: list[str]) -> str:
 
 
 def abschnitt_html(abschnitt: Abschnitt, unter_tag: str = "h3") -> str:
-    """Der Text eines Abschnitts, seine Unterabschnitte mit ihrer Ueberschrift darin."""
+    """Der Text eines Abschnitts, seine Unterabschnitte mit ihrer Ueberschrift darin.
+
+    Ist die Ueberschrift eines Unterabschnitts weggefallen, steht sein Text ohne sie.
+    """
     teile = [nach_html(abschnitt.zeilen)]
     for unter in abschnitt.unterabschnitte:
-        teile += [f"<{unter_tag}>{inline(unter.ueberschrift)}</{unter_tag}>",
-                  nach_html(unter.zeilen)]
+        if unter.ueberschrift:
+            teile.append(f"<{unter_tag}>{inline(unter.ueberschrift)}</{unter_tag}>")
+        teile.append(nach_html(unter.zeilen))
     return "\n".join(t for t in teile if t)
 
 

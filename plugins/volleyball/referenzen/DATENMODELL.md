@@ -555,8 +555,9 @@ In der Leseansicht steht er dort, wo man den Programmpunkt aufklappt:
   `### 69–89 Hallenteil A: Hallenskizze` nur bei Hallenteil A, und unter
   `## Athletik` wandert jeder `### <Zeitangabe> Athletik` zu seinem
   Programmpunkt.
-- Im Programmpunkt steht die Überschrift ohne Zeitangabe und Hallenteil.
-  Gleicht der Rest dem Namen der Übung, fällt sie weg.
+- Im Programmpunkt steht jede Überschrift ohne Zeitangabe und Hallenteil.
+  Gleicht der Rest dem Namen der Übung, fällt sie weg, beim `##` wie beim
+  `###`.
 - Eine Überschrift, die mit einer Uhrzeit wie `18:00` beginnt, trägt keine
   Zeitangabe.
 

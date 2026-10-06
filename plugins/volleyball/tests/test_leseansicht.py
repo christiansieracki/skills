@@ -488,6 +488,29 @@ class ZuordnungTest(LeseansichtTest):
         self.assertEqual(self.abschnitte(punkt),
                          [("", "Sechs gegen sechs. Hallenskizze Netz längs.")])
 
+    def test_auch_eine_unterueberschrift_wie_die_uebung_faellt_weg(self) -> None:
+        # Ob mit eigener Zeitangabe und Hallenteil oder ohne: Was nach deren
+        # Abzug dem Namen der Uebung gleicht, steht nicht noch einmal da.
+        ansicht = self.ansicht([Zeile("46–93", "Hauptteil, Hallenteil A",
+                                      "Drei Sechser mit Zweierserie")],
+                               nachher="""
+            ## 46–93 Aufbau
+
+            Zwei Netze.
+
+            ### 46–93 Hallenteil A: Drei Sechser mit Zweierserie
+
+            Sechs gegen sechs.
+
+            ### drei sechser mit  Zweierserie
+
+            Zweierserie.
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(self.abschnitte(punkt),
+                         [("Aufbau", "Zwei Netze. Sechs gegen sechs. Zweierserie.")])
+
     def test_mehrere_abschnitte_stehen_in_der_reihenfolge_des_plans(self) -> None:
         # Zwischen "Heute" und dem Schaubild der Karte. Die Ueberschriften
         # sind absichtlich nicht alphabetisch.
