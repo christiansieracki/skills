@@ -42,12 +42,12 @@ import os
 import re
 import sys
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    finde_wurzel, konsole_vorbereiten, lies_frontmatter, lies_uebungen, schaubilder,
+    finde_wurzel, konsole_vorbereiten, lies_frontmatter, lies_gruppen, lies_uebungen, schaubilder,
 )
 
 # --------------------------------------------------------------------------
@@ -200,12 +200,78 @@ class Programmpunkt:
         return not zu.hallenteil or zu.hallenteil.casefold() == self.hallenteil.casefold()
 
 
+# Der Gedankenstrich zwischen Datum und Kurztitel in der `#`-Ueberschrift:
+# "Training 01.10.2026 — Drei Sechser". Ein Halbgeviertstrich zaehlt nur mit
+# Leerzeichen, ohne ist er eine Spanne wie 18–20.
+GEDANKENSTRICH = re.compile(r"\s*—\s*|\s+–\s+")
+
+# Die Wochentage kurz, ab Montag wie date.weekday(). Nicht aus der Locale des
+# Rechners, die ist unter Windows oft englisch.
+WOCHENTAGE = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
+
+
 @dataclass
 class Kopf:
-    """Die Rohdaten fuer den Kopf: die `#`-Ueberschrift und das Frontmatter."""
+    """Die Rohdaten fuer den Kopf: die `#`-Ueberschrift und das Frontmatter.
+
+    `gruppenname` ist der Name der Gruppe aus der Wurzeldatei, unter
+    `gruppen.<gruppe>.name`. Ausserhalb eines Arbeitsordners oder ohne Namen
+    dort ist er None.
+
+    Die Angaben darunter kommen als Text ohne Markup, so wie sie im Kopf
+    stehen. Fehlt ein Feld im Frontmatter oder ist es leer, ist die Angabe
+    None.
+    """
 
     titel: str
     felder: dict
+    gruppenname: str | None = None
+
+    @property
+    def kurztitel(self) -> str:
+        """Was in der Ueberschrift nach dem Gedankenstrich steht. Ohne ihn die ganze."""
+        teile = GEDANKENSTRICH.split(self.titel, maxsplit=1)
+        return teile[1] if len(teile) == 2 and teile[1] else self.titel
+
+    @property
+    def datum(self) -> str | None:
+        """Wochentag und Datum aus `datum`: "Do, 01.10.2026". Was kein Datum ist, bleibt stehen."""
+        wert = self.felder.get("datum")
+        if wert is None:
+            return None
+        try:
+            tag = date.fromisoformat(str(wert))
+        except ValueError:
+            return str(wert)
+        return f"{WOCHENTAGE[tag.weekday()]}, {tag:%d.%m.%Y}"
+
+    @property
+    def gruppe(self) -> str | None:
+        """Der Name der Gruppe, sonst ihr Kuerzel aus `gruppe`."""
+        kuerzel = self.felder.get("gruppe")
+        return self.gruppenname or (str(kuerzel) if kuerzel is not None else None)
+
+    @property
+    def teilnehmer(self) -> str | None:
+        """Die Zahl aus `teilnehmer`: "18 Teilnehmer"."""
+        wert = self.felder.get("teilnehmer")
+        return f"{wert} Teilnehmer" if wert is not None else None
+
+    @property
+    def dauer(self) -> str | None:
+        """Die Minuten aus `dauer`: "120 min". Steht dort mehr als eine Zahl, bleibt es stehen."""
+        wert = self.felder.get("dauer")
+        if wert is None:
+            return None
+        return f"{wert} min" if isinstance(wert, int) else str(wert)
+
+    @property
+    def hallenteile(self) -> str | None:
+        """Die Zahl der Hallenteile aus `spielflaechen`: "1 Hallenteil", "2 Hallenteile"."""
+        wert = self.felder.get("spielflaechen")
+        if wert is None:
+            return None
+        return "1 Hallenteil" if wert == 1 else f"{wert} Hallenteile"
 
 
 @dataclass
@@ -328,6 +394,14 @@ def lies_karten(wurzel: Path | None) -> dict[str, Karte]:
     return karten
 
 
+def lies_gruppenname(wurzel: Path | None, kuerzel) -> str | None:
+    """Der Name der Gruppe aus der Wurzeldatei. Ausserhalb eines Arbeitsordners None."""
+    if wurzel is None or kuerzel is None:
+        return None
+    name = ((lies_gruppen(wurzel) or {}).get(str(kuerzel)) or {}).get("name")
+    return str(name) if name not in (None, "") else None
+
+
 def _gleich(a: str, b: str) -> bool:
     return " ".join(a.split()).casefold() == " ".join(b.split()).casefold()
 
@@ -408,7 +482,8 @@ def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
     for punkt in punkte:
         punkt.karte = karten.get(punkt.id)
     abschnitte, meldungen = verteile(abschnitte, punkte)
-    return Gliederung(kopf=Kopf(titel, felder), programmpunkte=punkte,
+    return Gliederung(kopf=Kopf(titel, felder, lies_gruppenname(wurzel, felder.get("gruppe"))),
+                      programmpunkte=punkte,
                       vorbereitung=[a for a in abschnitte if not a.leer],
                       meldungen=meldungen)
 
@@ -450,9 +525,14 @@ h1,h2,h3,p{margin:0}
 a{color:var(--akzent)}
 :focus-visible{outline:3px solid var(--akzent);outline-offset:3px}
 summary{cursor:pointer;min-height:44px}
-h1{font-size:24px;line-height:1.2;letter-spacing:-.5px;padding-top:22px}
-.meta{color:var(--gedaempft);font-size:12px;margin-top:3px;padding-bottom:16px;
-border-bottom:1px solid var(--linie)}
+.kopf{padding:22px 0 16px;border-bottom:1px solid var(--linie)}
+h1{font-size:24px;line-height:1.2;letter-spacing:-.5px}
+.leiste{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px}
+.kopf .datum{font-weight:700;font-size:19px;letter-spacing:-.4px}
+.kopf .angaben{color:var(--gedaempft);font-size:12px;margin-top:3px}
+.umfang{margin-left:auto;text-align:right}
+.minuten{font:700 15px ui-monospace,monospace}
+.umfang .angaben{font-size:11px;margin-top:0}
 .knoepfe{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 0}
 .knoepfe a{flex:1;display:flex;align-items:center;justify-content:center;min-height:44px;
 padding:10px 14px;font-size:13px;color:inherit;text-decoration:none;background:var(--knopf);
@@ -509,6 +589,21 @@ vertical-align:top;min-width:65px}
 .rich th{background:var(--flaeche)}
 .rich code{font-family:ui-monospace,monospace;font-size:.85em;overflow-wrap:anywhere}
 .rich hr{border:0;border-top:1px solid var(--linie);margin:28px 0}
+.liste{margin:14px 0;border-top:1px solid var(--linie)}
+.eintrag{border-bottom:1px solid var(--linie)}
+.eintrag>summary{display:flex;gap:12px;justify-content:space-between;align-items:center;
+padding:13px 0;list-style:none}
+.eintrag>summary::-webkit-details-marker{display:none}
+.eintrag>summary::after{content:"+";font-size:22px;flex-shrink:0;color:var(--akzent)}
+.eintrag[open]>summary::after{content:"−"}
+.nr-uebung,.dosierung{display:block}
+.nr-uebung{font-size:14px}
+.dosierung{color:var(--gedaempft);font:12px ui-monospace,monospace;margin-top:4px}
+.eintrag-text{padding:0 0 18px}
+.eintrag-text p,.eintrag-text dl,.eintrag-text dd{margin:0}
+.eintrag-text dt{font-size:11px;letter-spacing:.7px;text-transform:uppercase;
+color:var(--gedaempft);margin-top:10px}
+.eintrag-text dt:first-child{margin-top:0}
 .vorbereitung{margin-top:40px}
 .vorbereitung h2{font-size:22px;line-height:1.25;padding-bottom:8px;
 border-bottom:2px solid var(--akzent)}
@@ -517,7 +612,7 @@ border-bottom:2px solid var(--akzent)}
 .abschnitt>.rich{padding-bottom:16px;overflow-wrap:anywhere}
 .fuss{font-size:11px;color:var(--gedaempft);border-top:1px solid var(--linie);
 padding-top:16px;margin-top:30px}
-@media (min-width:900px){.seite{padding:0 36px 48px}h1{padding-top:32px}}
+@media (min-width:900px){.seite{padding:0 36px 48px}.kopf{padding-top:32px}}
 """)
 
 
@@ -543,6 +638,41 @@ def inline(t: str) -> str:
     t = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<em>\1</em>", t)
     t = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', t)
     return t.replace("&lt;br&gt;", "<br>")
+
+
+def ist_liste_zum_aufklappen(tabelle: list[str]) -> bool:
+    """Ob die ersten beiden Spalten der Tabelle `Nr` und `Übung` heissen."""
+    kopf = [k.lower() for k in _zellen(tabelle[0])]
+    return len(kopf) >= 2 and kopf[0] == "nr" and kopf[1] in SPALTEN["uebung"]
+
+
+def liste_html(tabelle: list[str]) -> str:
+    """Eine Tabelle mit `Nr | Übung` als Liste zum Aufklappen, je Zeile ein Eintrag.
+
+    Vier Spalten sind auf dem Handy unlesbar, darum steht zugeklappt nur
+    "Nr. Übung" und darunter die Spalte `Heute`, die Dosierung dieses Abends.
+    Die uebrigen Spalten stehen im aufgeklappten Eintrag, eine einzelne ohne
+    Beschriftung, mehrere jeweils unter ihrer Spaltenueberschrift.
+    """
+    kopf, *reihen = [_zellen(z) for z in tabelle if not _ist_trennzeile(z)]
+    namen = [k.lower() for k in kopf]
+    heute = namen.index("heute") if "heute" in namen else None
+    uebrige = [i for i in range(2, len(kopf)) if i != heute]
+    eintraege = []
+    for reihe in reihen:
+        reihe += [""] * (len(kopf) - len(reihe))
+        dosierung = (f' <span class="dosierung">{inline(reihe[heute])}</span>'
+                     if heute is not None and reihe[heute] else "")
+        if len(uebrige) <= 1:
+            text = "".join(f"<p>{inline(reihe[i])}</p>" for i in uebrige if reihe[i])
+        else:
+            text = "<dl>" + "".join(f"<dt>{inline(kopf[i])}</dt><dd>{inline(reihe[i])}</dd>"
+                                    for i in uebrige if reihe[i]) + "</dl>"
+        eintraege.append(
+            f'<details class="eintrag"><summary><span>'
+            f'<span class="nr-uebung">{inline(reihe[0])}. {inline(reihe[1])}</span>{dosierung}'
+            f'</span></summary><div class="eintrag-text">{text}</div></details>')
+    return '<div class="liste">\n' + "\n".join(eintraege) + "\n</div>"
 
 
 def nach_html(zeilen: list[str]) -> str:
@@ -587,6 +717,9 @@ def nach_html(zeilen: list[str]) -> str:
                 block.append(zeilen[i])
                 i += 1
             liste_zu()
+            if ist_liste_zum_aufklappen(block):
+                raus.append(liste_html(block))
+                continue
             raus.append("<table>")
             for n, zz in enumerate(block):
                 if _ist_trennzeile(zz):
@@ -720,13 +853,26 @@ def programmpunkt_html(punkt: Programmpunkt, adresse) -> str:
 
 
 def kopf_html(kopf: Kopf) -> str:
-    meta = []
-    for schl, beschriftung in (("gruppe", ""), ("teilnehmer", "Teilnehmer"),
-                               ("dauer", "Minuten"), ("spielflaechen", "Spielflächen")):
-        if kopf.felder.get(schl) is not None:
-            meta.append(f"{kopf.felder[schl]} {beschriftung}".strip())
-    return (f"<h1>{html.escape(kopf.titel)}</h1>\n"
-            f'<div class="meta">{html.escape(" · ".join(meta))}</div>')
+    """Der Kurztitel, darunter wie in der Vorlage links Datum, Gruppe und
+    Teilnehmer, rechts Dauer und Hallenteile.
+
+    Jede Zeile traegt nur die Angaben, die es gibt, und nur zwischen ihnen
+    steht ein Trennzeichen. Eine Zeile ohne Angabe faellt weg, eine Seite
+    ohne Zeile auch.
+    """
+    def zeile(klasse: str, *angaben: str | None) -> str:
+        da = [f'<span class="angabe">{html.escape(a)}</span>' for a in angaben if a]
+        return f'<p class="{klasse}">{" · ".join(da)}</p>' if da else ""
+
+    def seite(klasse: str, *zeilen: str) -> str:
+        inhalt = "".join(zeilen)
+        return f'<div class="{klasse}">{inhalt}</div>' if inhalt else ""
+
+    leiste = (seite("wer", zeile("datum", kopf.datum),
+                    zeile("angaben", kopf.gruppe, kopf.teilnehmer))
+              + seite("umfang", zeile("minuten", kopf.dauer), zeile("angaben", kopf.hallenteile)))
+    return (f'<header class="kopf"><h1>{html.escape(kopf.kurztitel)}</h1>'
+            + (f'<div class="leiste">{leiste}</div>' if leiste else "") + "</header>")
 
 
 def schreibe(gliederung: Gliederung, adresse, quelle: str, erzeugt: str) -> str:

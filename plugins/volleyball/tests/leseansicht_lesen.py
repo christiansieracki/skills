@@ -14,7 +14,7 @@ Leerzeichen, so wie es im Browser dasteht.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from html.parser import HTMLParser
 
 # Elemente ohne schliessendes Tag.
@@ -145,15 +145,42 @@ class Programmpunkt:
 
 
 @dataclass
+class Eintrag:
+    """Ein Eintrag einer Liste zum Aufklappen, aus einer Zeile einer Tabelle mit `Nr | Übung`."""
+    titel: str
+    """"Nr. Übung", wie es zugeklappt dasteht."""
+    heute: str | None
+    """Was darunter steht, aus der Spalte Heute. Ohne die Spalte None."""
+    inhalt: list[tuple[str, str]]
+    """Was aufgeklappt dasteht, je Spalte Beschriftung und Text. Ohne Beschriftung ""."""
+    zugeklappt: bool
+
+
+@dataclass
 class Abschnitt:
     ueberschrift: str
     """In einem Programmpunkt leer, wenn die Ueberschrift weggefallen ist."""
     text: str
     zugeklappt: bool
+    listen: list[list[Eintrag]] = field(default_factory=list)
+    """Jede Liste zum Aufklappen im Abschnitt, in der Folge des Plans."""
+    tabellen: list[list[list[str]]] = field(default_factory=list)
+    """Jede Tabelle, die eine Tabelle blieb: je Zeile ihre Zellen, die Kopfzeile vorn."""
+
+
+@dataclass
+class Kopf:
+    titel: str
+    """Die Ueberschrift der Seite, der Kurztitel."""
+    angaben: list[str]
+    """Was darunter steht, je Angabe ihr Text, in der Folge der Seite."""
+    zeilen: list[str]
+    """Dieselben Angaben, wie sie dastehen: je Zeile ihr Text mit den Trennzeichen."""
 
 
 @dataclass
 class Leseansicht:
+    kopf: Kopf
     ablauf: str
     """Die Zeile ueber dem Ablauf, etwa "Ablauf · 3 Programmpunkte · Minuten ab Beginn"."""
     knoepfe: list[str]
@@ -202,10 +229,50 @@ def _programmpunkt(knoten: Knoten) -> Programmpunkt:
     )
 
 
+def _kopf(seite: Knoten) -> Kopf:
+    """Der Kopf ueber dem Ablauf. Jede Zeile ist ein Absatz, jede Angabe darin markiert."""
+    kopf = seite.erstes(klasse="kopf")
+    if kopf is None:
+        return Kopf("", [], [])
+    return Kopf(titel=_text(kopf.erstes("h1")) or "",
+                angaben=[k.text() for k in kopf.alle(klasse="angabe")],
+                zeilen=[p.text() for p in kopf.alle("p")])
+
+
+def _eintrag(knoten: Knoten) -> Eintrag:
+    kopf = knoten.erstes("summary")
+    inhalt, beschriftung = [], ""
+    for kind in knoten.erstes(klasse="eintrag-text").alle():
+        if kind.tag == "dt":
+            beschriftung = kind.text()
+        elif kind.tag in ("dd", "p"):
+            inhalt.append((beschriftung, kind.text()))
+            beschriftung = ""
+    return Eintrag(titel=_text(kopf.erstes(klasse="nr-uebung")) or "",
+                   heute=_text(kopf.erstes(klasse="dosierung")),
+                   inhalt=inhalt,
+                   zugeklappt="open" not in knoten.attribute)
+
+
+def _listen(knoten: Knoten) -> list[list[Eintrag]]:
+    """Die Listen zum Aufklappen unter diesem Knoten, je Liste ihre Eintraege."""
+    return [[_eintrag(e) for e in liste.alle("details", "eintrag")]
+            for liste in knoten.alle(klasse="liste")]
+
+
+def _tabellen(knoten: Knoten) -> list[list[list[str]]]:
+    """Die Tabellen unter diesem Knoten, je Zeile die Texte ihrer Zellen."""
+    return [[[zelle.text() for zelle in zeile.elemente() if zelle.tag in ("th", "td")]
+             for zeile in tabelle.alle("tr")]
+            for tabelle in knoten.alle("table")]
+
+
 def _abschnitt(knoten: Knoten) -> Abschnitt:
     return Abschnitt(ueberschrift=_text(knoten.erstes("summary")) or "",
                      text=_text(knoten.erstes(klasse="rich")) or "",
-                     zugeklappt="open" not in knoten.attribute)
+                     zugeklappt="open" not in knoten.attribute,
+                     listen=_listen(knoten),
+                     tabellen=_tabellen(knoten))
 
 
 def _planabschnitt(knoten: Knoten) -> Abschnitt:
@@ -213,7 +280,9 @@ def _planabschnitt(knoten: Knoten) -> Abschnitt:
     kopf = next((k for k in knoten.elemente() if k.tag == "h3"), None)
     return Abschnitt(ueberschrift=_text(kopf) or "",
                      text=_text(knoten.erstes(klasse="rich")) or "",
-                     zugeklappt=False)
+                     zugeklappt=False,
+                     listen=_listen(knoten),
+                     tabellen=_tabellen(knoten))
 
 
 def _knoepfe(seite: Knoten) -> list[str]:
@@ -243,6 +312,7 @@ def lies_leseansicht(html: str) -> Leseansicht:
     kopf = seite.erstes(klasse="ablauf-kopf")
     vorbereitung = seite.erstes(klasse="vorbereitung")
     return Leseansicht(
+        kopf=_kopf(seite),
         ablauf=" · ".join(k.text() for k in kopf.elemente()) if kopf is not None else "",
         knoepfe=_knoepfe(seite),
         programmpunkte=[_programmpunkt(k) for k in seite.alle("details", "programmpunkt")],

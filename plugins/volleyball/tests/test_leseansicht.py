@@ -17,10 +17,11 @@ gezeigt wird, entscheidet dieselbe Stelle wie beim Einbetten.
 
 from __future__ import annotations
 
+import textwrap
 import unittest
 from pathlib import Path
 
-from arbeitsordner import Arbeitsordner, Zeile
+from arbeitsordner import OHNE, Arbeitsordner, Zeile
 from leseansicht_lesen import Leseansicht, lies_leseansicht
 
 PLAN = "gruppe/2026-09-15.md"
@@ -127,6 +128,90 @@ class ProgrammpunktTest(LeseansichtTest):
 
         self.assertEqual(ansicht.ablauf, "Ablauf · 2 Programmpunkte · Minuten ab Beginn")
         self.assertEqual(einer.ablauf, "Ablauf · 1 Programmpunkt · Minuten ab Beginn")
+
+
+class KopfTest(LeseansichtTest):
+    ZEILEN = [Zeile("0–120", "Spiel", "Zwei gegen Zwei auf dem Kleinfeld")]
+
+    def test_der_kurztitel_steht_in_der_ueberschrift_nach_dem_gedankenstrich(self) -> None:
+        ansicht = self.ansicht(
+            self.ZEILEN,
+            titel="Training 01.10.2026 — Drei Sechser, 5-1 fürs Testspiel und 6-2 antesten")
+
+        self.assertEqual(ansicht.kopf.titel, "Drei Sechser, 5-1 fürs Testspiel und 6-2 antesten")
+
+    def test_ohne_gedankenstrich_ist_die_ganze_ueberschrift_der_kurztitel(self) -> None:
+        # Ein Bindestrich wie in 5-1 ist kein Gedankenstrich.
+        ansicht = self.ansicht(self.ZEILEN, titel="Training 15.09.2026, 5-1 gegen 6-2")
+
+        self.assertEqual(ansicht.kopf.titel, "Training 15.09.2026, 5-1 gegen 6-2")
+
+    def test_das_datum_steht_deutsch_und_kurz_mit_wochentag(self) -> None:
+        ansicht = self.ansicht(self.ZEILEN, datum="2026-10-01")
+
+        self.assertIn("Do, 01.10.2026", ansicht.kopf.angaben)
+
+    def test_der_name_der_gruppe_kommt_aus_der_wurzeldatei(self) -> None:
+        self.ordner.setze_gruppen({"h1-h2": {"name": "Herren 1 + Herren 2",
+                                             "teams": ["herren-1", "herren-2"],
+                                             "trainer": ["test"]}})
+
+        ansicht = self.ansicht(self.ZEILEN, gruppe="h1-h2")
+
+        self.assertIn("Herren 1 + Herren 2", ansicht.kopf.angaben)
+        self.assertNotIn("h1-h2", ansicht.kopf.angaben)
+
+    def test_ohne_namen_in_der_wurzeldatei_steht_das_kuerzel(self) -> None:
+        self.ordner.setze_gruppen({"h1-h2": {"name": "Herren 1 + Herren 2"},
+                                   "u16": {"teams": ["u16"]}})
+
+        ansicht = self.ansicht(self.ZEILEN, gruppe="u16")
+
+        self.assertIn("u16", ansicht.kopf.angaben)
+        self.assertNotIn("Herren 1 + Herren 2", ansicht.kopf.angaben)
+
+    def test_ausserhalb_eines_arbeitsordners_steht_das_kuerzel(self) -> None:
+        # Ohne Wurzeldatei gibt es keinen Namen nachzuschlagen. Die
+        # Leseansicht entsteht trotzdem, erzeuge() prueft den Exitcode.
+        self.ordner.setze_gruppen({"h1-h2": {"name": "Herren 1 + Herren 2"}})
+        plan = self.ordner.lege_plan_an(PLAN, self.ZEILEN, gruppe="h1-h2")
+        fremd = plan.replace(self.ordner.lege_entwurfsordner_an() / plan.name)
+
+        ansicht = self.erzeuge(fremd)
+
+        self.assertIn("h1-h2", ansicht.kopf.angaben)
+
+    def test_teilnehmer_und_dauer_stehen_im_kopf(self) -> None:
+        ansicht = self.ansicht(self.ZEILEN, teilnehmer=18, dauer=120)
+
+        self.assertIn("18 Teilnehmer", ansicht.kopf.angaben)
+        self.assertIn("120 min", ansicht.kopf.angaben)
+
+    def test_die_spielflaechen_sind_die_zahl_der_hallenteile(self) -> None:
+        for spielflaechen, hallenteile in ((1, "1 Hallenteil"), (2, "2 Hallenteile")):
+            with self.subTest(spielflaechen=spielflaechen):
+                ansicht = self.ansicht(self.ZEILEN, spielflaechen=spielflaechen)
+
+                self.assertIn(hallenteile, ansicht.kopf.angaben)
+
+    def test_was_im_frontmatter_fehlt_faellt_weg_ohne_leere_trennzeichen(self) -> None:
+        # Der Plan traegt immer datum und gruppe, wenn der Test sie nicht
+        # weglaesst. Ein leeres Feld zaehlt wie ein fehlendes, die Vorlage
+        # bringt etwa teilnehmer: leer mit.
+        faelle = [
+            ({}, ["Di, 15.09.2026", "gruppe"]),
+            ({"gruppe": OHNE, "spielflaechen": 2}, ["Di, 15.09.2026", "2 Hallenteile"]),
+            ({"datum": OHNE, "teilnehmer": 12, "dauer": None}, ["gruppe", "12 Teilnehmer"]),
+            ({"datum": OHNE, "gruppe": OHNE, "dauer": 90}, ["90 min"]),
+            ({"datum": OHNE, "gruppe": OHNE}, []),
+        ]
+        for frontmatter, angaben in faelle:
+            with self.subTest(**{k: str(v) for k, v in frontmatter.items()}):
+                kopf = self.ansicht(self.ZEILEN, **frontmatter).kopf
+
+                self.assertEqual(kopf.angaben, angaben)
+                for zeile in kopf.zeilen:
+                    self.assertTrue(all(teil.strip() for teil in zeile.split("·")), zeile)
 
 
 class VorbereitungTest(LeseansichtTest):
@@ -496,6 +581,98 @@ class OhneSkriptTest(LeseansichtTest):
             nachher="## Material gesamt\n\nBälle")
 
         self.assertEqual((ansicht.skripte, ansicht.ereignisse), ([], []))
+
+
+class ListeZumAufklappenTest(LeseansichtTest):
+    """Eine Tabelle, die mit `Nr | Übung` beginnt, wird eine Liste zum Aufklappen.
+
+    Vier Spalten sind auf dem Handy so unlesbar wie frueher die Ablauftabelle.
+    Gedacht ist sie fuer die Athletik, die Regel haengt aber nur an den
+    Spalten.
+    """
+
+    def abschnitt(self, tabelle: str):
+        """Der einzige Abschnitt unter Vorbereitung eines Plans mit dieser Tabelle."""
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")],
+                               nachher="## Athletik\n\n" + textwrap.dedent(tabelle))
+        (abschnitt,) = ansicht.vorbereitung
+        return abschnitt
+
+    def test_nummer_name_und_dosierung_im_kopf_die_beschreibung_beim_aufklappen(self) -> None:
+        abschnitt = self.abschnitt("""
+            | Nr | Übung | Worauf es ankommt | Heute |
+            |---|---|---|---|
+            | 1 | Ausfallschritt mit Drehung | Blick zur hinteren Hand | 3–5 Wdh. je Seite |
+            | 2 | Tiefe Hocke | Fersen bleiben am Boden | 20 s |
+        """)
+
+        self.assertEqual(abschnitt.tabellen, [])
+        (liste,) = abschnitt.listen
+        self.assertEqual(
+            [(e.titel, e.heute, e.inhalt, e.zugeklappt) for e in liste],
+            [("1. Ausfallschritt mit Drehung", "3–5 Wdh. je Seite",
+              [("", "Blick zur hinteren Hand")], True),
+             ("2. Tiefe Hocke", "20 s", [("", "Fersen bleiben am Boden")], True)])
+
+    def test_mehrere_uebrige_spalten_stehen_mit_ihrer_ueberschrift(self) -> None:
+        abschnitt = self.abschnitt("""
+            | Nr | Übung | Worauf es ankommt | Heute | Material |
+            |---|---|---|---|---|
+            | 1 | Tiefe Hocke | Fersen bleiben am Boden | 20 s | Matte |
+        """)
+
+        ((eintrag,),) = abschnitt.listen
+        self.assertEqual((eintrag.titel, eintrag.heute, eintrag.inhalt),
+                         ("1. Tiefe Hocke", "20 s",
+                          [("Worauf es ankommt", "Fersen bleiben am Boden"),
+                           ("Material", "Matte")]))
+
+    def test_ohne_spalte_heute_steht_im_kopf_nur_nummer_und_name(self) -> None:
+        abschnitt = self.abschnitt("""
+            | Nr | Übung | Worauf es ankommt |
+            |---|---|---|
+            | 1 | Tiefe Hocke | Fersen bleiben am Boden |
+        """)
+
+        ((eintrag,),) = abschnitt.listen
+        self.assertEqual((eintrag.titel, eintrag.heute, eintrag.inhalt),
+                         ("1. Tiefe Hocke", None, [("", "Fersen bleiben am Boden")]))
+
+    def test_eine_tabelle_die_nicht_mit_nr_und_uebung_beginnt_bleibt_eine_tabelle(self) -> None:
+        # Die Sechser haben auch eine Nummer, sind aber keine Uebungsliste.
+        abschnitt = self.abschnitt("""
+            | Nr | Sechser | Annahme |
+            |---|---|---|
+            | 1 | Rot | Dreierriegel |
+
+            | Übung | Nr | Heute |
+            |---|---|---|
+            | Tiefe Hocke | 1 | 20 s |
+        """)
+
+        self.assertEqual(abschnitt.listen, [])
+        self.assertEqual(abschnitt.tabellen,
+                         [[["Nr", "Sechser", "Annahme"], ["1", "Rot", "Dreierriegel"]],
+                          [["Übung", "Nr", "Heute"], ["Tiefe Hocke", "1", "20 s"]]])
+
+    def test_auch_im_programmpunkt_wird_die_tabelle_eine_liste(self) -> None:
+        # Die Athletik je Programmpunkt, als ### mit Zeitangabe (#53).
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")],
+                               nachher="""
+            ## Athletik
+
+            ### 0–10 Athletik
+
+            | Nr | Übung | Worauf es ankommt | Heute |
+            |---|---|---|---|
+            | 1 | Tiefe Hocke | Fersen bleiben am Boden | 20 s |
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        (abschnitt,) = punkt.abschnitte
+        ((eintrag,),) = abschnitt.listen
+        self.assertEqual((eintrag.titel, eintrag.heute), ("1. Tiefe Hocke", "20 s"))
+        self.assertEqual(abschnitt.tabellen, [])
 
 
 class SchaubildTest(LeseansichtTest):
