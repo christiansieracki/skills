@@ -65,8 +65,8 @@ from tpdaten import (  # noqa: E402
 # oder Bindestrich, so wie in der Spalte Zeit (Glossar).
 ZEITANGABE = re.compile(r"(\d+)\s*[–-]\s*(\d+)")
 
-# Ein Markdown-Link auf eine Stelle im Plan: [Text](#anker).
-LINK_AUF_STELLE = re.compile(r"\[[^\]]+\]\(#([^)\s]+)\)")
+# Ein Markdown-Link auf eine Ueberschrift im Plan: [Text](#anker).
+LINK_AUF_UEBERSCHRIFT = re.compile(r"\[[^\]]+\]\(#([^)\s]+)\)")
 
 # Die Spalten der Ablauftabelle und unter welchen Ueberschriften sie stehen
 # koennen, kleingeschrieben. Die zweite hiess bis zur Welle zur Leseansicht
@@ -86,7 +86,7 @@ def anker(ueberschrift: str) -> str:
 
     Klein geschrieben, Satzzeichen fallen weg, jedes Leerzeichen wird ein
     Bindestrich. Umlaute bleiben. So fuehrt ein Link wie `[…](#die-läufer)`
-    in der .md und in der Leseansicht zur selben Stelle.
+    in der .md und in der Leseansicht zur selben Ueberschrift.
     """
     return re.sub(r"[^\w\- ]", "", ueberschrift.strip().lower()).replace(" ", "-")
 
@@ -410,12 +410,12 @@ def programmpunkte(tabelle: list[str]) -> list[Programmpunkt]:
     if not reihen:
         return []
     kopf = [k.lower() for k in reihen[0]]
-    stelle = {feld: next((kopf.index(n) for n in namen if n in kopf), None)
+    spalte = {feld: next((kopf.index(n) for n in namen if n in kopf), None)
               for feld, namen in SPALTEN.items()}
     punkte = []
     for reihe in reihen[1:]:
         def zelle(feld: str) -> str:
-            i = stelle[feld]
+            i = spalte[feld]
             return reihe[i] if i is not None and i < len(reihe) else ""
         punkte.append(Programmpunkt(
             zeit=zelle("zeit"), name=zelle("name"), uebung=zelle("uebung"),
@@ -430,7 +430,7 @@ def verweise(texte: list[str], reiter: list[Abschnitt]) -> list[Abschnitt]:
     nach_anker = {anker(r.ueberschrift): r for r in reiter}
     gefunden: list[Abschnitt] = []
     for text in texte:
-        for ziel in LINK_AUF_STELLE.findall(text):
+        for ziel in LINK_AUF_UEBERSCHRIFT.findall(text):
             r = nach_anker.get(unquote(ziel))
             if r is not None and all(r is not g for g in gefunden):
                 gefunden.append(r)
@@ -601,7 +601,7 @@ DUNKEL = {
 
 
 def farben(palette: dict[str, str], schema: str) -> str:
-    """Eine Palette als CSS-Variablen, fuer einen Block um `:root`."""
+    """Eine Palette als CSS-Variablen, die Deklarationen einer Regel fuer `:root`."""
     return "".join(f"--{name}:{wert};" for name, wert in palette.items()) + f"color-scheme:{schema}"
 
 
@@ -826,8 +826,8 @@ UMSCHALTER_SKRIPT = """(function () {
 # Verweise springen dorthin. Mit Skript wird jeder Abschnitt mit
 # data-zurueck eine Ansicht: ein <dialog>, der sich mit dem Zurueck-Knopf,
 # einem Tipp daneben und, wo der Browser es weitergibt, mit Escape oder der
-# Zurueck-Geste schliesst. Ein Link auf eine Stelle darin oeffnet die
-# Ansicht, ein Link auf einen Reiter zeigt ihn. Der Ablauf bleibt dabei, wie
+# Zurueck-Geste schliesst. Ein Link auf etwas darin oeffnet die Ansicht,
+# ein Link auf einen Reiter zeigt ihn. Der Ablauf bleibt dabei, wie
 # er ist, offene Programmpunkte bleiben offen.
 #
 # `ansicht(titel, zurueck)` baut eine leere Ansicht. Was sie zeigt, kommt in
@@ -870,8 +870,8 @@ SKRIPT_ANSICHTEN = """
     dialog.scrollTop = 0;
   }
 
-  // Die Stelle, auf die ein Link zeigt, so wie der Browser sie sucht.
-  function stelle(link) {
+  // Das Element, zu dem ein Link springt, so wie der Browser es sucht.
+  function sprungziel(link) {
     var anker = link.getAttribute("href").slice(1);
     var ziel = document.getElementById(anker);
     if (!ziel) {
@@ -888,7 +888,7 @@ SKRIPT_ANSICHTEN = """
       r.hidden = r !== reiter;
     });
     abschnitt.querySelectorAll(".reiterleiste a").forEach(function (a) {
-      if (stelle(a) === reiter) a.setAttribute("aria-current", "true");
+      if (sprungziel(a) === reiter) a.setAttribute("aria-current", "true");
       else a.removeAttribute("aria-current");
     });
   }
@@ -903,7 +903,7 @@ SKRIPT_ANSICHTEN = """
 
   document.addEventListener("click", function (e) {
     var link = e.target.closest('a[href^="#"]');
-    var ziel = link && stelle(link);
+    var ziel = link && sprungziel(link);
     var dialog = ziel && ziel.closest("dialog.ansicht");
     if (!dialog) return;
     e.preventDefault();

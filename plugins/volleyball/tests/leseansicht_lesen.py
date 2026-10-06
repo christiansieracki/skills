@@ -29,7 +29,7 @@ LEERE_ELEMENTE = {"area", "base", "br", "col", "embed", "hr", "img", "input", "l
 IM_SATZ = {"a", "abbr", "b", "code", "em", "i", "small", "span", "strong"}
 
 # Was aufgeklappt in einem Programmpunkt stehen kann, nach der Klasse im Markup.
-TEILE = {
+INHALTE = {
     "heute": "Heute",
     "planabschnitt": "Abschnitt",
     "schaubild": "Schaubild der Karte",
@@ -151,8 +151,8 @@ class Programmpunkt:
     quelle: str | None
     id: str | None
     warum: str | None
-    teile: list[str]
-    """Was aufgeklappt untereinander steht, in dieser Folge, benannt wie in TEILE."""
+    inhalte: list[str]
+    """Was aufgeklappt untereinander steht, in dieser Folge, benannt wie in INHALTE."""
     zugeklappt: bool
     warum_zugeklappt: bool
     gedaempft: bool
@@ -250,7 +250,7 @@ def _text(knoten: Knoten | None) -> str | None:
 
 
 def _ziel(a: Knoten) -> str:
-    """Die Stelle, auf die ein Link auf dieser Seite zeigt, wie der Browser sie sucht.
+    """Die id, zu der ein Link auf dieser Seite springt, wie der Browser sie sucht.
 
     Fuer einen Link woandershin leer.
     """
@@ -272,7 +272,8 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, str]) -> Programmpunkt:
         unterschrift = bild.erstes("figcaption")
         schaubilder.append(Schaubild(bild.erstes("img").attribute.get("src") or "",
                                      _text(unterschrift) or ""))
-    teile = [TEILE[k] for kind in inhalt.elemente() for k in sorted(kind.klassen) if k in TEILE]
+    inhalte = [INHALTE[k] for kind in inhalt.elemente() for k in sorted(kind.klassen)
+               if k in INHALTE]
     return Programmpunkt(
         zeit=_text(kopf.erstes(klasse="zeit")) or "",
         dauer=int(re.search(r"\d+", dauer).group()) if dauer else None,
@@ -285,7 +286,7 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, str]) -> Programmpunkt:
         quelle=_text(inhalt.erstes(klasse="quelle")),
         id=_text(inhalt.erstes(klasse="id")),
         warum=_text(warum.erstes(klasse="rich")) if warum is not None else None,
-        teile=teile,
+        inhalte=inhalte,
         zugeklappt="open" not in knoten.attribute,
         warum_zugeklappt=warum is not None and "open" not in warum.attribute,
         gedaempft="gedaempft" in knoten.klassen,

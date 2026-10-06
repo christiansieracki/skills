@@ -12,7 +12,7 @@ Markup was traegt.
 
 Die Bilder kommen hier als Verweis statt eingebettet. Dann steht der Name
 jeder Datei im HTML, und ihre Reihenfolge laesst sich ablesen. Welche Datei
-gezeigt wird, entscheidet dieselbe Stelle wie beim Einbetten.
+gezeigt wird, entscheidet derselbe Code wie beim Einbetten.
 """
 
 from __future__ import annotations
@@ -99,7 +99,7 @@ class ProgrammpunktTest(LeseansichtTest):
                                       warum="Die Sechser stehen schon zusammen")])
 
         (punkt,) = ansicht.programmpunkte
-        self.assertEqual(punkt.teile,
+        self.assertEqual(punkt.inhalte,
                          ["Heute", "Schaubild der Karte", "Quelle und ID", "Warum hier?"])
         self.assertEqual(punkt.heute, "Drei Längsstreifen statt zwei")
         self.assertEqual(punkt.warum, "Die Sechser stehen schon zusammen")
@@ -223,7 +223,7 @@ class KopfTest(LeseansichtTest):
 
                 self.assertEqual(kopf.angaben, angaben)
                 for zeile in kopf.zeilen:
-                    self.assertTrue(all(teil.strip() for teil in zeile.split("·")), zeile)
+                    self.assertTrue(all(angabe.strip() for angabe in zeile.split("·")), zeile)
 
 
 class VorbereitungTest(LeseansichtTest):
@@ -549,7 +549,7 @@ class ZuordnungTest(LeseansichtTest):
         _, hauptteil = ansicht.programmpunkte
         self.assertEqual([a.ueberschrift for a in hauptteil.abschnitte],
                          ["Zuerst die Annahme", "Danach das Zuspiel"])
-        self.assertEqual(hauptteil.teile, ["Heute", "Abschnitt", "Abschnitt",
+        self.assertEqual(hauptteil.inhalte, ["Heute", "Abschnitt", "Abschnitt",
                                            "Schaubild der Karte", "Quelle und ID",
                                            "Warum hier?"])
 
@@ -725,7 +725,7 @@ class VerweisTest(LeseansichtTest):
 
         erster, zweiter = ansicht.programmpunkte
         self.assertEqual(erster.verweise, ["Die Sechser", "Kommunikationsregeln"])
-        self.assertEqual(erster.teile, ["Heute", "Quelle und ID", "Verweise", "Warum hier?"])
+        self.assertEqual(erster.inhalte, ["Heute", "Quelle und ID", "Verweise", "Warum hier?"])
         self.assertEqual(zweiter.verweise, [])
 
     def test_der_link_im_text_fuehrt_ebenfalls_zum_reiter(self) -> None:
@@ -797,7 +797,7 @@ class VerweisTest(LeseansichtTest):
 
         ankommen, hauptteil = ansicht.programmpunkte
         self.assertEqual(hauptteil.verweise, ["Kommunikationsregeln", "Die Sechser"])
-        self.assertEqual(hauptteil.teile, ["Abschnitt", "Verweise"])
+        self.assertEqual(hauptteil.inhalte, ["Abschnitt", "Verweise"])
         self.assertEqual(ankommen.verweise, [])
 
 
@@ -1038,7 +1038,7 @@ class SchaubildTest(LeseansichtTest):
         # neben der Uebung.
         (punkt,) = self.erzeuge(self.ordner.lege_trainingsplan_an(PLAN, "ue-000001")).programmpunkte
 
-        self.assertNotIn("Schaubild der Karte", punkt.teile)
+        self.assertNotIn("Schaubild der Karte", punkt.inhalte)
         self.assertEqual((punkt.quelle, punkt.id), ("Testbestand", "ue-000001"))
 
     def test_ein_einzelnes_schaubild_steht_bei_seiner_uebung(self) -> None:
