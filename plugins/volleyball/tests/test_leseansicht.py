@@ -121,6 +121,18 @@ class ProgrammpunktTest(LeseansichtTest):
         self.assertEqual([p.gedaempft for p in ansicht.programmpunkte],
                          [False, True, True, False])
 
+    def test_zwei_programmpunkte_zur_selben_zeit_stehen_je_mit_ihrem_hallenteil(self) -> None:
+        # Untereinander in der Reihenfolge der Tabelle. Der Hallenteil steht im
+        # Namen, ohne ihn hat ein Programmpunkt keinen.
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar"),
+                                Zeile("10–35", "Zuspiel, Hallenteil B", "Zuspiel im Dreieck"),
+                                Zeile("10–35", "Annahme, Hallenteil A", "Annahme im Halbfeld")])
+
+        self.assertEqual([(p.zeit, p.hallenteil, p.uebung) for p in ansicht.programmpunkte],
+                         [("0–10", "", "Zonenbaggern im Paar"),
+                          ("10–35", "B", "Zuspiel im Dreieck"),
+                          ("10–35", "A", "Annahme im Halbfeld")])
+
     def test_ueber_dem_ablauf_steht_die_zahl_der_programmpunkte(self) -> None:
         ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar"),
                                 Zeile("10–35", "Hauptteil", "Annahme im Halbfeld")])
@@ -359,7 +371,7 @@ class ZuordnungTest(LeseansichtTest):
         """)
 
         _, a, b = ansicht.programmpunkte
-        self.assertEqual((a.name, b.name), ("Zuspiel, Hallenteil A", "Annahme, Hallenteil B"))
+        self.assertEqual((a.hallenteil, b.hallenteil), ("A", "B"))
         self.assertEqual(self.abschnitte(a), [("Hallenskizze", "Netz längs."),
                                               ("Wechsel", "Nach zwölf Minuten tauschen.")])
         self.assertEqual(self.abschnitte(b), [("Hallenskizze", "Netz quer."),
@@ -391,6 +403,7 @@ class ZuordnungTest(LeseansichtTest):
         """)
 
         _, a, b = ansicht.programmpunkte
+        self.assertEqual((a.hallenteil, b.hallenteil), ("A", "B"))
         self.assertEqual(self.abschnitte(a), [
             ("Zuspiel und Annahme",
              "Nach zwölf Minuten tauschen. Hallenskizze Netz längs. Bälle Zwei Wagen.")])

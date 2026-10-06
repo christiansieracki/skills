@@ -1228,7 +1228,11 @@ def programmpunkt_html(punkt: Programmpunkt, adresse) -> str:
         inhalt.append('<details class="warum"><summary>Warum hier?</summary>'
                       f'<div class="rich"><p>{inline(punkt.warum)}</p></div></details>')
     klassen = "programmpunkt gedaempft" if punkt.pause_oder_umbau else "programmpunkt"
-    return (f'<details class="{klassen}">'
+    # Zu sehen ist der Hallenteil im Namen. Das Attribut sagt, welchen der
+    # Generator dort gefunden hat.
+    hallenteil = (f' data-hallenteil="{html.escape(punkt.hallenteil)}"'
+                  if punkt.hallenteil else "")
+    return (f'<details class="{klassen}"{hallenteil}>'
             f'<summary><span class="wann">{"".join(wann)}</span>'
             f'<span class="was">{"".join(was)}</span></summary>\n'
             f'<div class="inhalt">\n' + "\n".join(inhalt) + "\n</div></details>")

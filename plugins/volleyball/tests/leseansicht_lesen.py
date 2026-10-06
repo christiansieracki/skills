@@ -141,6 +141,8 @@ class Programmpunkt:
     zeit: str
     dauer: int | None
     name: str
+    hallenteil: str
+    """Der Hallenteil, wie der Generator ihn im Namen findet, "A". Ohne ihn leer."""
     uebung: str
     heute: str | None
     abschnitte: list[Abschnitt]
@@ -275,6 +277,7 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, str]) -> Programmpunkt:
         zeit=_text(kopf.erstes(klasse="zeit")) or "",
         dauer=int(re.search(r"\d+", dauer).group()) if dauer else None,
         name=_text(kopf.erstes(klasse="name")) or "",
+        hallenteil=knoten.attribute.get("data-hallenteil") or "",
         uebung=_text(kopf.erstes(klasse="uebung")) or "",
         heute=_text(heute.erstes("p")) if heute is not None else None,
         abschnitte=[_planabschnitt(k) for k in inhalt.alle(klasse="planabschnitt")],
