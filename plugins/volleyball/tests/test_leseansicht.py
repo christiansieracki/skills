@@ -17,11 +17,12 @@ gezeigt wird, entscheidet dieselbe Stelle wie beim Einbetten.
 
 from __future__ import annotations
 
+import textwrap
 import unittest
 from pathlib import Path
 
 from arbeitsordner import Arbeitsordner, Zeile
-from leseansicht_lesen import Leseansicht, lies_leseansicht
+from leseansicht_lesen import Leseansicht, Link, lies_leseansicht
 
 PLAN = "gruppe/2026-09-15.md"
 
@@ -179,6 +180,117 @@ class VorbereitungTest(LeseansichtTest):
         self.assertEqual((ansicht.knoepfe, ansicht.vorbereitung), ([], []))
 
 
+class NachschlagenTest(LeseansichtTest):
+    ZEILEN = [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar"),
+              Zeile("10–35", "Hauptteil", "Annahme im Halbfeld")]
+
+    # Ohne Einrueckung, damit ein Test weitere Abschnitte anhaengen kann.
+    NACHSCHLAGEN = textwrap.dedent("""
+        ## Zum Nachschlagen
+
+        Gilt den ganzen Abend.
+
+        ### Die Sechser
+
+        - Herren 1 auf Feld A
+
+        ### Kommunikationsregeln
+
+        1. „Ich“ in der Annahme.
+    """)
+
+    def test_jede_unterueberschrift_ist_ein_reiter_und_text_davor_steht_darueber(self) -> None:
+        ansicht = self.ansicht(self.ZEILEN, nachher=self.NACHSCHLAGEN)
+
+        self.assertEqual(ansicht.nachschlagen.vorweg, "Gilt den ganzen Abend.")
+        self.assertEqual([(r.name, r.text) for r in ansicht.nachschlagen.reiter],
+                         [("Die Sechser", "Herren 1 auf Feld A"),
+                          ("Kommunikationsregeln", "„Ich“ in der Annahme.")])
+
+    def test_zum_nachschlagen_steht_nicht_unter_vorbereitung(self) -> None:
+        ansicht = self.ansicht(self.ZEILEN,
+                               nachher=self.NACHSCHLAGEN + "\n## Material gesamt\n\nBälle\n")
+
+        self.assertEqual([(a.ueberschrift, a.text) for a in ansicht.vorbereitung],
+                         [("Material gesamt", "Bälle")])
+        self.assertEqual([r.name for r in ansicht.nachschlagen.reiter],
+                         ["Die Sechser", "Kommunikationsregeln"])
+        self.assertEqual(ansicht.knoepfe, ["Nachschlagen", "Vorbereitung"])
+
+    def test_der_knopf_nachschlagen_steht_nur_da_wenn_es_den_abschnitt_gibt(self) -> None:
+        mit = self.ansicht(self.ZEILEN, nachher=self.NACHSCHLAGEN)
+        leer = self.ansicht(self.ZEILEN, nachher="## Zum Nachschlagen\n\n### Die Sechser\n")
+        ohne = self.ansicht(self.ZEILEN)
+
+        self.assertEqual(mit.knoepfe, ["Nachschlagen"])
+        self.assertEqual((leer.knoepfe, leer.nachschlagen, leer.vorbereitung), ([], None, []))
+        self.assertEqual((ohne.knoepfe, ohne.nachschlagen), ([], None))
+
+
+class VerweisTest(LeseansichtTest):
+    NACHSCHLAGEN = NachschlagenTest.NACHSCHLAGEN
+
+    def test_ein_link_auf_einen_reiter_erscheint_beim_programmpunkt_als_verweis(self) -> None:
+        ansicht = self.ansicht(
+            [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar", "ue-000001",
+                   heute="In den [Sechsern](#die-sechser), "
+                         "[Regeln](#kommunikationsregeln) wie immer",
+                   warum="Die [Sechser](#die-sechser) stehen schon zusammen"),
+             Zeile("10–35", "Hauptteil", "Annahme im Halbfeld", heute="wie geplant")],
+            nachher=self.NACHSCHLAGEN)
+
+        erster, zweiter = ansicht.programmpunkte
+        self.assertEqual(erster.verweise, ["Die Sechser", "Kommunikationsregeln"])
+        self.assertEqual(erster.teile, ["Heute", "Quelle und ID", "Verweise", "Warum hier?"])
+        self.assertEqual(zweiter.verweise, [])
+
+    def test_der_link_im_text_fuehrt_ebenfalls_zum_reiter(self) -> None:
+        ansicht = self.ansicht(
+            [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar",
+                   heute="In den [Sechsern](#die-sechser)")],
+            nachher=self.NACHSCHLAGEN)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(punkt.links, [Link("Sechsern", "#die-sechser", "Die Sechser")])
+
+    def test_der_anker_wird_gebildet_wie_bei_github_auch_mit_umlauten(self) -> None:
+        # Klein geschrieben, Satzzeichen fallen weg, jedes Leerzeichen wird ein
+        # Bindestrich. So fuehrt derselbe Link auch in der .md zum Abschnitt.
+        ansicht = self.ansicht(
+            [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar",
+                   heute="[Läufer](#die-läufer-im-5-1-rotation) und "
+                         "[Regeln](#regeln-ich--aus)")],
+            nachher="""
+                ## Zum Nachschlagen
+
+                ### Die Läufer im 5-1 (Rotation)
+
+                Der Z steht auf 1.
+
+                ### Regeln: „Ich“ & „Aus“
+
+                Wer den Ball nimmt, ruft.
+            """)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(punkt.verweise,
+                         ["Die Läufer im 5-1 (Rotation)", "Regeln: „Ich“ & „Aus“"])
+        self.assertEqual([link.reiter for link in punkt.links], punkt.verweise)
+
+    def test_ein_link_auf_etwas_anderes_bleibt_ein_gewoehnlicher_link(self) -> None:
+        ansicht = self.ansicht(
+            [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar",
+                   heute="Wie beim [DVV](https://www.volleyball-verband.de), "
+                         "Bälle siehe [Material](#material-gesamt)")],
+            nachher=self.NACHSCHLAGEN + "\n## Material gesamt\n\nBälle\n")
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(punkt.verweise, [])
+        self.assertEqual(punkt.links,
+                         [Link("DVV", "https://www.volleyball-verband.de", None),
+                          Link("Material", "#material-gesamt", None)])
+
+
 class OhneSkriptTest(LeseansichtTest):
     """Die Leseansicht muss lesbar sein, wo kein JavaScript laeuft (ADR-0012).
 
@@ -233,20 +345,34 @@ class OhneSkriptTest(LeseansichtTest):
 
         (punkt,) = ansicht.programmpunkte
         self.assertEqual(punkt.heute, "<b>drei</b> Streifen")
+        # Der Text liest sich ohne Skript. Waere aus dem Plan ein Skript
+        # geworden, fehlte "weg".
         self.assertEqual(ansicht.vorbereitung[0].text,
                          "Nicht <b>fett</b> & nicht <script>weg</script>")
-        self.assertEqual(ansicht.skripte, [])
 
-    def test_die_leseansicht_enthaelt_kein_javascript(self) -> None:
+    def test_der_text_jedes_reiters_steht_ausserhalb_von_skript(self) -> None:
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")],
+                               nachher=NachschlagenTest.NACHSCHLAGEN)
+
+        for text in ("Gilt den ganzen Abend.", "Die Sechser", "Herren 1 auf Feld A",
+                     "Kommunikationsregeln", "„Ich“ in der Annahme."):
+            with self.subTest(text=text):
+                self.assertIn(text, ansicht.text)
+
+    def test_die_leseansicht_laedt_nichts_nach_und_kein_knopf_braucht_skript(self) -> None:
+        # Das Skript steckt in der Datei, ohne Bibliothek und ohne Netz. Ohne
+        # Skript sind Knoepfe und Verweise Links, die zum Abschnitt springen.
         self.ordner.lege_schaubild_an("ue-000030-aufbau.svg")
         self.ordner.lege_karte_an(id="ue-000030", titel="Mit einem Bild",
                                   schaubild="ue-000030-aufbau.svg")
         ansicht = self.ansicht(
             [Zeile("0–10", "Ankommen", "Mit einem Bild", "ue-000030",
-                   heute="heute anders", warum="weil")],
-            nachher="## Material gesamt\n\nBälle")
+                   heute="heute [anders](#die-sechser)", warum="weil")],
+            nachher=NachschlagenTest.NACHSCHLAGEN + "\n## Material gesamt\n\nBälle\n")
 
-        self.assertEqual((ansicht.skripte, ansicht.ereignisse), ([], []))
+        self.assertEqual((ansicht.nachgeladen, ansicht.ereignisse), ([], []))
+        self.assertEqual(ansicht.knoepfe, ["Nachschlagen", "Vorbereitung"])
+        self.assertEqual(ansicht.programmpunkte[0].verweise, ["Die Sechser"])
 
 
 class SchaubildTest(LeseansichtTest):
