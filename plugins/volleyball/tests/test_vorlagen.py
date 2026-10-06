@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import sys
 import tempfile
 import unittest
 from dataclasses import dataclass
@@ -24,6 +25,9 @@ from pathlib import Path
 
 from arbeitsordner import SKRIPTE, Arbeitsordner
 from leseansicht_lesen import Leseansicht, lies_leseansicht
+
+sys.path.insert(0, str(SKRIPTE))
+from tpdaten import tabellenzellen  # noqa: E402
 
 REFERENZEN = SKRIPTE.parent / "referenzen"
 
@@ -39,10 +43,6 @@ def geruest_aus_vorlagen_md() -> str:
     # selbst ein Codeblock ist.
     m = re.compile(r"^(`{3,})markdown\n(.*?)^\1[ \t]*$", re.M | re.S).search(text, ab)
     return m.group(2)
-
-
-def _zellen(zeile: str) -> list[str]:
-    return [z.strip() for z in zeile.strip().strip("|").split("|")]
 
 
 def gliederung(markdown: str) -> list[str]:
@@ -62,10 +62,10 @@ def gliederung(markdown: str) -> list[str]:
         elif zeile.startswith("#"):
             zeilen.append(zeile.strip())
         elif zeile.startswith("|") and not davor.startswith("|"):
-            zeilen.append("| " + " | ".join(_zellen(zeile)) + " |")
-            ablauf = _zellen(zeile)[0] == "Zeit"
+            zeilen.append("| " + " | ".join(tabellenzellen(zeile)) + " |")
+            ablauf = tabellenzellen(zeile)[0] == "Zeit"
         elif zeile.startswith("|") and ablauf and set(zeile.strip()) - set("|-: "):
-            zeit, name = _zellen(zeile)[:2]
+            zeit, name = tabellenzellen(zeile)[:2]
             zeilen.append(f"| {zeit} | {name} |")
         davor = zeile
     return zeilen

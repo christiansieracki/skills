@@ -55,6 +55,7 @@ from urllib.parse import unquote
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
     finde_wurzel, konsole_vorbereiten, lies_frontmatter, lies_gruppen, lies_uebungen, schaubilder,
+    tabellenzellen,
 )
 
 # --------------------------------------------------------------------------
@@ -376,10 +377,6 @@ def _ist_trennzeile(zeile: str) -> bool:
     return set(zeile.replace("|", "").strip()) <= set("-: ")
 
 
-def _zellen(zeile: str) -> list[str]:
-    return [z.strip() for z in zeile.strip().strip("|").split("|")]
-
-
 def nimm_tabelle(zeilen: list[str]) -> list[str]:
     """Nimmt die erste Tabelle aus den Zeilen heraus und gibt sie zurueck.
 
@@ -406,7 +403,7 @@ def _ohne_strich(text: str) -> str:
 
 def programmpunkte(tabelle: list[str]) -> list[Programmpunkt]:
     """Je Zeile der Ablauftabelle ein Programmpunkt, in ihrer Reihenfolge."""
-    reihen = [_zellen(z) for z in tabelle if not _ist_trennzeile(z)]
+    reihen = [tabellenzellen(z) for z in tabelle if not _ist_trennzeile(z)]
     if not reihen:
         return []
     kopf = [k.lower() for k in reihen[0]]
@@ -997,7 +994,7 @@ def inline(t: str) -> str:
 
 def ist_liste_zum_aufklappen(tabelle: list[str]) -> bool:
     """Ob die ersten beiden Spalten der Tabelle `Nr` und `Übung` heissen."""
-    kopf = [k.lower() for k in _zellen(tabelle[0])]
+    kopf = [k.lower() for k in tabellenzellen(tabelle[0])]
     return len(kopf) >= 2 and kopf[0] == "nr" and kopf[1] in SPALTEN["uebung"]
 
 
@@ -1009,7 +1006,7 @@ def liste_html(tabelle: list[str]) -> str:
     Die uebrigen Spalten stehen im aufgeklappten Eintrag, eine einzelne ohne
     Beschriftung, mehrere jeweils unter ihrer Spaltenueberschrift.
     """
-    kopf, *reihen = [_zellen(z) for z in tabelle if not _ist_trennzeile(z)]
+    kopf, *reihen = [tabellenzellen(z) for z in tabelle if not _ist_trennzeile(z)]
     namen = [k.lower() for k in kopf]
     heute = namen.index("heute") if "heute" in namen else None
     uebrige = [i for i in range(2, len(kopf)) if i != heute]
@@ -1081,7 +1078,7 @@ def nach_html(zeilen: list[str]) -> str:
                     continue
                 tag = "th" if n == 0 else "td"
                 raus.append("<tr>" + "".join(f"<{tag}>{inline(f)}</{tag}>"
-                                             for f in _zellen(zz)) + "</tr>")
+                                             for f in tabellenzellen(zz)) + "</tr>")
             raus.append("</table>")
             continue
 

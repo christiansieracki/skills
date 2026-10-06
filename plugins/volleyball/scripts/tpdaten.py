@@ -204,6 +204,17 @@ def lies_frontmatter(pfad: Path) -> tuple[dict, str]:
     return fm, teile[2]
 
 
+def tabellenzellen(zeile: str) -> list[str]:
+    """Die Zellen einer Zeile aus einer Markdown-Tabelle, ohne Leerraum drumherum.
+
+    Wie bei GitHub trennt ein `\\|` keine Zellen, in der Zelle steht dann `|`.
+    """
+    innen = zeile.strip()
+    innen = innen[1:] if innen.startswith("|") else innen
+    innen = innen[:-1] if innen.endswith("|") and not innen.endswith("\\|") else innen
+    return [z.strip().replace("\\|", "|") for z in re.split(r"(?<!\\)\|", innen)]
+
+
 # --------------------------------------------------------------------------
 # Einlesen
 # --------------------------------------------------------------------------

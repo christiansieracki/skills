@@ -59,7 +59,8 @@ from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E40
 from tpdaten import (  # noqa: E402
     DISZIPLIN_SPALTE, KARTENFELDER, TYPEN, KeineId, finde_wurzel, hole_index, interpreter,
     konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_schwerpunkte,
-    lies_uebungen, naechste_id, pruefe_felder, schaubilder, trainer_dieses_rechners,
+    lies_uebungen, naechste_id, pruefe_felder, schaubilder, tabellenzellen,
+    trainer_dieses_rechners,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -133,13 +134,6 @@ def _frontmatter_ende(zeilen: list[str]) -> int | None:
 def _zelle(wert: str) -> str:
     """Ein Wert so, dass er in einer Zelle bleibt: ohne Zeilenumbruch, `|` maskiert."""
     return " ".join(str(wert).split()).replace("|", "\\|")
-
-
-def _zellen(zeile: str) -> list[str]:
-    innen = zeile.strip()
-    innen = innen[1:] if innen.startswith("|") else innen
-    innen = innen[:-1] if innen.endswith("|") and not innen.endswith("\\|") else innen
-    return [z.strip().replace("\\|", "|") for z in re.split(r"(?<!\\)\|", innen)]
 
 
 # --------------------------------------------------------------------------
@@ -247,13 +241,13 @@ class Sammelimport:
                      if self.zeilen[i].lstrip().startswith("|")), None)
         if kopf is None:
             return
-        self.spalten = _zellen(self.zeilen[kopf])
+        self.spalten = tabellenzellen(self.zeilen[kopf])
         fehlend = [s for s in SPALTEN if s not in self.spalten]
         if fehlend:
             raise self._abbruch(f"Es fehlen die Spalten {', '.join(fehlend)}.")
         self.anfang = self.ende = kopf + 2
         while self.ende < len(self.zeilen) and self.zeilen[self.ende].lstrip().startswith("|"):
-            werte = _zellen(self.zeilen[self.ende])
+            werte = tabellenzellen(self.zeilen[self.ende])
             werte += [""] * (len(self.spalten) - len(werte))
             self._nimm_auf(Kandidat(self.zeilen[self.ende], dict(zip(self.spalten, werte))))
             self.ende += 1

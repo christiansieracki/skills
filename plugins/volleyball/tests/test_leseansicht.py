@@ -980,6 +980,23 @@ class ListeZumAufklappenTest(LeseansichtTest):
                          [[["Nr", "Sechser", "Annahme"], ["1", "Rot", "Dreierriegel"]],
                           [["Übung", "Nr", "Heute"], ["Tiefe Hocke", "1", "20 s"]]])
 
+    def test_ein_maskierter_strich_bleibt_in_seiner_zelle(self) -> None:
+        # Wie bei GitHub trennt `\|` keine Zellen, in der Zelle steht `|`.
+        abschnitt = self.abschnitt(r"""
+            | Nr | Übung | Heute |
+            |---|---|---|
+            | 1 | Tiefe Hocke | 20 s \| 30 s |
+
+            | Sechser | Annahme |
+            |---|---|
+            | Rot \| Blau | Dreierriegel |
+        """)
+
+        ((eintrag,),) = abschnitt.listen
+        self.assertEqual((eintrag.titel, eintrag.heute), ("1. Tiefe Hocke", "20 s | 30 s"))
+        self.assertEqual(abschnitt.tabellen,
+                         [[["Sechser", "Annahme"], ["Rot | Blau", "Dreierriegel"]]])
+
     def test_auch_im_programmpunkt_wird_die_tabelle_eine_liste(self) -> None:
         # Die Athletik je Programmpunkt, als ### mit Zeitangabe (#53).
         ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")],
