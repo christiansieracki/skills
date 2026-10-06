@@ -20,9 +20,9 @@ JavaScript laeuft, waehlt der Trainer Hell, Dunkel oder System selbst
 (ADR-0012).
 
 Erzeugt wird in zwei Schritten. `gliedere` zerlegt den Plan in eine
-Gliederung: die Rohdaten fuer den Kopf, die Programmpunkte, die Vorbereitung
-und die Meldungen. `schreibe` macht daraus das HTML. Die Gestaltung steckt nur
-im zweiten Schritt.
+Gliederung: die Rohdaten fuer den Kopf, die Programmpunkte, Nachschlagen, die
+Vorbereitung und die Meldungen. `schreibe` macht daraus das HTML. Die
+Gestaltung steckt nur im zweiten Schritt.
 
 Hat eine Uebung im Ablauf ein Schaubild auf ihrer Karte, steht es bei ihr,
 bei einer Liste alle in ihrer Reihenfolge. Standardmaessig als Data-URI
@@ -47,9 +47,11 @@ import mimetypes
 import os
 import re
 import sys
+from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from pathlib import Path
+from typing import NamedTuple
 from urllib.parse import unquote
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -92,13 +94,24 @@ def anker(ueberschrift: str) -> str:
     return re.sub(r"[^\w\- ]", "", ueberschrift.strip().lower()).replace(" ", "-")
 
 
-def zeitangabe(text: str) -> tuple[int, int] | None:
-    """Von und bis, wenn der Text eine Zeitangabe ist, sonst None."""
+class Zeitangabe(NamedTuple):
+    """Von und bis in ganzen Minuten ab Beginn. Wie sie geschrieben ist, zaehlt nicht."""
+
+    von: int
+    bis: int
+
+    @property
+    def minuten(self) -> int:
+        return self.bis - self.von
+
+
+def zeitangabe(text: str) -> Zeitangabe | None:
+    """Die Zeitangabe, wenn der Text eine ist, sonst None."""
     m = ZEITANGABE.fullmatch(text.strip())
     if not m:
         return None
     von, bis = int(m.group(1)), int(m.group(2))
-    return (von, bis) if von < bis else None
+    return Zeitangabe(von, bis) if von < bis else None
 
 
 # Eine Ueberschrift, die mit einer Zeitangabe beginnt: "46–93 Drei Sechser".
@@ -119,6 +132,7 @@ class Zuordnung:
 
     zeit: str
     """Die Zeitangabe, wie sie in der Ueberschrift steht."""
+    zeitangabe: Zeitangabe
     hallenteil: str
     """Leer, wenn keiner dabeisteht. Dann gilt der Abschnitt fuer jeden Programmpunkt zu der Zeit."""
     rest: str
@@ -128,13 +142,15 @@ class Zuordnung:
 def zuordnung(ueberschrift: str) -> Zuordnung | None:
     """Wozu die Ueberschrift gehoert, wenn sie mit einer Zeitangabe beginnt. Sonst None."""
     m = VORN_ZEITANGABE.match(ueberschrift.strip())
-    if not m or zeitangabe(m.group(1)) is None:
+    von_bis = zeitangabe(m.group(1)) if m else None
+    if von_bis is None:
         return None
     zeit, rest = m.group(1), m.group(2).strip()
-    teil = HALLENTEIL.match(rest)
-    if teil:
-        return Zuordnung(zeit, teil.group(1), rest[teil.end():].lstrip(" :,·–—-"))
-    return Zuordnung(zeit, "", rest)
+    kennung = HALLENTEIL.match(rest)
+    if kennung:
+        return Zuordnung(zeit, von_bis, kennung.group(1),
+                         rest[kennung.end():].lstrip(" :,·–—-"))
+    return Zuordnung(zeit, von_bis, "", rest)
 
 
 @dataclass
@@ -218,10 +234,13 @@ class Programmpunkt:
         return [self.heute, *abschnitte, self.warum]
 
     @property
-    def dauer(self) -> int | None:
-        """Die Minuten aus der Zeitangabe. Steht etwas anderes in der Spalte Zeit, None."""
+    def dauer(self) -> str | None:
+        """Die Minuten aus der Zeitangabe, wie beim Kopf als Text: "47 min".
+
+        Steht etwas anderes in der Spalte Zeit, None.
+        """
         von_bis = zeitangabe(self.zeit)
-        return von_bis[1] - von_bis[0] if von_bis else None
+        return f"{von_bis.minuten} min" if von_bis else None
 
     @property
     def pause_oder_umbau(self) -> bool:
@@ -238,7 +257,7 @@ class Programmpunkt:
 
         Ein Programmpunkt mit "18:00" in der Spalte Zeit bekommt keinen.
         """
-        if zeitangabe(self.zeit) != zeitangabe(zu.zeit):
+        if zeitangabe(self.zeit) != zu.zeitangabe:
             return False
         return not zu.hallenteil or zu.hallenteil.casefold() == self.hallenteil.casefold()
 
@@ -335,6 +354,37 @@ def _ist_zaun(zeile: str) -> bool:
     return zeile.strip().startswith("```")
 
 
+def _ist_tabellenzeile(zeile: str) -> bool:
+    return zeile.strip().startswith("|")
+
+
+def _bloecke(zeilen: list[str]) -> Iterator[tuple[str, int, int]]:
+    """Die Zeilen in Bloecken, je Block seine Art, sein Anfang und sein Ende.
+
+    Die Art ist "code", "tabelle" oder "zeile". Ein Codeblock reicht von Zaun
+    zu Zaun, beide eingeschlossen, ohne schliessenden Zaun bis zum Schluss.
+    Darin ist nichts Markdown, kein `#` und kein `|`. Eine Tabelle sind
+    aufeinanderfolgende Zeilen mit `|` vorn. Jede andere Zeile ist ein Block
+    fuer sich. Das Ende gehoert nicht mehr zum Block.
+    """
+    i = 0
+    while i < len(zeilen):
+        anfang = i
+        if _ist_zaun(zeilen[i]):
+            i += 1
+            while i < len(zeilen) and not _ist_zaun(zeilen[i]):
+                i += 1
+            i = min(i + 1, len(zeilen))
+            yield "code", anfang, i
+        elif _ist_tabellenzeile(zeilen[i]):
+            while i < len(zeilen) and _ist_tabellenzeile(zeilen[i]):
+                i += 1
+            yield "tabelle", anfang, i
+        else:
+            i += 1
+            yield "zeile", anfang, i
+
+
 def zerlege(rumpf: str) -> tuple[str | None, list[Abschnitt]]:
     """Teilt den Rumpf des Plans an seinen Ueberschriften.
 
@@ -349,27 +399,22 @@ def zerlege(rumpf: str) -> tuple[str | None, list[Abschnitt]]:
     abschnitte = [vorab]
     oben = vorab
     ziel = vorab.zeilen
-    im_code = False
-    for zeile in rumpf.splitlines():
-        if _ist_zaun(zeile):
-            im_code = not im_code
-        elif not im_code:
-            m = re.match(r"^(#{1,3})\s+(.*)$", zeile)
-            stufe = len(m.group(1)) if m else 0
-            if stufe == 1 and titel is None:
-                titel = m.group(2).strip()
-                continue
-            if stufe == 2:
-                oben = Abschnitt(2, m.group(2).strip())
-                abschnitte.append(oben)
-                ziel = oben.zeilen
-                continue
-            if stufe == 3:
-                unten = Abschnitt(3, m.group(2).strip())
-                oben.unterabschnitte.append(unten)
-                ziel = unten.zeilen
-                continue
-        ziel.append(zeile)
+    zeilen = rumpf.splitlines()
+    for art, anfang, ende in _bloecke(zeilen):
+        m = re.match(r"^(#{1,3})\s+(.*)$", zeilen[anfang]) if art == "zeile" else None
+        stufe = len(m.group(1)) if m else 0
+        if stufe == 1 and titel is None:
+            titel = m.group(2).strip()
+        elif stufe == 2:
+            oben = Abschnitt(2, m.group(2).strip())
+            abschnitte.append(oben)
+            ziel = oben.zeilen
+        elif stufe == 3:
+            unten = Abschnitt(3, m.group(2).strip())
+            oben.unterabschnitte.append(unten)
+            ziel = unten.zeilen
+        else:
+            ziel.extend(zeilen[anfang:ende])
     return titel, abschnitte
 
 
@@ -383,14 +428,8 @@ def nimm_tabelle(zeilen: list[str]) -> list[str]:
     Was davor und danach steht, bleibt in `zeilen`. Ohne Tabelle eine leere
     Liste. Eine Zeile mit `|` in einem Codeblock gehoert zu keiner Tabelle.
     """
-    im_code = False
-    for anfang, zeile in enumerate(zeilen):
-        if _ist_zaun(zeile):
-            im_code = not im_code
-        elif not im_code and zeile.strip().startswith("|"):
-            ende = anfang
-            while ende < len(zeilen) and zeilen[ende].strip().startswith("|"):
-                ende += 1
+    for art, anfang, ende in _bloecke(zeilen):
+        if art == "tabelle":
             tabelle = zeilen[anfang:ende]
             del zeilen[anfang:ende]
             return tabelle
@@ -459,7 +498,7 @@ def _gleich(a: str, b: str) -> bool:
     return " ".join(a.split()).casefold() == " ".join(b.split()).casefold()
 
 
-def _hier(abschnitt: Abschnitt, punkt: Programmpunkt) -> Abschnitt:
+def _im_programmpunkt(abschnitt: Abschnitt, punkt: Programmpunkt) -> Abschnitt:
     """Der Abschnitt, wie er im Programmpunkt steht.
 
     Zeitangabe und Hallenteil fallen aus der Ueberschrift, auch aus der eines
@@ -467,36 +506,38 @@ def _hier(abschnitt: Abschnitt, punkt: Programmpunkt) -> Abschnitt:
     Gleicht der Rest dem Namen der Uebung, faellt die Ueberschrift ganz weg,
     oben wie in einem Unterabschnitt.
     """
-    def ohne(ueberschrift: str) -> str:
+    def gekuerzt(ueberschrift: str) -> str:
         zu = zuordnung(ueberschrift)
         rest = zu.rest if zu and punkt.gehoert_dazu(zu) else ueberschrift
         return "" if _gleich(rest, punkt.uebung) else rest
 
-    return replace(abschnitt, ueberschrift=ohne(abschnitt.ueberschrift),
-                   unterabschnitte=[replace(u, ueberschrift=ohne(u.ueberschrift))
+    return replace(abschnitt, ueberschrift=gekuerzt(abschnitt.ueberschrift),
+                   unterabschnitte=[replace(u, ueberschrift=gekuerzt(u.ueberschrift))
                                     for u in abschnitt.unterabschnitte])
 
 
-def _ziele(abschnitt: Abschnitt, punkte: list[Programmpunkt],
-           meldungen: list[str]) -> list[Programmpunkt] | None:
+def _ziele(abschnitt: Abschnitt, punkte: list[Programmpunkt]) -> list[Programmpunkt] | None:
     """Die Programmpunkte, zu denen der Abschnitt ueber seine Zeitangabe gehoert.
 
     None, wenn seine Ueberschrift mit keiner beginnt. Passt sie auf keinen
-    Programmpunkt, eine leere Liste und eine Meldung, damit der Trainer den
-    Tippfehler oder die verschobene Zeit findet.
+    Programmpunkt, eine leere Liste.
     """
     zu = zuordnung(abschnitt.ueberschrift)
-    if zu is None:
-        return None
-    ziele = [p for p in punkte if p.gehoert_dazu(zu)]
-    if not ziele:
-        wo = f" in Hallenteil {zu.hallenteil}" if zu.hallenteil else ""
-        meldungen.append(f"Kein Programmpunkt mit der Zeitangabe {zu.zeit}{wo} für den "
-                         f"Abschnitt „{abschnitt.ueberschrift}“. Er steht unter Vorbereitung.")
-    return ziele
+    return None if zu is None else [p for p in punkte if p.gehoert_dazu(zu)]
 
 
-def _unter(punkt: Programmpunkt, ziele: list[Programmpunkt] | None) -> bool:
+def _meldung(abschnitt: Abschnitt) -> str:
+    """Was der Trainer liest, wenn die Zeitangabe des Abschnitts auf keinen Programmpunkt passt.
+
+    Damit findet er den Tippfehler oder die verschobene Zeit.
+    """
+    zu = zuordnung(abschnitt.ueberschrift)
+    wo = f" in Hallenteil {zu.hallenteil}" if zu.hallenteil else ""
+    return (f"Kein Programmpunkt mit der Zeitangabe {zu.zeit}{wo} für den "
+            f"Abschnitt „{abschnitt.ueberschrift}“. Er steht unter Vorbereitung.")
+
+
+def _ist_ziel(punkt: Programmpunkt, ziele: list[Programmpunkt] | None) -> bool:
     return any(p is punkt for p in ziele or [])
 
 
@@ -512,26 +553,29 @@ def verteile(abschnitte: list[Abschnitt],
 
     Zurueck kommen die Abschnitte, die bleiben, in der Reihenfolge des Plans,
     und die Meldungen. Ein `##`, der gewandert ist, bleibt nur mit den `###`,
-    deren Zeitangabe auf keinen Programmpunkt passt.
+    deren Zeitangabe auf keinen Programmpunkt passt. Die Abschnitte, die
+    hereinkommen, bleiben, wie sie sind.
     """
     bleiben, meldungen = [], []
     for abschnitt in abschnitte:
-        oben = _ziele(abschnitt, punkte, meldungen) if abschnitt.stufe > 1 else None
-        unten = [(u, _ziele(u, punkte, meldungen)) for u in abschnitt.unterabschnitte]
+        oben = _ziele(abschnitt, punkte) if abschnitt.stufe > 1 else None
+        unten = [(u, _ziele(u, punkte)) for u in abschnitt.unterabschnitte]
+        meldungen += [_meldung(a) for a, ziele in [(abschnitt, oben), *unten] if ziele == []]
         for punkt in oben or []:
-            mit = [u for u, ziele in unten if ziele is None or _unter(punkt, ziele)]
-            punkt.abschnitte.append(_hier(replace(abschnitt, unterabschnitte=mit), punkt))
+            mit = [u for u, ziele in unten if ziele is None or _ist_ziel(punkt, ziele)]
+            punkt.abschnitte.append(
+                _im_programmpunkt(replace(abschnitt, unterabschnitte=mit), punkt))
         for u, ziele in unten:
             for punkt in ziele or []:
-                if not _unter(punkt, oben):
-                    punkt.abschnitte.append(_hier(u, punkt))
+                if not _ist_ziel(punkt, oben):
+                    punkt.abschnitte.append(_im_programmpunkt(u, punkt))
         if oben:
             rest = [u for u, ziele in unten if ziele == []]
             if rest:
                 bleiben.append(replace(abschnitt, zeilen=[], unterabschnitte=rest))
         else:
-            abschnitt.unterabschnitte = [u for u, ziele in unten if not ziele]
-            bleiben.append(abschnitt)
+            bleiben.append(replace(abschnitt,
+                                   unterabschnitte=[u for u, ziele in unten if not ziele]))
     return bleiben, meldungen
 
 
@@ -833,7 +877,7 @@ UMSCHALTER_SKRIPT = """(function () {
 # Breite, das sich auf doppelte Breite stellen laesst. Die Knoepfe dazu
 # entstehen erst hier. Ohne Skript stehen Skizze und Bild im Programmpunkt,
 # und der Browser zoomt wie gewohnt.
-SKRIPT_ANSICHTEN = """
+ANSICHTEN_SKRIPT = """
 (function () {
   "use strict";
   if (typeof HTMLDialogElement !== "function"
@@ -1027,6 +1071,19 @@ def liste_html(tabelle: list[str]) -> str:
     return '<div class="liste">\n' + "\n".join(eintraege) + "\n</div>"
 
 
+def tabelle_html(tabelle: list[str]) -> str:
+    """Eine Tabelle aus dem Plan. Beginnt sie mit `Nr | Übung`, eine Liste zum Aufklappen."""
+    if ist_liste_zum_aufklappen(tabelle):
+        return liste_html(tabelle)
+    reihen = []
+    for n, zeile in enumerate(tabelle):
+        if not _ist_trennzeile(zeile):
+            tag = "th" if n == 0 else "td"
+            reihen.append("<tr>" + "".join(f"<{tag}>{inline(f)}</{tag}>"
+                                           for f in tabellenzellen(zeile)) + "</tr>")
+    return "\n".join(["<table>", *reihen, "</table>"])
+
+
 def nach_html(zeilen: list[str]) -> str:
     """Das Markdown eines Abschnitts als HTML.
 
@@ -1035,10 +1092,8 @@ def nach_html(zeilen: list[str]) -> str:
     `##` und `###` sind hier schon herausgeloest, eine tiefere Ueberschrift
     wird eine kleine.
     """
-    raus, i = [], 0
+    raus = []
     liste = None
-    in_code = False
-    code: list[str] = []
 
     def liste_zu():
         nonlocal liste
@@ -1046,47 +1101,25 @@ def nach_html(zeilen: list[str]) -> str:
             raus.append(f"</{liste}>")
             liste = None
 
-    while i < len(zeilen):
-        z = zeilen[i]
-
-        if _ist_zaun(z):
-            if in_code:
-                raus.append("<pre>" + html.escape("\n".join(code)) + "</pre>")
-                code, in_code = [], False
-            else:
-                liste_zu()
-                in_code = True
-            i += 1
-            continue
-        if in_code:
-            code.append(z)
-            i += 1
-            continue
-
-        if z.strip().startswith("|"):
-            block = []
-            while i < len(zeilen) and zeilen[i].strip().startswith("|"):
-                block.append(zeilen[i])
-                i += 1
+    for art, anfang, ende in _bloecke(zeilen):
+        if art == "code":
             liste_zu()
-            if ist_liste_zum_aufklappen(block):
-                raus.append(liste_html(block))
-                continue
-            raus.append("<table>")
-            for n, zz in enumerate(block):
-                if _ist_trennzeile(zz):
-                    continue
-                tag = "th" if n == 0 else "td"
-                raus.append("<tr>" + "".join(f"<{tag}>{inline(f)}</{tag}>"
-                                             for f in tabellenzellen(zz)) + "</tr>")
-            raus.append("</table>")
+            code = zeilen[anfang + 1:ende]
+            if code and ende - anfang > 1 and _ist_zaun(code[-1]):
+                code = code[:-1]
+            raus.append("<pre>" + html.escape("\n".join(code)) + "</pre>")
             continue
 
+        if art == "tabelle":
+            liste_zu()
+            raus.append(tabelle_html(zeilen[anfang:ende]))
+            continue
+
+        z = zeilen[anfang]
         m = re.match(r"^#{1,4}\s+(.*)$", z)
         if m:
             liste_zu()
             raus.append(f"<h4>{inline(m.group(1).strip())}</h4>")
-            i += 1
             continue
 
         m = re.match(r"^\s*[-*]\s+(.*)$", z)
@@ -1096,7 +1129,6 @@ def nach_html(zeilen: list[str]) -> str:
                 raus.append("<ul>")
                 liste = "ul"
             raus.append(f"<li>{inline(m.group(1))}</li>")
-            i += 1
             continue
 
         m = re.match(r"^\s*(\d+)\.\s+(.*)$", z)
@@ -1106,22 +1138,17 @@ def nach_html(zeilen: list[str]) -> str:
                 raus.append("<ol>")
                 liste = "ol"
             raus.append(f"<li>{inline(m.group(2))}</li>")
-            i += 1
             continue
 
         if z.strip() in ("---", "___"):
             liste_zu()
             raus.append("<hr>")
-            i += 1
             continue
 
         if z.strip():
             liste_zu()
             raus.append(f"<p>{inline(z.strip())}</p>")
-        i += 1
 
-    if in_code:
-        raus.append("<pre>" + html.escape("\n".join(code)) + "</pre>")
     liste_zu()
     return "\n".join(raus)
 
@@ -1218,7 +1245,7 @@ def karte_html(punkt: Programmpunkt, adresse) -> list[str]:
 def programmpunkt_html(punkt: Programmpunkt, adresse) -> str:
     wann = [f'<span class="zeit">{inline(punkt.zeit)}</span>'] if punkt.zeit else []
     if punkt.dauer is not None:
-        wann.append(f'<span class="dauer">{punkt.dauer} min</span>')
+        wann.append(f'<span class="dauer">{punkt.dauer}</span>')
     was = [f'<span class="name">{inline(punkt.name)}</span>'] if punkt.name else []
     if punkt.uebung:
         was.append(f'<strong class="uebung">{inline(punkt.uebung)}</strong>')
@@ -1298,7 +1325,7 @@ def schreibe(gliederung: Gliederung, adresse, quelle: str, erzeugt: str) -> str:
 <div class="fuss">Leseansicht, erzeugt am {erzeugt} aus <code>{html.escape(quelle)}</code>.<br>
 Änderungen gehören in die Markdown-Datei, hier gehen sie beim nächsten Erzeugen verloren.</div>
 </main>
-<script>{SKRIPT_ANSICHTEN}</script>
+<script>{ANSICHTEN_SKRIPT}</script>
 </body></html>"""
 
 
