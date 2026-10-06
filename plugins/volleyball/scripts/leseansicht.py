@@ -3,13 +3,16 @@
 
     <python> leseansicht.py trainings/h1-h2/2026-09-15.md
 
-Erzeugt die .html neben der .md, eine einzige Datei, die ohne JavaScript
-auskommt. Die Ablauftabelle wird dabei bewusst NICHT als Tabelle gezeigt:
-sechs Spalten sind auf einem Handy in der Halle unlesbar. Jede Zeile wird ein
-Programmpunkt, der zugeklappt Zeitangabe, Dauer, Name und Uebung zeigt und
-sich mit dem Daumen aufklappen laesst. Alle anderen Abschnitte des Plans
-stehen am Ende unter Vorbereitung. Gestaltet ist die Seite nach der Vorlage
-unter docs/gestaltung/leseansicht/, hell oder dunkel nach dem Geraet. Wo
+Erzeugt die .html neben der .md, eine einzige Datei, die auch ohne
+JavaScript lesbar ist. Die Ablauftabelle wird dabei bewusst NICHT als Tabelle
+gezeigt: sechs Spalten sind auf einem Handy in der Halle unlesbar. Jede Zeile
+wird ein Programmpunkt, der zugeklappt Zeitangabe, Dauer, Name und Uebung
+zeigt und sich mit dem Daumen aufklappen laesst. `## Zum Nachschlagen` steht
+am Ende fuer sich, jede `###` darin ein Reiter. Alle anderen Abschnitte des
+Plans stehen am Ende unter Vorbereitung. Ein kurzes eingebettetes Skript
+macht aus Nachschlagen und Vorbereitung Ansichten, die sich ueber dem Ablauf
+oeffnen. Gestaltet ist die Seite nach der Vorlage unter
+docs/gestaltung/leseansicht/, hell oder dunkel nach dem Geraet. Wo
 JavaScript laeuft, waehlt der Trainer Hell, Dunkel oder System selbst
 (ADR-0012).
 
@@ -42,6 +45,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
+from urllib.parse import unquote
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
@@ -56,6 +60,9 @@ from tpdaten import (  # noqa: E402
 # oder Bindestrich, so wie in der Spalte Zeit (Glossar).
 ZEITANGABE = re.compile(r"(\d+)\s*[–-]\s*(\d+)")
 
+# Ein Markdown-Link auf eine Stelle im Plan: [Text](#anker).
+LINK_AUF_STELLE = re.compile(r"\[[^\]]+\]\(#([^)\s]+)\)")
+
 # Die Spalten der Ablauftabelle und unter welchen Ueberschriften sie stehen
 # koennen, kleingeschrieben. Die zweite hiess bis zur Welle zur Leseansicht
 # "Teil", davor "Block". Alte Plaene gelten weiter.
@@ -67,6 +74,16 @@ SPALTEN = {
     "heute": ("anpassung heute", "anpassung"),
     "warum": ("warum hier", "begründung", "warum"),
 }
+
+
+def anker(ueberschrift: str) -> str:
+    """Der Anker einer Ueberschrift, wie GitHub ihn bildet.
+
+    Klein geschrieben, Satzzeichen fallen weg, jedes Leerzeichen wird ein
+    Bindestrich. Umlaute bleiben. So fuehrt ein Link wie `[…](#die-läufer)`
+    in der .md und in der Leseansicht zur selben Stelle.
+    """
+    return re.sub(r"[^\w\- ]", "", ueberschrift.strip().lower()).replace(" ", "-")
 
 
 def zeitangabe(text: str) -> tuple[int, int] | None:
@@ -104,6 +121,10 @@ class Abschnitt:
     def ist_ablauf(self) -> bool:
         return self.stufe == 2 and self.ueberschrift.lower().startswith("ablauf")
 
+    @property
+    def ist_nachschlagen(self) -> bool:
+        return self.stufe == 2 and self.ueberschrift.lower() == "zum nachschlagen"
+
 
 @dataclass
 class Karte:
@@ -133,6 +154,16 @@ class Programmpunkt:
     heute: str
     warum: str
     karte: Karte | None = None
+    verweise: list[Abschnitt] = field(default_factory=list)
+    """Die Reiter unter Nachschlagen, auf die der Programmpunkt verweist, jeder einmal."""
+
+    def texte(self) -> list[str]:
+        """Was der Plan zu diesem Programmpunkt schreibt, in der Folge der Leseansicht.
+
+        Aus diesen Texten kommen seine Verweise: "Heute", die Abschnitte, die
+        ihm gehoeren, und "Warum hier".
+        """
+        return [self.heute, self.warum]
 
     @property
     def dauer(self) -> int | None:
@@ -229,6 +260,8 @@ class Gliederung:
     """Jeder Abschnitt, der nicht leer ist, in der Reihenfolge des Plans."""
     meldungen: list[str] = field(default_factory=list)
     """Was der Trainer auf der Konsole lesen soll, eine Zeile je Meldung."""
+    nachschlagen: Abschnitt | None = None
+    """`## Zum Nachschlagen`, wenn es ihn gibt und er nicht leer ist. Die `###` sind die Reiter."""
 
 
 def _ist_zaun(zeile: str) -> bool:
@@ -326,6 +359,18 @@ def programmpunkte(tabelle: list[str]) -> list[Programmpunkt]:
     return punkte
 
 
+def verweise(texte: list[str], reiter: list[Abschnitt]) -> list[Abschnitt]:
+    """Die Reiter, auf die ein Link in diesen Texten zeigt, jeder einmal, in der Folge der Links."""
+    nach_anker = {anker(r.ueberschrift): r for r in reiter}
+    gefunden: list[Abschnitt] = []
+    for text in texte:
+        for ziel in LINK_AUF_STELLE.findall(text):
+            r = nach_anker.get(unquote(ziel))
+            if r is not None and all(r is not g for g in gefunden):
+                gefunden.append(r)
+    return gefunden
+
+
 def lies_karten(wurzel: Path | None) -> dict[str, Karte]:
     """Die Karten der Bibliothek nach ID. Ausserhalb eines Arbeitsordners keine."""
     if wurzel is None:
@@ -352,12 +397,17 @@ def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
 
     Die erste Tabelle unter `## Ablauf` ist die Ablauftabelle. Was dort
     daneben steht, bleibt im Abschnitt Ablauf und kommt mit ihm unter
+    Vorbereitung. `## Zum Nachschlagen` steht fuer sich, nicht unter
     Vorbereitung.
     """
     felder, rumpf = lies_frontmatter(plan)
     titel, abschnitte = zerlege(rumpf)
     titel = titel or plan.stem
     abschnitte[0].ueberschrift = titel
+    nachschlagen = next((a for a in abschnitte if a.ist_nachschlagen), None)
+    if nachschlagen is not None:
+        abschnitte.remove(nachschlagen)
+        nachschlagen.unterabschnitte = [r for r in nachschlagen.unterabschnitte if not r.leer]
     punkte = []
     for abschnitt in abschnitte:
         if abschnitt.ist_ablauf:
@@ -365,9 +415,15 @@ def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
     karten = lies_karten(wurzel)
     for punkt in punkte:
         punkt.karte = karten.get(punkt.id)
+    if nachschlagen is not None and nachschlagen.leer:
+        nachschlagen = None
+    reiter = nachschlagen.unterabschnitte if nachschlagen else []
+    for punkt in punkte:
+        punkt.verweise = verweise(punkt.texte(), reiter)
     return Gliederung(kopf=Kopf(titel, felder, lies_gruppenname(wurzel, felder.get("gruppe"))),
                       programmpunkte=punkte,
-                      vorbereitung=[a for a in abschnitte if not a.leer])
+                      vorbereitung=[a for a in abschnitte if not a.leer],
+                      nachschlagen=nachschlagen)
 
 
 # --------------------------------------------------------------------------
@@ -382,12 +438,14 @@ HELL = {
     "akzent": "#356548", "linie": "#c7d6c6", "heute": "#e5ece0", "heute-marke": "#243d32",
     "knopf": "transparent", "knopf-rand": "#c7d6c6", "offen": "#243d32",
     "bildgrund": "#e5ece0", "bildrand": "#c7d6c6", "bild": "transparent",
+    "schleier": "#192c2ba6", "schatten": "#1e30252b",
 }
 DUNKEL = {
     "papier": "#14241e", "flaeche": "#21382c", "tinte": "#e6eee3", "gedaempft": "#a9beab",
     "akzent": "#b3d5a0", "linie": "#3b5141", "heute": "#233a2b", "heute-marke": "#b3d5a0",
     "knopf": "#1a2d23", "knopf-rand": "#45604b", "offen": "#d9edca",
     "bildgrund": "#dce4d7", "bildrand": "#82997d", "bild": "#edf1e8",
+    "schleier": "#08140dd1", "schatten": "#07110ccc",
 }
 
 
@@ -492,6 +550,34 @@ border-bottom:2px solid var(--akzent)}
 .abschnitt{border-bottom:1px solid var(--linie)}
 .abschnitt>summary{font-weight:700;padding:12px 0}
 .abschnitt>.rich{padding-bottom:16px;overflow-wrap:anywhere}
+.nachschlagen{margin-top:40px}
+.nachschlagen>h2{font-size:22px;line-height:1.25;padding-bottom:8px;
+border-bottom:2px solid var(--akzent)}
+.reiterleiste,.verweise{display:flex;gap:8px;flex-wrap:wrap}
+.reiterleiste{padding-top:16px;margin-bottom:20px}
+.verweise{margin-top:24px}
+.reiterleiste a,.verweise a,.ansicht-kopf button{display:flex;align-items:center;min-height:44px;
+padding:10px 14px;font:inherit;font-size:13px;color:inherit;text-decoration:none;cursor:pointer;
+background:var(--knopf);border:1px solid var(--knopf-rand);border-radius:7px}
+.reiterleiste a:hover,.verweise a:hover,.ansicht-kopf button:hover{background:var(--flaeche)}
+.verweise a::after{content:"\\2009↗"}
+.reiterleiste a[aria-current]{background:var(--akzent);color:var(--papier);
+border-color:var(--akzent)}
+.reiter>h3{font-size:18px;line-height:1.4;margin:24px 0 10px}
+.ansicht .reiter>h3{font-size:22px;line-height:1.25;margin-top:8px}
+.ansicht{padding:0;max-height:90vh;max-height:90dvh;width:calc(100% - 24px);max-width:760px;
+margin:auto;background:var(--papier);color:var(--tinte);border:1px solid var(--linie);
+border-radius:16px;box-shadow:0 20px 70px var(--schatten);overscroll-behavior:contain}
+.ansicht::backdrop{background:var(--schleier,#192c2ba6)}
+.ansicht-kopf{display:flex;justify-content:space-between;align-items:center;gap:12px;
+padding:18px 20px;background:var(--papier);position:sticky;top:0;z-index:2;
+border-bottom:1px solid var(--linie)}
+.ansicht-kopf h2{font-size:19px;line-height:1.25}
+.ansicht-kopf button{flex-shrink:0}
+.ansicht-inhalt{padding:4px 20px 28px;overflow-wrap:anywhere}
+.ansicht-inhalt>section{margin:0}
+@media (prefers-reduced-motion:no-preference){.ansicht[open]{animation:aufgehen .15s ease-out}}
+@keyframes aufgehen{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .fuss{font-size:11px;color:var(--gedaempft);border-top:1px solid var(--linie);
 padding-top:16px;margin-top:30px}
 @media (min-width:900px){.seite{padding:0 36px 48px}.kopf{padding-top:32px}}
@@ -572,6 +658,95 @@ UMSCHALTER_SKRIPT = """(function () {
     }
   });
 })();"""
+
+# Die Ansichten (#56). Ohne Skript, oder wo der Browser kein <dialog> kennt,
+# stehen Nachschlagen und Vorbereitung am Ende der Seite, und Knoepfe und
+# Verweise springen dorthin. Mit Skript wird jeder Abschnitt mit
+# data-zurueck eine Ansicht: ein <dialog>, der sich mit dem Zurueck-Knopf,
+# einem Tipp daneben und, wo der Browser es weitergibt, mit Escape oder der
+# Zurueck-Geste schliesst. Ein Link auf eine Stelle darin oeffnet die
+# Ansicht, ein Link auf einen Reiter zeigt ihn. Der Ablauf bleibt dabei, wie
+# er ist, offene Programmpunkte bleiben offen.
+#
+# `ansicht(titel, zurueck)` baut eine leere Ansicht. Was sie zeigt, kommt in
+# ihr Feld .ansicht-inhalt, hier ein Abschnitt der Seite, beim Vergroessern
+# ein Bild.
+SKRIPT_ANSICHTEN = """
+(function () {
+  "use strict";
+  if (typeof HTMLDialogElement !== "function"
+      || typeof HTMLDialogElement.prototype.showModal !== "function") return;
+
+  function ansicht(titel, zurueck) {
+    var dialog = document.createElement("dialog");
+    dialog.className = "ansicht";
+    dialog.setAttribute("aria-label", titel.textContent);
+    var kopf = document.createElement("div");
+    kopf.className = "ansicht-kopf";
+    var knopf = document.createElement("button");
+    knopf.type = "button";
+    knopf.textContent = zurueck;
+    knopf.addEventListener("click", function () { dialog.close(); });
+    kopf.append(titel, knopf);
+    var inhalt = document.createElement("div");
+    inhalt.className = "ansicht-inhalt";
+    dialog.append(kopf, inhalt);
+    dialog.addEventListener("click", function (e) {
+      if (e.target !== dialog) return;
+      var r = dialog.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right
+          || e.clientY < r.top || e.clientY > r.bottom) dialog.close();
+    });
+    return dialog;
+  }
+
+  function oeffne(dialog) {
+    if (!dialog.open) dialog.showModal();
+    dialog.scrollTop = 0;
+  }
+
+  // Die Stelle, auf die ein Link zeigt, so wie der Browser sie sucht.
+  function stelle(link) {
+    var anker = link.getAttribute("href").slice(1);
+    var ziel = document.getElementById(anker);
+    if (!ziel) {
+      try { ziel = document.getElementById(decodeURIComponent(anker)); } catch (e) {}
+    }
+    return ziel;
+  }
+
+  // Zeigt von den Reitern seines Abschnitts nur diesen.
+  function zeigeReiter(reiter) {
+    if (!reiter) return;
+    var abschnitt = reiter.parentNode;
+    abschnitt.querySelectorAll(":scope > .reiter").forEach(function (r) {
+      r.hidden = r !== reiter;
+    });
+    abschnitt.querySelectorAll(".reiterleiste a").forEach(function (a) {
+      if (stelle(a) === reiter) a.setAttribute("aria-current", "true");
+      else a.removeAttribute("aria-current");
+    });
+  }
+
+  document.querySelectorAll("section[data-zurueck]").forEach(function (abschnitt) {
+    var dialog = ansicht(abschnitt.querySelector(":scope > h2"),
+                         abschnitt.getAttribute("data-zurueck"));
+    abschnitt.before(dialog);
+    dialog.querySelector(".ansicht-inhalt").append(abschnitt);
+    zeigeReiter(abschnitt.querySelector(":scope > .reiter"));
+  });
+
+  document.addEventListener("click", function (e) {
+    var link = e.target.closest('a[href^="#"]');
+    var ziel = link && stelle(link);
+    var dialog = ziel && ziel.closest("dialog.ansicht");
+    if (!dialog) return;
+    e.preventDefault();
+    zeigeReiter(ziel.closest(".reiter") || dialog.querySelector(".reiter"));
+    oeffne(dialog);
+  });
+})();
+"""
 
 
 def baue_adresse(ziel: Path, modus: str):
@@ -743,11 +918,40 @@ def abschnitt_html(abschnitt: Abschnitt) -> str:
 def vorbereitung_html(abschnitte: list[Abschnitt]) -> str:
     if not abschnitte:
         return ""
-    return ('<section class="vorbereitung" id="vorbereitung"><h2>Vorbereitung</h2>\n'
+    return ('<section class="vorbereitung" id="vorbereitung" data-zurueck="Zurück zum Ablauf">'
+            '<h2>Vorbereitung</h2>\n'
             + "\n".join(f'<details class="abschnitt"><summary>{inline(a.ueberschrift)}</summary>'
                         f'<div class="rich">\n{abschnitt_html(a)}\n</div></details>'
                         for a in abschnitte)
             + "\n</section>")
+
+
+def link_auf_reiter(reiter: Abschnitt) -> str:
+    """Ohne Skript ein Sprung zum Reiter am Ende der Seite, mit Skript oeffnet er ihn."""
+    return f'<a href="#{html.escape(anker(reiter.ueberschrift))}">{inline(reiter.ueberschrift)}</a>'
+
+
+def nachschlagen_html(abschnitt: Abschnitt | None) -> str:
+    """Zum Nachschlagen, ein Reiter je `###`, der Text davor ueber den Reitern.
+
+    Ohne Skript stehen die Reiter untereinander, und die Leiste darueber
+    springt zu jedem. Mit Skript zeigt die Ansicht einen Reiter auf einmal.
+    """
+    if abschnitt is None:
+        return ""
+    teile = ['<section class="nachschlagen" id="nachschlagen" data-zurueck="Zurück zur Übung">'
+             '<h2>Nachschlagen</h2>']
+    vorweg = nach_html(abschnitt.zeilen)
+    if vorweg:
+        teile.append(f'<div class="rich vorweg">\n{vorweg}\n</div>')
+    reiter = abschnitt.unterabschnitte
+    if reiter:
+        teile.append('<nav class="reiterleiste" aria-label="Themen">'
+                     + "".join(map(link_auf_reiter, reiter)) + "</nav>")
+    teile += [f'<section class="reiter" id="{html.escape(anker(r.ueberschrift))}">'
+              f'<h3>{inline(r.ueberschrift)}</h3>'
+              f'<div class="rich">\n{nach_html(r.zeilen)}\n</div></section>' for r in reiter]
+    return "\n".join(teile) + "\n</section>"
 
 
 def karte_html(punkt: Programmpunkt, adresse) -> list[str]:
@@ -787,6 +991,9 @@ def programmpunkt_html(punkt: Programmpunkt, adresse) -> str:
     if punkt.heute:
         inhalt.append(f'<div class="heute"><b>Heute</b><p>{inline(punkt.heute)}</p></div>')
     inhalt += karte_html(punkt, adresse)
+    if punkt.verweise:
+        inhalt.append('<nav class="verweise" aria-label="Nachschlagen">'
+                      + "".join(map(link_auf_reiter, punkt.verweise)) + "</nav>")
     if punkt.warum:
         inhalt.append('<details class="warum"><summary>Warum hier?</summary>'
                       f'<div class="rich"><p>{inline(punkt.warum)}</p></div></details>')
@@ -825,11 +1032,13 @@ def schreibe(gliederung: Gliederung, adresse, quelle: str, erzeugt: str) -> str:
     punkte = "\n".join(programmpunkt_html(p, adresse) for p in gliederung.programmpunkte)
     zahl = len(gliederung.programmpunkte)
     zahl = f"{zahl} Programmpunkt" if zahl == 1 else f"{zahl} Programmpunkte"
-    # Ohne JavaScript ein Sprung ans Ende der Seite. Einen Knopf ohne Ziel
-    # gibt es nicht.
-    knoepfe = ('<nav class="knoepfe" aria-label="Trainingsunterlagen">'
-               '<a href="#vorbereitung">Vorbereitung</a></nav>'
-               if gliederung.vorbereitung else "")
+    # Ohne JavaScript ein Sprung ans Ende der Seite, mit Skript oeffnet der
+    # Knopf eine Ansicht. Einen Knopf ohne Ziel gibt es nicht.
+    knoepfe = "".join(f'<a href="#{ziel}">{name}</a>' for ziel, name, da in (
+        ("nachschlagen", "Nachschlagen", gliederung.nachschlagen),
+        ("vorbereitung", "Vorbereitung", gliederung.vorbereitung)) if da)
+    if knoepfe:
+        knoepfe = f'<nav class="knoepfe" aria-label="Trainingsunterlagen">{knoepfe}</nav>'
     return f"""<!DOCTYPE html>
 <html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -844,10 +1053,12 @@ def schreibe(gliederung: Gliederung, adresse, quelle: str, erzeugt: str) -> str:
 <div class="ablauf">
 {punkte}
 </div>
+{nachschlagen_html(gliederung.nachschlagen)}
 {vorbereitung_html(gliederung.vorbereitung)}
 <div class="fuss">Leseansicht, erzeugt am {erzeugt} aus <code>{html.escape(quelle)}</code>.<br>
 Änderungen gehören in die Markdown-Datei, hier gehen sie beim nächsten Erzeugen verloren.</div>
 </main>
+<script>{SKRIPT_ANSICHTEN}</script>
 </body></html>"""
 
 

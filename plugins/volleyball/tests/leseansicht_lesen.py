@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
+from urllib.parse import unquote
 
 # Elemente ohne schliessendes Tag.
 LEERE_ELEMENTE = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link",
@@ -30,6 +31,7 @@ TEILE = {
     "heute": "Heute",
     "schaubild": "Schaubild der Karte",
     "karte": "Quelle und ID",
+    "verweise": "Verweise",
     "warum": "Warum hier?",
 }
 
@@ -124,6 +126,14 @@ class Schaubild:
 
 
 @dataclass
+class Link:
+    text: str
+    adresse: str
+    reiter: str | None
+    """Der Name des Reiters unter Nachschlagen, zu dem der Link fuehrt, sonst None."""
+
+
+@dataclass
 class Programmpunkt:
     zeit: str
     dauer: int | None
@@ -139,6 +149,10 @@ class Programmpunkt:
     zugeklappt: bool
     warum_zugeklappt: bool
     gedaempft: bool
+    verweise: list[str]
+    """Die Knoepfe zum Nachschlagen, je der Name des Reiters, den er oeffnet."""
+    links: list[Link]
+    """Jeder Link im Text des Programmpunkts, ohne die Verweise."""
 
 
 @dataclass
@@ -162,6 +176,19 @@ class Abschnitt:
     """Jede Liste zum Aufklappen im Abschnitt, in der Folge des Plans."""
     tabellen: list[list[list[str]]] = field(default_factory=list)
     """Jede Tabelle, die eine Tabelle blieb: je Zeile ihre Zellen, die Kopfzeile vorn."""
+
+
+@dataclass
+class Reiter:
+    name: str
+    text: str
+
+
+@dataclass
+class Nachschlagen:
+    vorweg: str
+    """Der Text ueber den Reitern."""
+    reiter: list[Reiter]
 
 
 @dataclass
@@ -202,15 +229,31 @@ class Leseansicht:
     """Der Umschalter Hell, Dunkel, System."""
     farbschema: dict[str, str]
     """Das Farbschema ohne Skript, je Bedingung einer Media-Query, "" ohne Bedingung."""
+    nachschlagen: Nachschlagen | None = None
+    nachgeladen: list[str] = field(default_factory=list)
+    """Was die Seite von anderswo holt: Skripte und Stile mit eigener Quelle,
+    jede Adresse ins Netz in einem Skript oder Stil."""
 
 
 def _text(knoten: Knoten | None) -> str | None:
     return knoten.text() if knoten is not None else None
 
 
-def _programmpunkt(knoten: Knoten) -> Programmpunkt:
+def _ziel(a: Knoten) -> str:
+    """Die Stelle, auf die ein Link auf dieser Seite zeigt, wie der Browser sie sucht.
+
+    Fuer einen Link woandershin leer.
+    """
+    adresse = a.attribute.get("href") or ""
+    return unquote(adresse[1:]) if adresse.startswith("#") else ""
+
+
+def _programmpunkt(knoten: Knoten, reiter: dict[str, str]) -> Programmpunkt:
+    """`reiter` sind die Namen der Reiter unter Nachschlagen nach ihrem Anker."""
     kopf = knoten.erstes("summary")
     inhalt = knoten.erstes(klasse="inhalt")
+    verweise = inhalt.erstes(klasse="verweise")
+    knoepfe = verweise.alle("a") if verweise is not None else []
     dauer = _text(kopf.erstes(klasse="dauer"))
     heute = inhalt.erstes(klasse="heute")
     warum = inhalt.erstes(klasse="warum")
@@ -234,6 +277,9 @@ def _programmpunkt(knoten: Knoten) -> Programmpunkt:
         zugeklappt="open" not in knoten.attribute,
         warum_zugeklappt=warum is not None and "open" not in warum.attribute,
         gedaempft="gedaempft" in knoten.klassen,
+        verweise=[reiter.get(_ziel(a), a.attribute.get("href") or "") for a in knoepfe],
+        links=[Link(a.text(), a.attribute.get("href") or "", reiter.get(_ziel(a)))
+               for a in inhalt.alle("a") if a not in knoepfe],
     )
 
 
@@ -281,6 +327,15 @@ def _abschnitt(knoten: Knoten) -> Abschnitt:
                      zugeklappt="open" not in knoten.attribute,
                      listen=_listen(knoten),
                      tabellen=_tabellen(knoten))
+
+
+def _nachschlagen(knoten: Knoten | None) -> Nachschlagen | None:
+    if knoten is None:
+        return None
+    return Nachschlagen(
+        vorweg=_text(knoten.erstes(klasse="vorweg")) or "",
+        reiter=[Reiter(_text(r.erstes("h3")) or "", _text(r.erstes(klasse="rich")) or "")
+                for r in knoten.alle(klasse="reiter")])
 
 
 def _knoepfe(seite: Knoten) -> list[str]:
@@ -359,15 +414,28 @@ def _farbschema(seite: Knoten) -> dict[str, str]:
     return schema
 
 
+def _nachgeladen(seite: Knoten) -> list[str]:
+    gefunden = [f"script src={k.attribute['src']}" for k in seite.alle("script")
+                if k.attribute.get("src")]
+    gefunden += [f"link href={k.attribute.get('href')}" for k in seite.alle("link")]
+    for k in seite.alle("script") + seite.alle("style"):
+        text = "".join(kind for kind in k.kinder if isinstance(kind, str))
+        gefunden += re.findall(r"https?://\S+|@import\b", text)
+    return gefunden
+
+
 def lies_leseansicht(html: str) -> Leseansicht:
     seite = baum(html)
     kopf = seite.erstes(klasse="ablauf-kopf")
     vorbereitung = seite.erstes(klasse="vorbereitung")
+    nachschlagen = seite.erstes(klasse="nachschlagen")
+    reiter = ({r.attribute.get("id"): _text(r.erstes("h3"))
+               for r in nachschlagen.alle(klasse="reiter")} if nachschlagen is not None else {})
     return Leseansicht(
         kopf=_kopf(seite),
         ablauf=" · ".join(k.text() for k in kopf.elemente()) if kopf is not None else "",
         knoepfe=_knoepfe(seite),
-        programmpunkte=[_programmpunkt(k) for k in seite.alle("details", "programmpunkt")],
+        programmpunkte=[_programmpunkt(k, reiter) for k in seite.alle("details", "programmpunkt")],
         vorbereitung=([_abschnitt(k) for k in vorbereitung.alle("details", "abschnitt")]
                       if vorbereitung is not None else []),
         text=seite.text(),
@@ -376,4 +444,6 @@ def lies_leseansicht(html: str) -> Leseansicht:
         ereignisse=_ereignisse(seite),
         umschalter=_umschalter(seite),
         farbschema=_farbschema(seite),
+        nachschlagen=_nachschlagen(nachschlagen),
+        nachgeladen=_nachgeladen(seite),
     )
