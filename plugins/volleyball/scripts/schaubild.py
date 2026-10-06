@@ -144,10 +144,10 @@ BLOCKABSTAND = KLEINSCHRIFT * ZEILENABSTAND / 2
 # sitzen wie das Bild und nicht auf zweiten daneben.
 SEITENRAND = RAND * MASSSTAB
 
-# Die Farben. Zwei Saetze derselben Namen, einer je Schema, damit das Bild in
-# einer hellen wie in einer dunklen Leseansicht lesbar bleibt. Die Werte sind
-# die aus leseansicht.py, damit Schaubild und Blatt nicht zwei Handschriften
-# haben.
+# Die Farben. Zwei Saetze derselben Namen, einer je Schema, damit das Bild
+# hell wie dunkel lesbar bleibt. Die Werte stammen aus der frueheren
+# Leseansicht. Die heutige hat die gruene Palette ihrer Gestaltungsvorlage und
+# legt ein Schaubild auch im Dunkeln auf hellen Grund (#50).
 HELL = {
     "papier": "#fbfaf8",
     "feld": "#ffffff",

@@ -42,7 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    ALTE_ID_MUSTER, MARKER, TRAINER_ABSCHNITT, TRAINERNAME, KeineId, finde_wurzel,
+    ALTE_ID_MUSTER, EINTRAGSNAME, MARKER, TRAINER_ABSCHNITT, KeineId, finde_wurzel,
     interpreter, konsole_vorbereiten, lies_trainer, rechnername, trainernummer,
 )
 
@@ -230,7 +230,7 @@ def main() -> int:
                     help="umstellen, statt nur zu zeigen, was sich ändert")
     a = ap.parse_args()
 
-    if not re.fullmatch(TRAINERNAME, a.trainer):
+    if not re.fullmatch(EINTRAGSNAME, a.trainer):
         print(f"--trainer {a.trainer!r}: ein Name ohne Leerzeichen, Doppelpunkt und #, "
               f"so wie unter gruppen.<gruppe>.trainer.")
         return 1

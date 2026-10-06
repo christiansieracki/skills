@@ -335,16 +335,15 @@ def rechnername() -> str:
     return socket.gethostname()
 
 
-# Der Name eines Trainers unter `trainer:`, und die Zeile, mit der der
-# Abschnitt beginnt. ids_umstellen.py schreibt beides, deshalb stehen die
-# Muster einmal hier.
-TRAINERNAME = r"[^\s:#]+"
+# Der Name eines Eintrags in der Wurzeldatei: eines Trainers unter
+# `trainer:` oder das Kuerzel einer Gruppe unter `gruppen:`, etwa `h1-h2`.
+# Dazu die Zeilen, mit denen die beiden Abschnitte beginnen.
+# ids_umstellen.py schreibt einen Trainer mit seinem Abschnitt, deshalb stehen
+# die Muster einmal hier.
+EINTRAGSNAME = r"[^\s:#]+"
 TRAINER_ABSCHNITT = re.compile(r"trainer:\s*(#.*)?$")
-_EINTRAGSZEILE = re.compile(rf"(?P<name>{TRAINERNAME}):\s*(#.*)?$")
-
-# Die Zeile, mit der der Abschnitt `gruppen:` beginnt. Das Kuerzel einer
-# Gruppe sieht aus wie der Name eines Trainers, etwa `h1-h2`.
 GRUPPEN_ABSCHNITT = re.compile(r"gruppen:\s*(#.*)?$")
+_EINTRAGSZEILE = re.compile(rf"(?P<name>{EINTRAGSNAME}):\s*(#.*)?$")
 
 
 def _lies_eintraege(wurzel: Path, abschnitt: re.Pattern) -> dict[str, dict] | None:
