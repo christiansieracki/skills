@@ -25,7 +25,9 @@ ein Ticket bekommen, siehe den Nachtrag in #29. Bei der Durchsicht am
 05.10.2026 nach der Abnahme (#37) ebenso: #75 und #76 kommen in die Welle zur
 Leseansicht, #77 davor. Der Ausschnitt für PDFs, die nicht wie PlayDrill
 aufgebaut sind, bleibt in der Welle zur Wissenskarte (#62 bis #65), nach der
-Welle zur Leseansicht.
+Welle zur Leseansicht. Beim Bau der Welle zur Leseansicht am 06.10.2026 kamen
+Punkte aus #52 bis #59, #75 und #76 dazu. Was davon die Abnahme prüfen soll,
+steht als Kommentar in #60, der Rest hier mit Ziel.
 
 ### DVV Plan 1 als Übungsfolge mit ID
 
@@ -49,6 +51,16 @@ ausgenommen.
 
 Ziel: Welle zur Wissenskarte, mit #63, das den Kartenentwurf ohnehin anfasst.
 
+### „Block“ für den Trainingsblock
+
+Aus #59. `TRAININGSDESIGN.md` sagt „siehe aktiven Block in `mesozyklen/`“ und
+„frühe Einheiten im Block“, der Skill `volleyball-saisonplaner` an mehreren
+Stellen „Block“ und „Blöcke“ für den Trainingsblock. Die Block-Regel im Glossar
+lässt „Block“ allein nur für das Technikelement zu. Die Welle zur Leseansicht
+hat nur „Teil“ für den Programmpunkt bereinigt.
+
+Ziel: Welle 2, die das Trainingsdesign und den Saisonplaner ohnehin anfasst.
+
 ## Bewusst nicht gebaut
 
 ### Das PDF sieht aus wie die Leseansicht
@@ -66,6 +78,96 @@ Vorlage sagt das selbst: „Keine laufende Zeitmessung". Aus dem Interview zur
 Welle zur Leseansicht.
 
 Ziel: bewusst nicht. Auslöser: Der Trainer vermisst es in der Halle.
+
+### Nach einem Schaubild wird die Leseansicht eingebettet neu gebaut
+
+Aus #76. Der Skill `volleyball-schaubild` baut die betroffenen Leseansichten
+mit der Voreinstellung von `leseansicht.py`, die Bilder also eingebettet. Eine
+Leseansicht, die mit `--bilder verweis` gebaut war, ist danach eingebettet und
+größer. Meldungen über Zeitangaben ohne Programmpunkt gibt er dabei nicht
+weiter, die kommen mit Exitcode 0. Weiter gibt er nur, was den Neubau
+scheitern lässt (#75).
+
+Ziel: bewusst nicht. Auslöser: Ein Trainer baut Leseansichten mit `verweis`
+und vermisst es nach einem Neubau, oder eine Meldung geht beim Neubau
+verloren.
+
+### Ein Link mit `javascript:` im Plan
+
+Aus #52. Ein Markdown-Link im Trainingsplan kommt mit seinem Ziel in die
+Leseansicht, auch `[x](javascript:…)`. Maskiert wird wie vorher, der Plan ist
+der eigene des Trainers.
+
+Ziel: bewusst nicht. Auslöser: Trainingspläne kommen aus fremden Quellen.
+
+### Andere Skripte bei einer gesperrten Datei
+
+Aus #75. `leseansicht.py` meldet eine gesperrte Zieldatei ohne Traceback.
+`export_pdf.py` und die übrigen Skripte, die Dateien schreiben, brechen in dem
+Fall weiter mit einem Traceback ab. Das Ticket hat sie ausgenommen.
+
+Ziel: bewusst nicht. Auslöser: Ein gesperrtes PDF oder eine gesperrte Karte
+bricht ein Skript in der Halle oder beim Import ab.
+
+### Grenzfälle der Athletiktabelle
+
+Aus #55. Eine Tabelle wird nur dann eine Liste zum Aufklappen, wenn ihre
+ersten Spalten genau `Nr` und `Übung` heißen, und die Dosierung kommt nur aus
+einer Spalte `Heute`. `Nr.` oder `Dosierung` lässt sie eine Tabelle bleiben.
+Steht in `Nr` schon „1.“, erscheint „1.. Übung“, ist `Nr` leer, „. Übung“.
+Sind die übrigen Zellen einer Zeile leer, klappt der Eintrag ins Leere auf.
+
+Ziel: bewusst nicht. Auslöser: Ein echter Plan schreibt die Tabelle so, etwa
+bei der Abnahme der Welle zur Leseansicht (#60).
+
+### Gleiche Überschriften unter „Zum Nachschlagen“
+
+Aus #56. GitHub hängt an den Anker einer zweiten gleichen Überschrift `-1`
+an, der Generator nicht. Steht „### Regeln“ unter Vorbereitung und unter Zum
+Nachschlagen, verfehlt der Link aus der `.md` den Reiter. Ebenso bekäme ein
+Thema namens „Vorbereitung“ oder „Nachschlagen“ denselben Anker wie die festen
+Abschnitte.
+
+Ziel: bewusst nicht. Auslöser: Ein Verweis in einem echten Plan trifft
+deshalb nicht.
+
+### Eine Leseansicht mit Sprungziel in der Adresse
+
+Aus #56. Wird die Datei mit Sprungziel geöffnet, etwa
+`2026-10-01.html#die-sechser`, springt der Browser zum Abschnitt unten, das
+Skript öffnet aber nicht die Ansicht mit dem Reiter.
+
+Ziel: bewusst nicht. Auslöser: Jemand teilt einen Link auf einen Reiter.
+
+### Dieselbe Karte in zwei Programmpunkten
+
+Aus #57. Jedes Schaubild steht einmal je Programmpunkt in der Datei, die
+Ansicht zum Vergrößern bettet es nicht noch einmal ein. Nennt ein Plan
+dieselbe Karte in zwei Programmpunkten, ist ihr Bild zweimal eingebettet.
+
+Ziel: bewusst nicht. Auslöser: Ein Plan nennt dieselbe Karte zweimal, und die
+Datei wird für WhatsApp zu groß.
+
+### Parallele Testläufe und die PNGs der Schaubilder
+
+Aus #58. `schaubild.py` legt PNGs in ein gemeinsames
+`%TEMP%\volleyball-schaubild\`, und `Arbeitsordner.starte()` gibt keinem
+Testlauf ein eigenes Temp-Verzeichnis. Liefen bei der Welle zur Leseansicht
+sechs Suiten zugleich, scheiterten einmal zwei Schaubild-Tests mit „kein PNG
+entstanden“. Allein laufen sie grün.
+
+Ziel: bewusst nicht. Auslöser: Parallele Implementierer werden die Regel.
+Dann setzt `starte()` TEMP und TMP je Arbeitsordner.
+
+### Frontmatter und Dauer in den Vorlagen
+
+Aus #59. `VORLAGEN.md` führt `meso_woche: <n>` im Frontmatter des
+Trainingsplans, die Saat-Vorlage und `DATENMODELL.md` nicht, und kein Skript
+liest es. Die Saat-Vorlage hat `dauer: 120`, ihre Beispielzeilen enden bei 90.
+Beides war schon vor der Welle so.
+
+Ziel: bewusst nicht. Auslöser: Ein Skill oder Skript liest `meso_woche`, oder
+ein Trainer stolpert über die Dauer in einem neuen Arbeitsordner.
 
 ### Eine Liste in Blockform liest der Parser als leer
 
