@@ -68,6 +68,10 @@ class Knoten:
         sammle(self)
         return " ".join("".join(stuecke).split())
 
+    def rohtext(self) -> str:
+        """Der Text direkt in diesem Element, wie er dasteht. Fuer Skript und Stil."""
+        return "".join(kind for kind in self.kinder if isinstance(kind, str))
+
     def alle(self, tag: str | None = None, klasse: str | None = None) -> list[Knoten]:
         """Jeder Nachfahre mit diesem Tag und dieser Klasse, in der Folge der Seite."""
         gefunden = []
@@ -258,8 +262,13 @@ def _ziel(a: Knoten) -> str:
     return unquote(adresse[1:]) if adresse.startswith("#") else ""
 
 
-def _programmpunkt(knoten: Knoten, reiter: dict[str, str]) -> Programmpunkt:
-    """`reiter` sind die Namen der Reiter unter Nachschlagen nach ihrem Anker."""
+def _programmpunkt(knoten: Knoten, reiter: dict[str, Reiter]) -> Programmpunkt:
+    """`reiter` sind die Reiter unter Nachschlagen nach ihrem Anker."""
+    def reitername(a: Knoten) -> str | None:
+        """Der Name des Reiters, zu dem der Link fuehrt, sonst None."""
+        ziel = reiter.get(_ziel(a))
+        return ziel.name if ziel is not None else None
+
     kopf = knoten.erstes("summary")
     inhalt = knoten.erstes(klasse="inhalt")
     verweise = inhalt.erstes(klasse="verweise")
@@ -281,7 +290,7 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, str]) -> Programmpunkt:
         hallenteil=knoten.attribute.get("data-hallenteil") or "",
         uebung=_text(kopf.erstes(klasse="uebung")) or "",
         heute=_text(heute.erstes("p")) if heute is not None else None,
-        abschnitte=[_planabschnitt(k) for k in inhalt.alle(klasse="planabschnitt")],
+        abschnitte=[_abschnitt(k) for k in inhalt.alle(klasse="planabschnitt")],
         schaubilder=schaubilder,
         quelle=_text(inhalt.erstes(klasse="quelle")),
         id=_text(inhalt.erstes(klasse="id")),
@@ -290,8 +299,9 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, str]) -> Programmpunkt:
         zugeklappt="open" not in knoten.attribute,
         warum_zugeklappt=warum is not None and "open" not in warum.attribute,
         gedaempft="gedaempft" in knoten.klassen,
-        verweise=[reiter.get(_ziel(a), a.attribute.get("href") or "") for a in knoepfe],
-        links=[Link(a.text(), a.attribute.get("href") or "", reiter.get(_ziel(a)))
+        verweise=[name if (name := reitername(a)) is not None else a.attribute.get("href") or ""
+                  for a in knoepfe],
+        links=[Link(a.text(), a.attribute.get("href") or "", reitername(a))
                for a in inhalt.alle("a") if a not in knoepfe],
     )
 
@@ -335,30 +345,34 @@ def _tabellen(knoten: Knoten) -> list[list[list[str]]]:
 
 
 def _abschnitt(knoten: Knoten) -> Abschnitt:
-    return Abschnitt(ueberschrift=_text(knoten.erstes("summary")) or "",
-                     text=_text(knoten.erstes(klasse="rich")) or "",
-                     zugeklappt="open" not in knoten.attribute,
-                     listen=_listen(knoten),
-                     tabellen=_tabellen(knoten))
+    """Ein Abschnitt unter Vorbereitung oder im Programmpunkt.
 
-
-def _planabschnitt(knoten: Knoten) -> Abschnitt:
-    """Ein Abschnitt im Programmpunkt, mit seiner Ueberschrift, wenn er eine hat."""
-    kopf = next((k for k in knoten.elemente() if k.tag == "h3"), None)
+    Unter Vorbereitung klappt er auf, seine Ueberschrift steht im `<summary>`.
+    Im Programmpunkt steht sie als `<h3>`, wenn sie nicht weggefallen ist.
+    """
+    zum_aufklappen = knoten.tag == "details"
+    kopf = (knoten.erstes("summary") if zum_aufklappen
+            else next((k for k in knoten.elemente() if k.tag == "h3"), None))
     return Abschnitt(ueberschrift=_text(kopf) or "",
                      text=_text(knoten.erstes(klasse="rich")) or "",
-                     zugeklappt=False,
+                     zugeklappt=zum_aufklappen and "open" not in knoten.attribute,
                      listen=_listen(knoten),
                      tabellen=_tabellen(knoten))
 
 
-def _nachschlagen(knoten: Knoten | None) -> Nachschlagen | None:
+def _reiter(nachschlagen: Knoten | None) -> list[tuple[str | None, Reiter]]:
+    """Die Reiter unter Nachschlagen in der Folge der Seite, jeder mit seinem Anker."""
+    if nachschlagen is None:
+        return []
+    return [(r.attribute.get("id"),
+             Reiter(_text(r.erstes("h3")) or "", _text(r.erstes(klasse="rich")) or ""))
+            for r in nachschlagen.alle(klasse="reiter")]
+
+
+def _nachschlagen(knoten: Knoten | None, reiter: list[Reiter]) -> Nachschlagen | None:
     if knoten is None:
         return None
-    return Nachschlagen(
-        vorweg=_text(knoten.erstes(klasse="vorweg")) or "",
-        reiter=[Reiter(_text(r.erstes("h3")) or "", _text(r.erstes(klasse="rich")) or "")
-                for r in knoten.alle(klasse="reiter")])
+    return Nachschlagen(vorweg=_text(knoten.erstes(klasse="vorweg")) or "", reiter=reiter)
 
 
 def _knoepfe(seite: Knoten) -> list[str]:
@@ -428,7 +442,7 @@ def _trifft_wurzel(selektor: str, wurzel: Knoten) -> bool:
 def _farbschema(seite: Knoten) -> dict[str, str]:
     """Welches color-scheme ohne Skript am Wurzelelement gilt, je Media-Query."""
     wurzel = seite.erstes("html")
-    stil = "".join(k for s in seite.alle("style") for k in s.kinder if isinstance(k, str))
+    stil = "".join(s.rohtext() for s in seite.alle("style"))
     schema = {}
     for media, selektor, deklarationen in _regeln(stil):
         m = re.search(r"color-scheme:\s*([\w ]+)", deklarationen)
@@ -442,8 +456,7 @@ def _nachgeladen(seite: Knoten) -> list[str]:
                 if k.attribute.get("src")]
     gefunden += [f"link href={k.attribute.get('href')}" for k in seite.alle("link")]
     for k in seite.alle("script") + seite.alle("style"):
-        text = "".join(kind for kind in k.kinder if isinstance(kind, str))
-        gefunden += re.findall(r"https?://\S+|@import\b", text)
+        gefunden += re.findall(r"https?://\S+|@import\b", k.rohtext())
     return gefunden
 
 
@@ -484,22 +497,21 @@ def lies_leseansicht(html: str) -> Leseansicht:
     kopf = seite.erstes(klasse="ablauf-kopf")
     vorbereitung = seite.erstes(klasse="vorbereitung")
     nachschlagen = seite.erstes(klasse="nachschlagen")
-    reiter = ({r.attribute.get("id"): _text(r.erstes("h3"))
-               for r in nachschlagen.alle(klasse="reiter")} if nachschlagen is not None else {})
+    reiter = _reiter(nachschlagen)
     return Leseansicht(
         kopf=_kopf(seite),
         ablauf=" · ".join(k.text() for k in kopf.elemente()) if kopf is not None else "",
         knoepfe=_knoepfe(seite),
-        programmpunkte=[_programmpunkt(k, reiter) for k in seite.alle("details", "programmpunkt")],
+        programmpunkte=[_programmpunkt(k, dict(reiter))
+                        for k in seite.alle("details", "programmpunkt")],
         vorbereitung=([_abschnitt(k) for k in vorbereitung.alle("details", "abschnitt")]
                       if vorbereitung is not None else []),
         text=seite.text(),
-        skripte=[s.attribute.get("src") or "".join(k for k in s.kinder if isinstance(k, str))
-                 for s in seite.alle("script")],
+        skripte=[s.attribute.get("src") or s.rohtext() for s in seite.alle("script")],
         ereignisse=_ereignisse(seite),
         umschalter=_umschalter(seite),
         farbschema=_farbschema(seite),
-        nachschlagen=_nachschlagen(nachschlagen),
+        nachschlagen=_nachschlagen(nachschlagen, [r for _, r in reiter]),
         nachgeladen=_nachgeladen(seite),
         vergroessern=_vergroessern(seite),
     )
