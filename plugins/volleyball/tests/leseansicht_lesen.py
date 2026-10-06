@@ -31,6 +31,7 @@ IM_SATZ = {"a", "abbr", "b", "code", "em", "i", "small", "span", "strong"}
 # Was aufgeklappt in einem Programmpunkt stehen kann, nach der Klasse im Markup.
 TEILE = {
     "heute": "Heute",
+    "planabschnitt": "Abschnitt",
     "schaubild": "Schaubild der Karte",
     "karte": "Quelle und ID",
     "verweise": "Verweise",
@@ -142,6 +143,8 @@ class Programmpunkt:
     name: str
     uebung: str
     heute: str | None
+    abschnitte: list[Abschnitt]
+    """Die Abschnitte des Plans, die zu diesem Programmpunkt gehoeren, in ihrer Folge."""
     schaubilder: list[Schaubild]
     quelle: str | None
     id: str | None
@@ -172,6 +175,7 @@ class Eintrag:
 @dataclass
 class Abschnitt:
     ueberschrift: str
+    """In einem Programmpunkt leer, wenn die Ueberschrift weggefallen ist."""
     text: str
     zugeklappt: bool
     listen: list[list[Eintrag]] = field(default_factory=list)
@@ -204,6 +208,15 @@ class Kopf:
 
 
 @dataclass
+class Umschalter:
+    wahl: list[str]
+    """Was man waehlen kann, in der Folge der Seite."""
+    voreingestellt: str | None
+    sichtbar: bool
+    """Ob er ohne Skript zu sehen ist."""
+
+
+@dataclass
 class Leseansicht:
     kopf: Kopf
     ablauf: str
@@ -218,6 +231,10 @@ class Leseansicht:
     """Je Skript sein Inhalt oder seine Quelle."""
     ereignisse: list[str]
     """Skript an Elementen: Attribute wie onclick und Links auf javascript:."""
+    umschalter: Umschalter | None
+    """Der Umschalter Hell, Dunkel, System."""
+    farbschema: dict[str, str]
+    """Das Farbschema ohne Skript, je Bedingung einer Media-Query, "" ohne Bedingung."""
     nachschlagen: Nachschlagen | None = None
     nachgeladen: list[str] = field(default_factory=list)
     """Was die Seite von anderswo holt: Skripte und Stile mit eigener Quelle,
@@ -260,6 +277,7 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, str]) -> Programmpunkt:
         name=_text(kopf.erstes(klasse="name")) or "",
         uebung=_text(kopf.erstes(klasse="uebung")) or "",
         heute=_text(heute.erstes("p")) if heute is not None else None,
+        abschnitte=[_planabschnitt(k) for k in inhalt.alle(klasse="planabschnitt")],
         schaubilder=schaubilder,
         quelle=_text(inhalt.erstes(klasse="quelle")),
         id=_text(inhalt.erstes(klasse="id")),
@@ -320,6 +338,16 @@ def _abschnitt(knoten: Knoten) -> Abschnitt:
                      tabellen=_tabellen(knoten))
 
 
+def _planabschnitt(knoten: Knoten) -> Abschnitt:
+    """Ein Abschnitt im Programmpunkt, mit seiner Ueberschrift, wenn er eine hat."""
+    kopf = next((k for k in knoten.elemente() if k.tag == "h3"), None)
+    return Abschnitt(ueberschrift=_text(kopf) or "",
+                     text=_text(knoten.erstes(klasse="rich")) or "",
+                     zugeklappt=False,
+                     listen=_listen(knoten),
+                     tabellen=_tabellen(knoten))
+
+
 def _nachschlagen(knoten: Knoten | None) -> Nachschlagen | None:
     if knoten is None:
         return None
@@ -349,6 +377,60 @@ def _ereignisse(seite: Knoten) -> list[str]:
             elif (wert or "").strip().lower().startswith("javascript:"):
                 gefunden.append(f"{knoten.tag} {name}={wert}")
     return gefunden
+
+
+def _umschalter(seite: Knoten) -> Umschalter | None:
+    feld = seite.erstes(klasse="darstellung")
+    if feld is None:
+        return None
+    wahl = [(label.text(), "checked" in label.erstes("input").attribute)
+            for label in feld.alle("label")]
+    return Umschalter(wahl=[name for name, _ in wahl],
+                      voreingestellt=next((name for name, an in wahl if an), None),
+                      sichtbar="hidden" not in feld.attribute)
+
+
+def _regeln(stil: str) -> list[tuple[str, str, str]]:
+    """Je Regel im Stil ihre Media-Query ohne Leerzeichen, ihr Selektor und ihre Deklarationen."""
+    regeln, offen = [], []
+    for m in re.finditer(r"([^{}]*)([{}])", stil):
+        davor = m.group(1).strip()
+        if m.group(2) == "{":
+            offen.append(davor)
+        elif offen:
+            selektor = offen.pop()
+            if not selektor.startswith("@"):
+                media = "".join(o.removeprefix("@media") for o in offen)
+                regeln.append(("".join(media.split()), selektor, davor))
+    return regeln
+
+
+# Ein Selektor fuer das Wurzelelement, mit Bedingungen an seine Attribute.
+WURZEL = re.compile(r":root((?::not\()?\[[\w-]+(?:=[^\]]*)?\]\)?)*")
+BEDINGUNG = re.compile(r"(:not\()?\[([\w-]+)(?:=\"?([^\]\"]*)\"?)?\]")
+
+
+def _trifft_wurzel(selektor: str, wurzel: Knoten) -> bool:
+    """Ob der Selektor das Wurzelelement trifft, wie es im HTML steht, ohne Skript."""
+    if not WURZEL.fullmatch(selektor.strip()):
+        return False
+    for nicht, name, wert in BEDINGUNG.findall(selektor):
+        hat = name in wurzel.attribute and wert in ("", wurzel.attribute[name])
+        if hat == bool(nicht):
+            return False
+    return True
+
+
+def _farbschema(seite: Knoten) -> dict[str, str]:
+    """Welches color-scheme ohne Skript am Wurzelelement gilt, je Media-Query."""
+    wurzel = seite.erstes("html")
+    stil = "".join(k for s in seite.alle("style") for k in s.kinder if isinstance(k, str))
+    schema = {}
+    for media, selektor, deklarationen in _regeln(stil):
+        m = re.search(r"color-scheme:\s*([\w ]+)", deklarationen)
+        if m and any(_trifft_wurzel(s, wurzel) for s in selektor.split(",")):
+            schema[media] = m.group(1).strip()
+    return schema
 
 
 def _nachgeladen(seite: Knoten) -> list[str]:
@@ -411,6 +493,8 @@ def lies_leseansicht(html: str) -> Leseansicht:
         skripte=[s.attribute.get("src") or "".join(k for k in s.kinder if isinstance(k, str))
                  for s in seite.alle("script")],
         ereignisse=_ereignisse(seite),
+        umschalter=_umschalter(seite),
+        farbschema=_farbschema(seite),
         nachschlagen=_nachschlagen(nachschlagen),
         nachgeladen=_nachgeladen(seite),
         vergroessern=_vergroessern(seite),

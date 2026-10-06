@@ -7,12 +7,17 @@ Erzeugt die .html neben der .md, eine einzige Datei, die auch ohne
 JavaScript lesbar ist. Die Ablauftabelle wird dabei bewusst NICHT als Tabelle
 gezeigt: sechs Spalten sind auf einem Handy in der Halle unlesbar. Jede Zeile
 wird ein Programmpunkt, der zugeklappt Zeitangabe, Dauer, Name und Uebung
-zeigt und sich mit dem Daumen aufklappen laesst. `## Zum Nachschlagen` steht
-am Ende fuer sich, jede `###` darin ein Reiter. Alle anderen Abschnitte des
-Plans stehen am Ende unter Vorbereitung. Ein kurzes eingebettetes Skript
-macht aus Nachschlagen und Vorbereitung Ansichten, die sich ueber dem Ablauf
+zeigt und sich mit dem Daumen aufklappen laesst. Beginnt die Ueberschrift
+eines Abschnitts mit einer Zeitangabe, steht er aufgeklappt in diesem
+Programmpunkt (Glossar). `## Zum Nachschlagen` steht am Ende fuer sich, jede
+`###` darin ein Reiter. Alle anderen Abschnitte des Plans stehen am Ende unter
+Vorbereitung, auch einer, dessen Zeitangabe auf keinen Programmpunkt passt.
+Den nennt das Skript auf der Konsole. Ein kurzes eingebettetes Skript macht
+aus Nachschlagen und Vorbereitung Ansichten, die sich ueber dem Ablauf
 oeffnen. Gestaltet ist die Seite nach der Vorlage unter
-docs/gestaltung/leseansicht/, hell oder dunkel nach dem Geraet (ADR-0012).
+docs/gestaltung/leseansicht/, hell oder dunkel nach dem Geraet. Wo
+JavaScript laeuft, waehlt der Trainer Hell, Dunkel oder System selbst
+(ADR-0012).
 
 Erzeugt wird in zwei Schritten. `gliedere` zerlegt den Plan in eine
 Gliederung: die Rohdaten fuer den Kopf, die Programmpunkte, die Vorbereitung
@@ -42,7 +47,7 @@ import mimetypes
 import os
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import unquote
@@ -95,6 +100,40 @@ def zeitangabe(text: str) -> tuple[int, int] | None:
     return (von, bis) if von < bis else None
 
 
+# Eine Ueberschrift, die mit einer Zeitangabe beginnt: "46–93 Drei Sechser".
+# Was danach steht, ist der Rest der Ueberschrift. "18:00 Aufwaermen" beginnt
+# mit keiner.
+VORN_ZEITANGABE = re.compile(r"(\d+\s*[–-]\s*\d+)(?!\d|[:.]\d)[\s:,·–—-]*(.*)")
+
+# Der Hallenteil, im Namen eines Programmpunkts ("Zuspiel, Hallenteil A") wie
+# in einer Ueberschrift gleich hinter der Zeitangabe ("Hallenteil A: Skizze").
+HALLENTEIL = re.compile(r"\bHallenteil\s+(\w+)", re.IGNORECASE)
+
+
+@dataclass
+class Zuordnung:
+    """Was eine Ueberschrift ueber ihren Programmpunkt sagt: "69–89 Hallenteil A: Hallenskizze"."""
+
+    zeit: str
+    """Die Zeitangabe, wie sie in der Ueberschrift steht."""
+    hallenteil: str
+    """Leer, wenn keiner dabeisteht. Dann gilt der Abschnitt fuer jeden Programmpunkt zu der Zeit."""
+    rest: str
+    """Die Ueberschrift ohne Zeitangabe und Hallenteil."""
+
+
+def zuordnung(ueberschrift: str) -> Zuordnung | None:
+    """Wozu die Ueberschrift gehoert, wenn sie mit einer Zeitangabe beginnt. Sonst None."""
+    m = VORN_ZEITANGABE.match(ueberschrift.strip())
+    if not m or zeitangabe(m.group(1)) is None:
+        return None
+    zeit, rest = m.group(1), m.group(2).strip()
+    teil = HALLENTEIL.match(rest)
+    if teil:
+        return Zuordnung(zeit, teil.group(1), rest[teil.end():].lstrip(" :,·–—-"))
+    return Zuordnung(zeit, "", rest)
+
+
 @dataclass
 class Abschnitt:
     """Ein Stueck des Plans unter einer Ueberschrift, `##` oder `###`.
@@ -145,6 +184,9 @@ class Programmpunkt:
     """Eine Zeile der Ablauftabelle. Die Texte als Markdown, wie sie im Plan stehen.
 
     `id`, `heute` und `warum` sind leer, wenn die Zelle leer ist oder "—" heisst.
+    `abschnitte` sind die Abschnitte des Plans, die ueber ihre Zeitangabe zu
+    ihm gehoeren, in der Reihenfolge des Plans, jeder mit der Ueberschrift,
+    die hier steht.
     """
 
     zeit: str
@@ -154,6 +196,7 @@ class Programmpunkt:
     heute: str
     warum: str
     karte: Karte | None = None
+    abschnitte: list[Abschnitt] = field(default_factory=list)
     verweise: list[Abschnitt] = field(default_factory=list)
     """Die Reiter unter Nachschlagen, auf die der Programmpunkt verweist, jeder einmal."""
 
@@ -161,9 +204,15 @@ class Programmpunkt:
         """Was der Plan zu diesem Programmpunkt schreibt, in der Folge der Leseansicht.
 
         Aus diesen Texten kommen seine Verweise: "Heute", die Abschnitte, die
-        ihm gehoeren, und "Warum hier".
+        ihm gehoeren, je einer mit seinen Unterabschnitten, und "Warum hier".
         """
-        return [self.heute, self.warum]
+        abschnitte = []
+        for abschnitt in self.abschnitte:
+            zeilen = [abschnitt.ueberschrift, *abschnitt.zeilen]
+            for unter in abschnitt.unterabschnitte:
+                zeilen += [unter.ueberschrift, *unter.zeilen]
+            abschnitte.append("\n".join(zeilen))
+        return [self.heute, *abschnitte, self.warum]
 
     @property
     def dauer(self) -> int | None:
@@ -174,6 +223,21 @@ class Programmpunkt:
     @property
     def pause_oder_umbau(self) -> bool:
         return self.name.lower().startswith(("pause", "umbau"))
+
+    @property
+    def hallenteil(self) -> str:
+        """Der Hallenteil aus dem Namen, "Zuspiel, Hallenteil A". Ohne ihn leer."""
+        m = HALLENTEIL.search(self.name)
+        return m.group(1) if m else ""
+
+    def gehoert_dazu(self, zu: Zuordnung) -> bool:
+        """Ob ein Abschnitt mit dieser Zeitangabe und diesem Hallenteil hierher gehoert.
+
+        Ein Programmpunkt mit "18:00" in der Spalte Zeit bekommt keinen.
+        """
+        if zeitangabe(self.zeit) != zeitangabe(zu.zeit):
+            return False
+        return not zu.hallenteil or zu.hallenteil.casefold() == self.hallenteil.casefold()
 
 
 # Der Gedankenstrich zwischen Datum und Kurztitel in der `#`-Ueberschrift:
@@ -392,6 +456,67 @@ def lies_gruppenname(wurzel: Path | None, kuerzel) -> str | None:
     return str(name) if name not in (None, "") else None
 
 
+def _gleich(a: str, b: str) -> bool:
+    return " ".join(a.split()).casefold() == " ".join(b.split()).casefold()
+
+
+def _hier(abschnitt: Abschnitt, punkt: Programmpunkt) -> Abschnitt:
+    """Der Abschnitt, wie er im Programmpunkt steht.
+
+    Zeitangabe und Hallenteil fallen aus der Ueberschrift, auch aus der eines
+    mitgenommenen Unterabschnitts, wenn sie auf diesen Programmpunkt zeigen.
+    Gleicht der Rest dem Namen der Uebung, faellt die Ueberschrift ganz weg.
+    """
+    def ohne(ueberschrift: str) -> str:
+        zu = zuordnung(ueberschrift)
+        return zu.rest if zu and punkt.gehoert_dazu(zu) else ueberschrift
+
+    ueberschrift = ohne(abschnitt.ueberschrift)
+    return replace(abschnitt,
+                   ueberschrift="" if _gleich(ueberschrift, punkt.uebung) else ueberschrift,
+                   unterabschnitte=[replace(u, ueberschrift=ohne(u.ueberschrift))
+                                    for u in abschnitt.unterabschnitte])
+
+
+def _wandert(abschnitt: Abschnitt, punkte: list[Programmpunkt], meldungen: list[str]) -> bool:
+    """Haengt den Abschnitt an jeden Programmpunkt mit seiner Zeitangabe.
+
+    True, wenn er dabei zu mindestens einem gewandert ist. Passt die
+    Zeitangabe auf keinen, kommt eine Meldung dazu, damit der Trainer den
+    Tippfehler oder die verschobene Zeit findet.
+    """
+    zu = zuordnung(abschnitt.ueberschrift)
+    if zu is None:
+        return False
+    ziele = [p for p in punkte if p.gehoert_dazu(zu)]
+    for punkt in ziele:
+        punkt.abschnitte.append(_hier(abschnitt, punkt))
+    if not ziele:
+        wo = f" in Hallenteil {zu.hallenteil}" if zu.hallenteil else ""
+        meldungen.append(f"Kein Programmpunkt mit der Zeitangabe {zu.zeit}{wo} für den "
+                         f"Abschnitt „{abschnitt.ueberschrift}“. Er steht unter Vorbereitung.")
+    return bool(ziele)
+
+
+def verteile(abschnitte: list[Abschnitt],
+             punkte: list[Programmpunkt]) -> tuple[list[Abschnitt], list[str]]:
+    """Gibt jedem Programmpunkt die Abschnitte, deren Ueberschrift mit seiner Zeitangabe beginnt.
+
+    Ein `##` mit Zeitangabe nimmt seine `###` mit. Unter einem ohne wandert
+    jeder `###` mit Zeitangabe allein und fehlt danach dort, der Rest bleibt.
+    Zurueck kommen die Abschnitte, die bleiben, in der Reihenfolge des Plans,
+    und die Meldungen.
+    """
+    bleiben, meldungen = [], []
+    for abschnitt in abschnitte:
+        if abschnitt.stufe > 1 and _wandert(abschnitt, punkte, meldungen):
+            continue
+        abschnitt.unterabschnitte = [u for u in abschnitt.unterabschnitte
+                                     if not _wandert(u, punkte, meldungen)]
+        bleiben.append(abschnitt)
+    return bleiben, meldungen
+
+
 def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
     """Zerlegt den Plan in die Gliederung der Leseansicht.
 
@@ -415,6 +540,7 @@ def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
     karten = lies_karten(wurzel)
     for punkt in punkte:
         punkt.karte = karten.get(punkt.id)
+    abschnitte, meldungen = verteile(abschnitte, punkte)
     if nachschlagen is not None and nachschlagen.leer:
         nachschlagen = None
     reiter = nachschlagen.unterabschnitte if nachschlagen else []
@@ -423,7 +549,8 @@ def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
     return Gliederung(kopf=Kopf(titel, felder, lies_gruppenname(wurzel, felder.get("gruppe"))),
                       programmpunkte=punkte,
                       vorbereitung=[a for a in abschnitte if not a.leer],
-                      nachschlagen=nachschlagen)
+                      nachschlagen=nachschlagen,
+                      meldungen=meldungen)
 
 
 # --------------------------------------------------------------------------
@@ -593,6 +720,82 @@ border:1px solid var(--bildrand);border-radius:4px}
 padding-top:16px;margin-top:30px}
 @media (min-width:900px){.seite{padding:0 36px 48px}.kopf{padding-top:32px}}
 """)
+
+# Der Umschalter Hell, Dunkel, System. Ohne Skript bleibt er verborgen, und
+# das Farbschema folgt dem Geraet wie oben. Das Skript zeigt ihn und setzt die
+# Wahl als data-darstellung am Wurzelelement. Bei "system" gilt weiter die
+# Media-Query, bei "hell" und "dunkel" die Palette hier, gleich wie das Geraet
+# eingestellt ist.
+UMSCHALTER_HTML = (
+    '<fieldset class="darstellung" aria-describedby="darstellung-hinweis" hidden>'
+    '<legend>Darstellung</legend><div class="wahl">'
+    + "".join(f'<label><input type="radio" name="darstellung" value="{wert}" autocomplete="off"'
+              f'{" checked" if wert == "system" else ""}><span>{name}</span></label>'
+              for wert, name in (("hell", "Hell"), ("dunkel", "Dunkel"), ("system", "System")))
+    + '</div><p class="hinweis" id="darstellung-hinweis"></p></fieldset>')
+
+UMSCHALTER_CSS = (":root[data-darstellung=hell]{" + farben(HELL, "light") + "}"
+                  ":root[data-darstellung=dunkel]{" + farben(DUNKEL, "dark") + "}" + """
+.darstellung{margin:16px 0 0;border:0;padding:0;min-width:0}
+.darstellung legend{padding:0;margin-bottom:7px;font-size:11px;letter-spacing:.7px;
+text-transform:uppercase;color:var(--gedaempft)}
+.darstellung .wahl{display:flex;gap:3px;padding:3px;background:var(--papier);
+border:1px solid var(--linie);border-radius:7px}
+.darstellung label{flex:1;display:flex;position:relative;cursor:pointer;font-size:13px}
+.darstellung input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.darstellung span{flex:1;display:flex;align-items:center;justify-content:center;
+min-height:44px;border-radius:4px}
+.darstellung input:checked+span{background:var(--flaeche);color:var(--akzent);font-weight:700}
+.darstellung input:focus-visible+span{outline:3px solid var(--akzent);outline-offset:2px}
+.darstellung .hinweis{margin-top:5px;font-size:11px;color:var(--gedaempft)}
+""")
+
+# Steht im Kopf der Seite, damit eine gemerkte Wahl gilt, bevor etwas zu sehen
+# ist. Den Umschalter zeigt es erst, wenn alles andere geklappt hat. Ohne
+# Speicher gilt die Wahl fuer diesen Besuch. Kommt die Wahl aus einem anderen
+# Tab, wird sie uebernommen.
+UMSCHALTER_SKRIPT = """(function () {
+  var schluessel = "volleyball-leseansicht-darstellung";
+  var geraet = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+  var wahl = gemerkt();
+
+  function gemerkt() {
+    try {
+      var wert = window.localStorage.getItem(schluessel);
+      if (wert === "hell" || wert === "dunkel" || wert === "system") return wert;
+    } catch (e) { /* kein Speicher, etwa bei einer lokalen Datei */ }
+    return "system";
+  }
+
+  function zeige() {
+    document.documentElement.setAttribute("data-darstellung", wahl);
+    var feld = document.querySelector(".darstellung");
+    if (!feld) return;
+    feld.querySelector('input[value="' + wahl + '"]').checked = true;
+    feld.querySelector(".hinweis").textContent = wahl !== "system" ? "Manuell gewählt"
+      : "Folgt deiner Geräteeinstellung · " + (geraet && geraet.matches ? "dunkel" : "hell");
+    feld.hidden = false;
+  }
+
+  zeige();
+  document.addEventListener("DOMContentLoaded", function () {
+    zeige();
+    document.querySelector(".darstellung").addEventListener("change", function (ereignis) {
+      wahl = ereignis.target.value;
+      try { window.localStorage.setItem(schluessel, wahl); }
+      catch (e) { /* dann gilt sie fuer diesen Besuch */ }
+      zeige();
+    });
+  });
+  if (geraet && geraet.addEventListener) geraet.addEventListener("change", zeige);
+  else if (geraet && geraet.addListener) geraet.addListener(zeige);
+  window.addEventListener("storage", function (ereignis) {
+    if (ereignis.key === schluessel || ereignis.key === null) {
+      wahl = gemerkt();
+      zeige();
+    }
+  });
+})();"""
 
 # Die Ansichten (#56). Ohne Skript, oder wo der Browser kein <dialog> kennt,
 # stehen Nachschlagen und Vorbereitung am Ende der Seite, und Knoepfe und
@@ -902,12 +1105,24 @@ def nach_html(zeilen: list[str]) -> str:
     return "\n".join(raus)
 
 
-def abschnitt_html(abschnitt: Abschnitt) -> str:
+def abschnitt_html(abschnitt: Abschnitt, unter_tag: str = "h3") -> str:
     """Der Text eines Abschnitts, seine Unterabschnitte mit ihrer Ueberschrift darin."""
     teile = [nach_html(abschnitt.zeilen)]
     for unter in abschnitt.unterabschnitte:
-        teile += [f"<h3>{inline(unter.ueberschrift)}</h3>", nach_html(unter.zeilen)]
+        teile += [f"<{unter_tag}>{inline(unter.ueberschrift)}</{unter_tag}>",
+                  nach_html(unter.zeilen)]
     return "\n".join(t for t in teile if t)
+
+
+def planabschnitt_html(abschnitt: Abschnitt) -> str:
+    """Ein Abschnitt im Programmpunkt. Ist seine Ueberschrift weggefallen, ohne sie.
+
+    Die Ueberschrift steht eine Stufe tiefer als die des Programmpunkts, die
+    seiner Unterabschnitte noch eine darunter.
+    """
+    kopf = f"<h3>{inline(abschnitt.ueberschrift)}</h3>" if abschnitt.ueberschrift else ""
+    return (f'<section class="planabschnitt">{kopf}<div class="rich">\n'
+            f"{abschnitt_html(abschnitt, 'h4')}\n</div></section>")
 
 
 def vorbereitung_html(abschnitte: list[Abschnitt]) -> str:
@@ -985,6 +1200,7 @@ def programmpunkt_html(punkt: Programmpunkt, adresse) -> str:
     inhalt = []
     if punkt.heute:
         inhalt.append(f'<div class="heute"><b>Heute</b><p>{inline(punkt.heute)}</p></div>')
+    inhalt += [planabschnitt_html(a) for a in punkt.abschnitte]
     inhalt += karte_html(punkt, adresse)
     if punkt.verweise:
         inhalt.append('<nav class="verweise" aria-label="Nachschlagen">'
@@ -1038,9 +1254,11 @@ def schreibe(gliederung: Gliederung, adresse, quelle: str, erzeugt: str) -> str:
 <html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>{html.escape(gliederung.kopf.titel)}</title><style>{CSS}</style></head><body>
+<title>{html.escape(gliederung.kopf.titel)}</title><style>{CSS}{UMSCHALTER_CSS}</style>
+<script>{UMSCHALTER_SKRIPT}</script></head><body>
 <main class="seite">
 {kopf_html(gliederung.kopf)}
+{UMSCHALTER_HTML}
 {knoepfe}
 <div class="ablauf-kopf"><h2>Ablauf</h2><span>{zahl} · Minuten ab Beginn</span></div>
 <div class="ablauf">
