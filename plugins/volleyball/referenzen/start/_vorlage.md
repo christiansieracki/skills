@@ -80,8 +80,9 @@ Der Ablauf, ausgeschrieben. Was mehrere Programmpunkte brauchen, steht unter
 ### Thema
 
 Was mehrere Programmpunkte brauchen, etwa die Sechser, die Läufer im 5-1 oder
-die Regeln. Jede Überschrift `###` unter „Zum Nachschlagen" ist ein Thema. Ein
-Programmpunkt verweist darauf mit einem Link wie oben.
+die Regeln. Jede Überschrift `###` unter „Zum Nachschlagen“ ist ein Thema, in
+der Leseansicht wird es ein Reiter. Ein Programmpunkt verweist darauf mit einem
+Link wie oben.
 
 ## Material gesamt
 

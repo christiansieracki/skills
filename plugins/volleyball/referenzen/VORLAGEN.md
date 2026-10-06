@@ -218,8 +218,9 @@ Zu den Abschnitten:
   Programmpunkten, bekommt jeder unter `## Athletik` einen eigenen
   `### <Zeitangabe> Athletik`.
 - **`## Zum Nachschlagen`** ist fest. Jede `###` darunter ist ein Thema, das
-  mehrere Programmpunkte brauchen. Ein Programmpunkt verweist mit einem
-  Markdown-Link auf ihre Überschrift: `[die Sechser](#die-sechser)`.
+  mehrere Programmpunkte brauchen, in der Leseansicht wird es ein Reiter. Ein
+  Programmpunkt verweist mit einem Markdown-Link auf seine Überschrift:
+  `[die Sechser](#die-sechser)`.
 - Alles andere steht in der Leseansicht unter Vorbereitung.
 
 Die genauen Regeln stehen in `DATENMODELL.md` unter „Der Trainingsplan".

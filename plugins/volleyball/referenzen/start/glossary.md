@@ -96,6 +96,9 @@ abdeckt und welches Team führt, steht in `trainingsplanung-root.yml`.
 | **Programmpunkt** | Eine Zeile der Ablauftabelle: Zeitangabe, Name und meist eine Übung. Auch Pause und Umbau sind Programmpunkte. Laufen zwei gleichzeitig, steht beim Namen der Hallenteil: „Zuspiel, Hallenteil A". |
 | **Zeitangabe** | Von–bis in Minuten ab Beginn der Einheit, wie in der Spalte Zeit: „46–93". Mit dem Hallenteil bestimmt sie einen Programmpunkt eindeutig. |
 | **Abschnitt** | Ein Stück des Trainingsplans unter einer Überschrift (`##` oder `###`). |
+| **Zum Nachschlagen** | Der feste Abschnitt `## Zum Nachschlagen` für Themen, die mehrere Programmpunkte brauchen, etwa die Sechser oder die Regeln. Jedes Thema als `###` wird in der Leseansicht ein Reiter. |
+| **Verweis** | Ein Markdown-Link auf ein Thema unter Zum Nachschlagen: `[die Sechser](#die-sechser)`. In der Leseansicht öffnet er den Reiter. Nicht zu verwechseln mit `--bilder verweis`, das ein Bild als Dateiverweis setzt statt eingebettet. |
+| **Vorbereitung** | Alles im Trainingsplan ohne Zeitangabe außer Zum Nachschlagen: Schwerpunkte, Rahmenbedingungen, Material, Nachbereitung. In der Leseansicht eine eigene Ansicht. |
 | **Hallenskizze** | Die Zeichnung im Trainingsplan, wie die Halle in einem Programmpunkt an diesem Abend aufgebaut ist, mit Zeichen in einem Codeblock gezeichnet. Gehört zum Abend, nicht zur Übung. |
 | **Leseansicht** | Die daraus erzeugte Fassung als HTML fürs Handy und als PDF zum Ausdrucken. Darf jederzeit weggeworfen und neu gebaut werden. |
 
@@ -106,7 +109,9 @@ Beginnt die Überschrift eines Abschnitts mit einer Zeitangabe, gehört der
 Abschnitt zu diesem Programmpunkt: `## 46–93 Drei Sechser mit Zweierserie`.
 Laufen zwei Programmpunkte zur selben Zeit, kommt der Hallenteil dazu:
 `### 69–89 Hallenteil A: Hallenskizze`. Ohne ihn gilt der Abschnitt für beide.
-In der Leseansicht steht er dort, wo man den Programmpunkt aufklappt.
+In der Leseansicht steht er dort, wo man den Programmpunkt aufklappt. Ein `###`
+mit eigener Zeitangabe entscheidet selbst, auch unter einem `##` mit
+Zeitangabe. Ohne folgt er seinem `##`.
 
 **Schaubild oder Hallenskizze?** Das Schaubild gehört zur Karte und zeigt die
 Übung. Die Hallenskizze gehört zum Trainingsplan und zeigt, wie die Übung an

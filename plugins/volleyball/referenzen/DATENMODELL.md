@@ -587,18 +587,20 @@ es ein Tippfehler oder eine Zeit, die sich beim Planen verschoben hat.
 ### Zum Nachschlagen
 
 `## Zum Nachschlagen` ist ein fester Abschnitt für Themen, die mehrere
-Programmpunkte brauchen: die Sechser, die Läufer im 5-1, die Regeln. Jede `###`
-darunter wird in der Leseansicht ein Reiter mit ihrer Überschrift als Namen.
-Text vor der ersten `###` steht über den Reitern. Auch eine `###` ohne Text
-wird ein Reiter, damit ein Verweis auf sie nicht ins Leere führt. Nur ein
-`## Zum Nachschlagen` ganz ohne Text und ohne `###` fällt weg.
+Programmpunkte brauchen: die Sechser, die Läufer im 5-1, die Regeln. Jedes
+Thema steht als `###` darunter und wird in der Leseansicht ein Reiter mit
+seiner Überschrift als Namen. Text vor dem ersten Thema steht über den Reitern.
+Auch ein Thema ohne Text wird ein Reiter, damit ein Verweis darauf nicht ins
+Leere führt. Nur ein `## Zum Nachschlagen` ganz ohne Text und ohne Thema fällt
+weg.
 
-Ein **Verweis** ist ein gewöhnlicher Markdown-Link auf den Anker einer
-Überschrift unter „Zum Nachschlagen": `[die Sechser](#die-sechser)`. Der Anker
-entsteht wie bei GitHub: klein geschrieben, Satzzeichen fallen weg, jedes
-Leerzeichen wird ein Bindestrich, Umlaute bleiben. Aus
-`### Die Läufer im 5-1 (Rotation)` wird `#die-läufer-im-5-1-rotation`. So
-führt der Link auch in der `.md` zur Überschrift.
+Ein **Verweis** ist ein gewöhnlicher Markdown-Link auf ein Thema unter „Zum
+Nachschlagen", genauer auf den Anker seiner Überschrift:
+`[die Sechser](#die-sechser)`. Der Anker entsteht wie bei GitHub: klein
+geschrieben, Satzzeichen fallen weg, jedes Leerzeichen wird ein Bindestrich,
+Umlaute bleiben. Aus `### Die Läufer im 5-1 (Rotation)` wird
+`#die-läufer-im-5-1-rotation`. So führt der Link auch in der `.md` zur
+Überschrift.
 
 Steht ein Verweis in „Anpassung heute", in einem Abschnitt des Programmpunkts
 oder in „Warum hier", bekommt der Programmpunkt in der Leseansicht einen Knopf,
