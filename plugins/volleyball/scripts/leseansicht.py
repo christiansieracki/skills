@@ -107,7 +107,9 @@ VORN_ZEITANGABE = re.compile(r"(\d+\s*[–-]\s*\d+)(?!\d|[:.]\d)[\s:,·–—-]*
 
 # Der Hallenteil, im Namen eines Programmpunkts ("Zuspiel, Hallenteil A") wie
 # in einer Ueberschrift gleich hinter der Zeitangabe ("Hallenteil A: Skizze").
-HALLENTEIL = re.compile(r"\bHallenteil\s+(\w+)", re.IGNORECASE)
+# Seine Kennung ist ein einzelner Buchstabe oder eine Ziffer. "Hallenteil
+# wechseln" nennt keinen, das ist Text.
+HALLENTEIL = re.compile(r"\bHallenteil\s+([^\W_])(?!\w)", re.IGNORECASE)
 
 
 @dataclass

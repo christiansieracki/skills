@@ -516,9 +516,11 @@ Jede Zeile ist ein Programmpunkt, auch Pause und Umbau.
   `18:00`, bleibt es als Text stehen, der Programmpunkt hat keine Dauer, und
   kein Abschnitt kann ihm zugeordnet werden.
 - **Programmpunkt** ist sein Name. Laufen zwei zur selben Zeit, einer je
-  Hallenteil, steht der Hallenteil im Namen: „Zuspiel, Hallenteil A".
-  Zeitangabe und Hallenteil zusammen bestimmen einen Programmpunkt. Beginnt
-  der Name mit „Pause" oder „Umbau", erscheint er in der Leseansicht gedämpft.
+  Hallenteil, steht der Hallenteil im Namen: „Zuspiel, Hallenteil A". Er heißt
+  nach einem einzelnen Buchstaben oder einer Ziffer, „Hallenteil wechseln"
+  nennt keinen. Zeitangabe und Hallenteil zusammen bestimmen einen
+  Programmpunkt. Beginnt der Name mit „Pause" oder „Umbau", erscheint er in der
+  Leseansicht gedämpft.
 - **ID** verweist auf die Karte. Was die Übung ist, steht dort, nicht hier.
 - **Anpassung heute** ist alles, was an diesem Abend anders war als auf der
   Karte: Gruppengrößen, welches Netz, veränderte Regeln, Anpassung an eine

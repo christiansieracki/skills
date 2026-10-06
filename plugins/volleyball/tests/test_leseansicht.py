@@ -411,6 +411,33 @@ class ZuordnungTest(LeseansichtTest):
             ("Zuspiel und Annahme",
              "Nach zwölf Minuten tauschen. Hallenskizze Netz quer. Bälle Zwei Wagen.")])
 
+    def test_nur_ein_buchstabe_oder_eine_ziffer_ist_ein_hallenteil(self) -> None:
+        # "Hallenteil wechseln" nennt keinen Hallenteil, das ist Text der
+        # Ueberschrift, und der Abschnitt gilt fuer beide. Ebenso im Namen
+        # eines Programmpunkts.
+        ansicht = self.ansicht([Zeile("10–35", "Zuspiel, Hallenteil A", "Zuspiel im Dreieck"),
+                                Zeile("10–35", "Annahme, Hallenteil 2", "Annahme im Halbfeld"),
+                                Zeile("35–40", "Umbau, Hallenteil wechseln")],
+                               nachher="""
+            ## Organisation
+
+            ### 10–35 Hallenteil wechseln
+
+            Nach zwölf Minuten.
+
+            ### 10–35 Hallenteil 2: Hallenskizze
+
+            Netz quer.
+        """)
+
+        a, zwei, _ = ansicht.programmpunkte
+        self.assertEqual([p.hallenteil for p in ansicht.programmpunkte], ["A", "2", ""])
+        self.assertEqual(self.abschnitte(a), [("Hallenteil wechseln", "Nach zwölf Minuten.")])
+        self.assertEqual(self.abschnitte(zwei), [("Hallenteil wechseln", "Nach zwölf Minuten."),
+                                                 ("Hallenskizze", "Netz quer.")])
+        self.assertEqual(ansicht.vorbereitung, [])
+        self.assertEqual(self.meldungen("Hallenteil"), [])
+
     def test_ein_unterabschnitt_mit_anderer_zeitangabe_geht_zu_seinem_programmpunkt(
             self) -> None:
         # Passt seine Zeitangabe auf keinen, bleibt er unter Vorbereitung,
