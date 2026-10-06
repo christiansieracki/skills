@@ -43,9 +43,10 @@ ROOT_YML = """\
 # Wurzeldatei eines kuenstlichen Arbeitsordners fuer die Tests.
 #
 # finde_wurzel() erkennt den Ordner an ihrem Namen, und die naechste ID liest
-# hier, welcher Trainer an diesem Rechner sitzt. Mehr lesen die Skripte nicht
-# aus ihr, deshalb steht hier nur das Noetigste. Was ein echter Arbeitsordner
-# mitbringt, legt init_struktur.py an.
+# hier, welcher Trainer an diesem Rechner sitzt. Die Leseansicht liest noch den
+# Namen der Gruppe, den Abschnitt gruppen: schreibt erst setze_gruppen(). Mehr
+# lesen die Skripte nicht aus ihr, deshalb steht hier nur das Noetigste. Was
+# ein echter Arbeitsordner mitbringt, legt init_struktur.py an.
 
 version: 1
 verein: "Testverein"
@@ -259,14 +260,30 @@ def _als_karte(felder: dict) -> str:
     return f"---\n{frontmatter}\n---\n" + RUMPF.format(titel=felder["titel"])
 
 
-def _als_wurzeldatei(trainer: dict | None) -> str:
+def _als_gruppen(gruppen: dict | None) -> str:
+    """Der Abschnitt `gruppen:` der Wurzeldatei, wie init_struktur.py ihn anlegt.
+
+    Je Gruppe ihr Kuerzel und ihre Felder, etwa `name` und `teams`. `None`
+    laesst den Abschnitt weg.
+    """
+    if gruppen is None:
+        return ""
+    zeilen = ["", "gruppen:"]
+    for kuerzel, felder in gruppen.items():
+        zeilen.append(f"  {kuerzel}:")
+        zeilen += [f"    {name}: {_yaml(wert)}" for name, wert in felder.items()]
+    return "\n".join(zeilen) + "\n"
+
+
+def _als_wurzeldatei(trainer: dict | None, gruppen: dict | None = None) -> str:
     """Die Wurzeldatei, mit dem Abschnitt `trainer:` in der Form aus DATENMODELL.md.
 
     `None` laesst den Abschnitt weg, so wie in jedem Arbeitsordner vor 3.0.0.
+    Der Abschnitt `gruppen:` steht davor, wie in einem echten Arbeitsordner.
     """
     if trainer is None:
-        return ROOT_YML
-    zeilen = ["", "trainer:"]
+        return ROOT_YML + _als_gruppen(gruppen)
+    zeilen = [_als_gruppen(gruppen), "trainer:"]
     for name, eintrag in trainer.items():
         zeilen += [f"  {name}:",
                    f'    nummer: "{eintrag["nummer"]}"',
@@ -484,6 +501,7 @@ class Arbeitsordner:
         self.pfad = Path(tempfile.mkdtemp(prefix="trainingsplanung-test-"))
         self.ids: list[str] = []
         self.entwurfsordner: Path | None = None
+        self.gruppen: dict | None = None
         self.setze_trainer(None if vor_der_umstellung else TRAINER)
         (self.pfad / "schwerpunkte.md").write_text(SCHWERPUNKTE_MD, encoding="utf-8")
         (self.pfad / "uebungen").mkdir()
@@ -498,7 +516,19 @@ class Arbeitsordner:
         Je Trainer `nummer` und `rechner`, wie in TRAINER. `None` laesst den
         Abschnitt ganz weg.
         """
-        (self.pfad / WURZELDATEI).write_text(_als_wurzeldatei(trainer), encoding="utf-8")
+        self.trainer = trainer
+        (self.pfad / WURZELDATEI).write_text(_als_wurzeldatei(trainer, self.gruppen),
+                                             encoding="utf-8")
+
+    def setze_gruppen(self, gruppen: dict | None) -> None:
+        """Schreibt die Wurzeldatei neu, mit diesen Gruppen unter `gruppen:`.
+
+        Je Gruppe ihr Kuerzel und ihre Felder, etwa
+        `{"h1-h2": {"name": "Herren 1 + Herren 2"}}`. `None` laesst den
+        Abschnitt weg, wie im Fixture ohne diesen Aufruf. Die Trainer bleiben.
+        """
+        self.gruppen = gruppen
+        self.setze_trainer(self.trainer)
 
     def lege_trainingsplan_an(self, name: str, *ids: str) -> Path:
         """Legt unter `trainings/` einen Trainingsplan an, der diese IDs nennt.

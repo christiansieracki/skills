@@ -176,7 +176,18 @@ class Nachschlagen:
 
 
 @dataclass
+class Kopf:
+    titel: str
+    """Die Ueberschrift der Seite, der Kurztitel."""
+    angaben: list[str]
+    """Was darunter steht, je Angabe ihr Text, in der Folge der Seite."""
+    zeilen: list[str]
+    """Dieselben Angaben, wie sie dastehen: je Zeile ihr Text mit den Trennzeichen."""
+
+
+@dataclass
 class Leseansicht:
+    kopf: Kopf
     ablauf: str
     """Die Zeile ueber dem Ablauf, etwa "Ablauf · 3 Programmpunkte · Minuten ab Beginn"."""
     knoepfe: list[str]
@@ -243,6 +254,16 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, str]) -> Programmpunkt:
     )
 
 
+def _kopf(seite: Knoten) -> Kopf:
+    """Der Kopf ueber dem Ablauf. Jede Zeile ist ein Absatz, jede Angabe darin markiert."""
+    kopf = seite.erstes(klasse="kopf")
+    if kopf is None:
+        return Kopf("", [], [])
+    return Kopf(titel=_text(kopf.erstes("h1")) or "",
+                angaben=[k.text() for k in kopf.alle(klasse="angabe")],
+                zeilen=[p.text() for p in kopf.alle("p")])
+
+
 def _abschnitt(knoten: Knoten) -> Abschnitt:
     return Abschnitt(ueberschrift=_text(knoten.erstes("summary")) or "",
                      text=_text(knoten.erstes(klasse="rich")) or "",
@@ -298,6 +319,7 @@ def lies_leseansicht(html: str) -> Leseansicht:
     reiter = ({r.attribute.get("id"): _text(r.erstes("h3"))
                for r in nachschlagen.alle(klasse="reiter")} if nachschlagen is not None else {})
     return Leseansicht(
+        kopf=_kopf(seite),
         ablauf=" · ".join(k.text() for k in kopf.elemente()) if kopf is not None else "",
         knoepfe=_knoepfe(seite),
         programmpunkte=[_programmpunkt(k, reiter) for k in seite.alle("details", "programmpunkt")],

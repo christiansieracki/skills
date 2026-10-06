@@ -329,29 +329,33 @@ def rechnername() -> str:
 # Muster einmal hier.
 TRAINERNAME = r"[^\s:#]+"
 TRAINER_ABSCHNITT = re.compile(r"trainer:\s*(#.*)?$")
-_TRAINERZEILE = re.compile(rf"(?P<name>{TRAINERNAME}):\s*(#.*)?$")
+_EINTRAGSZEILE = re.compile(rf"(?P<name>{TRAINERNAME}):\s*(#.*)?$")
+
+# Die Zeile, mit der der Abschnitt `gruppen:` beginnt. Das Kuerzel einer
+# Gruppe sieht aus wie der Name eines Trainers, etwa `h1-h2`.
+GRUPPEN_ABSCHNITT = re.compile(r"gruppen:\s*(#.*)?$")
 
 
-def lies_trainer(wurzel: Path) -> dict[str, dict] | None:
-    """Der Abschnitt `trainer:` der Wurzeldatei: je Trainer `nummer` und `rechner`.
+def _lies_eintraege(wurzel: Path, abschnitt: re.Pattern) -> dict[str, dict] | None:
+    """Ein Abschnitt der Wurzeldatei aus benannten Eintraegen, je Eintrag seine Felder.
 
-    None, wenn es den Abschnitt nicht gibt. Ein Abschnitt ohne Eintrag, wie
-    ihn init_struktur.py anlegt, ergibt ein leeres Woerterbuch.
+    None, wenn es den Abschnitt nicht gibt. Ein Abschnitt ohne Eintrag ergibt
+    ein leeres Woerterbuch.
 
     Gelesen wird nur dieser eine Abschnitt, mit dem schmalen Parser des
-    Frontmatters: Er beginnt mit `trainer:` am Zeilenanfang und endet an der
-    naechsten Zeile, die wieder dort beginnt. `rechner` steht in eckigen
-    Klammern, eine Liste aus `- ` Zeilen wird auch verstanden, weil die
-    Wurzeldatei von Hand gepflegt wird.
+    Frontmatters: Er beginnt mit der Zeile, auf die `abschnitt` passt, am
+    Zeilenanfang und endet an der naechsten Zeile, die wieder dort beginnt.
+    Eine Liste steht in eckigen Klammern, eine aus `- ` Zeilen wird auch
+    verstanden, weil die Wurzeldatei von Hand gepflegt wird.
     """
     datei = wurzel / MARKER
     if not datei.is_file():
         return None
     zeilen = datei.read_text(encoding="utf-8").splitlines()
-    anfang = next((i for i, z in enumerate(zeilen) if TRAINER_ABSCHNITT.match(z)), None)
+    anfang = next((i for i, z in enumerate(zeilen) if abschnitt.match(z)), None)
     if anfang is None:
         return None
-    trainer: dict[str, dict] = {}
+    eintraege: dict[str, dict] = {}
     eintrag: dict | None = None
     feld = ""
     einzug_der_namen = None
@@ -364,8 +368,8 @@ def lies_trainer(wurzel: Path) -> dict[str, dict] | None:
             break
         einzug_der_namen = einzug_der_namen or einzug
         if einzug == einzug_der_namen:
-            m = _TRAINERZEILE.match(inhalt)
-            eintrag = trainer.setdefault(m.group("name"), {}) if m else None
+            m = _EINTRAGSZEILE.match(inhalt)
+            eintrag = eintraege.setdefault(m.group("name"), {}) if m else None
             continue
         if eintrag is None:
             continue
@@ -378,7 +382,27 @@ def lies_trainer(wurzel: Path) -> dict[str, dict] | None:
         if m:
             feld = m.group("key")
             eintrag[feld] = _wert(m.group("val"))
-    return trainer
+    return eintraege
+
+
+def lies_trainer(wurzel: Path) -> dict[str, dict] | None:
+    """Der Abschnitt `trainer:` der Wurzeldatei: je Trainer `nummer` und `rechner`.
+
+    None, wenn es den Abschnitt nicht gibt. Ein Abschnitt ohne Eintrag, wie
+    ihn init_struktur.py anlegt, ergibt ein leeres Woerterbuch. `rechner`
+    steht in eckigen Klammern oder als Liste aus `- ` Zeilen.
+    """
+    return _lies_eintraege(wurzel, TRAINER_ABSCHNITT)
+
+
+def lies_gruppen(wurzel: Path) -> dict[str, dict] | None:
+    """Der Abschnitt `gruppen:` der Wurzeldatei: je Gruppe nach Kuerzel ihre Felder.
+
+    Gebraucht wird bisher nur `name`, den die Leseansicht statt des Kuerzels
+    zeigt. Gelesen wird wie `trainer:`, mit demselben schmalen Parser. None,
+    wenn es den Abschnitt nicht gibt.
+    """
+    return _lies_eintraege(wurzel, GRUPPEN_ABSCHNITT)
 
 
 def _nummer(wert) -> str | None:
