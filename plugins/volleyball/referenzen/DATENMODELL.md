@@ -588,8 +588,9 @@ es ein Tippfehler oder eine Zeit, die sich beim Planen verschoben hat.
 `## Zum Nachschlagen` ist ein fester Abschnitt für Themen, die mehrere
 Programmpunkte brauchen: die Sechser, die Läufer im 5-1, die Regeln. Jede `###`
 darunter wird in der Leseansicht ein Reiter mit ihrer Überschrift als Namen.
-Text vor der ersten `###` steht über den Reitern. Eine `###` ohne Text fällt
-weg, ein Abschnitt ohne Text auch.
+Text vor der ersten `###` steht über den Reitern. Auch eine `###` ohne Text
+wird ein Reiter, damit ein Verweis auf sie nicht ins Leere führt. Nur ein
+`## Zum Nachschlagen` ganz ohne Text und ohne `###` fällt weg.
 
 Ein **Verweis** ist ein gewöhnlicher Markdown-Link auf den Anker einer
 Überschrift unter „Zum Nachschlagen": `[die Sechser](#die-sechser)`. Der Anker

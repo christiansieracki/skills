@@ -327,7 +327,7 @@ class Gliederung:
     meldungen: list[str] = field(default_factory=list)
     """Was der Trainer auf der Konsole lesen soll, eine Zeile je Meldung."""
     nachschlagen: Abschnitt | None = None
-    """`## Zum Nachschlagen`, wenn es ihn gibt und er nicht leer ist. Die `###` sind die Reiter."""
+    """`## Zum Nachschlagen`, wenn es ihn mit Text oder `###` gibt. Jede `###` ist ein Reiter."""
 
 
 def _ist_zaun(zeile: str) -> bool:
@@ -553,7 +553,10 @@ def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
     nachschlagen = next((a for a in abschnitte if a.ist_nachschlagen), None)
     if nachschlagen is not None:
         abschnitte.remove(nachschlagen)
-        nachschlagen.unterabschnitte = [r for r in nachschlagen.unterabschnitte if not r.leer]
+        # Jede `###` ist ein Reiter, auch ohne Text, sonst fuehrte ein Verweis
+        # darauf ins Leere. Ohne Text und ohne `###` gibt es nichts nachzuschlagen.
+        if nachschlagen.leer and not nachschlagen.unterabschnitte:
+            nachschlagen = None
     punkte = []
     for abschnitt in abschnitte:
         if abschnitt.ist_ablauf:
@@ -562,9 +565,7 @@ def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
     for punkt in punkte:
         punkt.karte = karten.get(punkt.id)
     abschnitte, meldungen = verteile(abschnitte, punkte)
-    if nachschlagen is not None and nachschlagen.leer:
-        nachschlagen = None
-    reiter = nachschlagen.unterabschnitte if nachschlagen else []
+    reiter =nachschlagen.unterabschnitte if nachschlagen else []
     for punkt in punkte:
         punkt.verweise = verweise(punkt.texte(), reiter)
     return Gliederung(kopf=Kopf(titel, felder, lies_gruppenname(wurzel, felder.get("gruppe"))),

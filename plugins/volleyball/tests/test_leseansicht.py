@@ -679,12 +679,27 @@ class NachschlagenTest(LeseansichtTest):
 
     def test_der_knopf_nachschlagen_steht_nur_da_wenn_es_den_abschnitt_gibt(self) -> None:
         mit = self.ansicht(self.ZEILEN, nachher=self.NACHSCHLAGEN)
-        leer = self.ansicht(self.ZEILEN, nachher="## Zum Nachschlagen\n\n### Die Sechser\n")
+        leer = self.ansicht(self.ZEILEN, nachher="## Zum Nachschlagen\n\n## Nachbereitung\n")
         ohne = self.ansicht(self.ZEILEN)
 
         self.assertEqual(mit.knoepfe, ["Nachschlagen"])
         self.assertEqual((leer.knoepfe, leer.nachschlagen, leer.vorbereitung), ([], None, []))
         self.assertEqual((ohne.knoepfe, ohne.nachschlagen), ([], None))
+
+    def test_ein_thema_ohne_text_bleibt_ein_reiter(self) -> None:
+        # Sonst fuehrte ein Verweis darauf ins Leere. Ohne Text steht nur die
+        # Ueberschrift da, der Trainer sieht, dass er dort noch schreiben wollte.
+        ansicht = self.ansicht(
+            [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar",
+                   heute="In den [Sechsern](#die-sechser)")],
+            nachher="## Zum Nachschlagen\n\n### Die Sechser\n\n### Regeln\n\nWer ruft, nimmt.\n")
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual([(r.name, r.text) for r in ansicht.nachschlagen.reiter],
+                         [("Die Sechser", ""), ("Regeln", "Wer ruft, nimmt.")])
+        self.assertEqual(punkt.verweise, ["Die Sechser"])
+        self.assertEqual(punkt.links, [Link("Sechsern", "#die-sechser", "Die Sechser")])
+        self.assertEqual(ansicht.knoepfe, ["Nachschlagen"])
 
 
 class VerweisTest(LeseansichtTest):
