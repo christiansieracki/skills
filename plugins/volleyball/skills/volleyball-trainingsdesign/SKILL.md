@@ -217,7 +217,8 @@ Abschnitt unter Vorbereitung statt im Programmpunkt. Meist ist die Zeit in der
 welche der beiden du angleichst, und baue nach seinem Ja neu.
 
 Endet `leseansicht.py` nicht mit 0, etwa weil die HTML gesperrt oder
-schreibgeschützt ist, gib seine Meldung dem Trainer weiter. Gebaut wird erst
+schreibgeschützt ist, gib seine Meldung dem Trainer weiter, und eine Meldung
+zu einer Zeitangabe davor wie oben. Gebaut wird erst
 wieder, wenn er sagt, dass die Datei frei ist. Entsperren ist seine Sache, oft
 im Nextcloud-Client, die Dateirechte fasst du nicht an.
 

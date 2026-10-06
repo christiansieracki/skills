@@ -1145,13 +1145,16 @@ class GesperrtTest(LeseansichtTest):
 
     ALT = "<p>Die Leseansicht vom letzten Erzeugen</p>"
 
-    def gesperrt(self) -> list[tuple[Path, int, str]]:
+    def gesperrt(self, **plan) -> list[tuple[Path, int, str]]:
         """Erzeugt die Leseansicht eines Plans in eine gesperrte Datei, je Ziel einmal.
 
         Vorher steht in der Datei ALT. Zurueck kommen je Ziel die Datei, der
-        Exitcode und die ganze Ausgabe des Aufrufs.
+        Exitcode und die ganze Ausgabe des Aufrufs, erst stdout, dann stderr.
+        Freie Abschnitte des Plans kommen als Schluesselwort, wie bei
+        `lege_plan_an`.
         """
-        plan = self.ordner.lege_plan_an(PLAN, [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")])
+        plan = self.ordner.lege_plan_an(PLAN, [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")],
+                                        **plan)
         aus_out = self.ordner.pfad / "handy" / "training.html"
         laeufe = []
         for ziel, argumente in ((plan.with_suffix(".html"), []),
@@ -1176,6 +1179,14 @@ class GesperrtTest(LeseansichtTest):
         for ziel, _, ausgabe in self.gesperrt():
             with self.subTest(ziel=ziel.name):
                 self.assertIn(str(ziel), ausgabe)
+
+    def test_die_meldung_ueber_eine_zeitangabe_kommt_trotzdem_und_zuerst(self) -> None:
+        # Der Trainer soll den Tippfehler auch dann finden, wenn die Datei
+        # gesperrt ist. Die Meldung zur Datei steht zuletzt.
+        for ziel, _, ausgabe in self.gesperrt(nachher="## 35–60 Spiel\n\nSechs gegen sechs."):
+            with self.subTest(ziel=ziel.name):
+                self.assertIn("35–60 Spiel", ausgabe)
+                self.assertLess(ausgabe.index("35–60 Spiel"), ausgabe.index(str(ziel)))
 
     def test_die_gesperrte_datei_bleibt_wie_sie_war(self) -> None:
         # Die Rechte fasst das Skript nicht an, auch nicht, um doch noch zu

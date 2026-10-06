@@ -1334,18 +1334,25 @@ def main() -> int:
     seite = schreibe(gliederung, baue_adresse(ziel, a.bilder), plan.name, erzeugt)
     try:
         ziel.write_text(seite, encoding="utf-8")
+        gesperrt = False
     except PermissionError:
+        gesperrt = True
+    if not gesperrt:
+        print(f"Leseansicht: {ziel}")
+    # Die Meldungen gelten dem Plan, nicht der Datei. Sie kommen auch, wenn
+    # die Datei gesperrt ist, und vor deren Meldung.
+    for meldung in gliederung.meldungen:
+        print(meldung)
+    if gesperrt:
         # Die Rechte der Datei fasst das Skript nicht an (#75). Geoeffnet wird
         # sie erst, wenn das HTML fertig ist, eine alte bleibt also unberuehrt.
+        sys.stdout.flush()
         print(f"Leseansicht nicht geschrieben: {ziel}\n"
               "Die Datei ist gesperrt oder schreibgeschützt. Häufige Ursache: Der "
               "Nextcloud-Client hat sie gesperrt, weil sie auf dem Server kein "
               "Schreibrecht hat. Eine Leseansicht, die dort schon liegt, bleibt, "
               "wie sie war, ohne die Änderungen im Plan.", file=sys.stderr)
         return 1
-    print(f"Leseansicht: {ziel}")
-    for meldung in gliederung.meldungen:
-        print(meldung)
     return 0
 
 
