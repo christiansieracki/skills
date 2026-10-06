@@ -139,6 +139,11 @@ stattdessen `--bilder verweis` anbieten, dann steht nur ein Pfad nach
 `schaubilder/` drin und die Datei bleibt klein, funktioniert aber nur im
 Ordner.
 
+Endet `leseansicht.py` nicht mit 0, etwa weil die HTML gesperrt oder
+schreibgeschützt ist, gib seine Meldung dem Trainer weiter. Gebaut wird erst
+wieder, wenn er sagt, dass die Datei frei ist. Entsperren ist seine Sache, oft
+im Nextcloud-Client, die Dateirechte fasst du nicht an.
+
 ## Nachbereitung
 
 Nach der Einheit fragen: Was lief gut? Wie war die Belastung? Auffälligkeiten?
