@@ -26,7 +26,7 @@ ein Ticket bekommen, siehe den Nachtrag in #29. Bei der Durchsicht am
 Leseansicht, #77 davor. Der Ausschnitt für PDFs, die nicht wie PlayDrill
 aufgebaut sind, bleibt in der Welle zur Wissenskarte (#62 bis #65), nach der
 Welle zur Leseansicht. Beim Bau der Welle zur Leseansicht am 06.10.2026 kamen
-Punkte aus #52 bis #59, #75 und #76 dazu. Was davon die Abnahme prüfen soll,
+Punkte aus #52 bis #59, #75, #76 und dem Code-Review dazu. Was davon die Abnahme prüfen soll,
 steht als Kommentar in #60, der Rest hier mit Ziel.
 
 ### DVV Plan 1 als Übungsfolge mit ID
@@ -158,6 +158,26 @@ entstanden“. Allein laufen sie grün.
 
 Ziel: bewusst nicht. Auslöser: Parallele Implementierer werden die Regel.
 Dann setzt `starte()` TEMP und TMP je Arbeitsordner.
+
+### Ein maskierter Strich in anderen Tabellen
+
+Aus dem Code-Review der Welle zur Leseansicht. Die Zerlegung einer
+Tabellenzeile steht jetzt als `tabellenzellen` in `tpdaten.py`, und die
+Leseansicht lässt `\|` in seiner Zelle. `tpdaten.lies_schwerpunkt_zeilen` und
+drei Testhelfer (`arbeitsordner.py`, `test_sammelimport.py`, `test_index.py`)
+zerlegen weiter ohne `\|`.
+
+Ziel: bewusst nicht. Auslöser: Ein Klartext in `schwerpunkte.md` enthält ein
+`|`.
+
+### Der Schleier hinter einer Ansicht in älteren Browsern
+
+Aus dem Code-Review der Welle zur Leseansicht. Hinter einer geöffneten Ansicht
+liegt ein Schleier aus der Palette. Ältere Browser geben die Variablen nicht an
+`::backdrop` weiter, dort ist er auch im Dunkeln der helle.
+
+Ziel: bewusst nicht. Auslöser: Jemand meldet einen zu hellen Schleier auf
+einem älteren Handy.
 
 ### Frontmatter und Dauer in den Vorlagen
 
