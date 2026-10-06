@@ -470,6 +470,21 @@ vertical-align:top;min-width:65px}
 .rich th{background:var(--flaeche)}
 .rich code{font-family:ui-monospace,monospace;font-size:.85em;overflow-wrap:anywhere}
 .rich hr{border:0;border-top:1px solid var(--linie);margin:28px 0}
+.liste{margin:14px 0;border-top:1px solid var(--linie)}
+.eintrag{border-bottom:1px solid var(--linie)}
+.eintrag>summary{display:flex;gap:12px;justify-content:space-between;align-items:center;
+padding:13px 0;list-style:none}
+.eintrag>summary::-webkit-details-marker{display:none}
+.eintrag>summary::after{content:"+";font-size:22px;flex-shrink:0;color:var(--akzent)}
+.eintrag[open]>summary::after{content:"−"}
+.nr-uebung,.dosierung{display:block}
+.nr-uebung{font-size:14px}
+.dosierung{color:var(--gedaempft);font:12px ui-monospace,monospace;margin-top:4px}
+.eintrag-text{padding:0 0 18px}
+.eintrag-text p,.eintrag-text dl,.eintrag-text dd{margin:0}
+.eintrag-text dt{font-size:11px;letter-spacing:.7px;text-transform:uppercase;
+color:var(--gedaempft);margin-top:10px}
+.eintrag-text dt:first-child{margin-top:0}
 .vorbereitung{margin-top:40px}
 .vorbereitung h2{font-size:22px;line-height:1.25;padding-bottom:8px;
 border-bottom:2px solid var(--akzent)}
@@ -504,6 +519,41 @@ def inline(t: str) -> str:
     t = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<em>\1</em>", t)
     t = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', t)
     return t.replace("&lt;br&gt;", "<br>")
+
+
+def ist_liste_zum_aufklappen(tabelle: list[str]) -> bool:
+    """Ob die ersten beiden Spalten der Tabelle `Nr` und `Übung` heissen."""
+    kopf = [k.lower() for k in _zellen(tabelle[0])]
+    return len(kopf) >= 2 and kopf[0] == "nr" and kopf[1] in SPALTEN["uebung"]
+
+
+def liste_html(tabelle: list[str]) -> str:
+    """Eine Tabelle mit `Nr | Übung` als Liste zum Aufklappen, je Zeile ein Eintrag.
+
+    Vier Spalten sind auf dem Handy unlesbar, darum steht zugeklappt nur
+    "Nr. Übung" und darunter die Spalte `Heute`, die Dosierung dieses Abends.
+    Die uebrigen Spalten stehen im aufgeklappten Eintrag, eine einzelne ohne
+    Beschriftung, mehrere jeweils unter ihrer Spaltenueberschrift.
+    """
+    kopf, *reihen = [_zellen(z) for z in tabelle if not _ist_trennzeile(z)]
+    namen = [k.lower() for k in kopf]
+    heute = namen.index("heute") if "heute" in namen else None
+    uebrige = [i for i in range(2, len(kopf)) if i != heute]
+    eintraege = []
+    for reihe in reihen:
+        reihe += [""] * (len(kopf) - len(reihe))
+        dosierung = (f' <span class="dosierung">{inline(reihe[heute])}</span>'
+                     if heute is not None and reihe[heute] else "")
+        if len(uebrige) <= 1:
+            text = "".join(f"<p>{inline(reihe[i])}</p>" for i in uebrige if reihe[i])
+        else:
+            text = "<dl>" + "".join(f"<dt>{inline(kopf[i])}</dt><dd>{inline(reihe[i])}</dd>"
+                                    for i in uebrige if reihe[i]) + "</dl>"
+        eintraege.append(
+            f'<details class="eintrag"><summary><span>'
+            f'<span class="nr-uebung">{inline(reihe[0])}. {inline(reihe[1])}</span>{dosierung}'
+            f'</span></summary><div class="eintrag-text">{text}</div></details>')
+    return '<div class="liste">\n' + "\n".join(eintraege) + "\n</div>"
 
 
 def nach_html(zeilen: list[str]) -> str:
@@ -548,6 +598,9 @@ def nach_html(zeilen: list[str]) -> str:
                 block.append(zeilen[i])
                 i += 1
             liste_zu()
+            if ist_liste_zum_aufklappen(block):
+                raus.append(liste_html(block))
+                continue
             raus.append("<table>")
             for n, zz in enumerate(block):
                 if _ist_trennzeile(zz):

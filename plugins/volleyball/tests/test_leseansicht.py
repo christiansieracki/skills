@@ -17,6 +17,7 @@ gezeigt wird, entscheidet dieselbe Stelle wie beim Einbetten.
 
 from __future__ import annotations
 
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -331,6 +332,79 @@ class OhneSkriptTest(LeseansichtTest):
             nachher="## Material gesamt\n\nBälle")
 
         self.assertEqual((ansicht.skripte, ansicht.ereignisse), ([], []))
+
+
+class ListeZumAufklappenTest(LeseansichtTest):
+    """Eine Tabelle, die mit `Nr | Übung` beginnt, wird eine Liste zum Aufklappen.
+
+    Vier Spalten sind auf dem Handy so unlesbar wie frueher die Ablauftabelle.
+    Gedacht ist sie fuer die Athletik, die Regel haengt aber nur an den
+    Spalten.
+    """
+
+    def abschnitt(self, tabelle: str):
+        """Der einzige Abschnitt unter Vorbereitung eines Plans mit dieser Tabelle."""
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")],
+                               nachher="## Athletik\n\n" + textwrap.dedent(tabelle))
+        (abschnitt,) = ansicht.vorbereitung
+        return abschnitt
+
+    def test_nummer_name_und_dosierung_im_kopf_die_beschreibung_beim_aufklappen(self) -> None:
+        abschnitt = self.abschnitt("""
+            | Nr | Übung | Worauf es ankommt | Heute |
+            |---|---|---|---|
+            | 1 | Ausfallschritt mit Drehung | Blick zur hinteren Hand | 3–5 Wdh. je Seite |
+            | 2 | Tiefe Hocke | Fersen bleiben am Boden | 20 s |
+        """)
+
+        self.assertEqual(abschnitt.tabellen, [])
+        (liste,) = abschnitt.listen
+        self.assertEqual(
+            [(e.titel, e.heute, e.inhalt, e.zugeklappt) for e in liste],
+            [("1. Ausfallschritt mit Drehung", "3–5 Wdh. je Seite",
+              [("", "Blick zur hinteren Hand")], True),
+             ("2. Tiefe Hocke", "20 s", [("", "Fersen bleiben am Boden")], True)])
+
+    def test_mehrere_uebrige_spalten_stehen_mit_ihrer_ueberschrift(self) -> None:
+        abschnitt = self.abschnitt("""
+            | Nr | Übung | Worauf es ankommt | Heute | Material |
+            |---|---|---|---|---|
+            | 1 | Tiefe Hocke | Fersen bleiben am Boden | 20 s | Matte |
+        """)
+
+        ((eintrag,),) = abschnitt.listen
+        self.assertEqual((eintrag.titel, eintrag.heute, eintrag.inhalt),
+                         ("1. Tiefe Hocke", "20 s",
+                          [("Worauf es ankommt", "Fersen bleiben am Boden"),
+                           ("Material", "Matte")]))
+
+    def test_ohne_spalte_heute_steht_im_kopf_nur_nummer_und_name(self) -> None:
+        abschnitt = self.abschnitt("""
+            | Nr | Übung | Worauf es ankommt |
+            |---|---|---|
+            | 1 | Tiefe Hocke | Fersen bleiben am Boden |
+        """)
+
+        ((eintrag,),) = abschnitt.listen
+        self.assertEqual((eintrag.titel, eintrag.heute, eintrag.inhalt),
+                         ("1. Tiefe Hocke", None, [("", "Fersen bleiben am Boden")]))
+
+    def test_eine_tabelle_die_nicht_mit_nr_und_uebung_beginnt_bleibt_eine_tabelle(self) -> None:
+        # Die Sechser haben auch eine Nummer, sind aber keine Uebungsliste.
+        abschnitt = self.abschnitt("""
+            | Nr | Sechser | Annahme |
+            |---|---|---|
+            | 1 | Rot | Dreierriegel |
+
+            | Übung | Nr | Heute |
+            |---|---|---|
+            | Tiefe Hocke | 1 | 20 s |
+        """)
+
+        self.assertEqual(abschnitt.listen, [])
+        self.assertEqual(abschnitt.tabellen,
+                         [[["Nr", "Sechser", "Annahme"], ["1", "Rot", "Dreierriegel"]],
+                          [["Übung", "Nr", "Heute"], ["Tiefe Hocke", "1", "20 s"]]])
 
 
 class SchaubildTest(LeseansichtTest):
