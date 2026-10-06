@@ -20,7 +20,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from arbeitsordner import Arbeitsordner, Zeile
+from arbeitsordner import OHNE, Arbeitsordner, Zeile
 from leseansicht_lesen import Leseansicht, lies_leseansicht
 
 PLAN = "gruppe/2026-09-15.md"
@@ -122,6 +122,90 @@ class ProgrammpunktTest(LeseansichtTest):
 
         self.assertEqual(ansicht.ablauf, "Ablauf · 2 Programmpunkte · Minuten ab Beginn")
         self.assertEqual(einer.ablauf, "Ablauf · 1 Programmpunkt · Minuten ab Beginn")
+
+
+class KopfTest(LeseansichtTest):
+    ZEILEN = [Zeile("0–120", "Spiel", "Zwei gegen Zwei auf dem Kleinfeld")]
+
+    def test_der_kurztitel_steht_in_der_ueberschrift_nach_dem_gedankenstrich(self) -> None:
+        ansicht = self.ansicht(
+            self.ZEILEN,
+            titel="Training 01.10.2026 — Drei Sechser, 5-1 fürs Testspiel und 6-2 antesten")
+
+        self.assertEqual(ansicht.kopf.titel, "Drei Sechser, 5-1 fürs Testspiel und 6-2 antesten")
+
+    def test_ohne_gedankenstrich_ist_die_ganze_ueberschrift_der_kurztitel(self) -> None:
+        # Ein Bindestrich wie in 5-1 ist kein Gedankenstrich.
+        ansicht = self.ansicht(self.ZEILEN, titel="Training 15.09.2026, 5-1 gegen 6-2")
+
+        self.assertEqual(ansicht.kopf.titel, "Training 15.09.2026, 5-1 gegen 6-2")
+
+    def test_das_datum_steht_deutsch_und_kurz_mit_wochentag(self) -> None:
+        ansicht = self.ansicht(self.ZEILEN, datum="2026-10-01")
+
+        self.assertIn("Do, 01.10.2026", ansicht.kopf.angaben)
+
+    def test_der_name_der_gruppe_kommt_aus_der_wurzeldatei(self) -> None:
+        self.ordner.setze_gruppen({"h1-h2": {"name": "Herren 1 + Herren 2",
+                                             "teams": ["herren-1", "herren-2"],
+                                             "trainer": ["test"]}})
+
+        ansicht = self.ansicht(self.ZEILEN, gruppe="h1-h2")
+
+        self.assertIn("Herren 1 + Herren 2", ansicht.kopf.angaben)
+        self.assertNotIn("h1-h2", ansicht.kopf.angaben)
+
+    def test_ohne_namen_in_der_wurzeldatei_steht_das_kuerzel(self) -> None:
+        self.ordner.setze_gruppen({"h1-h2": {"name": "Herren 1 + Herren 2"},
+                                   "u16": {"teams": ["u16"]}})
+
+        ansicht = self.ansicht(self.ZEILEN, gruppe="u16")
+
+        self.assertIn("u16", ansicht.kopf.angaben)
+        self.assertNotIn("Herren 1 + Herren 2", ansicht.kopf.angaben)
+
+    def test_ausserhalb_eines_arbeitsordners_steht_das_kuerzel(self) -> None:
+        # Ohne Wurzeldatei gibt es keinen Namen nachzuschlagen. Die
+        # Leseansicht entsteht trotzdem, erzeuge() prueft den Exitcode.
+        self.ordner.setze_gruppen({"h1-h2": {"name": "Herren 1 + Herren 2"}})
+        plan = self.ordner.lege_plan_an(PLAN, self.ZEILEN, gruppe="h1-h2")
+        fremd = plan.replace(self.ordner.lege_entwurfsordner_an() / plan.name)
+
+        ansicht = self.erzeuge(fremd)
+
+        self.assertIn("h1-h2", ansicht.kopf.angaben)
+
+    def test_teilnehmer_und_dauer_stehen_im_kopf(self) -> None:
+        ansicht = self.ansicht(self.ZEILEN, teilnehmer=18, dauer=120)
+
+        self.assertIn("18 Teilnehmer", ansicht.kopf.angaben)
+        self.assertIn("120 min", ansicht.kopf.angaben)
+
+    def test_die_spielflaechen_sind_die_zahl_der_hallenteile(self) -> None:
+        for spielflaechen, hallenteile in ((1, "1 Hallenteil"), (2, "2 Hallenteile")):
+            with self.subTest(spielflaechen=spielflaechen):
+                ansicht = self.ansicht(self.ZEILEN, spielflaechen=spielflaechen)
+
+                self.assertIn(hallenteile, ansicht.kopf.angaben)
+
+    def test_was_im_frontmatter_fehlt_faellt_weg_ohne_leere_trennzeichen(self) -> None:
+        # Der Plan traegt immer datum und gruppe, wenn der Test sie nicht
+        # weglaesst. Ein leeres Feld zaehlt wie ein fehlendes, die Vorlage
+        # bringt etwa teilnehmer: leer mit.
+        faelle = [
+            ({}, ["Di, 15.09.2026", "gruppe"]),
+            ({"gruppe": OHNE, "spielflaechen": 2}, ["Di, 15.09.2026", "2 Hallenteile"]),
+            ({"datum": OHNE, "teilnehmer": 12, "dauer": None}, ["gruppe", "12 Teilnehmer"]),
+            ({"datum": OHNE, "gruppe": OHNE, "dauer": 90}, ["90 min"]),
+            ({"datum": OHNE, "gruppe": OHNE}, []),
+        ]
+        for frontmatter, angaben in faelle:
+            with self.subTest(**{k: str(v) for k, v in frontmatter.items()}):
+                kopf = self.ansicht(self.ZEILEN, **frontmatter).kopf
+
+                self.assertEqual(kopf.angaben, angaben)
+                for zeile in kopf.zeilen:
+                    self.assertTrue(all(teil.strip() for teil in zeile.split("·")), zeile)
 
 
 class VorbereitungTest(LeseansichtTest):
