@@ -149,6 +149,15 @@ class Abschnitt:
 
 
 @dataclass
+class Umschalter:
+    wahl: list[str]
+    """Was man waehlen kann, in der Folge der Seite."""
+    voreingestellt: str | None
+    sichtbar: bool
+    """Ob er ohne Skript zu sehen ist."""
+
+
+@dataclass
 class Leseansicht:
     ablauf: str
     """Die Zeile ueber dem Ablauf, etwa "Ablauf · 3 Programmpunkte · Minuten ab Beginn"."""
@@ -162,6 +171,10 @@ class Leseansicht:
     """Je Skript sein Inhalt oder seine Quelle."""
     ereignisse: list[str]
     """Skript an Elementen: Attribute wie onclick und Links auf javascript:."""
+    umschalter: Umschalter | None
+    """Der Umschalter Hell, Dunkel, System."""
+    farbschema: dict[str, str]
+    """Das Farbschema ohne Skript, je Bedingung einer Media-Query, "" ohne Bedingung."""
 
 
 def _text(knoten: Knoten | None) -> str | None:
@@ -225,6 +238,60 @@ def _ereignisse(seite: Knoten) -> list[str]:
     return gefunden
 
 
+def _umschalter(seite: Knoten) -> Umschalter | None:
+    feld = seite.erstes(klasse="darstellung")
+    if feld is None:
+        return None
+    wahl = [(label.text(), "checked" in label.erstes("input").attribute)
+            for label in feld.alle("label")]
+    return Umschalter(wahl=[name for name, _ in wahl],
+                      voreingestellt=next((name for name, an in wahl if an), None),
+                      sichtbar="hidden" not in feld.attribute)
+
+
+def _regeln(stil: str) -> list[tuple[str, str, str]]:
+    """Je Regel im Stil ihre Media-Query ohne Leerzeichen, ihr Selektor und ihre Deklarationen."""
+    regeln, offen = [], []
+    for m in re.finditer(r"([^{}]*)([{}])", stil):
+        davor = m.group(1).strip()
+        if m.group(2) == "{":
+            offen.append(davor)
+        elif offen:
+            selektor = offen.pop()
+            if not selektor.startswith("@"):
+                media = "".join(o.removeprefix("@media") for o in offen)
+                regeln.append(("".join(media.split()), selektor, davor))
+    return regeln
+
+
+# Ein Selektor fuer das Wurzelelement, mit Bedingungen an seine Attribute.
+WURZEL = re.compile(r":root((?::not\()?\[[\w-]+(?:=[^\]]*)?\]\)?)*")
+BEDINGUNG = re.compile(r"(:not\()?\[([\w-]+)(?:=\"?([^\]\"]*)\"?)?\]")
+
+
+def _trifft_wurzel(selektor: str, wurzel: Knoten) -> bool:
+    """Ob der Selektor das Wurzelelement trifft, wie es im HTML steht, ohne Skript."""
+    if not WURZEL.fullmatch(selektor.strip()):
+        return False
+    for nicht, name, wert in BEDINGUNG.findall(selektor):
+        hat = name in wurzel.attribute and wert in ("", wurzel.attribute[name])
+        if hat == bool(nicht):
+            return False
+    return True
+
+
+def _farbschema(seite: Knoten) -> dict[str, str]:
+    """Welches color-scheme ohne Skript am Wurzelelement gilt, je Media-Query."""
+    wurzel = seite.erstes("html")
+    stil = "".join(k for s in seite.alle("style") for k in s.kinder if isinstance(k, str))
+    schema = {}
+    for media, selektor, deklarationen in _regeln(stil):
+        m = re.search(r"color-scheme:\s*([\w ]+)", deklarationen)
+        if m and any(_trifft_wurzel(s, wurzel) for s in selektor.split(",")):
+            schema[media] = m.group(1).strip()
+    return schema
+
+
 def lies_leseansicht(html: str) -> Leseansicht:
     seite = baum(html)
     kopf = seite.erstes(klasse="ablauf-kopf")
@@ -239,4 +306,6 @@ def lies_leseansicht(html: str) -> Leseansicht:
         skripte=[s.attribute.get("src") or "".join(k for k in s.kinder if isinstance(k, str))
                  for s in seite.alle("script")],
         ereignisse=_ereignisse(seite),
+        umschalter=_umschalter(seite),
+        farbschema=_farbschema(seite),
     )

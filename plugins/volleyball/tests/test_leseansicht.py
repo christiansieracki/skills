@@ -235,9 +235,14 @@ class OhneSkriptTest(LeseansichtTest):
         self.assertEqual(punkt.heute, "<b>drei</b> Streifen")
         self.assertEqual(ansicht.vorbereitung[0].text,
                          "Nicht <b>fett</b> & nicht <script>weg</script>")
-        self.assertEqual(ansicht.skripte, [])
+        # Das Skript der Leseansicht bleibt das einzige.
+        ohne = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")])
+        self.assertEqual(ansicht.skripte, ohne.skripte)
 
-    def test_die_leseansicht_enthaelt_kein_javascript(self) -> None:
+    def test_kein_element_haengt_am_skript(self) -> None:
+        # Das Skript bringt nur den Umschalter, die Ansichten und das
+        # Vergroessern dazu (ADR-0012). Ein onclick oder ein Link auf
+        # javascript: waere ohne Skript ein Knopf, der nichts tut.
         self.ordner.lege_schaubild_an("ue-000030-aufbau.svg")
         self.ordner.lege_karte_an(id="ue-000030", titel="Mit einem Bild",
                                   schaubild="ue-000030-aufbau.svg")
@@ -246,7 +251,30 @@ class OhneSkriptTest(LeseansichtTest):
                    heute="heute anders", warum="weil")],
             nachher="## Material gesamt\n\nBälle")
 
-        self.assertEqual((ansicht.skripte, ansicht.ereignisse), ([], []))
+        self.assertEqual(ansicht.ereignisse, [])
+
+
+class UmschalterTest(LeseansichtTest):
+    """Hell, Dunkel oder System, damit der Trainer die Ansicht an die Halle anpasst.
+
+    Was der Umschalter mit Skript tut, prueft die Abnahme im Browser (#50,
+    Testing Decisions). Hier steht, was ohne Skript gilt.
+    """
+
+    def test_ohne_skript_ist_der_umschalter_verborgen(self) -> None:
+        # Ein Umschalter, der nichts tut, waere schlimmer als keiner.
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")])
+
+        umschalter = ansicht.umschalter
+        self.assertEqual((umschalter.wahl, umschalter.voreingestellt),
+                         (["Hell", "Dunkel", "System"], "System"))
+        self.assertFalse(umschalter.sichtbar)
+
+    def test_ohne_skript_folgt_das_farbschema_dem_geraet(self) -> None:
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")])
+
+        self.assertEqual(ansicht.farbschema,
+                         {"": "light", "(prefers-color-scheme:dark)": "dark"})
 
 
 class SchaubildTest(LeseansichtTest):
