@@ -352,5 +352,59 @@ class SchaubildTest(LeseansichtTest):
                          ["ue-000032-zirkel-1.png", "ue-000032-zirkel-3.png"])
 
 
+class GesperrtTest(LeseansichtTest):
+    """Eine Leseansicht, die sich nicht schreiben laesst, wird gemeldet (#75).
+
+    Bei der Abnahme von 1d war eine Leseansicht gesperrt: Der Nextcloud-Client
+    setzt einen Verweigern-Eintrag in die Dateirechte, wenn die Datei auf dem
+    Server kein Schreibrecht hat. `leseansicht.py` brach mit einem Traceback
+    ab. Hier steht dafuer eine schreibgeschuetzte Datei, die laesst sich auf
+    jedem Rechner mit os.chmod herstellen.
+
+    Jeder Test gilt fuer das Ziel neben dem Plan und fuer eins aus `--out`.
+    """
+
+    ALT = "<p>Die Leseansicht vom letzten Erzeugen</p>"
+
+    def gesperrt(self) -> list[tuple[Path, int, str]]:
+        """Erzeugt die Leseansicht eines Plans in eine gesperrte Datei, je Ziel einmal.
+
+        Vorher steht in der Datei ALT. Zurueck kommen je Ziel die Datei, der
+        Exitcode und die ganze Ausgabe des Aufrufs.
+        """
+        plan = self.ordner.lege_plan_an(PLAN, [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")])
+        aus_out = self.ordner.pfad / "handy" / "training.html"
+        laeufe = []
+        for ziel, argumente in ((plan.with_suffix(".html"), []),
+                                (aus_out, ["--out", str(aus_out)])):
+            ziel.parent.mkdir(parents=True, exist_ok=True)
+            ziel.write_text(self.ALT, encoding="utf-8")
+            ziel.chmod(0o444)
+            # Unter Windows raeumt rmtree eine schreibgeschuetzte Datei nicht weg.
+            self.addCleanup(ziel.chmod, 0o666)
+            fertig = self.ordner.starte("leseansicht.py", str(plan), *argumente,
+                                        mit_wurzel=False)
+            laeufe.append((ziel, fertig.returncode, fertig.stdout + fertig.stderr))
+        return laeufe
+
+    def test_der_aufruf_endet_ohne_traceback_und_nicht_mit_null(self) -> None:
+        for ziel, exitcode, ausgabe in self.gesperrt():
+            with self.subTest(ziel=ziel.name):
+                self.assertNotEqual(exitcode, 0)
+                self.assertNotIn("Traceback", ausgabe)
+
+    def test_die_meldung_nennt_die_datei_mit_pfad(self) -> None:
+        for ziel, _, ausgabe in self.gesperrt():
+            with self.subTest(ziel=ziel.name):
+                self.assertIn(str(ziel), ausgabe)
+
+    def test_die_gesperrte_datei_bleibt_wie_sie_war(self) -> None:
+        # Die Rechte fasst das Skript nicht an, auch nicht, um doch noch zu
+        # schreiben.
+        for ziel, _, _ in self.gesperrt():
+            with self.subTest(ziel=ziel.name):
+                self.assertEqual(ziel.read_text(encoding="utf-8"), self.ALT)
+
+
 if __name__ == "__main__":
     unittest.main()

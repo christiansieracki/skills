@@ -208,7 +208,8 @@ kommt deshalb allein aus diesem Aufruf.
   Jede gebaute Datei nennen, sie steht in der Zeile `Leseansicht:`.
 - Endet ein Aufruf nicht mit 0, etwa weil die Datei gerade offen oder gesperrt
   ist, die Meldung von `leseansicht.py` an den Trainer weitergeben und mit den
-  übrigen Plänen weitermachen.
+  übrigen Plänen weitermachen. Entsperren ist seine Sache, die Dateirechte
+  fasst du nicht an.
 
 ## Eine Karte, die schon ein Bild hat
 
