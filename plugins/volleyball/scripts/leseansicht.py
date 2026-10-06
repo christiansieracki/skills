@@ -624,19 +624,21 @@ def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
 
 # Die Farben der Vorlage, je Schema ein Satz derselben Namen. Schaubilder
 # liegen auch im Dunkeln auf hellem Grund, sonst verschwinden Linien und
-# Beschriftung.
+# Beschriftung. Darum ist auch die Schrift daneben, die Bildtinte, in beiden
+# Schemata dunkel. Der helle Schleier steht im Stil noch einmal als Rueckfall
+# fuer ::backdrop, dem aeltere Browser die Variablen nicht weitergeben.
 HELL = {
     "papier": "#f3f6f0", "flaeche": "#e5ece0", "tinte": "#243d32", "gedaempft": "#58705e",
     "akzent": "#356548", "linie": "#c7d6c6", "heute": "#e5ece0", "heute-marke": "#243d32",
     "knopf": "transparent", "knopf-rand": "#c7d6c6", "offen": "#243d32",
-    "bildgrund": "#e5ece0", "bildrand": "#c7d6c6", "bild": "transparent",
+    "bildgrund": "#e5ece0", "bildrand": "#c7d6c6", "bild": "transparent", "bildtinte": "#243d32",
     "schleier": "#192c2ba6", "schatten": "#1e30252b",
 }
 DUNKEL = {
     "papier": "#14241e", "flaeche": "#21382c", "tinte": "#e6eee3", "gedaempft": "#a9beab",
     "akzent": "#b3d5a0", "linie": "#3b5141", "heute": "#233a2b", "heute-marke": "#b3d5a0",
     "knopf": "#1a2d23", "knopf-rand": "#45604b", "offen": "#d9edca",
-    "bildgrund": "#dce4d7", "bildrand": "#82997d", "bild": "#edf1e8",
+    "bildgrund": "#dce4d7", "bildrand": "#82997d", "bild": "#edf1e8", "bildtinte": "#243d32",
     "schleier": "#08140dd1", "schatten": "#07110ccc",
 }
 
@@ -680,9 +682,11 @@ color:var(--gedaempft);text-align:right}
 .programmpunkt[open]{border-left:3px solid var(--akzent);padding-left:14px;margin-left:-17px}
 .programmpunkt>summary{display:grid;grid-template-columns:57px 1fr 20px;gap:12px;
 padding:17px 0;align-items:center;list-style:none}
-.programmpunkt>summary::-webkit-details-marker{display:none}
-.programmpunkt>summary::after{content:"+";font-size:23px;color:var(--akzent)}
-.programmpunkt[open]>summary::after{content:"−"}
+.programmpunkt>summary::-webkit-details-marker,.eintrag>summary::-webkit-details-marker{
+display:none}
+.programmpunkt>summary::after,.eintrag>summary::after{content:"+";font-size:23px;flex-shrink:0;
+color:var(--akzent)}
+.programmpunkt[open]>summary::after,.eintrag[open]>summary::after{content:"−"}
 .wann{align-self:start;padding-top:3px;font:700 13px ui-monospace,monospace;
 font-variant-numeric:tabular-nums}
 .zeit,.dauer{display:block}
@@ -699,10 +703,10 @@ color:var(--gedaempft)}
 margin:10px 0 22px}
 .heute b{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;
 margin-bottom:6px;color:var(--heute-marke)}
-.inhalt h3,.rich h3{font-size:18px;line-height:1.4;margin:24px 0 10px}
+.inhalt h3,.rich h3,.reiter>h3{font-size:18px;line-height:1.4;margin:24px 0 10px}
 .rich h4{font-size:16px;margin:20px 0 8px}
 .schaubild figure{margin:16px 0;padding:10px;background:var(--bildgrund);
-border:1px solid var(--bildrand);color:#243d32;color-scheme:light}
+border:1px solid var(--bildrand);color:var(--bildtinte);color-scheme:light}
 .schaubild img{display:block;width:100%;height:auto;border-radius:4px;background:var(--bild)}
 .schaubild figcaption{text-align:center;font-size:12px;margin-top:8px}
 .karte{color:var(--gedaempft);font-size:12px;margin-top:3px}
@@ -725,9 +729,7 @@ vertical-align:top;min-width:65px}
 .eintrag{border-bottom:1px solid var(--linie)}
 .eintrag>summary{display:flex;gap:12px;justify-content:space-between;align-items:center;
 padding:13px 0;list-style:none}
-.eintrag>summary::-webkit-details-marker{display:none}
-.eintrag>summary::after{content:"+";font-size:22px;flex-shrink:0;color:var(--akzent)}
-.eintrag[open]>summary::after{content:"−"}
+.eintrag>summary::after{font-size:22px}
 .nr-uebung,.dosierung{display:block}
 .nr-uebung{font-size:14px}
 .dosierung{color:var(--gedaempft);font:12px ui-monospace,monospace;margin-top:4px}
@@ -736,15 +738,12 @@ padding:13px 0;list-style:none}
 .eintrag-text dt{font-size:11px;letter-spacing:.7px;text-transform:uppercase;
 color:var(--gedaempft);margin-top:10px}
 .eintrag-text dt:first-child{margin-top:0}
-.vorbereitung{margin-top:40px}
-.vorbereitung h2{font-size:22px;line-height:1.25;padding-bottom:8px;
+.vorbereitung,.nachschlagen{margin-top:40px}
+.vorbereitung>h2,.nachschlagen>h2{font-size:22px;line-height:1.25;padding-bottom:8px;
 border-bottom:2px solid var(--akzent)}
 .abschnitt{border-bottom:1px solid var(--linie)}
 .abschnitt>summary{font-weight:700;padding:12px 0}
 .abschnitt>.rich{padding-bottom:16px;overflow-wrap:anywhere}
-.nachschlagen{margin-top:40px}
-.nachschlagen>h2{font-size:22px;line-height:1.25;padding-bottom:8px;
-border-bottom:2px solid var(--akzent)}
 .reiterleiste,.verweise{display:flex;gap:8px;flex-wrap:wrap}
 .reiterleiste{padding-top:16px;margin-bottom:20px}
 .verweise{margin-top:24px}
@@ -756,12 +755,11 @@ background:var(--flaeche)}
 .verweise a::after{content:"\\2009↗"}
 .reiterleiste a[aria-current]{background:var(--akzent);color:var(--papier);
 border-color:var(--akzent)}
-.reiter>h3{font-size:18px;line-height:1.4;margin:24px 0 10px}
 .ansicht .reiter>h3{font-size:22px;line-height:1.25;margin-top:8px}
 .ansicht{padding:0;max-height:90vh;max-height:90dvh;width:calc(100% - 24px);max-width:760px;
 margin:auto;background:var(--papier);color:var(--tinte);border:1px solid var(--linie);
 border-radius:16px;box-shadow:0 20px 70px var(--schatten);overscroll-behavior:contain}
-.ansicht::backdrop{background:var(--schleier,#192c2ba6)}
+.ansicht::backdrop{background:var(--schleier,""" + HELL["schleier"] + """)}
 .ansicht-kopf{display:flex;justify-content:space-between;align-items:center;gap:12px;
 padding:18px 20px;background:var(--papier);position:sticky;top:0;z-index:2;
 border-bottom:1px solid var(--linie)}
@@ -883,17 +881,23 @@ ANSICHTEN_SKRIPT = """
   if (typeof HTMLDialogElement !== "function"
       || typeof HTMLDialogElement.prototype.showModal !== "function") return;
 
+  // Ein Knopf tut nur mit Skript etwas, darum entsteht jeder erst hier.
+  function knopf(klasse, text, beiKlick) {
+    var k = document.createElement("button");
+    k.type = "button";
+    if (klasse) k.className = klasse;
+    k.textContent = text;
+    k.addEventListener("click", beiKlick);
+    return k;
+  }
+
   function ansicht(titel, zurueck) {
     var dialog = document.createElement("dialog");
     dialog.className = "ansicht";
     dialog.setAttribute("aria-label", titel.textContent);
     var kopf = document.createElement("div");
     kopf.className = "ansicht-kopf";
-    var knopf = document.createElement("button");
-    knopf.type = "button";
-    knopf.textContent = zurueck;
-    knopf.addEventListener("click", function () { dialog.close(); });
-    kopf.append(titel, knopf);
+    kopf.append(titel, knopf("", zurueck, function () { dialog.close(); }));
     var inhalt = document.createElement("div");
     inhalt.className = "ansicht-inhalt";
     dialog.append(kopf, inhalt);
@@ -959,24 +963,15 @@ ANSICHTEN_SKRIPT = """
     kopf.textContent = titel;
     var dialog = ansicht(kopf, "Zurück");
     dialog.classList.add("vergroesserung");
-    inhalt.forEach(function (teil) { dialog.querySelector(".ansicht-inhalt").append(teil); });
+    inhalt.forEach(function (stueck) { dialog.querySelector(".ansicht-inhalt").append(stueck); });
     dialog.addEventListener("close", function () { dialog.remove(); });
     document.body.append(dialog);
     oeffne(dialog);
   }
 
-  function knopf(text, beiKlick) {
-    var k = document.createElement("button");
-    k.type = "button";
-    k.className = "vergroessern";
-    k.textContent = text;
-    k.addEventListener("click", beiKlick);
-    return k;
-  }
-
   // Unter jedem Codeblock im Ablauf, also jeder Hallenskizze, ein Knopf.
   document.querySelectorAll(".programmpunkt pre").forEach(function (skizze) {
-    skizze.after(knopf("Skizze vergrößern", function () {
+    skizze.after(knopf("vergroessern", "Skizze vergrößern", function () {
       var gross = document.createElement("pre");
       gross.textContent = skizze.textContent;
       vergroessere("Hallenskizze", [gross]);
@@ -986,27 +981,24 @@ ANSICHTEN_SKRIPT = """
   // Jedes Schaubild der Karte wird selbst ein Knopf. Die Ansicht nimmt das
   // Bild beim Oeffnen von ihm, eingebettet steht es nur einmal in der Datei.
   document.querySelectorAll(".programmpunkt .schaubild img").forEach(function (bild) {
-    var k = document.createElement("button");
-    k.type = "button";
-    k.className = "bildknopf";
-    k.setAttribute("aria-label", bild.alt + ", vergrößern");
-    var hinweis = document.createElement("span");
-    hinweis.textContent = "Schaubild vergrößern ↗";
-    bild.before(k);
-    k.append(bild, hinweis);
-    k.addEventListener("click", function () {
+    var k = knopf("bildknopf", "", function () {
       var flaeche = document.createElement("div");
       flaeche.className = "bildflaeche";
       var gross = document.createElement("img");
       gross.src = bild.src;
       gross.alt = bild.alt;
       flaeche.append(gross);
-      var breite = knopf("2× vergrößern", function () {
+      var breite = knopf("vergroessern", "2× vergrößern", function () {
         var doppelt = flaeche.classList.toggle("doppelt");
         breite.textContent = doppelt ? "Gesamtansicht" : "2× vergrößern";
       });
       vergroessere(bild.alt, [breite, flaeche]);
     });
+    k.setAttribute("aria-label", bild.alt + ", vergrößern");
+    var hinweis = document.createElement("span");
+    hinweis.textContent = "Schaubild vergrößern ↗";
+    bild.before(k);
+    k.append(bild, hinweis);
   });
 })();
 """
