@@ -133,6 +133,7 @@ class Zuordnung:
     zeit: str
     """Die Zeitangabe, wie sie in der Ueberschrift steht."""
     zeitangabe: Zeitangabe
+    """Dieselbe gelesen, zum Vergleich mit der Spalte Zeit."""
     hallenteil: str
     """Leer, wenn keiner dabeisteht. Dann gilt der Abschnitt fuer jeden Programmpunkt zu der Zeit."""
     rest: str
