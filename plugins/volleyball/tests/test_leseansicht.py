@@ -32,10 +32,15 @@ class LeseansichtTest(unittest.TestCase):
         self.addCleanup(self.ordner.raeume_auf)
 
     def erzeuge(self, plan: Path) -> Leseansicht:
-        """Erzeugt die Leseansicht dieses Plans und liest sie zurueck."""
+        """Erzeugt die Leseansicht dieses Plans und liest sie zurueck.
+
+        Was auf der Konsole stand, liegt danach in `self.konsole`, eine Zeile
+        je Eintrag.
+        """
         fertig = self.ordner.starte("leseansicht.py", str(plan), "--bilder", "verweis",
                                     mit_wurzel=False)
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.konsole = (fertig.stdout + fertig.stderr).splitlines()
         return lies_leseansicht(plan.with_suffix(".html").read_text(encoding="utf-8"))
 
     def ansicht(self, zeilen: list[Zeile], **plan) -> Leseansicht:
@@ -177,6 +182,250 @@ class VorbereitungTest(LeseansichtTest):
         ansicht = self.ansicht(self.ZEILEN, nachher="## Schaubilder\n\n## Nachbereitung\n\n")
 
         self.assertEqual((ansicht.knoepfe, ansicht.vorbereitung), ([], []))
+
+
+class ZuordnungTest(LeseansichtTest):
+    """Beginnt die Ueberschrift eines Abschnitts mit einer Zeitangabe, gehoert
+    er zu diesem Programmpunkt (Glossar, "Trainingsplan und Leseansicht")."""
+
+    ZEILEN = [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar"),
+              Zeile("10–35", "Hauptteil", "Annahme im Halbfeld")]
+
+    def abschnitte(self, punkt) -> list[tuple[str, str]]:
+        return [(a.ueberschrift, a.text) for a in punkt.abschnitte]
+
+    def meldungen(self, *ueberschriften: str) -> list[str]:
+        """Die Zeilen der Konsole, die eine dieser Ueberschriften nennen."""
+        return [z for z in self.konsole if any(u in z for u in ueberschriften)]
+
+    def test_ein_abschnitt_mit_zeitangabe_nimmt_seine_unterabschnitte_mit(self) -> None:
+        ansicht = self.ansicht(self.ZEILEN, nachher="""
+            ## 10–35 Annahme in drei Streifen
+
+            Erst die Annahme, dann das Zuspiel.
+
+            ### Hallenskizze
+
+            ```
+            |  A1   A2   A3  |
+            ```
+
+            ## Nachbereitung
+
+            Lief gut.
+        """)
+
+        ankommen, hauptteil = ansicht.programmpunkte
+        self.assertEqual(self.abschnitte(ankommen), [])
+        self.assertEqual(self.abschnitte(hauptteil), [
+            ("Annahme in drei Streifen",
+             "Erst die Annahme, dann das Zuspiel. Hallenskizze | A1 A2 A3 |")])
+        self.assertEqual([a.ueberschrift for a in ansicht.vorbereitung], ["Nachbereitung"])
+
+    def test_ein_unterabschnitt_mit_zeitangabe_wandert_allein(self) -> None:
+        # Etwa die Athletik je Programmpunkt: Der Abschnitt darueber hat keine
+        # Zeitangabe und bleibt mit seinem uebrigen Text unter Vorbereitung.
+        ansicht = self.ansicht(self.ZEILEN, nachher="""
+            ## Athletik
+
+            Nach DVV Plan 1.
+
+            ### 0–10 Athletik zum Ankommen
+
+            Zehn Kniebeugen.
+
+            ### Für zu Hause
+
+            Dehnen.
+
+            ### 10–35 Athletik im Hauptteil
+
+            Zwanzig Liegestütze.
+        """)
+
+        ankommen, hauptteil = ansicht.programmpunkte
+        self.assertEqual(self.abschnitte(ankommen),
+                         [("Athletik zum Ankommen", "Zehn Kniebeugen.")])
+        self.assertEqual(self.abschnitte(hauptteil),
+                         [("Athletik im Hauptteil", "Zwanzig Liegestütze.")])
+        self.assertEqual([(a.ueberschrift, a.text) for a in ansicht.vorbereitung],
+                         [("Athletik", "Nach DVV Plan 1. Für zu Hause Dehnen.")])
+
+    def test_mit_hallenteil_gilt_ein_abschnitt_nur_fuer_dessen_programmpunkt(self) -> None:
+        # Zwei Programmpunkte zur selben Zeit, einer je Hallenteil. Ohne
+        # Hallenteil in der Ueberschrift gilt der Abschnitt fuer beide.
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar"),
+                                Zeile("10–35", "Zuspiel, Hallenteil A", "Zuspiel im Dreieck"),
+                                Zeile("10–35", "Annahme, Hallenteil B", "Annahme im Halbfeld")],
+                               nachher="""
+            ## Hallenskizzen
+
+            ### 10–35 Hallenteil B: Hallenskizze
+
+            Netz quer.
+
+            ### 10–35 Hallenteil A: Hallenskizze
+
+            Netz längs.
+
+            ## 10–35 Wechsel
+
+            Nach zwölf Minuten tauschen.
+        """)
+
+        _, a, b = ansicht.programmpunkte
+        self.assertEqual((a.name, b.name), ("Zuspiel, Hallenteil A", "Annahme, Hallenteil B"))
+        self.assertEqual(self.abschnitte(a), [("Hallenskizze", "Netz längs."),
+                                              ("Wechsel", "Nach zwölf Minuten tauschen.")])
+        self.assertEqual(self.abschnitte(b), [("Hallenskizze", "Netz quer."),
+                                              ("Wechsel", "Nach zwölf Minuten tauschen.")])
+
+    def test_eine_ueberschrift_wie_die_uebung_faellt_weg(self) -> None:
+        # Sonst stuende derselbe Name zweimal untereinander. Die Zeitangabe
+        # faellt auch im mitgenommenen Unterabschnitt weg, mit Bindestrich
+        # geschrieben wie mit Halbgeviertstrich.
+        ansicht = self.ansicht([Zeile("46–93", "Hauptteil", "Drei Sechser mit Zweierserie")],
+                               nachher="""
+            ## 46-93 Drei Sechser mit Zweierserie
+
+            Sechs gegen sechs.
+
+            ### 46–93 Hallenskizze
+
+            Netz längs.
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(self.abschnitte(punkt),
+                         [("", "Sechs gegen sechs. Hallenskizze Netz längs.")])
+
+    def test_mehrere_abschnitte_stehen_in_der_reihenfolge_des_plans(self) -> None:
+        # Zwischen "Heute" und dem Schaubild der Karte. Die Ueberschriften
+        # sind absichtlich nicht alphabetisch.
+        self.ordner.lege_schaubild_an("ue-000030-aufbau.svg")
+        self.ordner.lege_karte_an(id="ue-000030", titel="Mit einem Bild",
+                                  schaubild="ue-000030-aufbau.svg", quelle="PlayDrill")
+        ansicht = self.ansicht(
+            [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar"),
+             Zeile("10–35", "Hauptteil", "Mit einem Bild", "ue-000030",
+                   heute="Drei Längsstreifen", warum="Die Sechser stehen schon")],
+            nachher="""
+                ## Material gesamt
+
+                ### 10–35 Zuerst die Annahme
+
+                Ein Wagen Bälle.
+
+                ## 0–10 Einspielen
+
+                Im Paar.
+
+                ## 10–35 Danach das Zuspiel
+
+                Zwei Netze.
+            """)
+
+        _, hauptteil = ansicht.programmpunkte
+        self.assertEqual([a.ueberschrift for a in hauptteil.abschnitte],
+                         ["Zuerst die Annahme", "Danach das Zuspiel"])
+        self.assertEqual(hauptteil.teile, ["Heute", "Abschnitt", "Abschnitt",
+                                           "Schaubild der Karte", "Quelle und ID",
+                                           "Warum hier?"])
+
+    def test_ein_leer_gewordener_abschnitt_fehlt_unter_vorbereitung(self) -> None:
+        ansicht = self.ansicht(self.ZEILEN, nachher="""
+            ## Hallenskizzen
+
+            ### 0–10 Einspielen
+
+            Paare an der Wand.
+
+            ### 10–35 Annahme
+
+            Drei Streifen.
+
+            ## Nachbereitung
+
+            Lief gut.
+        """)
+
+        self.assertEqual([a.ueberschrift for a in ansicht.vorbereitung], ["Nachbereitung"])
+        self.assertEqual([[a.ueberschrift for a in p.abschnitte] for p in ansicht.programmpunkte],
+                         [["Einspielen"], ["Annahme"]])
+
+    def test_eine_zeitangabe_ohne_programmpunkt_wird_gemeldet(self) -> None:
+        # Ein Tippfehler oder eine verschobene Zeit. Der Abschnitt bleibt
+        # unter Vorbereitung, damit nichts verloren geht, und die Leseansicht
+        # wird trotzdem geschrieben (erzeuge prueft den Exitcode 0).
+        ansicht = self.ansicht(self.ZEILEN, nachher="""
+            ## 35–60 Spiel
+
+            Sechs gegen sechs.
+
+            ## Hallenskizzen
+
+            ### 10–35 Hallenteil B: Hallenskizze
+
+            Netz quer.
+
+            ### 10–35 Annahme in Streifen
+
+            Drei Streifen.
+        """)
+
+        self.assertEqual([(a.ueberschrift, a.text) for a in ansicht.vorbereitung],
+                         [("35–60 Spiel", "Sechs gegen sechs."),
+                          ("Hallenskizzen", "10–35 Hallenteil B: Hallenskizze Netz quer.")])
+        spiel = self.meldungen("35–60 Spiel")
+        skizze = self.meldungen("10–35 Hallenteil B: Hallenskizze")
+        self.assertEqual((len(spiel), len(skizze)), (1, 1), self.konsole)
+        self.assertIn("Hallenteil B", skizze[0])
+        self.assertEqual(self.meldungen("Annahme in Streifen"), [])
+
+    def test_ein_alter_plan_behaelt_alle_abschnitte_unter_vorbereitung(self) -> None:
+        # Die Plaene seit September schreiben die Zeit hinten, mitten oder
+        # gar nicht in die Ueberschrift. Keine davon beginnt mit ihr. Der
+        # Generator schreibt keinen Text um, auch kein "siehe unten".
+        ueberschriften = ["Sechs mit sich, 0–10", "Bewegungsvorbereitung, Teil 10–18",
+                          "Hauptteil: Drei Sechser mit Zweierserie, 18–35",
+                          "Abschluss und Runde"]
+        for spalte in ("Teil", "Block"):
+            with self.subTest(spalte=spalte):
+                ansicht = self.ansicht(
+                    [Zeile("0–10", "Ankommen", "Sechs mit sich", heute="Ablauf siehe unten"),
+                     Zeile("10–18", "Bewegungsvorbereitung", "DVV Plan 1"),
+                     Zeile("18–35", "Hauptteil", "Drei Sechser mit Zweierserie",
+                           heute="Ablauf siehe unten"),
+                     Zeile("35–40", "Abschluss", "Runde")],
+                    spalte=spalte,
+                    nachher="\n\n".join(f"## {u}\n\nText zu {u}." for u in ueberschriften)
+                            + "\n\n**Teil 0–10: Einspielen im Kreis**")
+
+                self.assertEqual([p.abschnitte for p in ansicht.programmpunkte], [[]] * 4)
+                self.assertEqual([p.heute for p in ansicht.programmpunkte],
+                                 ["Ablauf siehe unten", None, "Ablauf siehe unten", None])
+                self.assertEqual([a.ueberschrift for a in ansicht.vorbereitung], ueberschriften)
+                self.assertEqual(self.meldungen(*ueberschriften), [])
+
+    def test_ein_programmpunkt_mit_uhrzeit_bekommt_keinen_abschnitt(self) -> None:
+        # "18:00" ist keine Zeitangabe. Eine Ueberschrift mit Uhrzeit beginnt
+        # mit keiner, und der Abschnitt bleibt ohne Meldung, wo er ist.
+        ansicht = self.ansicht([Zeile("18:00", "Hauptteil", "Annahme im Halbfeld")],
+                               nachher="""
+            ## 18:00 Annahme im Halbfeld
+
+            Drei Streifen.
+
+            ## 18:00–18:30 Aufbau
+
+            Zwei Netze.
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(punkt.abschnitte, [])
+        self.assertEqual([a.ueberschrift for a in ansicht.vorbereitung],
+                         ["18:00 Annahme im Halbfeld", "18:00–18:30 Aufbau"])
+        self.assertEqual(self.meldungen("Annahme im Halbfeld", "Aufbau"), [])
 
 
 class OhneSkriptTest(LeseansichtTest):

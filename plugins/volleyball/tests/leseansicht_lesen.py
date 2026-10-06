@@ -28,6 +28,7 @@ IM_SATZ = {"a", "abbr", "b", "code", "em", "i", "small", "span", "strong"}
 # Was aufgeklappt in einem Programmpunkt stehen kann, nach der Klasse im Markup.
 TEILE = {
     "heute": "Heute",
+    "planabschnitt": "Abschnitt",
     "schaubild": "Schaubild der Karte",
     "karte": "Quelle und ID",
     "warum": "Warum hier?",
@@ -130,6 +131,8 @@ class Programmpunkt:
     name: str
     uebung: str
     heute: str | None
+    abschnitte: list[Abschnitt]
+    """Die Abschnitte des Plans, die zu diesem Programmpunkt gehoeren, in ihrer Folge."""
     schaubilder: list[Schaubild]
     quelle: str | None
     id: str | None
@@ -144,6 +147,7 @@ class Programmpunkt:
 @dataclass
 class Abschnitt:
     ueberschrift: str
+    """In einem Programmpunkt leer, wenn die Ueberschrift weggefallen ist."""
     text: str
     zugeklappt: bool
 
@@ -186,6 +190,7 @@ def _programmpunkt(knoten: Knoten) -> Programmpunkt:
         name=_text(kopf.erstes(klasse="name")) or "",
         uebung=_text(kopf.erstes(klasse="uebung")) or "",
         heute=_text(heute.erstes("p")) if heute is not None else None,
+        abschnitte=[_planabschnitt(k) for k in inhalt.alle(klasse="planabschnitt")],
         schaubilder=schaubilder,
         quelle=_text(inhalt.erstes(klasse="quelle")),
         id=_text(inhalt.erstes(klasse="id")),
@@ -201,6 +206,14 @@ def _abschnitt(knoten: Knoten) -> Abschnitt:
     return Abschnitt(ueberschrift=_text(knoten.erstes("summary")) or "",
                      text=_text(knoten.erstes(klasse="rich")) or "",
                      zugeklappt="open" not in knoten.attribute)
+
+
+def _planabschnitt(knoten: Knoten) -> Abschnitt:
+    """Ein Abschnitt im Programmpunkt, mit seiner Ueberschrift, wenn er eine hat."""
+    kopf = next((k for k in knoten.elemente() if k.tag == "h3"), None)
+    return Abschnitt(ueberschrift=_text(kopf) or "",
+                     text=_text(knoten.erstes(klasse="rich")) or "",
+                     zugeklappt=False)
 
 
 def _knoepfe(seite: Knoten) -> list[str]:

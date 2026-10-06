@@ -7,8 +7,11 @@ Erzeugt die .html neben der .md, eine einzige Datei, die ohne JavaScript
 auskommt. Die Ablauftabelle wird dabei bewusst NICHT als Tabelle gezeigt:
 sechs Spalten sind auf einem Handy in der Halle unlesbar. Jede Zeile wird ein
 Programmpunkt, der zugeklappt Zeitangabe, Dauer, Name und Uebung zeigt und
-sich mit dem Daumen aufklappen laesst. Alle anderen Abschnitte des Plans
-stehen am Ende unter Vorbereitung. Gestaltet ist die Seite nach der Vorlage
+sich mit dem Daumen aufklappen laesst. Beginnt die Ueberschrift eines
+Abschnitts mit einer Zeitangabe, steht er aufgeklappt in diesem Programmpunkt
+(Glossar). Alle anderen Abschnitte des Plans stehen am Ende unter
+Vorbereitung, auch einer, dessen Zeitangabe auf keinen Programmpunkt passt.
+Den nennt das Skript auf der Konsole. Gestaltet ist die Seite nach der Vorlage
 unter docs/gestaltung/leseansicht/, hell oder dunkel nach dem Geraet
 (ADR-0012).
 
@@ -38,7 +41,7 @@ import mimetypes
 import os
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -75,6 +78,40 @@ def zeitangabe(text: str) -> tuple[int, int] | None:
         return None
     von, bis = int(m.group(1)), int(m.group(2))
     return (von, bis) if von < bis else None
+
+
+# Eine Ueberschrift, die mit einer Zeitangabe beginnt: "46–93 Drei Sechser".
+# Was danach steht, ist der Rest der Ueberschrift. "18:00 Aufwaermen" beginnt
+# mit keiner.
+VORN_ZEITANGABE = re.compile(r"(\d+\s*[–-]\s*\d+)(?!\d|[:.]\d)[\s:,·–—-]*(.*)")
+
+# Der Hallenteil, im Namen eines Programmpunkts ("Zuspiel, Hallenteil A") wie
+# in einer Ueberschrift gleich hinter der Zeitangabe ("Hallenteil A: Skizze").
+HALLENTEIL = re.compile(r"\bHallenteil\s+(\w+)", re.IGNORECASE)
+
+
+@dataclass
+class Zuordnung:
+    """Was eine Ueberschrift ueber ihren Programmpunkt sagt: "69–89 Hallenteil A: Hallenskizze"."""
+
+    zeit: str
+    """Die Zeitangabe, wie sie in der Ueberschrift steht."""
+    hallenteil: str
+    """Leer, wenn keiner dabeisteht. Dann gilt der Abschnitt fuer jeden Programmpunkt zu der Zeit."""
+    rest: str
+    """Die Ueberschrift ohne Zeitangabe und Hallenteil."""
+
+
+def zuordnung(ueberschrift: str) -> Zuordnung | None:
+    """Wozu die Ueberschrift gehoert, wenn sie mit einer Zeitangabe beginnt. Sonst None."""
+    m = VORN_ZEITANGABE.match(ueberschrift.strip())
+    if not m or zeitangabe(m.group(1)) is None:
+        return None
+    zeit, rest = m.group(1), m.group(2).strip()
+    teil = HALLENTEIL.match(rest)
+    if teil:
+        return Zuordnung(zeit, teil.group(1), rest[teil.end():].lstrip(" :,·–—-"))
+    return Zuordnung(zeit, "", rest)
 
 
 @dataclass
@@ -123,6 +160,9 @@ class Programmpunkt:
     """Eine Zeile der Ablauftabelle. Die Texte als Markdown, wie sie im Plan stehen.
 
     `id`, `heute` und `warum` sind leer, wenn die Zelle leer ist oder "—" heisst.
+    `abschnitte` sind die Abschnitte des Plans, die ueber ihre Zeitangabe zu
+    ihm gehoeren, in der Reihenfolge des Plans, jeder mit der Ueberschrift,
+    die hier steht.
     """
 
     zeit: str
@@ -132,6 +172,7 @@ class Programmpunkt:
     heute: str
     warum: str
     karte: Karte | None = None
+    abschnitte: list[Abschnitt] = field(default_factory=list)
 
     @property
     def dauer(self) -> int | None:
@@ -142,6 +183,21 @@ class Programmpunkt:
     @property
     def pause_oder_umbau(self) -> bool:
         return self.name.lower().startswith(("pause", "umbau"))
+
+    @property
+    def hallenteil(self) -> str:
+        """Der Hallenteil aus dem Namen, "Zuspiel, Hallenteil A". Ohne ihn leer."""
+        m = HALLENTEIL.search(self.name)
+        return m.group(1) if m else ""
+
+    def gehoert_dazu(self, zu: Zuordnung) -> bool:
+        """Ob ein Abschnitt mit dieser Zeitangabe und diesem Hallenteil hierher gehoert.
+
+        Ein Programmpunkt mit "18:00" in der Spalte Zeit bekommt keinen.
+        """
+        if zeitangabe(self.zeit) != zeitangabe(zu.zeit):
+            return False
+        return not zu.hallenteil or zu.hallenteil.casefold() == self.hallenteil.casefold()
 
 
 @dataclass
@@ -272,6 +328,67 @@ def lies_karten(wurzel: Path | None) -> dict[str, Karte]:
     return karten
 
 
+def _gleich(a: str, b: str) -> bool:
+    return " ".join(a.split()).casefold() == " ".join(b.split()).casefold()
+
+
+def _hier(abschnitt: Abschnitt, punkt: Programmpunkt) -> Abschnitt:
+    """Der Abschnitt, wie er im Programmpunkt steht.
+
+    Zeitangabe und Hallenteil fallen aus der Ueberschrift, auch aus der eines
+    mitgenommenen Unterabschnitts, wenn sie auf diesen Programmpunkt zeigen.
+    Gleicht der Rest dem Namen der Uebung, faellt die Ueberschrift ganz weg.
+    """
+    def ohne(ueberschrift: str) -> str:
+        zu = zuordnung(ueberschrift)
+        return zu.rest if zu and punkt.gehoert_dazu(zu) else ueberschrift
+
+    ueberschrift = ohne(abschnitt.ueberschrift)
+    return replace(abschnitt,
+                   ueberschrift="" if _gleich(ueberschrift, punkt.uebung) else ueberschrift,
+                   unterabschnitte=[replace(u, ueberschrift=ohne(u.ueberschrift))
+                                    for u in abschnitt.unterabschnitte])
+
+
+def _wandert(abschnitt: Abschnitt, punkte: list[Programmpunkt], meldungen: list[str]) -> bool:
+    """Haengt den Abschnitt an jeden Programmpunkt mit seiner Zeitangabe.
+
+    True, wenn er dabei zu mindestens einem gewandert ist. Passt die
+    Zeitangabe auf keinen, kommt eine Meldung dazu, damit der Trainer den
+    Tippfehler oder die verschobene Zeit findet.
+    """
+    zu = zuordnung(abschnitt.ueberschrift)
+    if zu is None:
+        return False
+    ziele = [p for p in punkte if p.gehoert_dazu(zu)]
+    for punkt in ziele:
+        punkt.abschnitte.append(_hier(abschnitt, punkt))
+    if not ziele:
+        wo = f" in Hallenteil {zu.hallenteil}" if zu.hallenteil else ""
+        meldungen.append(f"Kein Programmpunkt mit der Zeitangabe {zu.zeit}{wo} für den "
+                         f"Abschnitt „{abschnitt.ueberschrift}“. Er steht unter Vorbereitung.")
+    return bool(ziele)
+
+
+def verteile(abschnitte: list[Abschnitt],
+             punkte: list[Programmpunkt]) -> tuple[list[Abschnitt], list[str]]:
+    """Gibt jedem Programmpunkt die Abschnitte, deren Ueberschrift mit seiner Zeitangabe beginnt.
+
+    Ein `##` mit Zeitangabe nimmt seine `###` mit. Unter einem ohne wandert
+    jeder `###` mit Zeitangabe allein und fehlt danach dort, der Rest bleibt.
+    Zurueck kommen die Abschnitte, die bleiben, in der Reihenfolge des Plans,
+    und die Meldungen.
+    """
+    bleiben, meldungen = [], []
+    for abschnitt in abschnitte:
+        if abschnitt.stufe > 1 and _wandert(abschnitt, punkte, meldungen):
+            continue
+        abschnitt.unterabschnitte = [u for u in abschnitt.unterabschnitte
+                                     if not _wandert(u, punkte, meldungen)]
+        bleiben.append(abschnitt)
+    return bleiben, meldungen
+
+
 def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
     """Zerlegt den Plan in die Gliederung der Leseansicht.
 
@@ -290,8 +407,10 @@ def gliedere(plan: Path, wurzel: Path | None) -> Gliederung:
     karten = lies_karten(wurzel)
     for punkt in punkte:
         punkt.karte = karten.get(punkt.id)
+    abschnitte, meldungen = verteile(abschnitte, punkte)
     return Gliederung(kopf=Kopf(titel, felder), programmpunkte=punkte,
-                      vorbereitung=[a for a in abschnitte if not a.leer])
+                      vorbereitung=[a for a in abschnitte if not a.leer],
+                      meldungen=meldungen)
 
 
 # --------------------------------------------------------------------------
@@ -522,12 +641,24 @@ def nach_html(zeilen: list[str]) -> str:
     return "\n".join(raus)
 
 
-def abschnitt_html(abschnitt: Abschnitt) -> str:
+def abschnitt_html(abschnitt: Abschnitt, unter_tag: str = "h3") -> str:
     """Der Text eines Abschnitts, seine Unterabschnitte mit ihrer Ueberschrift darin."""
     teile = [nach_html(abschnitt.zeilen)]
     for unter in abschnitt.unterabschnitte:
-        teile += [f"<h3>{inline(unter.ueberschrift)}</h3>", nach_html(unter.zeilen)]
+        teile += [f"<{unter_tag}>{inline(unter.ueberschrift)}</{unter_tag}>",
+                  nach_html(unter.zeilen)]
     return "\n".join(t for t in teile if t)
+
+
+def planabschnitt_html(abschnitt: Abschnitt) -> str:
+    """Ein Abschnitt im Programmpunkt. Ist seine Ueberschrift weggefallen, ohne sie.
+
+    Die Ueberschrift steht eine Stufe tiefer als die des Programmpunkts, die
+    seiner Unterabschnitte noch eine darunter.
+    """
+    kopf = f"<h3>{inline(abschnitt.ueberschrift)}</h3>" if abschnitt.ueberschrift else ""
+    return (f'<section class="planabschnitt">{kopf}<div class="rich">\n'
+            f"{abschnitt_html(abschnitt, 'h4')}\n</div></section>")
 
 
 def vorbereitung_html(abschnitte: list[Abschnitt]) -> str:
@@ -576,6 +707,7 @@ def programmpunkt_html(punkt: Programmpunkt, adresse) -> str:
     inhalt = []
     if punkt.heute:
         inhalt.append(f'<div class="heute"><b>Heute</b><p>{inline(punkt.heute)}</p></div>')
+    inhalt += [planabschnitt_html(a) for a in punkt.abschnitte]
     inhalt += karte_html(punkt, adresse)
     if punkt.warum:
         inhalt.append('<details class="warum"><summary>Warum hier?</summary>'
