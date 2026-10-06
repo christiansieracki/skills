@@ -22,7 +22,7 @@ import unittest
 from pathlib import Path
 
 from arbeitsordner import OHNE, Arbeitsordner, Zeile
-from leseansicht_lesen import Leseansicht, Link, lies_leseansicht
+from leseansicht_lesen import Leseansicht, Link, lies_leseansicht, wie_oft_eingebettet
 
 PLAN = "gruppe/2026-09-15.md"
 
@@ -986,6 +986,62 @@ class SchaubildTest(LeseansichtTest):
 
         self.assertEqual(self.bilder("ue-000032"),
                          ["ue-000032-zirkel-1.png", "ue-000032-zirkel-3.png"])
+
+
+class VergroessernTest(LeseansichtTest):
+    """Hallenskizze und Schaubild lassen sich auf dem Handy vergroessern (#57).
+
+    Das tut das Skript in einer Ansicht. Wie es sich im Browser verhaelt,
+    prueft die Abnahme (#50, Testing Decisions). Hier steht, was ohne Skript
+    gilt und was die Datei dafuer nicht doppelt braucht.
+    """
+
+    def test_ohne_skript_erscheint_kein_knopf_zum_vergroessern(self) -> None:
+        # Ein Knopf, der nichts tut, waere schlimmer als keiner. Bild und
+        # Skizze stehen trotzdem da, und der Browser zoomt wie gewohnt.
+        self.ordner.lege_schaubild_an("ue-000030-aufbau.svg")
+        self.ordner.lege_karte_an(id="ue-000030", titel="Mit einem Bild",
+                                  schaubild="ue-000030-aufbau.svg")
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar"),
+                                Zeile("10–35", "Hauptteil", "Mit einem Bild", "ue-000030")],
+                               nachher="""
+            ## 10–35 Hallenskizze
+
+            ```
+            |  A1   A2   A3  |
+            ```
+        """)
+
+        self.assertEqual(ansicht.vergroessern, [])
+        self.assertIn("| A1 A2 A3 |", ansicht.text)
+        self.assertEqual(len(ansicht.programmpunkte[1].schaubilder), 1)
+
+    def test_jedes_eingebettete_schaubild_steht_genau_einmal_in_der_datei(self) -> None:
+        # Die Ansicht nimmt das Bild beim Oeffnen aus dem Programmpunkt.
+        # Zweimal eingebettet waere die Datei, die per WhatsApp aufs Handy
+        # geht, doppelt so gross. Jedes Bild bekommt einen eigenen Inhalt,
+        # sonst stuende derselbe zu Recht mehrmals da.
+        namen = ["ue-000030-aufbau.svg", "ue-000031-uebersicht.svg", "ue-000031-station-1.svg"]
+        for name in namen:
+            self.ordner.lege_schaubild_an(name).write_text(
+                f'<svg xmlns="http://www.w3.org/2000/svg"><title>{name}</title></svg>',
+                encoding="utf-8")
+        self.ordner.lege_karte_an(id="ue-000030", titel="Mit einem Bild", schaubild=namen[0])
+        self.ordner.lege_karte_an(id="ue-000031", titel="Zirkel mit zwei Bildern",
+                                  schaubild=namen[1:])
+        plan = self.ordner.lege_plan_an(PLAN, [
+            Zeile("0–10", "Ankommen", "Mit einem Bild", "ue-000030"),
+            Zeile("10–35", "Hauptteil", "Zirkel mit zwei Bildern", "ue-000031")])
+
+        # Ohne --bilder: Einbetten ist der Standard.
+        fertig = self.ordner.starte("leseansicht.py", str(plan), mit_wurzel=False)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        seite = plan.with_suffix(".html").read_text(encoding="utf-8")
+        for name in namen:
+            with self.subTest(name=name):
+                datei = self.ordner.pfad / "schaubilder" / name
+                self.assertEqual(wie_oft_eingebettet(seite, datei), 1)
 
 
 class GesperrtTest(LeseansichtTest):
