@@ -15,7 +15,9 @@ Vorbereitung, auch einer, dessen Zeitangabe auf keinen Programmpunkt passt.
 Den nennt das Skript auf der Konsole. Ein kurzes eingebettetes Skript macht
 aus Nachschlagen und Vorbereitung Ansichten, die sich ueber dem Ablauf
 oeffnen. Gestaltet ist die Seite nach der Vorlage unter
-docs/gestaltung/leseansicht/, hell oder dunkel nach dem Geraet (ADR-0012).
+docs/gestaltung/leseansicht/, hell oder dunkel nach dem Geraet. Wo
+JavaScript laeuft, waehlt der Trainer Hell, Dunkel oder System selbst
+(ADR-0012).
 
 Erzeugt wird in zwei Schritten. `gliedere` zerlegt den Plan in eine
 Gliederung: die Rohdaten fuer den Kopf, die Programmpunkte, die Vorbereitung
@@ -725,6 +727,82 @@ padding-top:16px;margin-top:30px}
 @media (min-width:900px){.seite{padding:0 36px 48px}.kopf{padding-top:32px}}
 """)
 
+# Der Umschalter Hell, Dunkel, System. Ohne Skript bleibt er verborgen, und
+# das Farbschema folgt dem Geraet wie oben. Das Skript zeigt ihn und setzt die
+# Wahl als data-darstellung am Wurzelelement. Bei "system" gilt weiter die
+# Media-Query, bei "hell" und "dunkel" die Palette hier, gleich wie das Geraet
+# eingestellt ist.
+UMSCHALTER_HTML = (
+    '<fieldset class="darstellung" aria-describedby="darstellung-hinweis" hidden>'
+    '<legend>Darstellung</legend><div class="wahl">'
+    + "".join(f'<label><input type="radio" name="darstellung" value="{wert}" autocomplete="off"'
+              f'{" checked" if wert == "system" else ""}><span>{name}</span></label>'
+              for wert, name in (("hell", "Hell"), ("dunkel", "Dunkel"), ("system", "System")))
+    + '</div><p class="hinweis" id="darstellung-hinweis"></p></fieldset>')
+
+UMSCHALTER_CSS = (":root[data-darstellung=hell]{" + farben(HELL, "light") + "}"
+                  ":root[data-darstellung=dunkel]{" + farben(DUNKEL, "dark") + "}" + """
+.darstellung{margin:16px 0 0;border:0;padding:0;min-width:0}
+.darstellung legend{padding:0;margin-bottom:7px;font-size:11px;letter-spacing:.7px;
+text-transform:uppercase;color:var(--gedaempft)}
+.darstellung .wahl{display:flex;gap:3px;padding:3px;background:var(--papier);
+border:1px solid var(--linie);border-radius:7px}
+.darstellung label{flex:1;display:flex;position:relative;cursor:pointer;font-size:13px}
+.darstellung input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.darstellung span{flex:1;display:flex;align-items:center;justify-content:center;
+min-height:44px;border-radius:4px}
+.darstellung input:checked+span{background:var(--flaeche);color:var(--akzent);font-weight:700}
+.darstellung input:focus-visible+span{outline:3px solid var(--akzent);outline-offset:2px}
+.darstellung .hinweis{margin-top:5px;font-size:11px;color:var(--gedaempft)}
+""")
+
+# Steht im Kopf der Seite, damit eine gemerkte Wahl gilt, bevor etwas zu sehen
+# ist. Den Umschalter zeigt es erst, wenn alles andere geklappt hat. Ohne
+# Speicher gilt die Wahl fuer diesen Besuch. Kommt die Wahl aus einem anderen
+# Tab, wird sie uebernommen.
+UMSCHALTER_SKRIPT = """(function () {
+  var schluessel = "volleyball-leseansicht-darstellung";
+  var geraet = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+  var wahl = gemerkt();
+
+  function gemerkt() {
+    try {
+      var wert = window.localStorage.getItem(schluessel);
+      if (wert === "hell" || wert === "dunkel" || wert === "system") return wert;
+    } catch (e) { /* kein Speicher, etwa bei einer lokalen Datei */ }
+    return "system";
+  }
+
+  function zeige() {
+    document.documentElement.setAttribute("data-darstellung", wahl);
+    var feld = document.querySelector(".darstellung");
+    if (!feld) return;
+    feld.querySelector('input[value="' + wahl + '"]').checked = true;
+    feld.querySelector(".hinweis").textContent = wahl !== "system" ? "Manuell gewählt"
+      : "Folgt deiner Geräteeinstellung · " + (geraet && geraet.matches ? "dunkel" : "hell");
+    feld.hidden = false;
+  }
+
+  zeige();
+  document.addEventListener("DOMContentLoaded", function () {
+    zeige();
+    document.querySelector(".darstellung").addEventListener("change", function (ereignis) {
+      wahl = ereignis.target.value;
+      try { window.localStorage.setItem(schluessel, wahl); }
+      catch (e) { /* dann gilt sie fuer diesen Besuch */ }
+      zeige();
+    });
+  });
+  if (geraet && geraet.addEventListener) geraet.addEventListener("change", zeige);
+  else if (geraet && geraet.addListener) geraet.addListener(zeige);
+  window.addEventListener("storage", function (ereignis) {
+    if (ereignis.key === schluessel || ereignis.key === null) {
+      wahl = gemerkt();
+      zeige();
+    }
+  });
+})();"""
+
 # Die Ansichten (#56). Ohne Skript, oder wo der Browser kein <dialog> kennt,
 # stehen Nachschlagen und Vorbereitung am Ende der Seite, und Knoepfe und
 # Verweise springen dorthin. Mit Skript wird jeder Abschnitt mit
@@ -1122,9 +1200,11 @@ def schreibe(gliederung: Gliederung, adresse, quelle: str, erzeugt: str) -> str:
 <html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>{html.escape(gliederung.kopf.titel)}</title><style>{CSS}</style></head><body>
+<title>{html.escape(gliederung.kopf.titel)}</title><style>{CSS}{UMSCHALTER_CSS}</style>
+<script>{UMSCHALTER_SKRIPT}</script></head><body>
 <main class="seite">
 {kopf_html(gliederung.kopf)}
+{UMSCHALTER_HTML}
 {knoepfe}
 <div class="ablauf-kopf"><h2>Ablauf</h2><span>{zahl} · Minuten ab Beginn</span></div>
 <div class="ablauf">
