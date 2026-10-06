@@ -474,42 +474,61 @@ def _hier(abschnitt: Abschnitt, punkt: Programmpunkt) -> Abschnitt:
                                     for u in abschnitt.unterabschnitte])
 
 
-def _wandert(abschnitt: Abschnitt, punkte: list[Programmpunkt], meldungen: list[str]) -> bool:
-    """Haengt den Abschnitt an jeden Programmpunkt mit seiner Zeitangabe.
+def _ziele(abschnitt: Abschnitt, punkte: list[Programmpunkt],
+           meldungen: list[str]) -> list[Programmpunkt] | None:
+    """Die Programmpunkte, zu denen der Abschnitt ueber seine Zeitangabe gehoert.
 
-    True, wenn er dabei zu mindestens einem gewandert ist. Passt die
-    Zeitangabe auf keinen, kommt eine Meldung dazu, damit der Trainer den
+    None, wenn seine Ueberschrift mit keiner beginnt. Passt sie auf keinen
+    Programmpunkt, eine leere Liste und eine Meldung, damit der Trainer den
     Tippfehler oder die verschobene Zeit findet.
     """
     zu = zuordnung(abschnitt.ueberschrift)
     if zu is None:
-        return False
+        return None
     ziele = [p for p in punkte if p.gehoert_dazu(zu)]
-    for punkt in ziele:
-        punkt.abschnitte.append(_hier(abschnitt, punkt))
     if not ziele:
         wo = f" in Hallenteil {zu.hallenteil}" if zu.hallenteil else ""
         meldungen.append(f"Kein Programmpunkt mit der Zeitangabe {zu.zeit}{wo} für den "
                          f"Abschnitt „{abschnitt.ueberschrift}“. Er steht unter Vorbereitung.")
-    return bool(ziele)
+    return ziele
+
+
+def _unter(punkt: Programmpunkt, ziele: list[Programmpunkt] | None) -> bool:
+    return any(p is punkt for p in ziele or [])
 
 
 def verteile(abschnitte: list[Abschnitt],
              punkte: list[Programmpunkt]) -> tuple[list[Abschnitt], list[str]]:
     """Gibt jedem Programmpunkt die Abschnitte, deren Ueberschrift mit seiner Zeitangabe beginnt.
 
-    Ein `##` mit Zeitangabe nimmt seine `###` mit. Unter einem ohne wandert
-    jeder `###` mit Zeitangabe allein und fehlt danach dort, der Rest bleibt.
+    Ein `###` mit eigener Zeitangabe entscheidet selbst, auch unter einem `##`
+    mit Zeitangabe. Ein `###` ohne folgt seinem `##`. So steht unter
+    `## 69–89 Zuspiel` jede Hallenskizze nur bei ihrem Hallenteil. Geht ein
+    `###` zu einem Programmpunkt, zu dem auch sein `##` geht, steht er dort in
+    ihm, sonst fuer sich.
+
     Zurueck kommen die Abschnitte, die bleiben, in der Reihenfolge des Plans,
-    und die Meldungen.
+    und die Meldungen. Ein `##`, der gewandert ist, bleibt nur mit den `###`,
+    deren Zeitangabe auf keinen Programmpunkt passt.
     """
     bleiben, meldungen = [], []
     for abschnitt in abschnitte:
-        if abschnitt.stufe > 1 and _wandert(abschnitt, punkte, meldungen):
-            continue
-        abschnitt.unterabschnitte = [u for u in abschnitt.unterabschnitte
-                                     if not _wandert(u, punkte, meldungen)]
-        bleiben.append(abschnitt)
+        oben = _ziele(abschnitt, punkte, meldungen) if abschnitt.stufe > 1 else None
+        unten = [(u, _ziele(u, punkte, meldungen)) for u in abschnitt.unterabschnitte]
+        for punkt in oben or []:
+            mit = [u for u, ziele in unten if ziele is None or _unter(punkt, ziele)]
+            punkt.abschnitte.append(_hier(replace(abschnitt, unterabschnitte=mit), punkt))
+        for u, ziele in unten:
+            for punkt in ziele or []:
+                if not _unter(punkt, oben):
+                    punkt.abschnitte.append(_hier(u, punkt))
+        if oben:
+            rest = [u for u, ziele in unten if ziele == []]
+            if rest:
+                bleiben.append(replace(abschnitt, zeilen=[], unterabschnitte=rest))
+        else:
+            abschnitt.unterabschnitte = [u for u, ziele in unten if not ziele]
+            bleiben.append(abschnitt)
     return bleiben, meldungen
 
 

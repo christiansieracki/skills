@@ -365,6 +365,70 @@ class ZuordnungTest(LeseansichtTest):
         self.assertEqual(self.abschnitte(b), [("Hallenskizze", "Netz quer."),
                                               ("Wechsel", "Nach zwölf Minuten tauschen.")])
 
+    def test_ein_unterabschnitt_mit_hallenteil_entscheidet_auch_unter_einer_zeitangabe(
+            self) -> None:
+        # Der Abschnitt gilt fuer beide Hallenteile, jede Hallenskizze nur
+        # fuer ihren. Ein ### ohne Zeitangabe folgt seinem ##.
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar"),
+                                Zeile("10–35", "Zuspiel, Hallenteil A", "Zuspiel im Dreieck"),
+                                Zeile("10–35", "Annahme, Hallenteil B", "Annahme im Halbfeld")],
+                               nachher="""
+            ## 10–35 Zuspiel und Annahme
+
+            Nach zwölf Minuten tauschen.
+
+            ### 10–35 Hallenteil A: Hallenskizze
+
+            Netz längs.
+
+            ### 10–35 Hallenteil B: Hallenskizze
+
+            Netz quer.
+
+            ### Bälle
+
+            Zwei Wagen.
+        """)
+
+        _, a, b = ansicht.programmpunkte
+        self.assertEqual(self.abschnitte(a), [
+            ("Zuspiel und Annahme",
+             "Nach zwölf Minuten tauschen. Hallenskizze Netz längs. Bälle Zwei Wagen.")])
+        self.assertEqual(self.abschnitte(b), [
+            ("Zuspiel und Annahme",
+             "Nach zwölf Minuten tauschen. Hallenskizze Netz quer. Bälle Zwei Wagen.")])
+
+    def test_ein_unterabschnitt_mit_anderer_zeitangabe_geht_zu_seinem_programmpunkt(
+            self) -> None:
+        # Passt seine Zeitangabe auf keinen, bleibt er unter Vorbereitung,
+        # unter der Ueberschrift seines ##, und die Konsole nennt ihn.
+        ansicht = self.ansicht(self.ZEILEN, nachher="""
+            ## 10–35 Annahme in drei Streifen
+
+            Erst die Annahme.
+
+            ### 0–10 Athletik
+
+            Zehn Kniebeugen.
+
+            ### 50–60 Spiel
+
+            Sechs gegen sechs.
+
+            ### Hallenskizze
+
+            Drei Streifen.
+        """)
+
+        ankommen, hauptteil = ansicht.programmpunkte
+        self.assertEqual(self.abschnitte(ankommen), [("Athletik", "Zehn Kniebeugen.")])
+        self.assertEqual(self.abschnitte(hauptteil), [
+            ("Annahme in drei Streifen", "Erst die Annahme. Hallenskizze Drei Streifen.")])
+        self.assertEqual([(a.ueberschrift, a.text) for a in ansicht.vorbereitung],
+                         [("10–35 Annahme in drei Streifen", "50–60 Spiel Sechs gegen sechs.")])
+        self.assertEqual(len(self.meldungen("50–60 Spiel")), 1, self.konsole)
+        self.assertEqual(self.meldungen("Athletik", "Annahme in drei Streifen"), [])
+
     def test_eine_ueberschrift_wie_die_uebung_faellt_weg(self) -> None:
         # Sonst stuende derselbe Name zweimal untereinander. Die Zeitangabe
         # faellt auch im mitgenommenen Unterabschnitt weg, mit Bindestrich
