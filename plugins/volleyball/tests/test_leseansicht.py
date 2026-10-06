@@ -734,6 +734,29 @@ class OhneSkriptTest(LeseansichtTest):
         self.assertEqual(ansicht.programmpunkte[0].verweise, ["Die Sechser"])
 
 
+class UmschalterTest(LeseansichtTest):
+    """Hell, Dunkel oder System, damit der Trainer die Ansicht an die Halle anpasst.
+
+    Was der Umschalter mit Skript tut, prueft die Abnahme im Browser (#50,
+    Testing Decisions). Hier steht, was ohne Skript gilt.
+    """
+
+    def test_ohne_skript_ist_der_umschalter_verborgen(self) -> None:
+        # Ein Umschalter, der nichts tut, waere schlimmer als keiner.
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")])
+
+        umschalter = ansicht.umschalter
+        self.assertEqual((umschalter.wahl, umschalter.voreingestellt),
+                         (["Hell", "Dunkel", "System"], "System"))
+        self.assertFalse(umschalter.sichtbar)
+
+    def test_ohne_skript_folgt_das_farbschema_dem_geraet(self) -> None:
+        ansicht = self.ansicht([Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")])
+
+        self.assertEqual(ansicht.farbschema,
+                         {"": "light", "(prefers-color-scheme:dark)": "dark"})
+
+
 class ListeZumAufklappenTest(LeseansichtTest):
     """Eine Tabelle, die mit `Nr | Übung` beginnt, wird eine Liste zum Aufklappen.
 
