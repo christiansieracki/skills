@@ -13,6 +13,7 @@ import os
 import re
 import socket
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from szene import ENDUNG as SZENE_ENDUNG
@@ -65,6 +66,30 @@ ALTE_ID_MUSTER = r"ue-\d{4}"
 
 # Was in jeder Meldung zu einer vierstelligen ID steht.
 HINWEIS_UMSTELLEN = "ids_umstellen.py stellt den Arbeitsordner auf sechs Stellen um"
+
+
+@dataclass(frozen=True)
+class Kartensorte:
+    """Eine Sorte Karte in der Bibliothek: Uebungskarte oder Wissenskarte (ADR-0002).
+
+    Jede Sorte liegt flach in ihrem eigenen Ordner, ihre ID hat ein eigenes
+    Praefix vor denselben sechs Ziffern, und gezaehlt wird je Sorte getrennt
+    (ADR-0011, Nachtrag zu ADR-0002). Wer Karten einliest, eine ID vergibt
+    oder eine Karte prueft, bekommt die Sorte als Angabe, statt Ordner und
+    Muster selbst zu kennen.
+
+    `alte_muster` ist das Muster einer vierstelligen ID von vor 3.0.0. Die gab
+    es nur bei Uebungen.
+    """
+
+    ordner: str
+    praefix: str
+    muster: str
+    felder: tuple[str, ...]
+    alte_muster: str | None = None
+
+
+UEBUNGSKARTE = Kartensorte("uebungen", "ue", ID_MUSTER, tuple(KARTENFELDER), ALTE_ID_MUSTER)
 
 
 def disziplin_text(eintrag: dict) -> str:
@@ -301,8 +326,20 @@ def lies_schwerpunkt_zeilen(wurzel: Path) -> list[tuple[str, str, str]]:
 
 
 def lies_uebungen(wurzel: Path) -> list[dict]:
+    """Die Uebungskarten aus uebungen/, wie `lies_karten` sie liest."""
+    return lies_karten(wurzel, UEBUNGSKARTE)
+
+
+def lies_karten(wurzel: Path, sorte: Kartensorte) -> list[dict]:
+    """Die Karten einer Sorte aus ihrem Ordner, je Karte ihr Frontmatter.
+
+    Dazu `datei`, der Pfad relativ zur Wurzel, und `_rumpf`, der Text unter
+    dem Frontmatter. Eine Karte ohne `id` faellt weg, ebenso eine Vorlage, die
+    README und eine Konfliktkopie. Fehlt der Ordner, gibt es keine Karte: Ein
+    Arbeitsordner aus der Zeit vor der Wissenskarte hat kein wissen/.
+    """
     karten = []
-    ordner = wurzel / "uebungen"
+    ordner = wurzel / sorte.ordner
     if not ordner.is_dir():
         return karten
     for pfad in sorted(ordner.glob("*.md")):
@@ -490,12 +527,14 @@ def trainernummer(wurzel: Path) -> str:
     return nummer
 
 
-def naechste_id(wurzel: Path) -> str:
+def naechste_id(wurzel: Path, sorte: Kartensorte = UEBUNGSKARTE) -> str:
     """Die naechste ID fuer den Trainer dieses Rechners: die hoechste in seinem Bereich plus eins.
 
     Der Bereich sind die IDs mit seiner Nummer vorn. Zwei Trainer vergeben so
     nie dieselbe ID, auch wenn Nextcloud ihre Rechner noch nicht abgeglichen
-    hat (ADR-0011).
+    hat (ADR-0011). Gezaehlt wird je Sorte fuer sich, im Ordner der Sorte und
+    nur IDs mit ihrem Praefix: `wi-000001` ist die erste Wissenskarte und
+    nicht irgendeine Nummer nach den Uebungen.
 
     Gelesen wird bei jedem Aufruf neu, unmittelbar vor dem Schreiben. Hat
     Nextcloud inzwischen eine Karte von einem anderen Rechner desselben
@@ -503,13 +542,14 @@ def naechste_id(wurzel: Path) -> str:
     `id:`, denn der Linter meldet eine Karte, bei der beide auseinanderlaufen,
     und bis dahin soll keine der beiden Nummern ein zweites Mal vergeben werden.
 
-    Steht in `uebungen/` noch eine vierstellige ID, gibt es keine neue. Sonst
-    bekaeme eine neue Karte `ue-000042`, und `ue-0042` wuerde beim Umstellen
-    zu derselben.
+    Steht in `uebungen/` noch eine vierstellige ID, gibt es keine neue Uebung.
+    Sonst bekaeme eine neue Karte `ue-000042`, und `ue-0042` wuerde beim
+    Umstellen zu derselben. Wissenskarten gab es vierstellig nie, ihre
+    Nummern kann das Umstellen nicht treffen.
     """
     vergeben: set[str] = set()
     vierstellig: list[str] = []
-    for pfad in sorted((wurzel / "uebungen").glob("*.md")):
+    for pfad in sorted((wurzel / sorte.ordner).glob("*.md")):
         kennungen = [pfad.name]
         try:
             felder, _ = lies_frontmatter(pfad)
@@ -517,21 +557,23 @@ def naechste_id(wurzel: Path) -> str:
         except (OSError, UnicodeDecodeError):
             pass
         for text in kennungen:
-            if re.match(rf"{ALTE_ID_MUSTER}\b", text):
+            if sorte.alte_muster and re.match(rf"{sorte.alte_muster}\b", text):
                 vierstellig.append(pfad.name)
-            m = re.match(rf"{ID_MUSTER}\b", text)
+            m = re.match(rf"{sorte.muster}\b", text)
             if m:
                 vergeben.add(m.group())
     if vierstellig:
-        raise KeineId(f"uebungen/ hat noch vierstellige IDs, etwa {vierstellig[0]}. "
+        raise KeineId(f"{sorte.ordner}/ hat noch vierstellige IDs, etwa {vierstellig[0]}. "
                       f"Erst umstellen: {HINWEIS_UMSTELLEN}. Steht unter trainer: "
                       f"noch niemand, traegt es dabei diesen Rechner ein, {rechnername()}.")
     nummer = trainernummer(wurzel)
-    laufend = [int(uid[-4:]) for uid in vergeben if uid[len("ue-"):len("ue-00")] == nummer]
+    # Die Nummer des Trainers steht direkt hinter Praefix und Strich.
+    vorn = len(sorte.praefix) + 1
+    laufend = [int(uid[-4:]) for uid in vergeben if uid[vorn:vorn + 2] == nummer]
     hoechste = max(laufend, default=0)
     if hoechste >= 9999:
         raise KeineId(f"Im Bereich {nummer} ist keine Nummer mehr frei.")
-    return f"ue-{nummer}{hoechste + 1:04d}"
+    return f"{sorte.praefix}-{nummer}{hoechste + 1:04d}"
 
 
 def lies_trainings(wurzel: Path) -> list[dict]:
