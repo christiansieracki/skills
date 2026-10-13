@@ -478,6 +478,62 @@ class NaechsteIdTest(unittest.TestCase):
         self.assertIn(socket.gethostname(), meldung)
 
 
+class NaechsteWissensIdTest(unittest.TestCase):
+    """`suche.py --naechste-id --wissen`: die ID fuer die naechste Wissenskarte (#66).
+
+    Derselbe Bereich wie bei den Uebungen, die Nummer des Trainers vorn, aber
+    ein eigener Zaehler: `wi-000001` ist die erste Wissenskarte und nicht
+    irgendeine Nummer nach den Uebungen.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def naechste_id(self, *argumente: str) -> str:
+        fertig = self.ordner.starte("suche.py", "--naechste-id", *argumente)
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        return fertig.stdout.strip()
+
+    def test_ohne_wissenskarten_beginnt_der_zaehler_bei_eins_auch_wenn_es_uebungen_gibt(
+            self) -> None:
+        # Der Fixture traegt die Uebungen ue-000001 bis ue-000005 und keine
+        # Wissenskarte.
+        self.assertEqual(self.naechste_id("--wissen"), "wi-000001")
+
+    def test_danach_die_hoechste_wi_nummer_im_eigenen_bereich_plus_eins(self) -> None:
+        # Mit einer Luecke, einer Wissenskarte eines anderen Trainers und
+        # einer Uebung mit hoeherer Nummer: Keine von beiden zaehlt mit.
+        self.ordner.lege_wissenskarte_an(id="wi-000003")
+        self.ordner.lege_wissenskarte_an(id="wi-000007")
+        self.ordner.lege_wissenskarte_an(id="wi-020009")
+        self.ordner.lege_karte_an(id="ue-000012", titel="Eine Übung mit höherer Nummer")
+
+        self.assertEqual(self.naechste_id("--wissen"), "wi-000008")
+
+    def test_ohne_trainer_an_diesem_rechner_gibt_es_keine_id(self) -> None:
+        # Wie bei der Uebung: kein Trainer, kein Bereich, keine ID.
+        self.ordner.setze_trainer(TRAINER_ANDERER_RECHNER)
+
+        fertig = self.ordner.starte("suche.py", "--naechste-id", "--wissen")
+
+        self.assertEqual(fertig.returncode, 1, fertig.stdout)
+        self.assertEqual(fertig.stdout, "", "auf stdout darf nichts stehen, was nach einer ID aussieht")
+        self.assertIn(socket.gethostname(), fertig.stderr)
+
+    def test_ohne_wissen_zaehlen_wie_bisher_nur_die_uebungen(self) -> None:
+        self.ordner.lege_wissenskarte_an(id="wi-000009")
+
+        self.assertEqual(self.naechste_id(), "ue-000006")
+
+    def test_eine_vierstellige_uebung_haelt_die_wissenskarte_nicht_auf(self) -> None:
+        # Die vierstellige ID sperrt die naechste Uebung, weil das Umstellen
+        # aus ue-0042 die ue-000042 macht. Eine wi-Nummer trifft es nie.
+        self.ordner.lege_karte_an(id="ue-0042", titel="Karte von vor der Umstellung")
+
+        self.assertEqual(self.naechste_id("--wissen"), "wi-000001")
+
+
 class PlaeneMitLeseansichtTest(unittest.TestCase):
     """`suche.py --plaene-mit-leseansicht`: welche Leseansichten ein neues Bild veraltet.
 

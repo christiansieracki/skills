@@ -91,6 +91,34 @@ class Kartensorte:
 
 UEBUNGSKARTE = Kartensorte("uebungen", "ue", ID_MUSTER, tuple(KARTENFELDER), ALTE_ID_MUSTER)
 
+# Die Wissenskarte (ADR-0002 mit Nachtrag, #61): Hintergrund aus einer
+# Fremdquelle, eine Frage je Karte, und die Frage ist ihr Titel. Ihre Felder in
+# der Reihenfolge aus DATENMODELL.md. Pflicht sind titel, thema, disziplin und
+# quelle; schwerpunkt und uebungen sind freiwillig. Bilder stehen als Verweis
+# im Text, ein Feld `schaubild` gibt es nicht, eines fuer Alter oder Level auch
+# nicht.
+WISSENSFELDER = [
+    "id", "titel", "thema", "schwerpunkt", "disziplin", "uebungen",
+    "quelle", "quelldatei", "autor", "angelegt",
+]
+
+# Die Werte von `thema`, fest im Datenmodell wie `element`. Kein Trainer
+# erweitert sie selbst. Technik und Taktik kamen im Nachtrag zu ADR-0002
+# dazu, sonst haetten die Merkmale des oberen Zuspiels kein Thema.
+THEMEN = {
+    "trainingslehre", "methodik", "psychologie", "physiologie",
+    "ernaehrung", "regelkunde", "technik", "taktik",
+}
+
+# Die beiden Abschnitte, die jede Wissenskarte hat, als `## <Titel>`.
+WISSENSABSCHNITTE = ["Kernaussagen", "Was das fürs Training heißt"]
+
+# Wie ID_MUSTER, mit dem Praefix der Wissenskarte. Der Bereich ist derselbe,
+# der Zaehler ein eigener.
+WISSEN_ID_MUSTER = r"wi-\d{6}"
+
+WISSENSKARTE = Kartensorte("wissen", "wi", WISSEN_ID_MUSTER, tuple(WISSENSFELDER))
+
 
 def disziplin_text(eintrag: dict) -> str:
     """Die Disziplin einer Karte, wie ein Mensch sie zu sehen bekommt.

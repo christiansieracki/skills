@@ -210,6 +210,37 @@ STANDARDKARTEN = [
     },
 ]
 
+# Die Felder einer Wissenskarte in der Reihenfolge aus DATENMODELL.md, mit
+# Werten, die der Linter durchlaesst. Wie bei KARTE gibt eine Karte im
+# Arbeitsordner nur an, was fuer ihren Fall wichtig ist.
+WISSENSKARTE = {
+    "id": "wi-000000",
+    "titel": "Wozu gibt es diese Karte im Test?",
+    "thema": ["methodik"],
+    "schwerpunkt": ["annahme"],
+    "disziplin": ["halle"],
+    "uebungen": ["ue-000001"],
+    "quelle": "Testbestand",
+    "quelldatei": None,
+    "autor": "test",
+    "angelegt": "2026-01-01",
+}
+
+# Der Text einer Wissenskarte mit ihren beiden Abschnitten.
+WISSENSRUMPF = """\
+
+# {titel}
+
+## Kernaussagen
+
+- Karte aus dem kuenstlichen Arbeitsordner. Steht hier, damit die Tests etwas
+  zu lesen haben.
+
+## Was das fürs Training heißt
+
+- Nichts, sie gehoert nur dem Test.
+"""
+
 # Platzhalter fuer ein Feld, das auf dieser Karte gar nicht stehen soll.
 # `disziplin=None` waere etwas anderes: dann stuende `disziplin: null` auf der
 # Karte. Fuer den Fall "Feld fehlt" braucht es deshalb einen eigenen Wert.
@@ -664,6 +695,28 @@ class Arbeitsordner:
         datei = self.pfad / "uebungen" / f"{karte['id']}-{_slug(karte['titel'])}.md"
         datei.write_text(_als_karte(karte), encoding="utf-8")
         self.ids.append(karte["id"])
+
+    def lege_wissenskarte_an(self, rumpf: str | None = None, **felder) -> Path:
+        """Legt eine Wissenskarte unter wissen/ an.
+
+        Nicht genannte Felder kommen aus WISSENSKARTE, ein Feld auf `OHNE`
+        fehlt ganz. `rumpf` ersetzt den Text unter dem Frontmatter, etwa
+        ohne einen der beiden Abschnitte oder mit einem Bildverweis, als
+        Markdown wie der Trainer es schreibt. Ohne ihn steht dort
+        WISSENSRUMPF. Den Ordner legt erst dieser Aufruf an, wie bei
+        schaubilder/: Ein Arbeitsordner aus der Zeit vor der Wissenskarte hat
+        keinen.
+        """
+        karte = {k: v for k, v in {**WISSENSKARTE, **felder}.items() if v is not OHNE}
+        titel = karte.get("titel") or "ohne titel"
+        ordner = self.pfad / "wissen"
+        ordner.mkdir(exist_ok=True)
+        datei = ordner / f"{karte['id']}-{_slug(titel)}.md"
+        text = (WISSENSRUMPF.format(titel=titel) if rumpf is None
+                else "\n" + _markdown(rumpf) + "\n")
+        frontmatter = "\n".join(f"{k}: {_yaml(v)}" for k, v in karte.items())
+        datei.write_text(f"---\n{frontmatter}\n---\n{text}", encoding="utf-8")
+        return datei
 
     def lege_quelldatei_an(self, name: str, inhalt: bytes) -> Path:
         """Legt eine Datei in `quellen/` ab, Byte fuer Byte wie angegeben.
