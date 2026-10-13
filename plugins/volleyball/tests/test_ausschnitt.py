@@ -107,6 +107,20 @@ class AusschnittTest(unittest.TestCase):
                 self.assertIn("500 × 400 Pixel", fertig.stdout)
 
     @BRAUCHT_PILLOW
+    def test_ein_ziel_das_schon_da_ist_wird_ueberschrieben(self) -> None:
+        # pruefen schneidet nach jeder Korrektur der Zahlen neu aus. Danach
+        # liegt der neue Ausschnitt da, nicht der alte.
+        quelle = self.ordner.lege_quellbild_an("seite-26.jpg", (1000, 800))
+        ziel = self.entwuerfe / "17.quellgrafik.jpg"
+        ziel.write_bytes(b"der alte Ausschnitt")
+
+        fertig = self.schneide(quelle, ziel, "--rechteck", "0", "0", "50", "50")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        with Image.open(ziel) as bild:
+            self.assertEqual(bild.size, (500, 400))
+
+    @BRAUCHT_PILLOW
     def test_bei_orientierung_sechs_meint_das_rechteck_die_aufrechte_seite(self) -> None:
         # So liegen die abfotografierten Magazinseiten vor: quer gespeichert,
         # mit der Anweisung im EXIF, sie fuer die Anzeige zu drehen. Der Agent
@@ -205,6 +219,88 @@ class AusschnittTest(unittest.TestCase):
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
         self.assertIn("pip install Pillow", fertig.stdout)
         self.assertEqual(list(self.entwuerfe.iterdir()), [])
+
+    def test_was_nicht_stimmt_endet_mit_meldung_und_es_wird_nichts_geschrieben(self) -> None:
+        # Den Aufruf schreibt ein Skill aus dem Entwurf eines Agenten ab, und
+        # pruefen gibt die Meldung als Notiz weiter. Sie muss sagen, was nicht
+        # stimmt, ohne dass jemand den Code liest. Geprueft wird vor dem
+        # Lesen der Quelle, deshalb genuegen hier Dateien, die keine Bilder
+        # sind, und der Test laeuft auch ohne Pillow.
+        foto = self.ordner.lege_quelldatei_an("seite-26.jpg", b"kein Bild")
+        pdf = self.ordner.lege_quelldatei_an("Merkmale.pdf", b"kein PDF")
+        text = self.ordner.lege_quelldatei_an("notizen.docx", b"kein Bild")
+        jpg, png = self.entwuerfe / "17.quellgrafik.jpg", self.entwuerfe / "17.quellgrafik.png"
+        faelle = [
+            ("links groesser als rechts", foto, jpg, ["--rechteck", "60", "20", "10", "70"],
+             "links (60)"),
+            ("oben groesser als unten", foto, jpg, ["--rechteck", "10", "70", "60", "20"],
+             "oben (70)"),
+            ("eine Zahl ueber 100", foto, jpg, ["--rechteck", "10", "20", "60", "120"],
+             "unten ist 120"),
+            ("eine Zahl unter 0", foto, jpg, ["--rechteck", "-5", "20", "60", "70"],
+             "links ist -5"),
+            ("weder Foto noch PDF", text, jpg, ["--rechteck", "10", "20", "60", "70"],
+             "weder ein Foto"),
+            ("Foto mit der Endung eines PDF", foto, png, ["--rechteck", "10", "20", "60", "70"],
+             "auf .jpg enden"),
+            ("PDF mit der Endung eines Fotos", pdf, jpg,
+             ["--seite", "1", "--rechteck", "10", "20", "60", "70"], "auf .png enden"),
+            ("PDF ohne Seite", pdf, png, ["--rechteck", "10", "20", "60", "70"],
+             "welche Seite"),
+            ("Foto mit Seite", foto, jpg, ["--seite", "2", "--rechteck", "10", "20", "60", "70"],
+             "keine Seiten"),
+            ("Quelle, die es nicht gibt", self.ordner.pfad / "quellen" / "fehlt.jpg", jpg,
+             ["--rechteck", "10", "20", "60", "70"], "fehlt.jpg gibt es nicht"),
+            ("Ziel in einem Ordner, den es nicht gibt", foto,
+             self.entwuerfe / "fehlt" / "17.quellgrafik.jpg",
+             ["--rechteck", "10", "20", "60", "70"], "Ordner"),
+        ]
+        for fall, quelle, ziel, argumente, stichwort in faelle:
+            with self.subTest(fall):
+                fertig = self.schneide(quelle, ziel, *argumente)
+
+                self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+                self.assertIn(stichwort, fertig.stdout)
+                self.assertNotIn("Traceback", fertig.stdout + fertig.stderr)
+                self.assertEqual(list(self.entwuerfe.iterdir()), [])
+
+    def test_das_ziel_ist_nie_die_quelle_selbst(self) -> None:
+        # Ein Tippfehler im Aufruf, und das Foto der Magazinseite waere durch
+        # seinen eigenen Ausschnitt ersetzt. Die Quelle ist das Einzige, was
+        # sich nicht neu schneiden laesst.
+        foto = self.ordner.lege_quelldatei_an("seite-26.jpg", b"kein Bild")
+
+        fertig = self.schneide(foto, foto, "--rechteck", "10", "20", "60", "70")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("Quelle", fertig.stdout)
+        self.assertEqual(foto.read_bytes(), b"kein Bild")
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_eine_seite_die_es_nicht_gibt_und_eine_kaputte_quelle_enden_mit_meldung(self) -> None:
+        # Das PDF hat zwei Seiten, und die Seite zaehlt ab 1. Eine Datei, die
+        # nur heisst wie ein Bild, laesst sich nicht oeffnen.
+        pdf = self.lege_merkmale_an()
+        kaputt_jpg = self.ordner.lege_quelldatei_an("kaputt.jpg", b"kein Bild")
+        kaputt_pdf = self.ordner.lege_quelldatei_an("kaputt.pdf", b"kein PDF")
+        png = self.entwuerfe / "17.quellgrafik.png"
+        faelle = [
+            ("Seite 5 von 2", pdf, png, ["--seite", "5"], "Seite 5 gibt es nicht"),
+            ("Seite 0", pdf, png, ["--seite", "0"], "Seite 0 gibt es nicht"),
+            ("kaputtes Foto", kaputt_jpg, self.entwuerfe / "17.quellgrafik.jpg", [],
+             "kaputt.jpg lässt sich nicht"),
+            ("kaputtes PDF", kaputt_pdf, png, ["--seite", "1"], "kaputt.pdf lässt sich nicht"),
+        ]
+        for fall, quelle, ziel, seite, stichwort in faelle:
+            with self.subTest(fall):
+                fertig = self.schneide(quelle, ziel, *seite,
+                                       "--rechteck", "10", "20", "60", "70")
+
+                self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+                self.assertIn(stichwort, fertig.stdout)
+                self.assertNotIn("Traceback", fertig.stdout + fertig.stderr)
+                self.assertEqual(list(self.entwuerfe.iterdir()), [])
 
 
 if __name__ == "__main__":

@@ -4,16 +4,28 @@
     <python> ausschnitt.py <foto> --rechteck 8 42 94 88 <ziel.jpg>
     <python> ausschnitt.py <pdf> --seite 3 --rechteck 5 20 95 61 <ziel.png>
 
-Die Quelle ist ein Foto (JPEG, PNG) oder ein PDF. Das Rechteck sind vier ganze
-Zahlen in Prozent der Seite: links, oben, rechts, unten, gemessen an der Seite,
-wie sie aufrecht steht. So nennt der Kartenentwurf seinen Ausschnitt, und so
-sieht ihn der Trainer bei der Freigabe.
+Die Quelle ist ein Foto (JPEG, PNG) oder ein PDF, bei einem PDF mit der Seite,
+ab 1 gezählt. Das Rechteck sind vier ganze Zahlen in Prozent der Seite: links,
+oben, rechts, unten, gemessen an der Seite, wie sie aufrecht steht. So nennt
+der Kartenentwurf seinen Ausschnitt, und so sieht ihn der Trainer bei der
+Freigabe.
 
 Ein Foto wird nach seiner EXIF-Orientierung gerade gestellt und mit Pillow
 ausgeschnitten. Das Ergebnis ist ein JPEG mit derselben Qualität wie in der
-Bildaufbereitung.
+Bildaufbereitung. Eine PDF-Seite zeichnet `pypdfium2` so, dass ihre lange
+Kante so lang ist wie das Zielmaß der Bildaufbereitung, 2000 Pixel. Pillow
+schneidet aus, das Ergebnis ist ein PNG. Die Endung des Ziels folgt deshalb
+der Quelle: `.jpg` beim Foto, `.png` beim PDF. Ein Ziel, das schon da ist,
+wird überschrieben, denn `sammelimport.py pruefen` schneidet nach jeder
+Korrektur neu aus.
 
-Am Ende nennt das Skript das Maß des Ausschnitts in Pixeln.
+Am Ende nennt das Skript das Maß des Ausschnitts in Pixeln. Stimmt etwas
+nicht, sagt es, was, endet mit Exitcode 1 und schreibt nichts.
+
+Pillow braucht jeder Ausschnitt, `pypdfium2` nur einer aus einem PDF. Beide
+sind freiwillig (ADR-0005, ADR-0013): Fehlt eins, nennt das Skript den Befehl
+zum Installieren. Geholt werden sie erst, wenn geschnitten wird, so bekommt
+ein Skript, das dieses importiert, keine neue Voraussetzung.
 
 Der Sammelimport schneidet über dieselbe Funktion, `schneide_aus()`. Das
 Skript ist nur die Kommandozeile darum.
@@ -28,8 +40,23 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bilder_aufbereiten import QUALITAET, ZIELKANTE  # noqa: E402
+from bilder_aufbereiten import QUALITAET, ZIELKANTE, fuer_jpeg  # noqa: E402
 from tpdaten import interpreter, konsole_vorbereiten  # noqa: E402
+
+FOTO_ENDUNGEN = {".jpg", ".jpeg", ".png"}
+
+# Was aus welcher Quelle wird, Endung und Format des Ausschnitts.
+FOTO, PDF = (".jpg", "JPEG"), (".png", "PNG")
+
+RECHTECK = ("links", "oben", "rechts", "unten")
+
+
+class KeinAusschnitt(Exception):
+    """Der Ausschnitt lässt sich so nicht schneiden. Der Text sagt einem Trainer, warum.
+
+    Eine Zeile, denn `sammelimport.py pruefen` schreibt ihn als Notiz in die
+    Übersicht und weist den Entwurf damit ab.
+    """
 
 
 class BibliothekFehlt(Exception):
@@ -65,6 +92,81 @@ def verlange_bibliotheken(pdf: bool) -> None:
                 f"Ein Ausschnitt aus einem Foto geht auch ohne.") from None
 
 
+# --------------------------------------------------------------------------
+# Prüfen, bevor gelesen wird
+# --------------------------------------------------------------------------
+
+def ergebnis(quelle: Path) -> tuple[str, str]:
+    """Endung und Format des Ausschnitts aus dieser Quelle: JPEG beim Foto, PNG beim PDF.
+
+    Erkannt wird die Quelle an ihrer Endung. Was weder Foto noch PDF ist,
+    wirft KeinAusschnitt.
+    """
+    endung = quelle.suffix.lower()
+    if endung == ".pdf":
+        return PDF
+    if endung in FOTO_ENDUNGEN:
+        return FOTO
+    raise KeinAusschnitt(
+        f"{quelle.name} ist weder ein Foto (JPEG, PNG) noch ein PDF. "
+        f"Ausschnitte gibt es nur aus diesen.")
+
+
+def pruefe_rechteck(rechteck: tuple[int, int, int, int]) -> None:
+    """Wirft KeinAusschnitt, wenn das Rechteck nicht den Regeln folgt.
+
+    Vier ganze Zahlen von 0 bis 100, links kleiner als rechts, oben kleiner
+    als unten. Ein Rechteck ohne Fläche ergäbe kein Bild.
+    """
+    for name, wert in zip(RECHTECK, rechteck):
+        if not isinstance(wert, int) or not 0 <= wert <= 100:
+            raise KeinAusschnitt(
+                f"Das Rechteck stimmt nicht: {name} ist {wert}. Jede Zahl ist "
+                f"eine ganze Zahl von 0 bis 100, in Prozent der Seite.")
+    links, oben, rechts, unten = rechteck
+    if links >= rechts:
+        raise KeinAusschnitt(
+            f"Das Rechteck stimmt nicht: links ({links}) muss kleiner sein als rechts ({rechts}).")
+    if oben >= unten:
+        raise KeinAusschnitt(
+            f"Das Rechteck stimmt nicht: oben ({oben}) muss kleiner sein als unten ({unten}).")
+
+
+def _pruefe_aufruf(quelle: Path, ziel: Path, rechteck: tuple[int, int, int, int],
+                   seite: int | None) -> tuple[str, str]:
+    """Prüft alles, was sich ohne Bibliothek und ohne die Quelle zu lesen prüfen lässt.
+
+    Gibt Endung und Format des Ausschnitts zurück.
+    """
+    if not quelle.is_file():
+        raise KeinAusschnitt(f"Die Quelle {quelle} gibt es nicht.")
+    art = ergebnis(quelle)
+    endung = art[0]
+    if ziel.suffix.lower() != endung:
+        aus = "einem PDF wird ein PNG" if art == PDF else "einem Foto wird ein JPEG"
+        raise KeinAusschnitt(
+            f"Aus {aus}, das Ziel muss deshalb auf {endung} enden, nicht {ziel.name}.")
+    # Ein Tippfehler im Aufruf, und die Quelle wäre durch ihren eigenen
+    # Ausschnitt ersetzt. Sie ist das Einzige, was sich nicht neu schneiden
+    # lässt.
+    if ziel.resolve() == quelle.resolve():
+        raise KeinAusschnitt(f"Das Ziel ist die Quelle selbst: {quelle.name}.")
+    if not ziel.parent.is_dir():
+        raise KeinAusschnitt(f"Den Ordner für das Ziel gibt es nicht: {ziel.parent}")
+    if art == PDF and seite is None:
+        raise KeinAusschnitt(
+            f"{quelle.name} ist ein PDF, und es fehlt, welche Seite. Gezählt wird ab 1.")
+    if art == FOTO and seite is not None:
+        raise KeinAusschnitt(
+            f"Ein Foto hat keine Seiten, eine Seite gibt es nur bei einem PDF: {quelle.name}.")
+    pruefe_rechteck(rechteck)
+    return art
+
+
+# --------------------------------------------------------------------------
+# Lesen und Schneiden
+# --------------------------------------------------------------------------
+
 def _foto(quelle: Path):
     """Das Foto, nach seiner EXIF-Orientierung gerade gestellt.
 
@@ -74,8 +176,11 @@ def _foto(quelle: Path):
     """
     from PIL import Image, ImageOps
 
-    with Image.open(io.BytesIO(quelle.read_bytes())) as bild:
-        return ImageOps.exif_transpose(bild)
+    try:
+        with Image.open(io.BytesIO(quelle.read_bytes())) as bild:
+            return ImageOps.exif_transpose(bild)
+    except (OSError, ValueError, Image.DecompressionBombError):
+        raise KeinAusschnitt(f"{quelle.name} lässt sich nicht als Bild öffnen.") from None
 
 
 def _pdf_seite(quelle: Path, seite: int):
@@ -85,13 +190,22 @@ def _pdf_seite(quelle: Path, seite: int):
     `pypdfium2` nennt, rechnen eine Drehung der Seite schon ein.
 
     `pypdfium2` rundet die Kanten auf. Ein Faktor, der knapp über dem
-    genauen liegt, ergäbe 2001 Pixel. Er wird deshalb so weit verkleinert,
-    bis die lange Kante genau ZIELKANTE misst.
+    genauen liegt, ergäbe 2001 Pixel, etwa bei einer Folie im Format 16:9.
+    Er wird deshalb so weit verkleinert, bis die lange Kante genau
+    ZIELKANTE misst.
     """
     import pypdfium2
 
-    pdf = pypdfium2.PdfDocument(quelle.read_bytes())
     try:
+        pdf = pypdfium2.PdfDocument(quelle.read_bytes())
+    except pypdfium2.PdfiumError:
+        raise KeinAusschnitt(f"{quelle.name} lässt sich nicht als PDF öffnen.") from None
+    try:
+        if not 1 <= seite <= len(pdf):
+            seiten = "eine Seite" if len(pdf) == 1 else f"{len(pdf)} Seiten"
+            raise KeinAusschnitt(
+                f"{quelle.name} hat {seiten}, eine Seite {seite} gibt es nicht. "
+                f"Gezählt wird ab 1.")
         blatt = pdf[seite - 1]
         lang = max(blatt.get_size())
         faktor = ZIELKANTE / lang
@@ -114,18 +228,27 @@ def schneide_aus(quelle: Path, ziel: Path, rechteck: tuple[int, int, int, int],
                  seite: int | None = None) -> tuple[int, int]:
     """Schneidet den Ausschnitt aus der Quelle und schreibt ihn nach `ziel`.
 
-    Gibt Breite und Höhe des Ausschnitts in Pixeln zurück.
+    `seite` zählt ab 1 und gehört nur zu einem PDF. Gibt Breite und Höhe des
+    Ausschnitts in Pixeln zurück.
+
+    Wirft KeinAusschnitt, wenn etwas am Aufruf oder an der Quelle nicht
+    stimmt, und BibliothekFehlt, wenn Pillow oder bei einem PDF `pypdfium2`
+    fehlt. In beiden Fällen ist nichts geschrieben: Kodiert wird in den
+    Speicher, erst das fertige Bild kommt auf die Platte. Ein Ziel, das schon
+    da ist, bleibt dann, wie es war.
     """
-    pdf = quelle.suffix.lower() == ".pdf"
-    verlange_bibliotheken(pdf)
-    if pdf:
+    art = _pruefe_aufruf(quelle, ziel, rechteck, seite)
+    verlange_bibliotheken(art == PDF)
+    if art == PDF:
         ausschnitt = _schneide(_pdf_seite(quelle, seite), rechteck)
-        ausschnitt.save(ziel, "PNG")
-        return ausschnitt.size
-    ausschnitt = _schneide(_foto(quelle), rechteck)
-    if ausschnitt.mode not in ("RGB", "L"):
-        ausschnitt = ausschnitt.convert("RGB")
-    ausschnitt.save(ziel, "JPEG", quality=QUALITAET)
+    else:
+        ausschnitt = fuer_jpeg(_schneide(_foto(quelle), rechteck))
+    puffer = io.BytesIO()
+    if art == PDF:
+        ausschnitt.save(puffer, "PNG")
+    else:
+        ausschnitt.save(puffer, "JPEG", quality=QUALITAET)
+    ziel.write_bytes(puffer.getvalue())
     return ausschnitt.size
 
 
@@ -148,8 +271,8 @@ def main() -> int:
 
     try:
         breite, hoehe = schneide_aus(a.quelle, a.ziel, tuple(a.rechteck), a.seite)
-    except BibliothekFehlt as fehlt:
-        print(f"{fehlt}\n\nEs ist kein Ausschnitt geschrieben.")
+    except (KeinAusschnitt, BibliothekFehlt) as fehler:
+        print(f"{fehler}\n\nEs ist kein Ausschnitt geschrieben.")
         return 1
     print(f"Ausschnitt: {a.ziel}, {breite} × {hoehe} Pixel")
     return 0
