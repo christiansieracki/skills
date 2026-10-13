@@ -119,6 +119,21 @@ WISSEN_ID_MUSTER = r"wi-\d{6}"
 
 WISSENSKARTE = Kartensorte("wissen", "wi", WISSEN_ID_MUSTER, tuple(WISSENSFELDER))
 
+SORTEN = (UEBUNGSKARTE, WISSENSKARTE)
+
+
+def sorte_der_id(uid) -> Kartensorte | None:
+    """Die Sorte, zu deren Muster eine ID passt, oder None.
+
+    Eine vierstellige ID von vor 3.0.0 gehoert zu ihrer Sorte, auch wenn sie
+    nicht mehr gilt.
+    """
+    for sorte in SORTEN:
+        for muster in (sorte.muster, sorte.alte_muster):
+            if muster and re.fullmatch(muster, str(uid)):
+                return sorte
+    return None
+
 
 def disziplin_text(eintrag: dict) -> str:
     """Die Disziplin einer Karte, wie ein Mensch sie zu sehen bekommt.
@@ -635,6 +650,7 @@ SCHLANK = [
 
 def baue_index(wurzel: Path) -> dict:
     karten = lies_uebungen(wurzel)
+    wissenskarten = lies_karten(wurzel, WISSENSKARTE)
     trainings = lies_trainings(wurzel)
     schwerpunkte, schwerpunkt_warnungen = lies_schwerpunkte(wurzel)
 
@@ -662,7 +678,7 @@ def baue_index(wurzel: Path) -> dict:
         eintraege.append(e)
 
     warnungen = schwerpunkt_warnungen + pruefe(
-        wurzel, karten, trainings, schwerpunkte, bekannt
+        wurzel, karten, wissenskarten, trainings, schwerpunkte, bekannt
     )
     return {
         "wurzel": str(wurzel),
@@ -672,31 +688,34 @@ def baue_index(wurzel: Path) -> dict:
     }
 
 
-def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
+def pruefe(wurzel: Path, karten, wissenskarten, trainings, schwerpunkte, bekannt) -> list[str]:
+    """Der Linter: was an den Karten beider Sorten und an den Plaenen nicht stimmt.
+
+    `bekannt` sind die IDs in uebungen/. Auf sie duerfen Plaene, `variante_von`
+    und die `uebungen` einer Wissenskarte zeigen.
+    """
     w: list[str] = []
     gesehen: dict[str, str] = {}
 
     for k in karten:
-        kid, datei = k["id"], k["datei"]
-        if kid in gesehen:
-            w.append(f"{datei}: id {kid} gibt es schon in {gesehen[kid]}")
-        gesehen[kid] = datei
+        befunde, am_platz = _pruefe_id(k, UEBUNGSKARTE, gesehen)
+        if am_platz:
+            befunde += pruefe_felder(k, schwerpunkte, bekannt)
+            # Ein toter Bildverweis faellt sonst nirgends auf: die Leseansicht
+            # laesst das Bild still weg, und gemerkt wird es erst in der Halle am
+            # Blatt ohne Bild. Bei einer Liste steht jedes fehlende Bild einzeln
+            # da, denn jedes fehlt fuer sich.
+            for bild in schaubilder(k.get("schaubild")):
+                if not (wurzel / "schaubilder" / bild).is_file():
+                    befunde.append(f"schaubild zeigt auf {bild}, das es unter schaubilder/ nicht gibt")
+        w += [f"{k['datei']}: {befund}" for befund in befunde]
 
-        if re.fullmatch(ALTE_ID_MUSTER, str(kid)):
-            w.append(f"{datei}: id {kid} ist noch vierstellig, {HINWEIS_UMSTELLEN}")
-        elif not re.fullmatch(ID_MUSTER, str(kid)):
-            w.append(f"{datei}: id {kid} passt nicht zum Muster ue-######")
-        if not str(Path(datei).name).startswith(str(kid)):
-            w.append(f"{datei}: Dateiname beginnt nicht mit der id {kid}")
-        w += [f"{datei}: {befund}" for befund in pruefe_felder(k, schwerpunkte, bekannt)]
-
-        # Ein toter Bildverweis faellt sonst nirgends auf: die Leseansicht
-        # laesst das Bild still weg, und gemerkt wird es erst in der Halle am
-        # Blatt ohne Bild. Bei einer Liste steht jedes fehlende Bild einzeln
-        # da, denn jedes fehlt fuer sich.
-        for bild in schaubilder(k.get("schaubild")):
-            if not (wurzel / "schaubilder" / bild).is_file():
-                w.append(f"{datei}: schaubild zeigt auf {bild}, das es unter schaubilder/ nicht gibt")
+    for k in wissenskarten:
+        befunde, am_platz = _pruefe_id(k, WISSENSKARTE, gesehen)
+        if am_platz:
+            befunde += pruefe_wissensfelder(k, schwerpunkte, bekannt)
+            befunde += pruefe_wissensrumpf(k["_rumpf"], wurzel / Path(k["datei"]).parent)
+        w += [f"{k['datei']}: {befund}" for befund in befunde]
 
     for t in trainings:
         for uid in t.get("verwendet", []):
@@ -711,6 +730,34 @@ def pruefe(wurzel: Path, karten, trainings, schwerpunkte, bekannt) -> list[str]:
     w += pruefe_szenen(wurzel)
     w += pruefe_konfliktkopien(wurzel)
     return w
+
+
+def _pruefe_id(k: dict, sorte: Kartensorte, gesehen: dict[str, str]) -> tuple[list[str], bool]:
+    """Was an der ID einer Karte nicht stimmt, und ob die Karte im Ordner ihrer Sorte liegt.
+
+    `gesehen` merkt sich ueber beide Sorten, in welcher Datei eine ID schon
+    stand. Traegt die Karte die ID der anderen Sorte, bleibt es bei dieser
+    einen Meldung: Mit den Regeln des falschen Ordners geprueft, meldete sie
+    jedes Feld, das die andere Sorte nicht hat.
+    """
+    kid, datei = k["id"], k["datei"]
+    w: list[str] = []
+    if kid in gesehen:
+        w.append(f"id {kid} gibt es schon in {gesehen[kid]}")
+    gesehen[kid] = datei
+
+    andere = sorte_der_id(kid)
+    if andere is not None and andere is not sorte:
+        w.append(f"id {kid} hat das Muster {andere.praefix}-######, "
+                 f"die Karte gehoert nach {andere.ordner}/")
+        return w, False
+    if sorte.alte_muster and re.fullmatch(sorte.alte_muster, str(kid)):
+        w.append(f"id {kid} ist noch vierstellig, {HINWEIS_UMSTELLEN}")
+    elif not re.fullmatch(sorte.muster, str(kid)):
+        w.append(f"id {kid} passt nicht zum Muster {sorte.praefix}-######")
+    if not str(Path(datei).name).startswith(str(kid)):
+        w.append(f"Dateiname beginnt nicht mit der id {kid}")
+    return w, True
 
 
 def pruefe_szenen(wurzel: Path) -> list[str]:
@@ -788,25 +835,10 @@ def pruefe_felder(k: dict, schwerpunkte: dict[str, set[str]], bekannt: set[str])
     # Pflichtfeld ohne stillen Default: faellt es weg, muss es auffallen.
     # Ein Default legte eine beim Import vergessene Beachuebung wortlos
     # unter Halle ab, und dort findet sie nie wieder jemand.
-    disziplin = k.get("disziplin")
-    gueltige_disziplinen: set[str] = set()
-    if not disziplin:
-        w.append("disziplin fehlt oder ist leer")
-    elif not isinstance(disziplin, list):
-        w.append(f"disziplin {disziplin!r} steht nicht in eckigen Klammern")
-    else:
-        for d in disziplin:
-            if d not in DISZIPLINEN:
-                w.append(f"disziplin {d!r} steht nicht in der Liste")
-            else:
-                gueltige_disziplinen.add(d)
+    befunde, gueltige_disziplinen = _pruefe_pflichtliste(k, "disziplin", DISZIPLINEN)
+    w += befunde
 
-    # Ohne eckige Klammern liest der Parser einen Text. Darueber zu laufen
-    # hiesse, jeden Buchstaben als Element oder Kennung zu melden.
-    for feld in ("element", "schwerpunkt"):
-        wert = k.get(feld)
-        if wert and not isinstance(wert, list):
-            w.append(f"{feld} {wert!r} steht nicht in eckigen Klammern")
+    w += _ohne_klammern(k, "element", "schwerpunkt")
     element = k.get("element")
     for el in element if isinstance(element, list) else []:
         if el not in ELEMENTE:
@@ -816,22 +848,7 @@ def pruefe_felder(k: dict, schwerpunkte: dict[str, set[str]], bekannt: set[str])
     if k.get("form") not in FORMEN:
         w.append(f"form {k.get('form')!r} ist unbekannt")
 
-    schwerpunkt = k.get("schwerpunkt")
-    if schwerpunkte and isinstance(schwerpunkt, list):
-        for s in schwerpunkt:
-            if s not in schwerpunkte:
-                w.append(f"schwerpunkt {s!r} steht nicht in schwerpunkte.md")
-                continue
-            # Eine Disziplin der Karte reicht: eine Karte fuer beides darf
-            # einen Schwerpunkt tragen, den es nur in einer Disziplin gibt.
-            # Traegt die Karte gar keine gueltige Disziplin, steht das
-            # schon oben, und zweimal dasselbe zu melden hilft niemandem.
-            if gueltige_disziplinen and not (schwerpunkte[s] & gueltige_disziplinen):
-                w.append(
-                    f"schwerpunkt {s!r} gilt nur fuer "
-                    f"{', '.join(sorted(schwerpunkte[s]))}, die Karte fuer "
-                    f"{', '.join(sorted(gueltige_disziplinen))}"
-                )
+    w += _pruefe_schwerpunkte(k, schwerpunkte, gueltige_disziplinen)
 
     for feld in ("level_min", "level_max"):
         v = k.get(feld)
@@ -856,6 +873,140 @@ def pruefe_felder(k: dict, schwerpunkte: dict[str, set[str]], bekannt: set[str])
     if not k.get("quelle"):
         w.append("quelle fehlt")
     return w
+
+
+def pruefe_wissensfelder(k: dict, schwerpunkte: dict[str, set[str]],
+                         bekannt: set[str]) -> list[str]:
+    """Was am Frontmatter einer Wissenskarte nicht stimmt, ohne die Datei davor.
+
+    Das Gegenstueck zu `pruefe_felder` fuer die zweite Sorte. Was den Ort der
+    Karte braucht, ID und Dateiname, prueft `pruefe` selbst, den Text
+    `pruefe_wissensrumpf`. `bekannt` sind die IDs in uebungen/.
+
+    Der Linter setzt die Datei davor. Der Sammelimport prueft damit den
+    Entwurf einer Wissenskarte, bevor er Karte wird, mit denselben Regeln.
+    """
+    w: list[str] = []
+    titel = str(k.get("titel") or "").strip()
+    if not titel:
+        w.append("titel fehlt")
+    elif not titel.endswith("?"):
+        # Die Karte beantwortet eine Frage, und die Frage ist ihr Titel.
+        w.append(f"titel {titel!r} endet nicht auf ein Fragezeichen")
+    w += _pruefe_pflichtliste(k, "thema", THEMEN)[0]
+    befunde, gueltige_disziplinen = _pruefe_pflichtliste(k, "disziplin", DISZIPLINEN)
+    w += befunde
+    # Ein Steuerungsschwerpunkt hat in schwerpunkte.md keine Disziplinspalte
+    # und gilt damit fuer beide. Auf der Wissenskarte ist er erlaubt, mit ihm
+    # findet der Saisonplaner sie zu einem Trainingsblock (ADR-0002).
+    w += _ohne_klammern(k, "schwerpunkt", "uebungen")
+    w += _pruefe_schwerpunkte(k, schwerpunkte, gueltige_disziplinen)
+
+    # Die Gegenrichtung, welche Wissenskarten auf eine Uebung zeigen, pflegt
+    # niemand auf der Uebungskarte. Sie stimmt nur, solange jede ID hier eine
+    # Uebung trifft.
+    uebungen = k.get("uebungen")
+    for uid in uebungen if isinstance(uebungen, list) else []:
+        if uid not in bekannt:
+            w.append(f"uebungen nennt {uid}, das es in uebungen/ nicht gibt")
+    if not str(k.get("quelle") or "").strip():
+        w.append("quelle fehlt oder ist leer")
+    return w
+
+
+# Ein Bildverweis in Markdown: `![Text](pfad)`, auch `![Text](<pfad mit leerzeichen>)`
+# und mit Titel dahinter, `![Text](pfad "Titel")`.
+_BILDVERWEIS = re.compile(
+    r"!\[[^\]]*\]\(\s*(?:<(?P<spitz>[^>]*)>|(?P<pfad>[^)\s]+))(?:\s+(?:\"[^\"]*\"|'[^']*'))?\s*\)")
+
+# Eine Adresse im Netz statt einer Datei, etwa `https:`. Mindestens zwei
+# Zeichen vor dem Doppelpunkt, sonst gaelte das Laufwerk `C:` als eine.
+_ADRESSE = re.compile(r"[a-z][a-z0-9+.-]+:", re.I)
+
+
+def bildverweise(rumpf: str) -> list[str]:
+    """Die Pfade der Bildverweise im Text einer Karte, in ihrer Reihenfolge.
+
+    So, wie Markdown sie aufloest: relativ zum Ordner der Karte, `%20` als
+    Leerzeichen. Auf einer Wissenskarte in wissen/ heisst das
+    `../schaubilder/<datei>`, im Entwurf der Name der Quellgrafik daneben.
+    """
+    from urllib.parse import unquote
+    return [unquote(m.group("spitz") if m.group("spitz") is not None else m.group("pfad"))
+            for m in _BILDVERWEIS.finditer(rumpf)]
+
+
+def pruefe_wissensrumpf(rumpf: str, ordner: Path) -> list[str]:
+    """Was am Text einer Wissenskarte nicht stimmt: die beiden Abschnitte und die Bilder.
+
+    `ordner` ist der Ordner, in dem die Karte liegt, gegen ihn wird ein
+    Bildverweis aufgeloest wie in jeder Markdown-Ansicht. Im Linter ist es
+    wissen/, im Sammelimport der Ordner des Entwurfs. Eine Adresse im Netz
+    ist keine Datei und wird nicht nachgesehen.
+    """
+    w = [f"Abschnitt ## {titel} fehlt" for titel in WISSENSABSCHNITTE
+         if not re.search(rf"^##[ \t]+{re.escape(titel)}[ \t]*$", rumpf, re.M)]
+    # Ein toter Bildverweis faellt sonst nirgends auf: Die Markdown-Ansicht
+    # zeigt an seiner Stelle nichts oder nur den Text in den Klammern.
+    for pfad in bildverweise(rumpf):
+        if not _ADRESSE.match(pfad) and not (ordner / pfad).is_file():
+            w.append(f"Bildverweis {pfad} zeigt auf eine Datei, die es nicht gibt")
+    return w
+
+
+def _ohne_klammern(k: dict, *felder: str) -> list[str]:
+    """Ein Listenfeld, das ohne eckige Klammern dasteht.
+
+    Der Parser liest dann einen Text. Darueber zu laufen hiesse, jeden
+    Buchstaben als Element oder Kennung zu melden.
+    """
+    return [f"{feld} {k[feld]!r} steht nicht in eckigen Klammern"
+            for feld in felder if k.get(feld) and not isinstance(k[feld], list)]
+
+
+def _pruefe_schwerpunkte(k: dict, schwerpunkte: dict[str, set[str]],
+                         gueltige_disziplinen: set[str]) -> list[str]:
+    """Die Kennungen in `schwerpunkt`: aus schwerpunkte.md, und passend zur Disziplin der Karte.
+
+    Fuer beide Sorten gleich. Ohne schwerpunkte.md gibt es nichts zu
+    vergleichen, ohne eckige Klammern meldet das `_ohne_klammern`.
+    """
+    w: list[str] = []
+    schwerpunkt = k.get("schwerpunkt")
+    if not schwerpunkte or not isinstance(schwerpunkt, list):
+        return w
+    for s in schwerpunkt:
+        if s not in schwerpunkte:
+            w.append(f"schwerpunkt {s!r} steht nicht in schwerpunkte.md")
+            continue
+        # Eine Disziplin der Karte reicht: eine Karte fuer beides darf
+        # einen Schwerpunkt tragen, den es nur in einer Disziplin gibt.
+        # Traegt die Karte gar keine gueltige Disziplin, steht das
+        # schon oben, und zweimal dasselbe zu melden hilft niemandem.
+        if gueltige_disziplinen and not (schwerpunkte[s] & gueltige_disziplinen):
+            w.append(
+                f"schwerpunkt {s!r} gilt nur fuer "
+                f"{', '.join(sorted(schwerpunkte[s]))}, die Karte fuer "
+                f"{', '.join(sorted(gueltige_disziplinen))}"
+            )
+    return w
+
+
+def _pruefe_pflichtliste(k: dict, feld: str, erlaubt: set[str]) -> tuple[list[str], set[str]]:
+    """Ein Pflichtfeld, das eine Liste aus festen Werten traegt: Befunde und die gueltigen Werte.
+
+    Ohne stillen Default: faellt das Feld weg, muss es auffallen. Ohne
+    eckige Klammern liest der Parser einen Text, darueber zu laufen hiesse,
+    jeden Buchstaben als Wert zu melden. Die gueltigen Werte braucht, wer
+    weiter mit ihnen prueft, etwa die Schwerpunkte gegen die Disziplin.
+    """
+    wert = k.get(feld)
+    if not wert:
+        return [f"{feld} fehlt oder ist leer"], set()
+    if not isinstance(wert, list):
+        return [f"{feld} {wert!r} steht nicht in eckigen Klammern"], set()
+    befunde = [f"{feld} {x!r} steht nicht in der Liste" for x in wert if x not in erlaubt]
+    return befunde, {x for x in wert if x in erlaubt}
 
 
 def cache_pfad(wurzel: Path) -> Path:
