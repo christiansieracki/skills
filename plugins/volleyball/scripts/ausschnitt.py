@@ -23,11 +23,12 @@ from __future__ import annotations
 
 import argparse
 import io
+import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bilder_aufbereiten import QUALITAET  # noqa: E402
+from bilder_aufbereiten import QUALITAET, ZIELKANTE  # noqa: E402
 from tpdaten import konsole_vorbereiten  # noqa: E402
 
 
@@ -44,6 +45,30 @@ def _foto(quelle: Path):
         return ImageOps.exif_transpose(bild)
 
 
+def _pdf_seite(quelle: Path, seite: int):
+    """Die Seite des PDF als Bild, ihre lange Kante ZIELKANTE Pixel lang.
+
+    Gezeichnet wird die Seite, wie sie aufrecht steht: Breite und Höhe, die
+    `pypdfium2` nennt, rechnen eine Drehung der Seite schon ein.
+
+    `pypdfium2` rundet die Kanten auf. Ein Faktor, der knapp über dem
+    genauen liegt, ergäbe 2001 Pixel. Er wird deshalb so weit verkleinert,
+    bis die lange Kante genau ZIELKANTE misst.
+    """
+    import pypdfium2
+
+    pdf = pypdfium2.PdfDocument(quelle.read_bytes())
+    try:
+        blatt = pdf[seite - 1]
+        lang = max(blatt.get_size())
+        faktor = ZIELKANTE / lang
+        while math.ceil(lang * faktor) > ZIELKANTE:
+            faktor = math.nextafter(faktor, 0)
+        return blatt.render(scale=faktor).to_pil()
+    finally:
+        pdf.close()
+
+
 def _schneide(bild, rechteck: tuple[int, int, int, int]):
     """Schneidet das Rechteck in Prozent aus dem aufrechten Bild."""
     links, oben, rechts, unten = rechteck
@@ -58,6 +83,10 @@ def schneide_aus(quelle: Path, ziel: Path, rechteck: tuple[int, int, int, int],
 
     Gibt Breite und Höhe des Ausschnitts in Pixeln zurück.
     """
+    if quelle.suffix.lower() == ".pdf":
+        ausschnitt = _schneide(_pdf_seite(quelle, seite), rechteck)
+        ausschnitt.save(ziel, "PNG")
+        return ausschnitt.size
     ausschnitt = _schneide(_foto(quelle), rechteck)
     if ausschnitt.mode not in ("RGB", "L"):
         ausschnitt = ausschnitt.convert("RGB")
@@ -75,12 +104,14 @@ def main() -> int:
     ap.add_argument("quelle", type=Path, help="das Foto (JPEG, PNG) oder das PDF")
     ap.add_argument("ziel", type=Path,
                     help="wohin der Ausschnitt kommt: .jpg beim Foto, .png beim PDF")
+    ap.add_argument("--seite", type=int, default=None,
+                    help="bei einem PDF die Seite, ab 1 gezählt")
     ap.add_argument("--rechteck", type=int, nargs=4, required=True,
                     metavar=("LINKS", "OBEN", "RECHTS", "UNTEN"),
                     help="in Prozent der aufrechten Seite, ganze Zahlen von 0 bis 100")
     a = ap.parse_args()
 
-    breite, hoehe = schneide_aus(a.quelle, a.ziel, tuple(a.rechteck))
+    breite, hoehe = schneide_aus(a.quelle, a.ziel, tuple(a.rechteck), a.seite)
     print(f"Ausschnitt: {a.ziel}, {breite} × {hoehe} Pixel")
     return 0
 

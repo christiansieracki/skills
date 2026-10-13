@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import unittest
 
-from arbeitsordner import Arbeitsordner
+from arbeitsordner import A4, FOLIE, Arbeitsordner, PdfFlaeche
 
 try:
     from PIL import Image
@@ -30,9 +30,17 @@ try:
 except ImportError:  # pragma: no cover - haengt an der Installation, nicht am Code
     HAT_PILLOW = False
 
+try:
+    import pypdfium2  # noqa: F401
+    HAT_PYPDFIUM2 = True
+except ImportError:  # pragma: no cover - haengt an der Installation, nicht am Code
+    HAT_PYPDFIUM2 = False
+
 BRAUCHT_PILLOW = unittest.skipUnless(HAT_PILLOW, "Pillow ist nicht installiert")
+BRAUCHT_PYPDFIUM2 = unittest.skipUnless(HAT_PYPDFIUM2, "pypdfium2 ist nicht installiert")
 
 ROT = (200, 30, 30)
+BLAU = (30, 120, 200)
 
 
 def anteil_in_farbe(bild, farbe: tuple[int, int, int], toleranz: int = 24) -> float:
@@ -97,6 +105,52 @@ class AusschnittTest(unittest.TestCase):
             # Aufrecht ist die Seite 800 breit und 1000 hoch.
             self.assertEqual(bild.size, (160, 200))
             self.assertGreater(anteil_in_farbe(bild, ROT), 0.95)
+
+    def lege_merkmale_an(self):
+        """Ein PDF mit zwei Seiten wie aus dem Lehrgang. Auf Seite 2 ist eine
+        Grafik gezeichnet, eine blaue Flaeche bei links 20, oben 30, rechts
+        60, unten 50. Seite 1 hat an derselben Stelle nichts."""
+        return self.ordner.lege_quell_pdf_an(
+            "Merkmale.pdf",
+            ["Oberes Zuspiel", "Merkmale"],
+            ["Bildreihe oberes Zuspiel", "Seite zwei"],
+            flaechen=[PdfFlaeche(seite=2, farbe=BLAU, rechteck=(20, 30, 60, 50))])
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_ein_ausschnitt_aus_der_zweiten_seite_trifft_die_dort_gezeichnete_flaeche(self) -> None:
+        # In den PDFs aus dem Lehrgang ist die Grafik oft gezeichnet und kein
+        # eingebettetes Bild (ADR-0013). Der Ausschnitt liegt innerhalb der
+        # Flaeche. Er trifft sie nur, wenn Seite, Richtung und Mass stimmen.
+        quelle = self.lege_merkmale_an()
+        ziel = self.entwuerfe / "17.quellgrafik.png"
+
+        fertig = self.schneide(quelle, ziel, "--seite", "2",
+                               "--rechteck", "25", "35", "55", "45")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        with Image.open(ziel) as bild:
+            self.assertEqual(bild.format, "PNG")
+            self.assertGreater(anteil_in_farbe(bild, BLAU, toleranz=3), 0.95)
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_die_ganze_seite_hat_eine_lange_kante_von_2000_pixeln(self) -> None:
+        # Das Zielmass der Bildaufbereitung. Die Folie im Format 16:9, wie
+        # PowerPoint sie ausgibt, liegt quer, und ihre lange Kante kaeme ohne
+        # Vorsicht auf 2001 Pixel.
+        for name, seitenmass in (("a4.pdf", A4), ("folie.pdf", FOLIE)):
+            with self.subTest(name):
+                quelle = self.ordner.lege_quell_pdf_an(name, ["Seite eins"],
+                                                       seitenmass=seitenmass)
+                ziel = self.entwuerfe / f"{name}.png"
+
+                fertig = self.schneide(quelle, ziel, "--seite", "1",
+                                       "--rechteck", "0", "0", "100", "100")
+
+                self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+                with Image.open(ziel) as bild:
+                    self.assertEqual(max(bild.size), 2000)
 
 
 if __name__ == "__main__":
