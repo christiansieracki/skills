@@ -20,7 +20,7 @@ from tpdaten import konsole_vorbereiten  # noqa: E402
 
 START = Path(__file__).resolve().parent.parent / "referenzen" / "start"
 
-ORDNER = ["uebungen", "quellen", "schaubilder", "teams", "trainings"]
+ORDNER = ["uebungen", "wissen", "quellen", "schaubilder", "teams", "trainings"]
 
 ROOT_YML = """\
 # Wurzeldatei der Trainingsplanung.
@@ -50,8 +50,9 @@ gruppen:
 teams:
 {teams_block}
 # --- Trainer ----------------------------------------------------------------
-# Jeder Trainer, der Uebungen anlegt, hat eine Nummer. Sie steht vorn in jeder
-# ID, die er vergibt: ue-010001 ist die erste Uebung von Trainer 01. Dazu die
+# Jeder Trainer, der Karten anlegt, hat eine Nummer. Sie steht vorn in jeder
+# ID, die er vergibt: ue-010001 ist die erste Uebung von Trainer 01, wi-010001
+# seine erste Wissenskarte. Dazu die
 # Rechner, an denen er importiert, mit dem Namen, den der Rechner sich selbst
 # gibt. Die Namen der Trainer sind dieselben wie unter gruppen.<gruppe>.trainer.
 # Den Eintrag legt volleyball-uebungsimport an, nach Rueckfrage. Etwa:
@@ -67,6 +68,7 @@ trainer:
 
 ordner:
   uebungen: uebungen/
+  wissen: wissen/
   quellen: quellen/
   schaubilder: schaubilder/
   trainings: trainings/
@@ -104,7 +106,8 @@ Editor öffnen, auch ohne Claude.
 | Ordner | Inhalt |
 |---|---|
 | `uebungen/` | Die Übungsbibliothek. Eine Datei je Übung. |
-| `quellen/` | Originaldokumente, aus denen Übungen stammen. |
+| `wissen/` | Wissenskarten: Hintergrund aus Fremdquellen. Eine Datei je Frage. |
+| `quellen/` | Originaldokumente, aus denen Übungen und Wissenskarten stammen. |
 | `schaubilder/` | Aufbauskizzen, die zu einer Übung gehören. |
 | `teams/<team>/` | Team-Profil, Saisonplan und Mesozyklen. |
 | `trainings/<gruppe>/` | Die Trainingseinheiten, benannt nach Datum. |
