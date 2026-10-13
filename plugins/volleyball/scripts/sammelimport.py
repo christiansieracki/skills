@@ -1022,6 +1022,27 @@ def pdf_text(seiten: tuple[str, ...] | None) -> str | None:
     return "\n".join(seite for seite in seiten if seite)
 
 
+# Die Marke, mit der in der Planeingabe jede Seite eines PDF beginnt (#64).
+SEITENMARKE = "=== Seite {} ==="
+
+
+def mit_seitenmarken(seiten: tuple[str, ...] | None) -> str | None:
+    """Der Text eines PDF am Stück, vor jeder Seite ihre Marke, gezählt ab 1.
+
+    Daran nennt der Zerlegungsplan Seitenbereiche. Auch eine Seite ohne Text
+    bekommt ihre Marke, sonst verrutschte die Zählung danach. Hat keine Seite
+    Text, bleibt es leer wie bei `pdf_text`: Marken allein wären kein Text,
+    und der Agent soll lesen, dass er das PDF selbst öffnen muss.
+    """
+    text = pdf_text(seiten)
+    if not text:
+        return text
+    zeilen: list[str] = []
+    for nummer, seite in enumerate(seiten, 1):
+        zeilen += [SEITENMARKE.format(nummer), *([seite] if seite else [])]
+    return "\n".join(zeilen)
+
+
 def erste_zeilen(text: str) -> str:
     """Die ersten Zeilen eines Textes, ganze Zeilen, bis ERSTE_ZEILEN_BIS Zeichen erreicht sind."""
     zeilen: list[str] = []
@@ -1152,7 +1173,7 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     pdftotext = finde_pdftotext() if pdfs else None
     if pdfs and not pdftotext:
         melde_ohne_pdftotext("die Planeingabe", "den Zerlegungsplan")
-    texte = ({name: pdf_text(pdf_seiten(pdftotext, dateien[name])) for name in pdfs}
+    texte = ({name: mit_seitenmarken(pdf_seiten(pdftotext, dateien[name])) for name in pdfs}
              if pdftotext else {})
 
     zeichen = sum(len(t) for t in texte.values() if t)

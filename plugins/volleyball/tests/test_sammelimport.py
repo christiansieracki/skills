@@ -356,6 +356,18 @@ class SeitenbereichTest(unittest.TestCase):
             self.assertNotIn(HEFT[seite - 1][0], zwei)
 
     @BRAUCHT_PDFTOTEXT
+    def test_ohne_seitenbereich_bekommt_der_auftrag_den_ganzen_text(self) -> None:
+        # Wie vor dem Seitenbereich. PlayDrill nennt nie Seiten, eine Uebung
+        # ist dort ein ganzes Blatt.
+        self.plane({"kandidat": 1, "dateien": ["heft.pdf"]})
+
+        self.vorbereiten()
+
+        abschnitt = unter_datei(auftrag_von(self.ordner, 1), "heft.pdf")
+        for seite in HEFT:
+            self.assertIn(seite[0], abschnitt)
+
+    @BRAUCHT_PDFTOTEXT
     def test_bindestrich_und_halbgeviertstrich_ergeben_dasselbe(self) -> None:
         # Der Zerlegungsplan schreibt den Halbgeviertstrich, von Hand und auf
         # der Tastatur kommt der Bindestrich. Auch Leerraum um den Strich
@@ -1065,6 +1077,19 @@ class PlaneingabeTest(unittest.TestCase):
 
         self.assertEqual(self.genannte_dateien(), ["unter/seite-04.jpg"])
 
+    def test_eine_datei_mit_seitenbereich_gilt_beim_zweiten_lauf_nicht_als_neu(self) -> None:
+        # Das Heft steht mit zwei Bereichen in zwei Zeilen. Kaeme es beim
+        # naechsten Lauf wieder, plante der Agent es ein zweites Mal (#64).
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": [("heft.pdf", "S. 1–2")]},
+            {"kandidat": 2, "dateien": [("heft.pdf", "S. 3"), "seite-04.jpg"]},
+        ])
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-05.jpg", b"")
+
+        self.plane()
+
+        self.assertEqual(self.genannte_dateien(), ["seite-05.jpg"])
+
     def naechste_nummer(self) -> int:
         """Die naechste freie Kandidatennummer laut Planeingabe."""
         return int(re.search(r"Kandidatennummer: (\d+)", self.planeingabe()).group(1))
@@ -1177,6 +1202,22 @@ class PlaneingabeTest(unittest.TestCase):
         self.assertIn("Ausführung: Der Trainer schlägt vom Kasten.", kasten)
         self.assertNotIn("Sprungkraftzirkel", kasten)
         self.assertIn("Sprungkraftzirkel", self.zu_datei("Ü_Abwehr/zirkel.pdf"))
+
+    @BRAUCHT_PDFTOTEXT
+    def test_die_planeingabe_markiert_wo_jede_seite_eines_pdf_beginnt(self) -> None:
+        # Daran nennt der Zerlegungsplan Seitenbereiche, etwa einen je Technik
+        # in einem langen Heft (#64). Die leere zweite Seite hat keinen Text
+        # und bekommt ihre Marke trotzdem, sonst verrutschte die Zaehlung
+        # danach um eins.
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", ["Inhalt des Hefts"], [],
+                                      ["Ablauf: Jeder hält den Ballon in der Luft."])
+
+        self.plane()
+
+        zeilen = [z for z in self.zu_datei("heft.pdf").splitlines()
+                  if z and not z.startswith("```")]
+        self.assertEqual(zeilen, ["=== Seite 1 ===", "Inhalt des Hefts", "=== Seite 2 ===",
+                                  "=== Seite 3 ===", "Ablauf: Jeder hält den Ballon in der Luft."])
 
     @BRAUCHT_PDFTOTEXT
     def test_ein_pdf_ohne_text_sagt_dem_agenten_dass_er_es_selbst_lesen_muss(self) -> None:
