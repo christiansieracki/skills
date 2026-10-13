@@ -1,8 +1,8 @@
 # Schwerpunkte
 
-Die verbindliche Liste. Saisonplan, Mesozyklen, Trainingspläne und Übungskarten
-benutzen **nur** die Kennungen aus der linken Spalte. Nur so findet die Suche
-zu einem Mesozyklus-Schwerpunkt auch die passenden Übungen.
+Die verbindliche Liste. Saisonplan, Mesozyklen, Trainingspläne, Übungskarten
+und Wissenskarten benutzen **nur** die Kennungen aus der linken Spalte. Nur so
+findet die Suche zu einem Mesozyklus-Schwerpunkt auch die passenden Übungen.
 
 Startfassung. Sie deckt den üblichen Erwachsenen- und Jugendbetrieb ab und
 wird von hier aus für euren Verein erweitert.
@@ -69,8 +69,13 @@ Beachimport.
 ## Steuerungsschwerpunkte
 
 Die gibt es nur auf Saison- und Mesozyklus-Ebene. Dazu gehören keine Übungen,
-deshalb tauchen sie auf keiner Karte auf und deshalb tragen sie keine
+deshalb tauchen sie auf keiner Übungskarte auf und deshalb tragen sie keine
 Disziplinspalte.
+
+Eine Wissenskarte darf sie tragen, etwa ein Beitrag darüber, wie man die
+Belastung über einen Block steuert. Mit diesen Kennungen plant der Saisonplaner
+einen Trainingsblock, und dazu soll er die Karte finden. Ohne Disziplinspalte
+gelten sie für Halle und Beach.
 
 | Kennung | Klartext |
 |---|---|
