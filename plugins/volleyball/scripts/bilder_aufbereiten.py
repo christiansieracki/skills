@@ -27,9 +27,12 @@ fasst nur eine Seite.
 
 Dieses Skript braucht Pillow immer (ADR-0005). Fehlt Pillow, bricht das Skript
 mit einem Installationshinweis ab und schreibt nichts. Sonst braucht Pillow nur
-der Sammelimport, wenn er die Quellgrafik aus dem PDF ausschneidet. Die
-übrigen Skripte des Plugins laufen davon unberührt weiter mit der
-Standardbibliothek.
+das Ausschneiden der Quellgrafik: im Sammelimport aus dem PDF und in
+`ausschnitt.py`. Die übrigen Skripte des Plugins laufen davon unberührt weiter
+mit der Standardbibliothek.
+
+`ausschnitt.py` übernimmt von hier ZIELKANTE und QUALITAET, damit ein
+Ausschnitt dasselbe Maß und dieselbe Qualität hat wie ein aufbereitetes Bild.
 
 HEIC öffnet Pillow erst mit dem Zusatzpaket pillow-heif, optional wie Pillow
 selbst (Nachtrag zu ADR-0005). Fehlt das Paket, nennt das Skript die
@@ -89,8 +92,8 @@ def pillow_da() -> bool:
         print("Für die Bildaufbereitung fehlt Pillow.\n")
         print("Installieren mit:")
         print(f"  {interpreter()} -m pip install Pillow\n")
-        print("Pillow brauchen nur dieses Skript und das Ausschneiden der Quellgrafik")
-        print("im Sammelimport. Die übrigen Skripte des Plugins laufen ohne es weiter.")
+        print("Pillow brauchen nur dieses Skript und das Ausschneiden der Quellgrafik.")
+        print("Die übrigen Skripte des Plugins laufen ohne es weiter.")
         return False
     return True
 

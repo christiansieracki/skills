@@ -674,19 +674,26 @@ nicht. Erkannt werden die Namen, die der Client schreibt:
 ## Skripte
 
 Alle liegen unter `${CLAUDE_PLUGIN_ROOT}/scripts/` und brauchen nur Python 3
-aus der Standardbibliothek. Es gibt drei Ausnahmen:
+aus der Standardbibliothek. Es gibt drei Ausnahmen von der Standardbibliothek:
 
-- **Pillow:** `bilder_aufbereiten.py` braucht es, dazu `sammelimport.py
-  vorbereiten`, wenn es die Quellgrafik ausschneiden soll. Beide brechen ohne es
-  mit einem Installationshinweis ab und schreiben nichts (ADR-0005). HEIC
-  öffnet Pillow erst mit dem Zusatzpaket `pillow-heif`. Fehlt es, nennt
-  `bilder_aufbereiten.py` die HEIC-Dateien mit Installationshinweis, lässt sie
-  liegen und bereitet die übrigen auf.
+- **Pillow:** `bilder_aufbereiten.py` und `ausschnitt.py` brauchen es, dazu
+  `sammelimport.py vorbereiten`, wenn es die Quellgrafik ausschneiden soll.
+  Alle drei brechen ohne es mit einem Installationshinweis ab und schreiben
+  nichts (ADR-0005). HEIC öffnet Pillow erst mit dem Zusatzpaket
+  `pillow-heif`. Fehlt es, nennt `bilder_aufbereiten.py` die HEIC-Dateien mit
+  Installationshinweis, lässt sie liegen und bereitet die übrigen auf.
 - **`pdftotext`:** `sammelimport.py vorbereiten` liest damit den Text von
   PDFs, für die Planeingabe und für die Aufträge. Gesucht wird erst im PATH,
   unter Windows danach neben `git.exe`, denn Git für Windows bringt es mit.
   Fehlt es, sagt das Skript das einmal mit Installationshinweis und macht ohne
   Text weiter (ADR-0008).
+- **`pypdfium2`:** `ausschnitt.py` zeichnet damit eine PDF-Seite als Bild,
+  bevor Pillow den Ausschnitt schneidet. Fehlt es, endet ein Ausschnitt aus
+  einem PDF mit Installationshinweis und schreibt nichts. Ein Ausschnitt aus
+  einem Foto geht ohne (ADR-0013).
+
+Dazu nehmen zwei Skripte einen Browser, wo einer da ist:
+
 - **Edge oder Chrome:** `export_pdf.py` druckt damit, wenn pandoc keine
   PDF-Maschine findet, und `schaubild.py --png` nimmt damit die Ansicht als
   PNG auf. Gesucht und aufgerufen wird der Browser allein in `browser.py`.
@@ -694,7 +701,8 @@ aus der Standardbibliothek. Es gibt drei Ausnahmen:
   `schaubild.py` schreibt das SVG trotzdem und sagt, dass die Ansicht als PNG
   fehlt.
 
-Die übrigen Skripte brauchen weder Pillow noch `pdftotext` noch einen Browser.
+Die übrigen Skripte brauchen weder Pillow noch `pdftotext` noch `pypdfium2`
+noch einen Browser.
 
 | Skript | Wofür |
 |---|---|
@@ -704,6 +712,7 @@ Die übrigen Skripte brauchen weder Pillow noch `pdftotext` noch einen Browser.
 | `export_pdf.py` | PDF zum Ausdrucken |
 | `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen, mit `--png` dazu eine Ansicht als PNG im Temp-Verzeichnis |
 | `bilder_aufbereiten.py` | Quellbilder verkleinern, nach EXIF geradedrehen und aus TIFF und HEIC ein JPEG machen |
+| `ausschnitt.py` | eine Quellgrafik als Ausschnitt schneiden, aus einem Foto oder einer PDF-Seite: `<quelle> [--seite N] --rechteck LINKS OBEN RECHTS UNTEN <ziel>`, das Rechteck in ganzen Prozent der aufrechten Seite. Aus einem Foto wird ein JPEG, aus einer PDF-Seite, deren lange Kante 2000 Pixel misst, ein PNG. Nennt am Ende das Maß in Pixeln |
 | `sammelimport.py` | Sammelimport über einen Quellenordner: `vorbereiten --plan` legt die Eingabe für den Zerlegungsplan an, `vorbereiten` die Aufträge, `pruefen` setzt den Status aus den Entwürfen und gibt mit `--json` aus, was die Freigabe braucht, `uebernehmen` macht freigegebene Entwürfe zu Karten und trägt gestrichene und ergänzende Kandidaten ein |
 | `ids_umstellen.py` | einen Arbeitsordner von vierstelligen auf sechsstellige IDs umstellen, einmal je Arbeitsordner |
 

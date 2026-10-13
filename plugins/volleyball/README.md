@@ -39,12 +39,13 @@ plugins/volleyball/
 ├── agents/            die beiden Agenten des Sammelimports
 ├── referenzen/        DATENMODELL, SPRACHE, VORLAGEN, METHODIK, ...
 ├── scripts/           index.py, suche.py, leseansicht.py, export_pdf.py,
-│                      bilder_aufbereiten.py, schaubild.py, szene.py,
-│                      browser.py, sammelimport.py, ids_umstellen.py
+│                      bilder_aufbereiten.py, ausschnitt.py, schaubild.py,
+│                      szene.py, browser.py, sammelimport.py,
+│                      ids_umstellen.py
 └── tests/             Linter, Suche, Leseansicht, Bildaufbereitung,
-                       Schaubilder, PDF-Export, Sammelimport und das
-                       Umstellen der IDs gegen einen künstlichen Arbeitsordner,
-                       dazu die Agenten gegen das Datenmodell
+                       Ausschnitt, Schaubilder, PDF-Export, Sammelimport und
+                       das Umstellen der IDs gegen einen künstlichen
+                       Arbeitsordner, dazu die Agenten gegen das Datenmodell
 ```
 
 **Im Plugin liegt das Werkzeug, im Arbeitsordner liegen die Daten.** Übungen,
@@ -65,7 +66,8 @@ Bibliothek wird nie angefasst und muss dafür nicht einmal existieren.
 
 Die Prüfungen der Bildaufbereitung werden übersprungen, wenn Pillow fehlt, die
 mit einem echten HEIC, wenn `pillow-heif` fehlt. Die Begründung steht im Kopf
-von `tests/test_bilder.py`.
+von `tests/test_bilder.py`. Ebenso die Prüfungen des Ausschnitts, die ein Bild
+schneiden, und die mit einer PDF-Seite, wenn `pypdfium2` fehlt.
 
 Der Test des Drucks über Edge oder Chrome läuft nur, wo der PDF-Export diesen
 Weg wählt. Warum, steht im Kopf von `tests/test_export.py`. Die Prüfungen der
@@ -75,15 +77,18 @@ Aufruf des Browsers kostet einige Sekunden.
 ## Voraussetzungen
 
 Python 3 für die Skripte, nur Standardbibliothek. Begrenzte Ausnahmen sind
-Pillow und `pdftotext`. Pillow braucht `bilder_aufbereiten.py`, dazu
-`sammelimport.py`, wenn es Quellgrafiken aus PDFs ausschneiden soll. Fehlt es,
-sagen beide im Klartext, wie es zu installieren ist, und schreiben nichts.
-Fotos im HEIC-Format vom iPhone öffnet Pillow erst mit `pillow-heif`. Fehlt
-es, lässt `bilder_aufbereiten.py` sie liegen, sagt, wie es zu installieren ist,
-und bereitet die übrigen auf. `pdftotext` liest im Sammelimport den Text der
-PDFs. Ohne es geht es weiter, die Agenten lesen die PDFs dann selbst. Unter
-Windows bringt Git für Windows es mit. Die übrigen Skripte hängen an keinem der
-beiden, eine frische Installation ist also sofort benutzbar.
+Pillow, `pdftotext` und `pypdfium2`. Pillow braucht `bilder_aufbereiten.py`
+und `ausschnitt.py`, dazu `sammelimport.py`, wenn es Quellgrafiken aus PDFs
+ausschneiden soll. Fehlt es, sagen alle drei im Klartext, wie es zu
+installieren ist, und schreiben nichts. Fotos im HEIC-Format vom iPhone öffnet
+Pillow erst mit `pillow-heif`. Fehlt es, lässt `bilder_aufbereiten.py` sie
+liegen, sagt, wie es zu installieren ist, und bereitet die übrigen auf.
+`pdftotext` liest im Sammelimport den Text der PDFs. Ohne es geht es weiter,
+die Agenten lesen die PDFs dann selbst. Unter Windows bringt Git für Windows es
+mit. `pypdfium2` zeichnet für `ausschnitt.py` eine PDF-Seite, bevor Pillow den
+Ausschnitt schneidet. Fehlt es, sagt das Skript bei einem PDF, wie es zu
+installieren ist, ein Foto schneidet es ohne. Die übrigen Skripte hängen an
+keinem der drei, eine frische Installation ist also sofort benutzbar.
 
 Für den PDF-Export pandoc, dazu eine PDF-Maschine wie wkhtmltopdf oder
 weasyprint. Fehlt die Maschine, druckt Edge oder Chrome die HTML-Fassung, dafür
