@@ -289,10 +289,11 @@ die für jede Karte gelten, stehen zuletzt unter
   Dann gehören nur diese Seiten zum Kandidaten, ohne Seitenbereich die ganze
   Datei. So ergibt ein langes PDF mehrere Kandidaten, und eine Datei steht
   mit verschiedenen Bereichen in mehreren Zeilen. Einen Seitenbereich gibt es
-  nur bei PDFs. Einer an einem Foto, einer über die letzte Seite hinaus oder
-  einer, der sich nicht lesen lässt, bricht `vorbereiten` vor dem ersten
-  Auftrag ab, und die Meldung nennt die Zeile. Die letzte Seite kennt das
-  Skript aus `pdftotext`. Ohne `pdftotext` merkt es erst der Agent.
+  nur bei PDFs. Hat ein Kandidat des Durchgangs einen an einem Foto, einen
+  über die letzte Seite hinaus oder einen, der sich nicht lesen lässt, bricht
+  `vorbereiten` vor dem ersten Auftrag ab, und die Meldung nennt die Zeile.
+  Die letzte Seite kennt das Skript aus `pdftotext`. Ohne `pdftotext` merkt
+  es erst der Agent.
 - **Ergebnis** ist eins von `uebung`, `folge`, `zurückgestellt`, `übersprungen`.
   Aus `uebung` und `folge` wird eine Karte mit diesem `typ`.
 - **Status** ist eins von `offen`, `bereit`, `rückfrage`, `importiert`,
@@ -338,9 +339,9 @@ keiner Zeile der Übersicht steht und die `ohne` nicht auslässt, bei PDFs ihr
 Text, die nächste freie Kandidatennummer, ohne Übersicht 1, und die
 Bibliotheksliste, in der die Karten aus diesem Quellenordner markiert sind.
 Eine Datei, die mit einem Seitenbereich in einer Zeile steht, ist nicht mehr
-neu, gleich welche Seiten die Zeile nennt. Im Text eines PDF steht vor jeder
-Seite eine **Seitenmarke**, `=== Seite 3 ===`, auch vor einer Seite ohne Text.
-Daran nennt der Zerlegungsplan Seitenbereiche.
+neu, gleich welche Seiten die Zeile nennt. In der Planeingabe steht im Text
+eines PDF vor jeder Seite eine **Seitenmarke**, `=== Seite 3 ===`, auch vor
+einer Seite ohne Text. Daran nennt der Zerlegungsplan Seitenbereiche.
 Daneben schreibt der Agent `volleyball-zerlegungsplan` den Plan als
 `zerlegungsplan.md`, in der Form der Übersicht. Daraus wird nach der Freigabe
 die Übersicht. Der Rest ist nach der Nummer des Kandidaten benannt:
