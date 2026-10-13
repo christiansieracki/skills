@@ -308,7 +308,157 @@ class VorbereitenTest(unittest.TestCase):
         self.assertIn("selbst lesen", unter_datei(auftrag_von(self.ordner, 1), "a.pdf"))
 
 
-PLAYDRILL = {"textmarke": "Ausführung:", "platzhalter": "hier könnte ihr Text stehen"}
+# Ein Heft mit vier Seiten, je Seite ein Text, der nur dort steht.
+HEFT = [["Inhalt des Hefts"],
+        ["Ballgewöhnung mit dem Luftballon"],
+        ["Ablauf: Jeder hält den Ballon in der Luft."],
+        ["Impressum und Werbung"]]
+
+
+class SeitenbereichTest(unittest.TestCase):
+    """Ein Kandidat nennt Seiten eines PDF, sein Auftrag traegt nur sie (#64).
+
+    Bei den Technik-Guidelines, 48 Seiten und eine Karte je Technik, bekaeme
+    sonst jeder der 15 Auftraege das ganze Heft.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def plane(self, *kandidaten: dict) -> None:
+        """Eine Uebersicht mit diesen Zeilen, und `heft.pdf` mit den Seiten aus HEFT."""
+        self.ordner.lege_quellenordner_an(ORDNER, list(kandidaten))
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", *HEFT)
+
+    def vorbereiten(self, **starte):
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER, **starte)
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        return fertig
+
+    @BRAUCHT_PDFTOTEXT
+    def test_ein_kandidat_mit_seitenbereich_bekommt_nur_den_text_dieser_seiten(self) -> None:
+        # Mit Halbgeviertstrich, so wie der Zerlegungsplan ihn schreibt, und
+        # eine einzelne Seite ohne Strich.
+        self.plane({"kandidat": 1, "dateien": [("heft.pdf", "S. 2–3")]},
+                   {"kandidat": 2, "dateien": [("heft.pdf", "S. 2")]})
+
+        self.vorbereiten()
+
+        eins = unter_datei(auftrag_von(self.ordner, 1), "heft.pdf")
+        for seite in (2, 3):
+            self.assertIn(HEFT[seite - 1][0], eins)
+        for seite in (1, 4):
+            self.assertNotIn(HEFT[seite - 1][0], eins)
+        zwei = unter_datei(auftrag_von(self.ordner, 2), "heft.pdf")
+        self.assertIn(HEFT[1][0], zwei)
+        for seite in (1, 3, 4):
+            self.assertNotIn(HEFT[seite - 1][0], zwei)
+
+    @BRAUCHT_PDFTOTEXT
+    def test_bindestrich_und_halbgeviertstrich_ergeben_dasselbe(self) -> None:
+        # Der Zerlegungsplan schreibt den Halbgeviertstrich, von Hand und auf
+        # der Tastatur kommt der Bindestrich. Auch Leerraum um den Strich
+        # aendert nichts.
+        self.plane({"kandidat": 1, "dateien": [("heft.pdf", "S. 2–3")]},
+                   {"kandidat": 2, "dateien": [("heft.pdf", "S. 2-3")]},
+                   {"kandidat": 3, "dateien": [("heft.pdf", "S.2 - 3")]})
+
+        self.vorbereiten()
+
+        halbgeviertstrich = unter_datei(auftrag_von(self.ordner, 1), "heft.pdf")
+        self.assertIn(HEFT[2][0], halbgeviertstrich)
+        for kandidat in (2, 3):
+            with self.subTest(kandidat):
+                self.assertEqual(unter_datei(auftrag_von(self.ordner, kandidat), "heft.pdf"),
+                                 halbgeviertstrich)
+
+    @BRAUCHT_PDFTOTEXT
+    def test_der_auftrag_nennt_die_seiten_die_der_agent_oeffnen_soll(self) -> None:
+        # Bilder und Tabellen stehen nicht im Text, dafuer oeffnet der Agent
+        # das PDF. Dann nur diese Seiten, nicht das ganze Heft. `quelldatei`
+        # bleibt die Datei, die Seiten nennt der Entwurf in `quelle`.
+        self.plane({"kandidat": 1, "dateien": [("heft.pdf", "S. 2–3")]})
+
+        self.vorbereiten()
+
+        auftrag = auftrag_von(self.ordner, 1)
+        self.assertIn("S. 2–3", unter_datei(auftrag, "heft.pdf"))
+        self.assertIn(f"`{ORDNER}/heft.pdf`", zeile_mit(auftrag, "quelldatei"))
+        self.assertNotIn("S. 2", zeile_mit(auftrag, "quelldatei"))
+
+    def test_ohne_pdftotext_sagt_der_auftrag_dass_der_agent_diese_seiten_selbst_liest(
+            self) -> None:
+        # Wie beim ganzen PDF kein Abbruch (ADR-0008), aber der Agent soll
+        # nicht das ganze Heft lesen. Der PATH zeigt auf einen leeren Ordner,
+        # dort gibt es weder pdftotext noch git.exe.
+        leer = Path(tempfile.mkdtemp(prefix="ohne-pdftotext-"))
+        self.addCleanup(shutil.rmtree, leer, True)
+        self.plane({"kandidat": 1, "dateien": [("heft.pdf", "S. 2–3")]})
+
+        self.vorbereiten(umgebung={"PATH": str(leer)})
+
+        abschnitt = unter_datei(auftrag_von(self.ordner, 1), "heft.pdf")
+        self.assertNotIn(HEFT[1][0], abschnitt)
+        self.assertIn("S. 2–3", zeile_mit(abschnitt, "selbst lesen"))
+
+    def bricht_ab(self, ordner: str = ORDNER) -> str:
+        """`vorbereiten` endet mit einem Fehler und hat nichts geschrieben. Zurueck kommt die Ausgabe.
+
+        Vorn in der Uebersicht steht jeweils ein Kandidat ohne Fehler. Gaebe
+        es den Abbruch erst beim Schreiben, laege sein Auftrag schon da.
+        """
+        sammelimport = self.ordner.pfad / "quellen" / ordner / "sammelimport.md"
+        vorher = sammelimport.read_text(encoding="utf-8")
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ordner)
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertEqual(sammelimport.read_text(encoding="utf-8"), vorher)
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe" / ordner).exists())
+        return fertig.stdout
+
+    def test_ein_seitenbereich_an_einem_foto_bricht_ab_und_nennt_die_zeile(self) -> None:
+        # Ein Foto ist eine Seite. Ein Bereich daran ist ein Versehen im Plan,
+        # und welche Seite gemeint war, laesst sich nicht raten.
+        self.plane({"kandidat": 1, "dateien": [("heft.pdf", "S. 2")]},
+                   {"kandidat": 7, "dateien": [("seite-24.jpg", "S. 2")]})
+
+        meldung = zeile_mit(self.bricht_ab(), "seite-24.jpg")
+
+        self.assertIn("Kandidat 7", meldung)
+        self.assertIn("S. 2", meldung)
+
+    @BRAUCHT_PDFTOTEXT
+    def test_ein_seitenbereich_ueber_die_letzte_seite_hinaus_bricht_ab_und_nennt_die_zeile(
+            self) -> None:
+        # Das Heft hat vier Seiten. Der Auftrag bekaeme fuer Seite 5 keinen
+        # Text, und der Agent entwuerfe aus Seite 4 allein.
+        self.plane({"kandidat": 1, "dateien": [("heft.pdf", "S. 2")]},
+                   {"kandidat": 7, "dateien": [("heft.pdf", "S. 4–5")]})
+
+        meldung = zeile_mit(self.bricht_ab(), "S. 4–5")
+
+        self.assertIn("Kandidat 7", meldung)
+        self.assertIn("4 Seiten", meldung)
+
+    def test_ein_seitenbereich_den_das_skript_nicht_lesen_kann_bricht_ab(self) -> None:
+        # Aus „S. 3 bis 4“ nur Seite 3 zu nehmen, gaebe dem Agenten still zu
+        # wenig, und „S. 3–2“ ist vertippt. Jeder Fall in einem eigenen
+        # Quellenordner, denn der erste Fehler beendet den Lauf.
+        for nr, angabe in enumerate(["S. 3 bis 4", "S. 3–2", "S. 0", "Seite 3"]):
+            with self.subTest(angabe):
+                ordner = f"heft-{nr}"
+                self.ordner.lege_quellenordner_an(ordner, [
+                    {"kandidat": 1, "dateien": ["a.pdf"]},
+                    {"kandidat": 7, "dateien": [("heft.pdf", angabe)]}])
+
+                meldung = zeile_mit(self.bricht_ab(ordner), angabe)
+
+                self.assertIn("Kandidat 7", meldung)
+
+
+PLAYDRILL ={"textmarke": "Ausführung:", "platzhalter": "hier könnte ihr Text stehen"}
 
 # Kopf und Ansage eines PlayDrill-Blatts, ueber 150 Zeichen. Zaehlte der
 # ganze Text, haette jedes Blatt genug, auch eins, unter dessen "Ausfuehrung:"
