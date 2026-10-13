@@ -20,7 +20,10 @@ PYTHONPATH, wie bei Pillow in test_bilder.py.
 
 from __future__ import annotations
 
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 
 from arbeitsordner import A4, FOLIE, Arbeitsordner, PdfFlaeche
 
@@ -41,6 +44,22 @@ BRAUCHT_PYPDFIUM2 = unittest.skipUnless(HAT_PYPDFIUM2, "pypdfium2 ist nicht inst
 
 ROT = (200, 30, 30)
 BLAU = (30, 120, 200)
+
+
+def blende_aus(test: unittest.TestCase, modul: str) -> dict[str, str]:
+    """Die Umgebung fuer einen Aufruf, in dem sich `modul` nicht importieren laesst.
+
+    Wie in test_bilder.py: Ein `<modul>.py`, das beim Import abbricht,
+    verdeckt das echte Paket, denn der PYTHONPATH kommt vor den
+    site-packages. Deinstalliert werden muss dafuer nichts.
+    """
+    schatten = Path(tempfile.mkdtemp(prefix=f"ohne-{modul}-"))
+    test.addCleanup(shutil.rmtree, schatten, True)
+    (schatten / f"{modul}.py").write_text(
+        f'raise ImportError("{modul} ist fuer diesen Test ausgeblendet")\n',
+        encoding="utf-8",
+    )
+    return {"PYTHONPATH": str(schatten)}
 
 
 def anteil_in_farbe(bild, farbe: tuple[int, int, int], toleranz: int = 24) -> float:
@@ -151,6 +170,41 @@ class AusschnittTest(unittest.TestCase):
                 self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
                 with Image.open(ziel) as bild:
                     self.assertEqual(max(bild.size), 2000)
+
+    @BRAUCHT_PILLOW
+    def test_ohne_pypdfium2_endet_ein_pdf_mit_hinweis_und_ein_foto_geht_weiter(self) -> None:
+        # pypdfium2 ist freiwillig wie Pillow (ADR-0013). Auf dem Rechner des
+        # Trainers fehlt es, und ein Foto soll trotzdem gehen.
+        ohne = blende_aus(self, "pypdfium2")
+        pdf = self.lege_merkmale_an()
+        foto = self.ordner.lege_quellbild_an("seite-26.jpg", (1000, 800))
+
+        fertig = self.schneide(pdf, self.entwuerfe / "17.quellgrafik.png", "--seite", "2",
+                               "--rechteck", "25", "35", "55", "45", umgebung=ohne)
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("pip install pypdfium2", fertig.stdout)
+        self.assertEqual(list(self.entwuerfe.iterdir()), [])
+
+        fertig = self.schneide(foto, self.entwuerfe / "18.quellgrafik.jpg",
+                               "--rechteck", "10", "20", "60", "70", umgebung=ohne)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertTrue((self.entwuerfe / "18.quellgrafik.jpg").is_file())
+
+    def test_ohne_pillow_endet_es_mit_hinweis(self) -> None:
+        # Ohne Pillow geht kein Ausschnitt, weder aus dem Foto noch aus dem
+        # PDF. Die Quelle muss dafuer kein Bild sein: Gefragt wird, bevor sie
+        # gelesen wird. So laeuft der Test auch dort, wo Pillow fehlt.
+        quelle = self.ordner.lege_quelldatei_an("seite-26.jpg", b"kein Bild")
+
+        fertig = self.schneide(quelle, self.entwuerfe / "17.quellgrafik.jpg",
+                               "--rechteck", "10", "20", "60", "70",
+                               umgebung=blende_aus(self, "PIL"))
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("pip install Pillow", fertig.stdout)
+        self.assertEqual(list(self.entwuerfe.iterdir()), [])
 
 
 if __name__ == "__main__":

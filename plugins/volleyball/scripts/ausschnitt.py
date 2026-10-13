@@ -29,7 +29,40 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bilder_aufbereiten import QUALITAET, ZIELKANTE  # noqa: E402
-from tpdaten import konsole_vorbereiten  # noqa: E402
+from tpdaten import interpreter, konsole_vorbereiten  # noqa: E402
+
+
+class BibliothekFehlt(Exception):
+    """Pillow fehlt, oder bei einem PDF `pypdfium2`. Der Text nennt den Befehl zum Installieren.
+
+    Eine eigene Ausnahme, weil das kein Fehler des Ausschnitts ist: Der
+    Sammelimport bricht dann ab, statt den Entwurf abzuweisen.
+    """
+
+
+def verlange_bibliotheken(pdf: bool) -> None:
+    """Wirft BibliothekFehlt, wenn eine Bibliothek fehlt, die der Ausschnitt braucht.
+
+    Gefragt wird vor dem ersten Lesen und Schreiben, damit nichts halb
+    geschrieben liegen bleibt. `pypdfium2` braucht nur ein PDF (ADR-0013),
+    ein Foto geht ohne.
+    """
+    try:
+        # Geholt wird beides, was der Ausschnitt braucht. Eine halbe
+        # Installation fiele sonst erst beim Schneiden auf.
+        from PIL import Image, ImageOps  # noqa: F401  Der Import ist die Prüfung.
+    except ImportError:
+        raise BibliothekFehlt(
+            f"Für den Ausschnitt fehlt Pillow.\n\n"
+            f"Installieren mit:\n  {interpreter()} -m pip install Pillow") from None
+    if pdf:
+        try:
+            import pypdfium2  # noqa: F401  Der Import ist die Prüfung.
+        except ImportError:
+            raise BibliothekFehlt(
+                f"Für einen Ausschnitt aus einem PDF fehlt pypdfium2.\n\n"
+                f"Installieren mit:\n  {interpreter()} -m pip install pypdfium2\n\n"
+                f"Ein Ausschnitt aus einem Foto geht auch ohne.") from None
 
 
 def _foto(quelle: Path):
@@ -83,7 +116,9 @@ def schneide_aus(quelle: Path, ziel: Path, rechteck: tuple[int, int, int, int],
 
     Gibt Breite und Höhe des Ausschnitts in Pixeln zurück.
     """
-    if quelle.suffix.lower() == ".pdf":
+    pdf = quelle.suffix.lower() == ".pdf"
+    verlange_bibliotheken(pdf)
+    if pdf:
         ausschnitt = _schneide(_pdf_seite(quelle, seite), rechteck)
         ausschnitt.save(ziel, "PNG")
         return ausschnitt.size
@@ -111,7 +146,11 @@ def main() -> int:
                     help="in Prozent der aufrechten Seite, ganze Zahlen von 0 bis 100")
     a = ap.parse_args()
 
-    breite, hoehe = schneide_aus(a.quelle, a.ziel, tuple(a.rechteck), a.seite)
+    try:
+        breite, hoehe = schneide_aus(a.quelle, a.ziel, tuple(a.rechteck), a.seite)
+    except BibliothekFehlt as fehlt:
+        print(f"{fehlt}\n\nEs ist kein Ausschnitt geschrieben.")
+        return 1
     print(f"Ausschnitt: {a.ziel}, {breite} × {hoehe} Pixel")
     return 0
 
