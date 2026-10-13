@@ -780,7 +780,9 @@ class Arbeitsordner:
         return zeilen
 
     def lege_quellbild_an(self, name: str, groesse: tuple[int, int],
-                          orientierung: int | None = None) -> Path:
+                          orientierung: int | None = None,
+                          flaeche: tuple[tuple[int, int, int],
+                                         tuple[int, int, int, int]] | None = None) -> Path:
         """Erzeugt ein Bild in `quellen/` zur Laufzeit. Braucht Pillow.
 
         Das Bild ist Rauschen, und das mit Absicht: nur unkomprimierbarer
@@ -789,8 +791,14 @@ class Arbeitsordner:
         waere ein eingechecktes Foto. Das hiesse Binaermaterial im Repo,
         dessen Bedingung niemand mehr ansieht.
 
-        `orientierung` schreibt den EXIF-Eintrag 0x0112. 6 heisst "fuer die
-        Anzeige um 90 Grad drehen", der Wert, den die Magazinseiten tragen.
+        `groesse` ist das Mass der gespeicherten Pixel. `orientierung`
+        schreibt den EXIF-Eintrag 0x0112. 6 heisst "fuer die Anzeige um 90
+        Grad im Uhrzeigersinn drehen", der Wert, den die Magazinseiten tragen.
+
+        `flaeche` ist eine Farbe und ein Rechteck darin, links, oben, rechts,
+        unten in Prozent des Bildes, wie es aufrecht steht, also nach der
+        Drehung, die `orientierung` verlangt. Dort ist das Bild einfarbig. So
+        laesst sich pruefen, ob ein Ausschnitt die aufrechte Seite meint.
 
         Das Format folgt der Endung: PNG, TIFF, HEIC oder sonst JPEG. HEIC
         braucht dazu pillow-heif.
@@ -799,6 +807,23 @@ class Arbeitsordner:
 
         breite, hoehe = groesse
         bild = Image.frombytes("RGB", groesse, os.urandom(breite * hoehe * 3))
+        if flaeche is not None:
+            # Gezeichnet wird auf das aufrechte Bild, gespeichert wird es
+            # zurueckgedreht. Bei 6 steht es aufrecht, wenn es 90 Grad im
+            # Uhrzeigersinn gedreht wird, gespeichert ist es also 90 Grad
+            # gegen den Uhrzeigersinn gedreht. Pillow dreht gegen den
+            # Uhrzeigersinn.
+            hin, zurueck = {
+                3: (Image.Transpose.ROTATE_180, Image.Transpose.ROTATE_180),
+                6: (Image.Transpose.ROTATE_270, Image.Transpose.ROTATE_90),
+                8: (Image.Transpose.ROTATE_90, Image.Transpose.ROTATE_270),
+            }.get(orientierung, (None, None))
+            aufrecht = bild.transpose(hin) if hin else bild
+            farbe, (links, oben, rechts, unten) = flaeche
+            w, h = aufrecht.size
+            aufrecht.paste(farbe, (links * w // 100, oben * h // 100,
+                                   rechts * w // 100, unten * h // 100))
+            bild = aufrecht.transpose(zurueck) if zurueck else aufrecht
         datei = self.pfad / "quellen" / name
         datei.parent.mkdir(parents=True, exist_ok=True)
         endung = datei.suffix.lower()
