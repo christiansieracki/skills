@@ -13,12 +13,14 @@
 
 `vorbereiten --plan` legt vor dem Zerlegungsplan die Planeingabe an: jede
 Datei, die noch in keiner Zeile der Übersicht steht und die `ohne:` nicht
-auslässt, bei PDFs ihr Text, dazu die nächste freie Kandidatennummer und die
-Bibliotheksliste. Ein zweiter Lauf über denselben Ordner nimmt so nur, was neu
-ist, und zählt weiter. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
+auslässt, bei PDFs ihr Text mit einer Marke, wo jede Seite beginnt, dazu die
+nächste freie Kandidatennummer und die Bibliotheksliste. Ein zweiter Lauf über
+denselben Ordner nimmt so nur, was neu ist, und zählt weiter. Den Text liest
+`pdftotext`, wenn es da ist (ADR-0008).
 
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
-nächsten offenen Kandidaten an, mit dem Text jedes PDF und der Angabe, ob der
+nächsten offenen Kandidaten an, mit dem Text jedes PDF, bei einem
+Seitenbereich nur dem dieser Seiten, und der Angabe, ob der
 Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein, welcher Trainer
 daran arbeitet. Arbeitet laut Eintrag ein anderer daran, geht es nur mit
 `--trotzdem` weiter. Wenn die Einstellungen es wollen, schneidet es
@@ -1155,7 +1157,8 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     """Legt die Eingabe für den Zerlegungsplan an.
 
     Der Agent liest sie in einem Aufruf: jede Datei, die noch in keiner Zeile
-    der Übersicht steht, bei PDFs mit ihrem Text, und die Bibliotheksliste.
+    der Übersicht steht, bei PDFs mit ihrem Text und den Seitenmarken, und
+    die Bibliotheksliste.
     Der Quellenordner steht einmal absolut im Kopf, denn Fotos und PDFs ohne
     Text öffnet der Agent selbst. Dazu die nächste freie Kandidatennummer, ab
     der er zählt.
