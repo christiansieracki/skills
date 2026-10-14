@@ -36,7 +36,9 @@ Freigabe nicht einhält. Welche Sorte Karte ein Entwurf werden soll, sagt das
 Ergebnis seiner Zeile. Mit `--json` gibt es aus, was die Freigabe im Chat
 braucht. `uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`
 oder `wissen/`, erst jetzt mit ID (ADR-0010), je Sorte aus dem eigenen Zähler,
-und legt die Quellgrafiken als ihre Schaubilder ab.
+und legt die Quellgrafiken als ihre Schaubilder ab. Nennt eine Wissenskarte
+unter `Übungen:` die Übungen aus demselben Beitrag, trägt es deren IDs in ihre
+`uebungen` ein, gleich in welcher Reihenfolge beide Karte werden.
 Ein freigegebener Entwurf, der die Prüfung nicht besteht, bleibt mit seinem
 Status stehen. Gestrichene, zurückgestellte und ergänzende Kandidaten
 bekommen nur ihren Status.
@@ -71,8 +73,8 @@ from ausschnitt import ergebnis as ergebnis_des_ausschnitts  # noqa: E402
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
-    DISZIPLIN_SPALTE, KARTENFELDER, SORTEN, UEBUNGSKARTE, WISSENSFELDER, WISSENSKARTE,
-    Kartensorte, KeineId, finde_wurzel, hole_index, interpreter, konsole_vorbereiten,
+    DISZIPLIN_SPALTE, ID_MUSTER, KARTENFELDER, SORTEN, UEBUNGSKARTE, WISSENSFELDER, WISSENSKARTE,
+    Kartensorte, KeineId, als_liste, finde_wurzel, hole_index, interpreter, konsole_vorbereiten,
     lies_frontmatter, lies_karten, lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen,
     naechste_id, pruefe_felder, pruefe_wissensfelder, pruefe_wissensrumpf, schaubilder,
     tabellenzellen, trainer_dieses_rechners,
@@ -132,6 +134,16 @@ STATUS = {"offen", "bereit", "rückfrage", "importiert", "ergänzt", "übersprun
 # Die Stände, in denen ein Kandidat noch auf seine Karte wartet. Alle anderen
 # sind erledigt, und kein Aufruf fasst ihre Zeile mehr an.
 NOCH_OFFEN = {"offen", "bereit", "rückfrage"}
+
+# Die Stände, in denen ein Kandidat eine Karte hat, in der Spalte Karte: seine
+# eigene, oder die, die er ergänzt hat.
+MIT_KARTE = {"importiert", "ergänzt"}
+
+# Damit beginnt am Ende von „Was es ist“ einer `wissen`-Zeile die Liste der
+# Übungen aus demselben Beitrag, in der festen Form `Übungen: 13, 14, ue-000041`
+# (#69): Kandidatennummern für Übungen dieses Plans, IDs für Übungen, die schon
+# Karte sind.
+UEBUNGEN_MARKE = "Übungen:"
 
 
 class Abbruch(Exception):
@@ -657,6 +669,126 @@ class Sammelimport:
         Eine Karte, die `uebernehmen` schreibt, trägt `uebernimm` hier nach.
         """
         return {str(karte["id"]) for karte in lies_uebungen(self.wurzel)}
+
+
+# --------------------------------------------------------------------------
+# Die Übungen aus demselben Beitrag
+# --------------------------------------------------------------------------
+
+def _uebungen_angaben(k: Kandidat) -> list[str]:
+    """Was hinter `Übungen:` in „Was es ist“ steht, je Angabe ein Text, ungeprüft.
+
+    Die Liste hat nur eine `wissen`-Zeile, und sie steht am Ende, nach einem
+    `ergänzt wi-######`. Ohne sie ist die Liste leer.
+    """
+    if k.sorte is not WISSENSKARTE:
+        return []
+    _, marke, liste = _nfc(k.was).rpartition(UEBUNGEN_MARKE)
+    if not marke:
+        return []
+    return [angabe.strip() for angabe in liste.strip().rstrip(".").split(",") if angabe.strip()]
+
+
+def uebungen_aus_dem_beitrag(sammelimport: Sammelimport,
+                             k: Kandidat) -> tuple[list[Kandidat], list[str]]:
+    """Die Übungen hinter `Übungen:`: die Zeilen der genannten Kandidaten und die IDs (#72).
+
+    Eine Nummer muss eine Zeile der Übersicht sein, aus der eine Übung oder
+    Folge wird, eine ID eine Karte in uebungen/. Sonst kommt ValueError mit
+    der Angabe und dem Grund. Eine Zeile, die der Trainer bei der Freigabe
+    gestrichen oder zurückgestellt hat, behält ihr Ergebnis und gilt weiter.
+    Sie bringt nur nie eine ID mit.
+    """
+    nach_nummer = {z.nummer: z for z in sammelimport.kandidaten}
+    zeilen: list[Kandidat] = []
+    ids: list[str] = []
+    for angabe in _uebungen_angaben(k):
+        if angabe.isdigit():
+            zeile = nach_nummer.get(angabe)
+            if zeile is None:
+                raise ValueError(f"{angabe}, das ist keine Zeile der Übersicht")
+            if zeile.sorte is not UEBUNGSKARTE:
+                raise ValueError(f"{angabe}, das ist keine Übung oder Folge, "
+                                 f"sondern {zeile.ergebnis}")
+            zeilen.append(zeile)
+        elif re.fullmatch(ID_MUSTER, angabe):
+            if angabe not in sammelimport.bekannt:
+                raise ValueError(f"{angabe}, das gibt es nicht in uebungen/")
+            ids.append(angabe)
+        else:
+            raise ValueError(f"„{angabe}“, das ist weder eine Kandidatennummer noch die ID "
+                             f"einer Übung")
+    return zeilen, ids
+
+
+def ids_der_uebungen(sammelimport: Sammelimport, k: Kandidat) -> list[str]:
+    """Die IDs, die laut `Übungen:` jetzt schon auf die Wissenskarte gehören, sortiert (#72).
+
+    Das sind die genannten IDs und die Karten der genannten Kandidaten, die
+    schon `importiert` oder `ergänzt` sind. Ein Kandidat, der noch wartet,
+    bringt seine ID mit, wenn er Karte wird, siehe
+    `trage_bei_wissenskarten_ein`. Einer, der übersprungen oder
+    zurückgestellt ist, nie. ValueError wie bei `uebungen_aus_dem_beitrag`.
+    """
+    zeilen, ids = uebungen_aus_dem_beitrag(sammelimport, k)
+    karten = [z.zellen["Karte"].strip() for z in zeilen if z.status in MIT_KARTE]
+    return sorted({*ids, *(uid for uid in karten if re.fullmatch(ID_MUSTER, uid))})
+
+
+def mit_uebungen(text: str, ids: list[str]) -> str:
+    """Der Text einer Wissenskarte, in deren `uebungen` genau diese IDs stehen.
+
+    Sonst bleibt der Text, wie er ist. Fehlt das Feld, etwa auf einer Karte
+    von Hand, kommt es ans Ende des Frontmatters.
+    """
+    zeilen = text.splitlines()
+    ende = _frontmatter_ende(zeilen)
+    if ende is None:
+        raise ValueError("Wissenskarte ohne geschlossenes Frontmatter")
+    felder = _setze_feld(zeilen[1:ende], "uebungen", f"[{', '.join(ids)}]")
+    return "\n".join(["---", *felder, "---", *zeilen[ende + 1:]]) + "\n"
+
+
+def _ersetze(datei: Path, text: str) -> None:
+    """Schreibt den Text erst daneben und benennt dann um, damit die Datei nie halb ist."""
+    zwischen = datei.with_name(datei.name + ".neu")
+    try:
+        zwischen.write_text(text, encoding="utf-8")
+        os.replace(zwischen, datei)
+    finally:
+        zwischen.unlink(missing_ok=True)
+
+
+def trage_bei_wissenskarten_ein(sammelimport: Sammelimport, k: Kandidat, uid: str) -> list[str]:
+    """Trägt eine Übung in jede schon übernommene Wissenskarte ein, die sie nennt (#72).
+
+    Das Gegenstück zu `ids_der_uebungen`. Kommt die Wissenskarte vor ihren
+    Übungen, fehlen ihr deren IDs noch, und jede Übung bringt ihre hier mit,
+    ob sie Karte wird oder eine Karte ergänzt. So stimmt das Ergebnis in
+    jeder Reihenfolge, auch in einem Aufruf, und keine ID steht doppelt.
+    Zurück kommen die Zeilen für die Ausgabe.
+    """
+    if k.sorte is not UEBUNGSKARTE:
+        return []
+    wissenskarten = [w.zellen["Karte"].strip() for w in sammelimport.kandidaten
+                     if w.status in MIT_KARTE and k.nummer in _uebungen_angaben(w)]
+    if not wissenskarten:
+        return []
+    dateien = {str(karte["id"]): sammelimport.wurzel / karte["datei"]
+               for karte in lies_karten(sammelimport.wurzel, WISSENSKARTE)}
+    meldungen = []
+    for wid in wissenskarten:
+        datei = dateien.get(wid)
+        if datei is None:
+            meldungen.append(f"{wid} liegt nicht in wissen/, dort fehlt {uid} in uebungen")
+            continue
+        felder, _ = lies_frontmatter(datei)
+        vorher = [str(u) for u in als_liste(felder.get("uebungen"))]
+        if uid not in vorher:
+            _ersetze(datei, mit_uebungen(datei.read_text(encoding="utf-8"),
+                                         sorted({*vorher, uid})))
+        meldungen.append(f"steht in uebungen von {wid}")
+    return meldungen
 
 
 # --------------------------------------------------------------------------
@@ -2076,6 +2208,30 @@ def ausschnitte_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> list[str]
     ]
 
 
+def uebungen_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> str:
+    """Die Zeile im Auftrag einer Wissenskarte mit den Übungen aus demselben Beitrag (#72).
+
+    Mit ID genannt werden die, die schon Karte sind. Die trägt der Agent in
+    `uebungen` ein, die Bibliothek kennt er sonst nicht. Ein Kandidat, der
+    noch wartet, hat keine ID. Er steht nur mit seiner Nummer da, damit der
+    Agent sie nicht für eine ID hält, und `uebernehmen` trägt ihn nach.
+    Dass sich `Übungen:` lesen lässt, hat `vorbereiten` vorher geprüft.
+    """
+    zeilen, _ = uebungen_aus_dem_beitrag(sammelimport, k)
+    ids = ids_der_uebungen(sammelimport, k)
+    if ids:
+        text = f"{', '.join(ids)}. Trag genau diese in `uebungen` ein."
+    elif _uebungen_angaben(k):
+        text = "noch keine ist Karte. `uebungen` bleibt `[]`."
+    else:
+        text = "keine. `uebungen` bleibt `[]`."
+    wartend = [z.nummer for z in zeilen if z.wartet]
+    if wartend:
+        text += (f" Noch ohne Karte und ohne ID: Kandidat {', '.join(wartend)}. Das trägt "
+                 f"`uebernehmen` nach.")
+    return f"- Übungen aus demselben Beitrag: {text}"
+
+
 def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[str],
                      pdftotext: str | None, quellgrafikzeilen: list[str]) -> Path:
     """Legt den Auftrag für einen Kandidaten an, alles, was der Agent braucht.
@@ -2089,11 +2245,13 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
     „Ablauf aus dem Bild“ (#70): Eine Wissenskarte hat keinen Ablauf, den die
     Regel „wenig Text“ zählen könnte. Die Kennungen kommen für beide Sorten
     samt den Steuerungsschwerpunkten. Die stehen auf keiner Übungskarte, auf
-    einer Wissenskarte schon.
+    einer Wissenskarte schon. Dafür nennt er die Übungen aus demselben
+    Beitrag, die schon Karte sind (#72).
     """
-    relativ = [f"{sammelimport.ordner}/{d.name}" for d in k.dateien]
+    relativ =[f"{sammelimport.ordner}/{d.name}" for d in k.dateien]
     dateien, texte = dateien_im_auftrag(sammelimport, k, pdftotext)
     ablauf = [ablauf_aus_dem_bild(sammelimport, texte)] if k.sorte is UEBUNGSKARTE else []
+    uebungen = [uebungen_im_auftrag(sammelimport, k)] if k.sorte is WISSENSKARTE else []
     # Eine Wissenskarte bekommt bis #71 keine Bilder, auch keine Ausschnitte,
     # siehe `lege_quellgrafiken_an`.
     ausschnitte = (ausschnitte_im_auftrag(sammelimport, k)
@@ -2108,6 +2266,7 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
         f"- Typ laut Zerlegungsplan: `{k.ergebnis}`",
         f"- `quelldatei:` `{', '.join(relativ)}`",
         *ablauf,
+        *uebungen,
         *quellgrafikzeilen,
         f"- Zielpfad des Entwurfs: `{sammelimport.entwurf(k).as_posix()}`",
         "",
@@ -2198,6 +2357,23 @@ def pruefe_seitenbereiche(sammelimport: Sammelimport, dran: list[Kandidat],
                                         f"Es ist noch kein Auftrag geschrieben.")
 
 
+def pruefe_uebungen_aus_dem_beitrag(sammelimport: Sammelimport, dran: list[Kandidat]) -> None:
+    """Bricht ab, wenn eine Wissenskarte des Durchgangs unter `Übungen:` keine Übung nennt (#72).
+
+    Vor dem ersten Auftrag, wie beim Seitenbereich, und die Meldung nennt
+    die Zeile. Still übergangen, fehlte die Übung später auf der Karte, und
+    eine ID, die es nicht gibt, schriebe der Agent laut Auftrag in den
+    Entwurf, den `pruefen` dann abweist, Durchgang für Durchgang.
+    """
+    for k in dran:
+        try:
+            uebungen_aus_dem_beitrag(sammelimport, k)
+        except ValueError as fehler:
+            raise sammelimport._abbruch(
+                f"Bei Kandidat {k.nummer} steht hinter {UEBUNGEN_MARKE} {fehler}.\n"
+                f"Es ist noch kein Auftrag geschrieben.") from None
+
+
 def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     """Legt die Aufträge für den nächsten Durchgang an.
 
@@ -2231,6 +2407,7 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
         if not pdftotext:
             melde_ohne_pdftotext("die Aufträge", "den Kartenentwurf")
     pruefe_seitenbereiche(sammelimport, dran, pdftotext)
+    pruefe_uebungen_aus_dem_beitrag(sammelimport, dran)
     eintrag = sammelimport.in_arbeit
     if eintrag is None or not eintrag.ist_von(trainer):
         sammelimport.setze_in_arbeit(trainer)
@@ -2463,6 +2640,13 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
         raise NichtUebernommen(f"schaubilder/{', schaubilder/'.join(belegt)} gibt es schon")
     text = als_karte(entwurf.read_text(encoding="utf-8"), uid, date.today().isoformat(),
                      [bild.name for bild in verschoben.values()])
+    if sorte is WISSENSKARTE:
+        # Zu den Übungen aus dem Entwurf die aus demselben Beitrag, die schon
+        # Karte sind (#72). Die übrigen bringen ihre ID mit, wenn sie Karte
+        # werden. Dass sich `Übungen:` lesen lässt, hat
+        # `pruefe_fuer_uebernahme` vorher festgestellt.
+        text = mit_uebungen(text, sorted({*map(str, als_liste(felder.get("uebungen"))),
+                                          *ids_der_uebungen(sammelimport, k)}))
     # "x" legt nur neu an. Eine Datei unter dieser ID gibt es laut
     # naechste_id() nicht, und falls doch, wird sie nicht überschrieben.
     ziel.parent.mkdir(exist_ok=True)
@@ -2526,11 +2710,21 @@ def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> st
     if grund or k is None:
         return grund
     try:
-        return pruefe_entwurf(sammelimport, k).fehler
+        grund = pruefe_entwurf(sammelimport, k).fehler
     except BibliothekFehlt as fehler:
         # Für den Ausschnitt fehlt eine Bibliothek. Die übrigen Kandidaten
         # gehen trotzdem durch, die Meldung steht in einer Zeile.
         return " ".join(str(fehler).split())
+    if grund:
+        return grund
+    # Die Übungen aus demselben Beitrag kommen beim Übernehmen auf die
+    # Wissenskarte (#72). `vorbereiten` hat sie vor dem Auftrag geprüft,
+    # aber die Zeile kann seitdem von Hand geändert sein.
+    try:
+        uebungen_aus_dem_beitrag(sammelimport, k)
+    except ValueError as fehler:
+        return f"hinter {UEBUNGEN_MARKE} steht {fehler}"
+    return None
 
 
 def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
@@ -2580,10 +2774,14 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
         grund = pruefe_fuer_uebernahme(sammelimport, k)
         if not grund and k is not None:
             try:
-                print(f"  {nummer}  importiert als {uebernimm(sammelimport, k, notiz)}")
-                continue
+                uid = uebernimm(sammelimport, k, notiz)
             except NichtUebernommen as fehler:
                 grund = str(fehler)
+            else:
+                print(f"  {nummer}  importiert als {uid}")
+                for meldung in trage_bei_wissenskarten_ein(sammelimport, k, uid):
+                    print(f"      {meldung}")
+                continue
         print(f"  {nummer}  nicht übernommen: {grund}")
         abgewiesen += 1
 
@@ -2609,6 +2807,10 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
             continue
         schliesse_ab(sammelimport, k, status, notiz, karte=karte)
         print(f"  {nummer}  {status}: {notiz or karte}")
+        # Auch eine Übung, die eine Karte ergänzt, gehört auf die
+        # Wissenskarte ihres Beitrags, mit der ID der ergänzten (#72).
+        for meldung in trage_bei_wissenskarten_ein(sammelimport, k, karte) if karte else []:
+            print(f"      {meldung}")
 
     # Der Linter prüft die ganze Bibliothek, nicht nur die neuen Karten. Was
     # er meldet, steht damit vor dem Trainer, solange der Durchgang frisch ist.
