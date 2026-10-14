@@ -292,8 +292,10 @@ Für jeden Ausschnitt der freigegebenen Kandidaten eine Runde:
    kommt.
 3. **Korrigieren.** Der Nutzer behält den Ausschnitt, korrigiert ihn mit einem
    Satz, etwa „etwas weiter nach unten“ oder „rechts fehlt die Beschriftung“,
-   oder streicht ihn. Aus dem Satz werden neue Zahlen, dann zurück zum
-   Schneiden.
+   oder streicht ihn. Aus dem Satz werden neue Zahlen, wie im Sammelimport:
+   „Etwas“ sind etwa fünf Prozentpunkte, „weiter nach unten“ verschiebt oben
+   und unten zugleich, „unten mehr“ nur unten. Liegt das Bild auf einer
+   anderen Seite, ändert sich auch die Seite. Dann zurück zum Schneiden.
 
 Fertig ist ein Ausschnitt, wenn der Nutzer ihn behält oder streicht. Ein
 gestrichener kommt nicht auf die Karte.
