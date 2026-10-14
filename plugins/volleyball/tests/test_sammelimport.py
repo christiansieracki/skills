@@ -1489,6 +1489,57 @@ class AusschnittTest(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in self.entwuerfe.iterdir()), ["3.auftrag.md"])
 
 
+class BilderDerWissenskarteTest(unittest.TestCase):
+    """Eine Wissenskarte bekommt ihre Bilder als Ausschnitt und Bildverweis (#71).
+
+    Der Mechanismus ist der aus AusschnittTest, nur steht das Bild nicht in
+    `schaubild:`, sondern als Bildverweis im Text, an der Kernaussage, die es
+    zeigt. Nach dem Uebernehmen zeigt der Verweis nach schaubilder/.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+        self.entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_der_auftrag_nennt_form_und_namen_der_ausschnitte_nur_bei_ausschnitt(self) -> None:
+        # Bei `ausschnitt` sagt der Auftrag einer Wissenskarte wie der einer
+        # Uebung, wie der Entwurf seine Ausschnitte nennt, nur kommt jeder als
+        # Bildverweis in den Text statt in `schaubild:`. Bei `eingebettet` und
+        # `keine` bekommt eine Wissenskarte keine Bilder: Das groesste
+        # eingebettete Bild zeigt bei Theorie selten, was eine Kernaussage
+        # erklaert.
+        for art in ("ausschnitt", "eingebettet", "keine"):
+            self.ordner.lege_quellenordner_an(art, [
+                {"kandidat": 1, "dateien": ["merkmale.pdf", "seite-26.jpg"],
+                 "ergebnis": "wissen"}], quellgrafik=art)
+            self.ordner.lege_quell_pdf_an(f"{art}/merkmale.pdf", ["Oberes Zuspiel"],
+                                          bilder=[PdfBild(90, 60, deckend=(12, 5, 80, 51))])
+
+        auftraege = {}
+        for art in ("ausschnitt", "eingebettet", "keine"):
+            fertig = self.ordner.starte("sammelimport.py", "vorbereiten", art)
+            self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+            entwuerfe = self.ordner.pfad / "kartenentwuerfe" / art
+            self.assertEqual(sorted(p.name for p in entwuerfe.iterdir()), ["1.auftrag.md"], art)
+            auftraege[art] = (entwuerfe / "1.auftrag.md").read_text(encoding="utf-8")
+
+        mit = auftraege["ausschnitt"]
+        self.assertIn("Ausschnitt", zeile_mit(mit, "Bilder"))
+        self.assertIn("Ausschnitte:\n- `1.quellgrafik.png`: `merkmale.pdf` S. 1, links ", mit)
+        self.assertIn("`1.quellgrafik-1.png`, `1.quellgrafik-2.png`", mit)
+        self.assertIn("](1.quellgrafik.png)`", mit)
+        self.assertIn(".jpg", mit)
+        self.assertNotIn("schaubild:", mit)
+        for art in ("eingebettet", "keine"):
+            with self.subTest(art):
+                self.assertIn("keine", zeile_mit(auftraege[art], "Bilder"))
+                self.assertNotIn("## Ausschnitte", auftraege[art])
+                self.assertNotIn("quellgrafik.png", auftraege[art])
+
+
 class PlaneingabeTest(unittest.TestCase):
     """`vorbereiten --plan` legt an, woraus der Agent den Zerlegungsplan macht.
 

@@ -1851,9 +1851,13 @@ def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list
     for altes in sammelimport.quellgrafiken(k):
         altes.unlink()
     # Eine Wissenskarte hat kein `schaubild:`. Ihre Bilder stehen als Verweis
-    # im Text, und das größte eingebettete Bild eines PDF zeigt bei Theorie
-    # selten, was eine Kernaussage erklärt (#61).
+    # im Text, an der Kernaussage, die sie zeigen, und kommen nur als
+    # Ausschnitt (#71). Das größte eingebettete Bild eines PDF zeigt bei
+    # Theorie selten, was eine Kernaussage erklärt (#61).
     if k.sorte is WISSENSKARTE:
+        if sammelimport.art_der_quellgrafik == "ausschnitt":
+            return ["- Bilder: als Ausschnitt mit Bildverweis, wenn die Quelle ein Bild zeigt, "
+                    "das eine Kernaussage erklärt, siehe `## Ausschnitte`."], []
         return ["- Bilder: keine. Setz keinen Bildverweis in den Entwurf."], []
     if sammelimport.art_der_quellgrafik == "ausschnitt":
         # Vorab geschnitten wird nichts, der Entwurf nennt seine Ausschnitte,
@@ -2037,13 +2041,18 @@ def ausschnitte_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> list[str]
     PNG, aus einem Foto ein JPEG. Genannt werden nur die Endungen, die bei
     diesem Kandidaten vorkommen. Die Seite eines PDF zählt wie die Marken im
     Text, bei einem Seitenbereich ist das Beispiel seine erste Seite.
+
+    Eine Übung trägt ihre Ausschnitte in `schaubild:`, eine Wissenskarte
+    setzt jeden als Bildverweis an die Kernaussage, die er zeigt (#71). Nur
+    darin unterscheidet sich der Abschnitt für die beiden Sorten.
     """
+    wissen = k.sorte is WISSENSKARTE
     moeglich = [(d, endung) for d in k.dateien if (endung := endung_des_ausschnitts(d.name))]
     if not moeglich:
+        ohne = ("der Entwurf hat keinen Bildverweis" if wissen else "`schaubild:` ist `null`")
         return ["## Ausschnitte", "",
-                "Aus keiner Datei dieses Kandidaten lässt sich ein Ausschnitt schneiden, nur aus "
-                "einem Foto (JPEG, PNG) oder einem PDF. Es gibt keinen, und `schaubild:` ist "
-                "`null`.", ""]
+                f"Aus keiner Datei dieses Kandidaten lässt sich ein Ausschnitt schneiden, nur aus "
+                f"einem Foto (JPEG, PNG) oder einem PDF. Es gibt keinen, und {ohne}.", ""]
     datei, endung = moeglich[0]
     pdf, foto = AUS_DEM_PDF[0], AUS_DEM_FOTO[0]
     seite = f" S. {datei.seiten.erste if datei.seiten else 1}" if endung == pdf else ""
@@ -2056,18 +2065,40 @@ def ausschnitte_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> list[str]
                     "gedruckt ist."),
               foto: (f"`{foto}` aus einem Foto", "Bei einem Foto steht keine Seite.")}
     gilt = [regeln[e] for e in (pdf, foto) if e in endungen]
+    if wissen:
+        wozu = [
+            "Zeigt die Quelle ein Bild, das eine Kernaussage erklärt, etwa eine Bildreihe oder "
+            "eine Kurve, nennst du es als Ausschnitt: unter `## Freigabe` in einer eigenen Liste "
+            "vor den Vorschlägen, ein Punkt je Ausschnitt. Dazu setzt du jeden Ausschnitt als "
+            "Bildverweis an die Kernaussage, die er zeigt, mit seinem Namen als Pfad. Hat die "
+            "Quelle kein Bild, das etwas erklärt, gibt es keinen Ausschnitt, keine Liste und "
+            "keinen Bildverweis.", "",
+            "```markdown",
+            "Ausschnitte:",
+            f"- `{einzeln}`: `{datei.name}`{seite}, links 8, oben 42, rechts 94, unten 88",
+            "```", "",
+            f"- Bildverweis: `![Bildreihe oberes Zuspiel]({einzeln})`, in einer eigenen Zeile "
+            f"unter der Kernaussage. Jeder Ausschnitt steht in einem Bildverweis, und jeder "
+            f"Bildverweis nennt einen Ausschnitt aus der Liste.",
+        ]
+        reihenfolge = "im Bildverweis genau mit diesem Namen"
+    else:
+        wozu = [
+            "Zeigt die Quelle ein Bild der Übung, nennst du es als Ausschnitt: unter "
+            "`## Freigabe` in einer eigenen Liste vor den Vorschlägen, ein Punkt je Ausschnitt, "
+            "und `schaubild:` trägt seinen Namen. Hat die Quelle kein Bild der Übung, gibt es "
+            "keinen Ausschnitt und keine Liste, und `schaubild:` ist `null`.", "",
+            "```markdown",
+            "Ausschnitte:",
+            f"- `{einzeln}`: `{datei.name}`{seite}, links 8, oben 42, rechts 94, unten 88",
+            "```", "",
+        ]
+        reihenfolge = "in `schaubild:` als Liste in derselben Reihenfolge"
     return [
         "## Ausschnitte", "",
-        "Zeigt die Quelle ein Bild der Übung, nennst du es als Ausschnitt: unter `## Freigabe` "
-        "in einer eigenen Liste vor den Vorschlägen, ein Punkt je Ausschnitt, und `schaubild:` "
-        "trägt seinen Namen. Hat die Quelle kein Bild der Übung, gibt es keinen Ausschnitt und "
-        "keine Liste, und `schaubild:` ist `null`.", "",
-        "```markdown",
-        "Ausschnitte:",
-        f"- `{einzeln}`: `{datei.name}`{seite}, links 8, oben 42, rechts 94, unten 88",
-        "```", "",
+        *wozu,
         f"- Name: ein einzelner Ausschnitt heißt `{einzeln}`, mehrere `{mehrere[0]}`, "
-        f"`{mehrere[1]}` und weiter, in `schaubild:` als Liste in derselben Reihenfolge. "
+        f"`{mehrere[1]}` und weiter, {reihenfolge}. "
         f"Die Endung ist {', '.join(e for e, _ in gilt)}.",
         f"- Datei: wie unter `## Dateien`, relativ zum Quellenordner. "
         f"{' '.join(regel for _, regel in gilt)}",
@@ -2094,11 +2125,9 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
     relativ = [f"{sammelimport.ordner}/{d.name}" for d in k.dateien]
     dateien, texte = dateien_im_auftrag(sammelimport, k, pdftotext)
     ablauf = [ablauf_aus_dem_bild(sammelimport, texte)] if k.sorte is UEBUNGSKARTE else []
-    # Eine Wissenskarte bekommt bis #71 keine Bilder, auch keine Ausschnitte,
-    # siehe `lege_quellgrafiken_an`.
+    # Bei `ausschnitt` nennt der Entwurf beider Sorten seine Ausschnitte (#71).
     ausschnitte = (ausschnitte_im_auftrag(sammelimport, k)
-                   if sammelimport.art_der_quellgrafik == "ausschnitt"
-                   and k.sorte is UEBUNGSKARTE else [])
+                   if sammelimport.art_der_quellgrafik == "ausschnitt" else [])
     teile = [
         f"# Auftrag für Kandidat {k.nummer}",
         "",
