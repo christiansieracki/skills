@@ -478,12 +478,50 @@ class PdfBild:
         ]
 
 
-def _pdf_mit_text(seiten: list[list[str]], bilder: list[PdfBild]) -> bytes:
+# Breite und Hoehe einer Seite in Punkten. A4 hochkant ist das Mass, wenn
+# ein Test keins nennt. Eine Folie im Format 16:9, wie PowerPoint sie als PDF
+# ausgibt, ist eine Seite, deren Zeichnen auf 2000 Pixel knapp danebenliegt.
+A4 = (595, 842)
+FOLIE = (960, 540)
+
+
+@dataclass
+class PdfFlaeche:
+    """Eine gezeichnete, gefuellte Flaeche fuer ein Test-PDF.
+
+    `seite` zaehlt ab 1, `farbe` ist RGB von 0 bis 255. `rechteck` ist links,
+    oben, rechts, unten in Prozent der Seite, von oben gemessen wie ein
+    Ausschnitt. Das PDF selbst misst von unten, die Umrechnung steht in
+    `zeichnen()`. Eine Grafik, die im PDF gezeichnet ist, ist kein
+    eingebettetes Bild (ADR-0013). Diese Flaeche ist so eine.
+    """
+
+    seite: int
+    farbe: tuple[int, int, int]
+    rechteck: tuple[int, int, int, int]
+
+    def zeichnen(self, seitenmass: tuple[int, int]) -> bytes:
+        """Der Inhalt, der die Flaeche zeichnet: Farbe setzen, Rechteck, fuellen."""
+        breite, hoehe = seitenmass
+        links, oben, rechts, unten = self.rechteck
+        r, g, b = (f"{kanal / 255:.4f}" for kanal in self.farbe)
+        return (f"q {r} {g} {b} rg {links * breite / 100:.2f} "
+                f"{(100 - unten) * hoehe / 100:.2f} {(rechts - links) * breite / 100:.2f} "
+                f"{(unten - oben) * hoehe / 100:.2f} re f Q\n").encode()
+
+
+def _pdf_mit_text(seiten: list[list[str]], bilder: list[PdfBild],
+                  flaechen: list[PdfFlaeche] = (),
+                  seitenmass: tuple[int, int] = A4) -> bytes:
     """Ein PDF mit Textebene, je Seite eine Liste von Zeilen, die Bilder auf der ersten.
 
     Die Schrift ist Helvetica, eine der vierzehn, die jeder PDF-Leser ohne
     Einbettung kennt. Mit WinAnsiEncoding kommen Umlaute durch, und nur dann
     zeigt der Test, dass pdftotext sie als UTF-8 herausgibt.
+
+    `flaechen` kommen auf die Seite, die sie nennen, unter den Text. Alle
+    Seiten haben dasselbe `seitenmass`. Der Text beginnt 800 Punkte ueber dem
+    unteren Rand, auf einer Seite, die niedriger ist, fehlt er.
 
     Die Objekte stehen in fester Folge: 1 Katalog, 2 Seitenbaum, 3 Schrift.
     Mit Bildern folgt das Farbprofil, das sie sich teilen, dann je Bild das
@@ -510,13 +548,14 @@ def _pdf_mit_text(seiten: list[list[str]], bilder: list[PdfBild]) -> bytes:
         if seite == 0 and xobjekte:
             inhalt = zeichnen + inhalt
             ressourcen += f" /XObject << {' '.join(xobjekte)} >>"
+        inhalt = b"".join(f.zeichnen(seitenmass) for f in flaechen if f.seite == seite + 1) + inhalt
         objekte.append(_pdf_strom(inhalt))
         objekte.append(f"<< /Type /Page /Parent 2 0 R /Resources << {ressourcen} >> "
                        f"/Contents {len(objekte)} 0 R >>".encode())
         kinder.append(f"{len(objekte)} 0 R")
     objekte[0] = b"<< /Type /Catalog /Pages 2 0 R >>"
     objekte[1] = (f"<< /Type /Pages /Kids [{' '.join(kinder)}] /Count {len(kinder)} "
-                  f"/MediaBox [0 0 595 842] >>").encode()
+                  f"/MediaBox [0 0 {seitenmass[0]} {seitenmass[1]}] >>").encode()
     return _pdf_datei(objekte)
 
 
@@ -732,15 +771,19 @@ class Arbeitsordner:
         return datei
 
     def lege_quell_pdf_an(self, name: str, *seiten: list[str],
-                          bilder: list[PdfBild] | None = None) -> Path:
+                          bilder: list[PdfBild] | None = None,
+                          flaechen: list[PdfFlaeche] | None = None,
+                          seitenmass: tuple[int, int] = A4) -> Path:
         """Legt ein PDF mit Textebene in `quellen/` ab, je Seite eine Liste von Zeilen.
 
         Gebaut wird es zur Laufzeit mit der Standardbibliothek, so wie
         `lege_quellbild_an` sein Foto baut. Kein Binaermaterial im Repo, und
         was im PDF steht, steht hier im Test. `bilder` kommen auf die erste
-        Seite, in der genannten Reihenfolge.
+        Seite, in der genannten Reihenfolge, `flaechen` auf die Seite, die
+        sie nennen. `seitenmass` ist Breite und Hoehe jeder Seite in Punkten.
         """
-        return self.lege_quelldatei_an(name, _pdf_mit_text(list(seiten), bilder or []))
+        return self.lege_quelldatei_an(
+            name, _pdf_mit_text(list(seiten), bilder or [], flaechen or [], seitenmass))
 
     def lege_quellenordner_an(self, ordner: str, kandidaten: list[dict],
                               freigegeben: str | None = "2026-09-30",
@@ -833,7 +876,9 @@ class Arbeitsordner:
         return zeilen
 
     def lege_quellbild_an(self, name: str, groesse: tuple[int, int],
-                          orientierung: int | None = None) -> Path:
+                          orientierung: int | None = None,
+                          flaeche: tuple[tuple[int, int, int],
+                                         tuple[int, int, int, int]] | None = None) -> Path:
         """Erzeugt ein Bild in `quellen/` zur Laufzeit. Braucht Pillow.
 
         Das Bild ist Rauschen, und das mit Absicht: nur unkomprimierbarer
@@ -842,8 +887,14 @@ class Arbeitsordner:
         waere ein eingechecktes Foto. Das hiesse Binaermaterial im Repo,
         dessen Bedingung niemand mehr ansieht.
 
-        `orientierung` schreibt den EXIF-Eintrag 0x0112. 6 heisst "fuer die
-        Anzeige um 90 Grad drehen", der Wert, den die Magazinseiten tragen.
+        `groesse` ist das Mass der gespeicherten Pixel. `orientierung`
+        schreibt den EXIF-Eintrag 0x0112. 6 heisst "fuer die Anzeige um 90
+        Grad im Uhrzeigersinn drehen", der Wert, den die Magazinseiten tragen.
+
+        `flaeche` ist eine Farbe und ein Rechteck darin, links, oben, rechts,
+        unten in Prozent des Bildes, wie es aufrecht steht, also nach der
+        Drehung, die `orientierung` verlangt. Dort ist das Bild einfarbig. So
+        laesst sich pruefen, ob ein Ausschnitt die aufrechte Seite meint.
 
         Das Format folgt der Endung: PNG, TIFF, HEIC oder sonst JPEG. HEIC
         braucht dazu pillow-heif.
@@ -852,6 +903,23 @@ class Arbeitsordner:
 
         breite, hoehe = groesse
         bild = Image.frombytes("RGB", groesse, os.urandom(breite * hoehe * 3))
+        if flaeche is not None:
+            # Gezeichnet wird auf das aufrechte Bild, gespeichert wird es
+            # zurueckgedreht. Bei 6 steht es aufrecht, wenn es 90 Grad im
+            # Uhrzeigersinn gedreht wird, gespeichert ist es also 90 Grad
+            # gegen den Uhrzeigersinn gedreht. Pillow dreht gegen den
+            # Uhrzeigersinn.
+            hin, zurueck = {
+                3: (Image.Transpose.ROTATE_180, Image.Transpose.ROTATE_180),
+                6: (Image.Transpose.ROTATE_270, Image.Transpose.ROTATE_90),
+                8: (Image.Transpose.ROTATE_90, Image.Transpose.ROTATE_270),
+            }.get(orientierung, (None, None))
+            aufrecht = bild.transpose(hin) if hin else bild
+            farbe, (links, oben, rechts, unten) = flaeche
+            w, h = aufrecht.size
+            aufrecht.paste(farbe, (links * w // 100, oben * h // 100,
+                                   rechts * w // 100, unten * h // 100))
+            bild = aufrecht.transpose(zurueck) if zurueck else aufrecht
         datei = self.pfad / "quellen" / name
         datei.parent.mkdir(parents=True, exist_ok=True)
         endung = datei.suffix.lower()
