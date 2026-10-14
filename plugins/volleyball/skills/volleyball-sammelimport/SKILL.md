@@ -1,6 +1,6 @@
 ---
 name: volleyball-sammelimport
-description: Führt den Sammelimport über einen ganzen Quellenordner im Gespräch, von den Absprachen über den Zerlegungsplan und die Kartenentwürfe der Plugin-Agenten bis zur Freigabe und Übernahme in die Übungsbibliothek. Use when the user asks for a Sammelimport über quellen/<ordner>, wants a whole folder of drill sources (PlayDrill PDFs, photographed magazine pages) imported at once, or says „weiter mit dem Sammelimport <ordner>“ or „hol die zurückgestellten aus <ordner>“. Companion zu volleyball-uebungsimport, der einzelne Quellen importiert.
+description: Führt den Sammelimport über einen ganzen Quellenordner im Gespräch, von den Absprachen über den Zerlegungsplan und die Kartenentwürfe der Plugin-Agenten bis zur Freigabe und Übernahme in die Bibliothek, als Übungs- und Wissenskarten. Use when the user asks for a Sammelimport über quellen/<ordner>, wants a whole folder of drill sources (PlayDrill PDFs, photographed magazine pages) imported at once, or says „weiter mit dem Sammelimport <ordner>“ or „hol die zurückgestellten aus <ordner>“. Companion zu volleyball-uebungsimport, der einzelne Quellen importiert.
 ---
 
 # Sammelimport
@@ -250,10 +250,12 @@ angenommener Vorschlag oder als Ausnahme.
 ## Ein Durchgang
 
 1. `sammelimport.py vorbereiten <ordner>`. Es legt die Aufträge für die
-   nächsten offenen Kandidaten an und nennt je Kandidat den Pfad.
-   - **„Aufträge für 0 von 0“:** Kein Kandidat wartet auf einen Entwurf.
-     Ohne Agenten weiter mit Schritt 3. Gibt `pruefen` dann auch keinen
-     Kandidaten aus, ist nichts mehr offen.
+   nächsten offenen Kandidaten an, für Übungen, Folgen und Wissenskarten,
+   und nennt je Kandidat die Sorte, `uebungskarte` oder `wissenskarte`, und
+   den Pfad des Auftrags.
+   - **„Aufträge für 0 von 0“:** Kein Kandidat wartet auf einen Entwurf,
+     gleich welcher Sorte. Ohne Agenten weiter mit Schritt 3. Gibt `pruefen`
+     dann auch keinen Kandidaten aus, ist nichts mehr offen.
    - **Ein anderer Trainer arbeitet daran:** Die Meldung nennt ihn und seit
      wann, laut `in_arbeit`. Beides dem Trainer sagen und fragen, ob er
      trotzdem weitermachen will, etwa weil der Eintrag von einem abgebrochenen
@@ -264,10 +266,12 @@ angenommener Vorschlag oder als Ausnahme.
      Pillow da ist. Geschrieben ist noch nichts.
    - **pdftotext fehlt:** Den Installationshinweis einmal weitergeben. Die
      Aufträge sind geschrieben, die Agenten lesen die PDFs selbst.
-2. Je Auftrag den Agenten `volleyball:volleyball-kartenentwurf` starten. Der
-   Aufruf ist der absolute Pfad des Auftrags. Vier zugleich, die nächsten
-   vier, wenn alle vier zurück sind. Nach jeder Runde eine Zeile an den
-   Trainer, wie weit der Durchgang ist.
+2. Je Auftrag den Agenten seiner Sorte starten: bei `wissenskarte`
+   `volleyball:volleyball-wissenskarte`, sonst
+   `volleyball:volleyball-kartenentwurf`. Der Aufruf ist der absolute Pfad
+   des Auftrags. Vier zugleich, gleich welcher Sorte, die nächsten vier, wenn
+   alle vier zurück sind. Nach jeder Runde eine Zeile an den Trainer, wie
+   weit der Durchgang ist.
 
    Von jeder Antwort zählt nur die erste Zeile, und nur als Fortschritt. Ob
    ein Entwurf taugt, sagt erst `pruefen`. Lautet sie
@@ -279,8 +283,8 @@ angenommener Vorschlag oder als Ausnahme.
    Bildaufbereitung.
 3. `sammelimport.py pruefen <ordner> --json`. Es setzt den Status aus den
    Entwürfen auf der Platte und gibt je Kandidat mit Entwurf aus, was die
-   Freigabe braucht. Ein abgewiesener Entwurf steht mit `offen` und dem Grund
-   in `notiz` da und kommt in den nächsten Durchgang.
+   Freigabe braucht, mit seiner `sorte`. Ein abgewiesener Entwurf steht mit
+   `offen` und dem Grund in `notiz` da und kommt in den nächsten Durchgang.
 4. Die Freigabe, siehe unten.
 5. Die Antworten in die Entwürfe einarbeiten, siehe unten.
 6. `sammelimport.py pruefen <ordner> --json` gleich danach. Ist ein
@@ -295,10 +299,13 @@ angenommener Vorschlag oder als Ausnahme.
    sammelimport.py uebernehmen <ordner> --kandidat 12 "spieler_min auf 6" --kandidat 13 "unverändert" --uebersprungen 14 "Vorlage, keine Übung" --zurueckgestellt 16 "Spielzüge, später holen" --ergaenzt 15 ue-000027
    ```
 
-   `--kandidat` mit dem, was der Trainer geändert hat, in wenigen Wörtern.
-   `--uebersprungen` und `--zurueckgestellt` mit dem Grund. `--ergaenzt` mit
-   der ID der ergänzten Karte. Was der Trainer offengelassen hat, fehlt im
-   Aufruf und kommt bei der nächsten Freigabe wieder.
+   `--kandidat` mit dem, was der Trainer geändert hat, in wenigen Wörtern,
+   für Übungen wie Wissenskarten. Eine Übung kommt nach `uebungen/` mit einer
+   `ue-`-ID, eine Wissenskarte nach `wissen/` mit einer `wi-`-ID, jede Sorte
+   aus ihrem eigenen Zähler. `--uebersprungen` und `--zurueckgestellt` mit
+   dem Grund. `--ergaenzt` mit der ID der ergänzten Karte. Was der Trainer
+   offengelassen hat, fehlt im Aufruf und kommt bei der nächsten Freigabe
+   wieder.
 
    Was nicht geklappt hat, nennt die Ausgabe je Kandidat, und der Exitcode ist
    ungleich 0. Entwurf und Status bleiben dann stehen, wie sie sind.
@@ -320,7 +327,8 @@ angenommener Vorschlag oder als Ausnahme.
 
 Über alle Kandidaten mit `bereit` oder `rückfrage` aus der letzten Ausgabe von
 `pruefen --json`. Erst die Rückfragen, gebündelt und einzeln, dann die
-Tabelle.
+Tabellen: eine für die Übungen, eine für die Wissenskarten. Welche Sorte ein
+Kandidat ist, steht unter `sorte`.
 
 **Gebündelt** kommt jede Rückfrage aus `rueckfragen.ohne_vermutung`, die sich
 ohne Bild beantworten lässt, wie unter „Gebündelt fragen“. Gruppen sind etwa
@@ -357,7 +365,8 @@ Die Einzelfragen kommen eine nach der anderen. Fertig sind die Rückfragen,
 wenn jede eine Antwort hat und jedes Angebot für die Absprachen ein Ja oder
 Nein.
 
-**Die Tabelle** hat eine Zeile je Kandidat:
+**Die Tabelle der Übungen** hat eine Zeile je Kandidat mit `sorte`
+`uebungskarte`:
 
 | Kandidat | Titel | Disziplin | Element | Form | Level | Spieler | Dauer | Schwerpunkt | Weitere Vorschläge | Vermutungen | aus dem Bild |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -375,7 +384,24 @@ Nein.
 - Steht in „Was es ist“ „ergänzt ue-######“ oder „Variante von ue-######“,
   steht das in der Zeile. Mit der Zeile bestätigt der Trainer es.
 
-Unter der Tabelle steht:
+**Die Tabelle der Wissenskarten** hat eine Zeile je Kandidat mit `sorte`
+`wissenskarte`:
+
+| Kandidat | Frage | Thema | Schwerpunkt | Disziplin | Vorschläge | Vermutungen |
+|---|---|---|---|---|---|---|
+| 16 | Wann lohnt sich einarmige Abwehr? | *technik, taktik* | abwehr | *halle, beach* | Training, Punkt 2: aus der zweiten Kernaussage abgeleitet | Gilt das auch für Jugendliche? → ja |
+
+- Die Frage ist `titel` aus `felder`, Thema, Schwerpunkt und Disziplin die
+  Felder dazu. Ein Wert, der ein Vorschlag ist, steht kursiv wie bei den
+  Übungen.
+- **Vorschläge:** die Vorschläge aus `vorschlaege.textstellen`, je Punkt aus
+  „Was das fürs Training heißt“ die Stelle und die Begründung. Das sind die
+  Ableitungen, und keine kommt ohne das Ja des Trainers auf die Karte.
+  Vorschläge zu Feldern ohne eigene Spalte, etwa `autor`, als `feld: wert`.
+- **Vermutungen:** wie bei den Übungen.
+- Wer den Text sehen will, bekommt die beiden Abschnitte aus dem Entwurf.
+
+Unter den Tabellen steht:
 
 - jeder Kandidat mit einem Eintrag in `quellgrafik_fehlt`, der keine
   Einzelfrage hatte, mit diesen PDFs: Aus ihnen ließ sich kein Bild
@@ -407,6 +433,10 @@ offengelassen ist.
   Ja schreiben. Beim Übernehmen wird der Kandidat `--ergaenzt` mit ihrer ID.
 - **Eine bestätigte Variante** wird eine eigene Karte. Der Entwurf bekommt
   `variante_von: ue-######`, der Agent kennt die Bibliothek nicht.
+- **Eine gekippte Ableitung** auf einer Wissenskarte: Der Punkt unter „Was
+  das fürs Training heißt“ verschwindet, die übrigen behalten ihre
+  Reihenfolge. Auf der Karte steht danach nur, was die Quelle sagt oder der
+  Trainer bestätigt hat.
 
 ## Am Ende eines Durchgangs
 
@@ -416,9 +446,10 @@ Was der Trainer hört:
   Auffälligkeiten jede Zeile;
 - das Angebot, `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py --md` laufen
   zu lassen, damit `index.md` die neuen Karten kennt;
-- die neuen Karten ohne Schaubild, mit ID und Titel, als Liste für
+- die neuen Übungen ohne Schaubild, mit ID und Titel, als Liste für
   `volleyball-schaubild`. Das sind die, bei denen `quellgrafiken` leer war.
-  Steht bei einer etwas in `quellgrafik_fehlt`, kommt das PDF dazu;
+  Steht bei einer etwas in `quellgrafik_fehlt`, kommt das PDF dazu.
+  Wissenskarten gehören nie dazu, sie haben kein Schaubild;
 - die neuen Karten, denen eine Quellgrafik fehlt, weil sie sich nicht
   ausschneiden ließ, mit dem PDF aus `quellgrafik_fehlt`. Sie haben andere
   Bilder und stehen deshalb nicht in der Liste davor. Für das fehlende lässt
