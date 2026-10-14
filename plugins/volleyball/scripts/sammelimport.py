@@ -26,17 +26,18 @@ jedes PDF, bei einem Seitenbereich nur dem dieser Seiten, bei einer Übung mit
 der Angabe, ob der Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein,
 welcher Trainer daran arbeitet. Arbeitet laut Eintrag ein anderer daran, geht
 es nur mit `--trotzdem` weiter. Bei `quellgrafik: eingebettet` schneidet es
-daneben aus jedem PDF mit Bild die Quellgrafik aus, dafür braucht es Pillow
-(ADR-0005). Bei `quellgrafik: ausschnitt` schneidet es nichts vorab, der
-Auftrag sagt, wie der Entwurf seine Ausschnitte nennt, und Pillow, bei einem
-PDF auch `pypdfium2`, muss da sein (ADR-0013). `pruefen` setzt den Status aus
+daneben für eine Übung aus jedem PDF mit Bild die Quellgrafik aus, dafür
+braucht es Pillow (ADR-0005). Bei `quellgrafik: ausschnitt` schneidet es
+nichts vorab, der Auftrag sagt, wie der Entwurf seine Ausschnitte nennt, eine
+Übung in `schaubild:`, eine Wissenskarte als Bildverweis, und Pillow, bei
+einem PDF auch `pypdfium2`, muss da sein (ADR-0013). `pruefen` setzt den Status aus
 den Kartenentwürfen, die dort auf der Platte liegen, schneidet ihre
 Ausschnitte neu aus und weist ab, was das Datenmodell bricht oder die Form der
 Freigabe nicht einhält. Welche Sorte Karte ein Entwurf werden soll, sagt das
 Ergebnis seiner Zeile. Mit `--json` gibt es aus, was die Freigabe im Chat
 braucht. `uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`
 oder `wissen/`, erst jetzt mit ID (ADR-0010), je Sorte aus dem eigenen Zähler,
-und legt die Quellgrafiken als ihre Schaubilder ab.
+und legt die Quellgrafiken unter dem Namen der Karte in `schaubilder/` ab.
 Ein freigegebener Entwurf, der die Prüfung nicht besteht, bleibt mit seinem
 Status stehen. Gestrichene, zurückgestellte und ergänzende Kandidaten
 bekommen nur ihren Status.

@@ -36,7 +36,9 @@ Rückfrage. Dein Volleyballwissen steht nie als Tatsache da.
 2. Lies die Quelle: unter jeder Datei im Auftrag ihren Text, dazu jedes Foto
    als Bild. Steht unter einer Datei, dass du das PDF selbst lesen musst,
    öffne es. Nennt der Auftrag unter einem PDF Seiten, gehören nur sie zum
-   Kandidaten. Dann liest du im PDF nur diese Seiten.
+   Kandidaten. Dann liest du im PDF nur diese Seiten. Kommen die Bilder als
+   Ausschnitt, öffnest du jedes PDF und siehst dir seine Seiten als Bild an,
+   denn dort suchst du die Bilder, die eine Kernaussage erklären.
 3. Schreib den Entwurf an den Zielpfad aus dem Auftrag.
 4. Antworte mit genau einer Zeile, ohne Pfad und ohne Zusatz:
    `<kandidat> | bereit | <n> Vorschläge` oder
@@ -62,15 +64,19 @@ Den Auftrag schreibt `sammelimport.py vorbereiten`. Oben steht eine Liste:
 - **Typ laut Zerlegungsplan:** `wissen`.
 - **`quelldatei:`** der Wert für das Feld. Übernimm ihn genau so.
 - **Bilder:** ob die Karte Bilder bekommt. Steht dort `keine`, setzt du
-  keinen Bildverweis in den Entwurf.
+  keinen Bildverweis in den Entwurf. Steht dort `als Ausschnitt`, nennst du
+  deine Ausschnitte, siehe „Die Bilder“.
 - **Zielpfad des Entwurfs:** wohin du schreibst.
 
-Darunter drei Abschnitte:
+Darunter diese Abschnitte:
 
 - `## Dateien`: je Datei der Quelle ihr Pfad, bei einem PDF sein Text oder
   der Hinweis, dass du das PDF selbst lesen musst. Gehört nur ein Teil eines
   PDF zum Kandidaten, steht unter dem Pfad, welche Seiten, etwa `S. 12–15`,
   und der Text ist nur der dieser Seiten.
+- `## Ausschnitte`, nur wenn die Bilder als Ausschnitt kommen: Form, Namen
+  und Endung deiner Ausschnitte, siehe unten. Dann beginnt im Text jede
+  Seite eines PDF mit ihrer Marke, etwa `=== Seite 12 ===`.
 - `## Absprachen`: wie sich die Quelle liest und welche Feldregeln für jede
   Karte aus diesem Quellenordner gelten. Was dort steht, gilt als belegt.
 - `## Schwerpunkt-Kennungen`: die Kennungen dieses Arbeitsordners mit
@@ -107,6 +113,46 @@ der das sagt.
   Karte kommt nur, was zur Frage gehört.
 - Du hältst den Kandidaten für eine Übung statt einer Wissenskarte.
 - Eine neue Schwerpunkt-Kennung fehlt, siehe unten.
+
+## Die Bilder
+
+Sagt der Auftrag `Bilder: als Ausschnitt`, suchst du in der Quelle die
+Bilder, die eine Kernaussage erklären: eine Bildreihe zu einer Technik, eine
+Kurve, eine Grafik, ein Foto, das zeigt, was der Text sagt. Sieh dir dafür
+jedes Foto des Kandidaten an, bei einem PDF jede Seite, die zu ihm gehört.
+Wo ein Bild liegt, nennst du als Ausschnitt, und `sammelimport.py` schneidet
+es aus. Sagt der Auftrag `Bilder: keine`, gibt es keinen Ausschnitt und
+keinen Bildverweis.
+
+- Ein Bild, das etwas erklärt, ist ein Ausschnitt. Eine Bildreihe, etwa fünf
+  Bilder einer Bewegung nebeneinander, ist ein Ausschnitt, nicht fünf.
+- Kein solches Bild sind Kopfleiste, Logo, Werbung, ein Porträt oder ein
+  Foto, das nur schmückt. Hat die Seite kein Bild, das etwas erklärt, gibt es
+  keinen Ausschnitt, keine Liste `Ausschnitte:` und keinen Bildverweis.
+- Jeden Ausschnitt setzt du als Bildverweis an die Kernaussage, die er
+  zeigt: in einer eigenen Zeile unter ihrem Punkt, um zwei Leerzeichen
+  eingerückt, der Text in eckigen Klammern sagt knapp, was das Bild zeigt,
+  der Pfad ist der Name des Ausschnitts:
+  `![Bildreihe oberes Zuspiel](17.quellgrafik-1.png)`. Jeder Ausschnitt
+  steht in einem Bildverweis, und jeder Bildverweis nennt einen Ausschnitt
+  aus deiner Liste, sonst nichts.
+- Das Rechteck fasst das ganze Bild samt Beschriftung, mit etwas Rand, aber
+  nicht die halbe Seite. Lieber zwei Prozent zu viel als eine Ecke
+  abgeschnitten. Der Trainer sieht jeden Ausschnitt bei der Freigabe und
+  korrigiert ihn.
+- Die Zahlen sind ganze Prozent der Seite, wie sie aufrecht steht: links,
+  oben, rechts, unten, jede gemessen von der linken oder der oberen Kante.
+  Links ist kleiner als rechts, oben kleiner als unten.
+- Die Datei steht genau wie in ihrer Überschrift unter `## Dateien`. Bei
+  einem PDF folgt die Seite, `S. 3`, gezählt im PDF ab 1 wie die Marken
+  `=== Seite 3 ===` im Text, nicht die Seitenzahl, die auf der Seite gedruckt
+  ist. Bei einem Foto steht keine Seite.
+- Namen und Endung nennt der Auftrag unter `## Ausschnitte`: ein einzelner
+  heißt etwa `17.quellgrafik.jpg`, mehrere `17.quellgrafik-1.jpg`,
+  `17.quellgrafik-2.png` und weiter. `.jpg` aus einem Foto, `.png` aus einer
+  PDF-Seite.
+
+Die Liste steht unter `## Freigabe`, siehe „Die Freigabe“.
 
 ## Kontrollierte Werte
 
@@ -157,6 +203,9 @@ autor: …                       # laut Absprachen
 ## Kernaussagen
 
 - …
+- …
+
+  ![Bildreihe einarmige Abwehr](17.quellgrafik.jpg)
 
 ## Was das fürs Training heißt
 
@@ -164,6 +213,9 @@ autor: …                       # laut Absprachen
 2. …
 
 ## Freigabe
+
+Ausschnitte:
+- `17.quellgrafik.jpg`: `seite-24.jpg`, links 8, oben 42, rechts 94, unten 88
 
 Vorschläge:
 - `thema`: Die Quelle beschreibt vor allem, wann die Technik im Spiel hilft.
@@ -197,7 +249,8 @@ Rückfragen:
 - `# <titel>`, dann `## Kernaussagen` und `## Was das fürs Training heißt`.
   Beide hat jeder Entwurf, genau mit diesen Überschriften.
 - Kernaussagen als Punkte, knapp, so viele, wie die Quelle trägt, selten mehr
-  als fünf.
+  als fünf. Ein Bild steht als Bildverweis unter der Kernaussage, die es
+  zeigt, siehe „Die Bilder“.
 - „Was das fürs Training heißt“ als nummerierte Punkte, damit ein Vorschlag
   seinen Punkt nennen kann. Jeder Punkt sagt, was ein Trainer in der Halle
   anders macht oder worauf er achtet.
@@ -212,6 +265,14 @@ abgewiesen und neu entworfen.
 - `## Freigabe` ist der letzte Abschnitt und hat immer beide Listen,
   `Vorschläge:` und `Rückfragen:`. Eine leere Liste heißt `Vorschläge: keine`
   oder `Rückfragen: keine`.
+- Hast du Ausschnitte, steht davor die Liste `Ausschnitte:`, sonst fehlt sie.
+  Jeder Punkt hat genau diese Form, bei einem Foto ohne Seite:
+
+  ```markdown
+  Ausschnitte:
+  - `17.quellgrafik-1.jpg`: `seite-26.jpg`, links 8, oben 42, rechts 94, unten 88
+  - `17.quellgrafik-2.png`: `Merkmale.pdf` S. 3, links 5, oben 20, rechts 95, unten 61
+  ```
 - Ein Vorschlag beginnt mit seinem Ziel in Backticks, dann ein Doppelpunkt und
   die Begründung in einem Satz. Das Ziel ist ein Feld aus dem Frontmatter,
   etwa `` `thema`: … ``, oder die Überschrift eines Abschnitts samt `##`,
@@ -236,6 +297,8 @@ Geh den Entwurf einmal durch:
 - Hat das Frontmatter jedes Feld aus dem Schema, ohne `id` und `angelegt`?
 - Stehen nur kontrollierte Werte und Kennungen aus dem Auftrag darin?
 - Ist `quelldatei` genau wie im Auftrag?
+- Hat jeder Ausschnitt die feste Form, steht jeder als Bildverweis an seiner
+  Kernaussage, und nennt jeder Bildverweis einen Ausschnitt aus der Liste?
 - Beginnt jeder Vorschlag mit einem Feld oder einer Überschrift samt `##` in
   Backticks?
 - Hat jede Rückfrage genau ein Fragezeichen und endet auf ihre Vermutung oder
