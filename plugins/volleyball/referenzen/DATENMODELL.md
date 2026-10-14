@@ -352,7 +352,7 @@ kandidaten_je_durchgang: 30      # so viele Aufträge je Durchgang
 plan_freigegeben: 2026-09-30     # null, solange der Plan nicht freigegeben ist
 textmarke: "Ausführung:"         # optional: ab hier beschreibt die Quelle ihren Ablauf
 platzhalter: "hier könnte ihr Text stehen"   # optional: was dort steht, wenn nichts dasteht
-quellgrafik_ausschneiden: true   # optional: die Quellgrafik aus dem PDF ausschneiden
+quellgrafik: eingebettet         # optional: eingebettet, ausschnitt oder keine
 ohne: [Aufst_Pos_D, PLAYDRILL_IMPORT_LOG.md]   # optional: was der Zerlegungsplan auslässt
 in_arbeit: christian, 2026-10-02 # schreibt das Skript: wer seit wann daran arbeitet
 ---
@@ -403,6 +403,23 @@ Textmarke, ohne den Platzhalter, weniger als 150 Zeichen, sagt der Auftrag
 dabei nicht. Ohne Textmarke, oder wenn eine Datei sie nicht trägt, zählt ihr
 ganzer Text. Hat eine Datei gar keinen Text, entscheidet der Agent.
 
+`quellgrafik` sagt, woher die Quellgrafik einer Karte kommt:
+
+- `eingebettet`: das größte eingebettete Bild jedes PDF, ohne seinen
+  durchsichtigen Rand. Das passt zu PlayDrill, eine Übung je PDF mit einem
+  Feldbild.
+- `ausschnitt`: Der Entwurf nennt seine Ausschnitte, Stellen auf der Seite
+  eines Fotos oder PDF, und `pruefen` schneidet sie aus, siehe unten. Das
+  passt zu Fotos von Seiten und zu jedem anderen PDF.
+- `keine`: Die Karten bekommen ihr Bild später mit `volleyball-schaubild`.
+  Ohne Einstellung gilt `keine`.
+
+Vor dem Ausschnitt hieß die Einstellung `quellgrafik_ausschneiden`. `true` gilt weiter
+als `eingebettet`, `false` als `keine`. Stehen beide da, oder ein Wert, den
+es nicht gibt, bricht `vorbereiten` vor dem ersten Auftrag ab. Steht dort
+noch das ältere `feldbild_ausschneiden`, ebenso, und die Meldung nennt
+`quellgrafik`.
+
 `ohne` ist eine Liste von Pfaden relativ zum Quellenordner, in eckigen
 Klammern. Ein Ordner gilt mit allem darunter. Was dort steht, sieht der
 Zerlegungsplan nicht: Es steht nicht in der Planeingabe, sein Text wird nicht
@@ -442,7 +459,8 @@ Daneben schreibt der Agent `volleyball-zerlegungsplan` den Plan als
 die Übersicht. Der Rest ist nach der Nummer des Kandidaten benannt:
 `17.auftrag.md` ist der Auftrag für den Agenten `volleyball-kartenentwurf`,
 `17.md` der Kartenentwurf, `17.quellgrafik.png` die Quellgrafik, bei mehreren
-`17.quellgrafik-1.png`, `17.quellgrafik-2.png` und so weiter.
+`17.quellgrafik-1.png`, `17.quellgrafik-2.png` und so weiter. Ein Ausschnitt
+aus einem Foto endet auf `.jpg`.
 
 Der Auftrag trägt unter jedem PDF des Kandidaten dessen ganzen Text, oder den
 Hinweis, dass der Agent das PDF selbst lesen muss. Nennt der Kandidat einen
@@ -450,7 +468,9 @@ Seitenbereich, steht nur der Text dieser Seiten da, und der Auftrag sagt, dass
 der Agent im PDF nur diese Seiten öffnet, ohne Text, dass er diese Seiten
 selbst liest. `quelldatei` nennt auch dann nur die Datei, die Seiten stehen
 in `quelle`. Der Auftrag sagt, ob der Ablauf aus dem Bild kommt, gezählt
-wird dafür nur der Text dieser Seiten. Ist `quellgrafik_ausschneiden` an, schneidet `vorbereiten`
+wird dafür nur der Text dieser Seiten.
+
+Bei `quellgrafik: eingebettet` schneidet `vorbereiten`
 aus jedem PDF des Kandidaten, das ein Bild einbettet, das größte Bild aus. Der
 durchsichtige Rand fällt weg. Eine einzelne Quellgrafik steht im Entwurf als
 `schaubild: 17.quellgrafik.png`. Mehrere nennt der Auftrag in der Reihenfolge
@@ -464,11 +484,26 @@ ihre Quellgrafiken trotzdem, und für die Übersicht lässt sich danach mit
 dem der Agent selbst nachsieht. Eine fremde Quellgrafik darf der Entwurf nicht
 nennen.
 
+Bei `quellgrafik: ausschnitt` schneidet `vorbereiten` nichts vorab aus. Der
+Auftrag sagt unter `## Ausschnitte`, dass der Entwurf seine Ausschnitte nennt,
+in welcher Form und wie sie heißen: ein einzelner `17.quellgrafik.<endung>`,
+mehrere ab 1 gezählt, die Endung `.jpg` aus einem Foto und `.png` aus einer
+PDF-Seite, wie bei `ausschnitt.py`. Weil ein Ausschnitt seine Seite nennt,
+trägt der Text eines PDF im Auftrag dann die Seitenmarken, gezählt wie im PDF,
+bei einem Seitenbereich also ab seiner ersten Seite. Fehlt Pillow, oder hat
+ein Kandidat des Durchgangs ein PDF und `pypdfium2` fehlt, bricht
+`vorbereiten` vor dem ersten Auftrag ab und schreibt nichts (ADR-0013).
+
 Ein Kartenentwurf hat das Frontmatter der Karte ohne `id` (ADR-0010), die
-Abschnitte der Karte und am Ende `## Freigabe` mit beiden Listen:
+Abschnitte der Karte und am Ende `## Freigabe` mit beiden Listen, davor, wenn
+er welche hat, die Liste seiner Ausschnitte:
 
 ```markdown
 ## Freigabe
+
+Ausschnitte:
+- `17.quellgrafik-1.jpg`: `seite-26.jpg`, links 8, oben 42, rechts 94, unten 88
+- `17.quellgrafik-2.png`: `Merkmale.pdf` S. 3, links 5, oben 20, rechts 95, unten 61
 
 Vorschläge:
 - `level_max`: Technikübung, die Schwierigkeit steuert der Ball.
@@ -482,6 +517,12 @@ endet auf `Vermutung im Entwurf: …` oder auf `Vermutung im Entwurf: keine`.
 Ein Vorschlag beginnt mit seinem Ziel in Backticks: dem Feld, oder der
 Überschrift des Abschnitts samt `##`, dahinter, wo im Abschnitt, etwa
 `` `## Ablauf`, Schritt 2: … ``. Eine leere Liste heißt `Vorschläge: keine`.
+
+Ein Ausschnitt nennt den Namen der Quellgrafik, die Datei des Kandidaten
+relativ zum Quellenordner, bei einem PDF die Seite, gezählt ab 1, und das
+Rechteck: links, oben, rechts, unten in ganzen Prozent der Seite, wie sie
+aufrecht steht. Die Übungskarte trägt die Namen in `schaubild:`, wie eine
+Quellgrafik, die `vorbereiten` ausgeschnitten hat.
 
 `sammelimport.py pruefen` weist einen Entwurf ab, wenn er das Datenmodell
 bricht oder die Form der Freigabe nicht einhält. Der Kandidat geht dann auf
@@ -504,13 +545,25 @@ wird:
   neben dem Entwurf;
 - `## Freigabe` mit beiden Listen, jede Rückfrage und jeder Vorschlag in der
   Form oben. Ein Vorschlag nennt ein Feld aus dem Frontmatter oder einen
-  Abschnitt, den der Entwurf hat.
+  Abschnitt, den der Entwurf hat;
+- die Ausschnitte: jeder in der Form oben, mit dem Namen einer eigenen
+  Quellgrafik, der nur einmal vorkommt, einer Datei des Kandidaten, bei einem
+  Seitenbereich einer Seite daraus, einer Endung, die zur Datei passt, und
+  eingetragen in `schaubild:`. Dann schneidet `pruefen` jeden neu aus, über
+  dieselbe Funktion wie `ausschnitt.py`, und legt ihn neben den Entwurf, bei
+  jedem Lauf. Nach einer Änderung der Zahlen liegt danach der neue da. Lässt
+  er sich nicht schneiden, etwa weil es die Seite nicht gibt, wird der Entwurf
+  abgewiesen. Fehlt dafür Pillow oder `pypdfium2`, bricht `pruefen` ab und
+  lässt die Übersicht, wie sie ist. `vorbereiten` und `uebernehmen` prüfen
+  einen Entwurf genauso und schneiden dabei mit.
 
 Mit `--json` gibt `pruefen` je Kandidat mit Entwurf aus, was die Freigabe im
 Chat braucht: die Felder des Entwurfs, die Vorschläge getrennt nach Feldern und
 Textstellen, die Rückfragen getrennt nach mit und ohne Vermutung, ob der Ablauf
 aus dem Bild kommt, den Pfad des Entwurfs und als Liste `quellgrafiken` die
-Pfade der Quellgrafiken, die er einträgt, in seiner Reihenfolge. Kandidaten
+Pfade der Quellgrafiken, die er einträgt, in seiner Reihenfolge. Als Liste
+`ausschnitte` steht jeder Ausschnitt da, mit `name`, `pfad`, `datei`, `seite`
+und `rechteck` (`links`, `oben`, `rechts`, `unten`). Kandidaten
 ohne Entwurf stehen nur in der Übersicht. Die Textstellen ergeben in
 der Tabelle die Spalte „aus dem Bild“. Als Liste `quellgrafik_fehlt` stehen die
 PDFs des Kandidaten da, deren Bild sich nicht ausschneiden ließ, relativ zum
@@ -522,7 +575,8 @@ Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
 mit `angelegt` von heute und ohne `## Freigabe`. Entwurf und Auftrag
 verschwinden dann. Die Quellgrafik kommt unter dem Namen der Karte nach
 `schaubilder/`, etwa `ue-000291-abwehr-vom-kasten.png`, und `schaubild:` zeigt
-darauf. Mehrere bekommen den Namen der Karte mit Nummer, in der Reihenfolge
+darauf. Sie behält ihre Endung, ein Ausschnitt aus einem Foto wird also
+`ue-000291-abwehr-vom-kasten.jpg`. Mehrere bekommen den Namen der Karte mit Nummer, in der Reihenfolge
 des Entwurfs, etwa `ue-000291-zirkel-1.png`, und `schaubild:` trägt sie als
 Liste. Eine einzelne Quellgrafik bleibt ein einzelner Name, auch wenn der
 Entwurf sie in eckigen Klammern nennt. Streicht der Trainer einen Kandidaten,
@@ -533,8 +587,9 @@ verschwinden. Ist im Quellenordner nichts mehr offen, verschwinden auch
 `kartenentwuerfe/<ordner>/` und `in_arbeit`.
 
 Nicht übernommen wird ein Kandidat, unter dessen Namen in `schaubilder/` schon
-eine Datei liegt, und einer, dessen freigegebener Entwurf die Prüfung nicht
-besteht. Entwurf und Status bleiben dann, wie sie sind, denn der Entwurf trägt
+eine Datei liegt, einer, dessen freigegebener Entwurf die Prüfung nicht
+besteht, und einer, für dessen Ausschnitt Pillow oder `pypdfium2` fehlt.
+Entwurf und Status bleiben dann, wie sie sind, denn der Entwurf trägt
 die Antworten des Trainers, und ein neuer Durchgang überschriebe sie. Die
 Ausgabe nennt den Fehler, die übrigen Kandidaten übernimmt `uebernehmen`
 trotzdem und endet mit einem Exitcode ungleich 0. Fehlt `quellen/<ordner>/`,
@@ -791,9 +846,9 @@ Alle liegen unter `${CLAUDE_PLUGIN_ROOT}/scripts/` und brauchen nur Python 3
 aus der Standardbibliothek. Es gibt drei Ausnahmen von der Standardbibliothek:
 
 - **Pillow:** `bilder_aufbereiten.py` und `ausschnitt.py` brauchen es, dazu
-  `sammelimport.py vorbereiten`, wenn es die Quellgrafik ausschneiden soll.
-  Alle drei brechen ohne es mit einem Installationshinweis ab und schreiben
-  nichts (ADR-0005). HEIC öffnet Pillow erst mit dem Zusatzpaket
+  `sammelimport.py`, wenn die Quellgrafik eingebettet oder als Ausschnitt
+  kommt. Alle drei brechen ohne es mit einem Installationshinweis ab und
+  schreiben nichts (ADR-0005). HEIC öffnet Pillow erst mit dem Zusatzpaket
   `pillow-heif`. Fehlt es, nennt `bilder_aufbereiten.py` die HEIC-Dateien mit
   Installationshinweis, lässt sie liegen und bereitet die übrigen auf.
 - **`pdftotext`:** `sammelimport.py vorbereiten` liest damit den Text von
@@ -802,9 +857,11 @@ aus der Standardbibliothek. Es gibt drei Ausnahmen von der Standardbibliothek:
   Fehlt es, sagt das Skript das einmal mit Installationshinweis und macht ohne
   Text weiter (ADR-0008).
 - **`pypdfium2`:** `ausschnitt.py` zeichnet damit eine PDF-Seite als Bild,
-  bevor Pillow den Ausschnitt schneidet. Fehlt es, endet ein Ausschnitt aus
-  einem PDF mit Installationshinweis und schreibt nichts. Ein Ausschnitt aus
-  einem Foto geht ohne (ADR-0013).
+  bevor Pillow den Ausschnitt schneidet, und `sammelimport.py` über dieselbe
+  Funktion. Fehlt es, endet ein Ausschnitt aus einem PDF mit
+  Installationshinweis und schreibt nichts. Bei `quellgrafik: ausschnitt`
+  bricht `vorbereiten` dann ab, sobald ein Kandidat des Durchgangs ein PDF
+  hat. Ein Ausschnitt aus einem Foto geht ohne (ADR-0013).
 
 Dazu nehmen zwei Skripte einen Browser, wo einer da ist:
 
