@@ -68,11 +68,15 @@ def wissenskarten_md(wissen: list[dict]) -> list[str]:
         return []
     nach_thema = defaultdict(list)
     for k in wissen:
-        for thema in als_liste(k.get("thema")) or ["ohne"]:
+        # Ein Thema, das zweimal dasteht, ist eines.
+        for thema in dict.fromkeys(als_liste(k.get("thema"))) or ["ohne"]:
             nach_thema[thema].append(k)
 
     z = ["## Wissenskarten", ""]
-    for thema in sorted(nach_thema, key=lambda x: THEMA_TITEL.get(x, x)):
+    # Ein Wert, den es nicht gibt, steht unter sich selbst, wie ein
+    # unbekanntes Element. Der Linter meldet ihn, die Lesebrille soll an ihm
+    # nicht scheitern, auch nicht an einer Zahl oder einem leeren Eintrag.
+    for thema in sorted(nach_thema, key=lambda x: str(THEMA_TITEL.get(x, x))):
         z += [f"### {THEMA_TITEL.get(thema, thema)}", "",
               "| Frage | ID | Übungen |",
               "|---|---|---|"]
