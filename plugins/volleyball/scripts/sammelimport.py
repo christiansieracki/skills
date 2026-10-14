@@ -72,10 +72,10 @@ from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
     DISZIPLIN_SPALTE, KARTENFELDER, SORTEN, UEBUNGSKARTE, WISSENSFELDER, WISSENSKARTE,
-    Kartensorte, KeineId, finde_wurzel, hole_index, interpreter, konsole_vorbereiten,
-    lies_frontmatter, lies_karten, lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen,
-    naechste_id, pruefe_felder, pruefe_wissensfelder, pruefe_wissensrumpf, schaubilder,
-    tabellenzellen, trainer_dieses_rechners,
+    Kartensorte, KeineId, bildverweise, finde_wurzel, hole_index, interpreter,
+    konsole_vorbereiten, lies_frontmatter, lies_karten, lies_schwerpunkt_zeilen, lies_schwerpunkte,
+    lies_uebungen, naechste_id, pruefe_felder, pruefe_wissensfelder, pruefe_wissensrumpf,
+    schaubilder, tabellenzellen, trainer_dieses_rechners,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -729,7 +729,9 @@ class Befund:
     """Was die Prüfung eines Kartenentwurfs ergeben hat.
 
     Besteht er nicht, steht in `fehler` der Grund, und der Rest bleibt leer.
-    Sonst trägt der Befund, was die Freigabe im Chat braucht.
+    Sonst trägt der Befund, was die Freigabe im Chat braucht. `quellgrafiken`
+    sind die Namen der Quellgrafiken, die der Entwurf auf die Karte bringt,
+    siehe `quellgrafiken_im_entwurf`.
     """
 
     fehler: str | None = None
@@ -738,6 +740,7 @@ class Befund:
     rueckfragen: list[Rueckfrage] = field(default_factory=list)
     aus_dem_bild: bool = False
     ausschnitte: list[Ausschnitt] = field(default_factory=list)
+    quellgrafiken: list[str] = field(default_factory=list)
 
     @property
     def mit_vermutung(self) -> list[Rueckfrage]:
@@ -937,15 +940,14 @@ def pruefe_quellgrafiken_daneben(sammelimport: Sammelimport, felder: dict) -> No
             raise Formfehler(f"Quellgrafik {name} liegt nicht neben dem Entwurf")
 
 
-def pruefe_wissensentwurf(sammelimport: Sammelimport, felder: dict, rumpf: str) -> None:
-    """Bricht mit Formfehler ab, wenn der Entwurf einer Wissenskarte keine Karte ergibt (#70).
+def pruefe_wissensentwurf(sammelimport: Sammelimport, felder: dict) -> None:
+    """Bricht mit Formfehler ab, wenn das Frontmatter einer Wissenskarte keine Karte ergibt (#70).
 
     Das Gegenstück zu `pruefe_frontmatter`, mit den Regeln, die der Linter
-    an eine Wissenskarte legt: `pruefe_wissensfelder` für das Frontmatter,
-    `pruefe_wissensrumpf` für die beiden Abschnitte und die Bildverweise,
-    aufgelöst gegen den Ordner des Entwurfs. Eine Karte aus einem Entwurf,
-    der hier besteht, hat dem Linter nichts zu melden. Gemeldet wird der
-    erste Fehler, wie bei der Übungskarte.
+    an eine Wissenskarte legt, aus `pruefe_wissensfelder`. Den Text prüft
+    `pruefe_wissenstext`, erst nach dem Schneiden der Ausschnitte. Eine
+    Karte aus einem Entwurf, der beides besteht, hat dem Linter nichts zu
+    melden. Gemeldet wird der erste Fehler, wie bei der Übungskarte.
     """
     if "id" in felder:
         raise Formfehler(f"Entwurf trägt id: {felder['id']}, die ID vergibt erst uebernehmen")
@@ -956,9 +958,61 @@ def pruefe_wissensentwurf(sammelimport: Sammelimport, felder: dict, rumpf: str) 
     if befunde:
         raise Formfehler(befunde[0])
     pruefe_quelldatei(sammelimport.wurzel, felder.get("quelldatei"))
+
+
+def bildverweise_der_karte(rumpf: str) -> list[str]:
+    """Die Bildverweise aus dem Text, der auf die Karte kommt, also ohne `## Freigabe`.
+
+    `## Freigabe` fällt beim Übernehmen weg, siehe `als_karte`, und mit ihm
+    jeder Verweis darin.
+    """
+    zeilen = rumpf.splitlines()
+    grenzen = _abschnitt_grenzen(zeilen, "Freigabe")
+    if grenzen is not None:
+        zeilen = zeilen[:grenzen[0]] + zeilen[grenzen[1]:]
+    return bildverweise("\n".join(zeilen))
+
+
+def pruefe_bildverweise(ausschnitte: list[Ausschnitt], rumpf: str) -> None:
+    """Bricht mit Formfehler ab, wenn ein Bildverweis im Entwurf einer Wissenskarte auf keinen Ausschnitt zeigt (#71).
+
+    Eine Wissenskarte bekommt ihre Bilder nur als Ausschnitt. Neben dem
+    Entwurf liegen nach `pruefen` genau die Ausschnitte aus seiner Liste, und
+    nur sie trägt `uebernehmen` nach schaubilder/. Ein anderer Bildverweis
+    zeigte auf der Karte ins Leere. Das gilt auch für einen gestrichenen
+    Ausschnitt, dessen Datei noch vom letzten Lauf daneben liegt: Er soll
+    nicht auf die Karte.
+    """
+    namen = {a.name for a in ausschnitte}
+    for pfad in bildverweise_der_karte(rumpf):
+        if pfad not in namen:
+            raise Formfehler(f"Bildverweis {pfad} zeigt auf keine Quellgrafik neben dem Entwurf, "
+                             f"nur ein Ausschnitt aus der Liste Ausschnitte: wird eine")
+
+
+def pruefe_wissenstext(sammelimport: Sammelimport, rumpf: str) -> None:
+    """Bricht mit Formfehler ab, wenn der Text einer Wissenskarte keine Karte ergibt (#70).
+
+    Die beiden Abschnitte und die Bildverweise, mit `pruefe_wissensrumpf`
+    wie im Linter, aufgelöst gegen den Ordner des Entwurfs. Deshalb erst,
+    wenn die Ausschnitte geschnitten sind (#71).
+    """
     befunde = pruefe_wissensrumpf(rumpf, sammelimport.entwurfsordner)
     if befunde:
         raise Formfehler(befunde[0])
+
+
+def quellgrafiken_im_entwurf(k: Kandidat, felder: dict, rumpf: str) -> list[str]:
+    """Die Namen der Quellgrafiken, die der Entwurf auf die Karte bringt, in ihrer Reihenfolge.
+
+    Bei einer Übung die aus `schaubild:`, bei einer Wissenskarte die aus den
+    Bildverweisen, in der Reihenfolge, in der sie im Text stehen, jede
+    einmal (#71). So kommen sie auch nach schaubilder/: Auf der Karte liest
+    man das erste Bild zuerst.
+    """
+    if k.sorte is WISSENSKARTE:
+        return list(dict.fromkeys(bildverweise_der_karte(rumpf)))
+    return schaubilder(felder.get("schaubild"))
 
 
 # Ein Ausschnitt in `## Freigabe`, die Form ist die Entscheidung aus #61:
@@ -1012,18 +1066,21 @@ def _bereiche(eintraege: list[Datei]) -> list[Seitenbereich] | None:
 
 
 def pruefe_ausschnitte(sammelimport: Sammelimport, k: Kandidat, ausschnitte: list[Ausschnitt],
-                       felder: dict) -> None:
+                       felder: dict, rumpf: str) -> None:
     """Bricht mit Formfehler ab, wenn ein Ausschnitt so nicht Quellgrafik werden kann (#63).
 
     Geprüft wird, was sich ohne Schneiden prüfen lässt. Der Name ist der
     einer Quellgrafik dieses Kandidaten und kommt einmal vor, sonst
     überschriebe ein Ausschnitt den anderen. Die Datei ist eine des
     Kandidaten, bei einem Seitenbereich auch die Seite. Die Endung passt zur
-    Datei, wie bei `ausschnitt.py`. Und `schaubild:` nennt den Ausschnitt,
-    denn auf die Karte kommt nur, was dort steht.
+    Datei, wie bei `ausschnitt.py`. Und der Entwurf bringt den Ausschnitt auf
+    die Karte: Bei einer Übung nennt ihn `schaubild:`, bei einer
+    Wissenskarte ein Bildverweis im Text (#71). Was dort nicht steht, sähe
+    der Trainer bei der Freigabe und vermisste es danach auf der Karte.
     """
     gesehen: set[str] = set()
-    eingetragen = set(schaubilder(felder.get("schaubild")))
+    wissen = k.sorte is WISSENSKARTE
+    eingetragen = set(quellgrafiken_im_entwurf(k, felder, rumpf))
     for a in ausschnitte:
         if not sammelimport.ist_quellgrafik_von(k, a.name):
             raise Formfehler(f"Ausschnitt {a.name} ist kein Name für eine Quellgrafik dieses "
@@ -1048,7 +1105,8 @@ def pruefe_ausschnitte(sammelimport: Sammelimport, k: Kandidat, ausschnitte: lis
             raise Formfehler(f"Ausschnitt {a.name} nennt {a.datei} S. {a.seite}, zu Kandidat "
                              f"{k.nummer} gehört nur {', '.join(map(str, bereiche))}")
         if a.name not in eingetragen:
-            raise Formfehler(f"Ausschnitt {a.name} fehlt in schaubild:")
+            raise Formfehler(f"Ausschnitt {a.name} steht in keinem Bildverweis im Text" if wissen
+                             else f"Ausschnitt {a.name} fehlt in schaubild:")
 
 
 def schneide_ausschnitte(sammelimport: Sammelimport, k: Kandidat,
@@ -1151,7 +1209,9 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
     Die Ausschnitte eines Entwurfs, der sonst besteht, werden dabei neu
     geschnitten, bei jedem Aufruf, der prüft: Was neben ihm liegt, folgt so
     immer den Zahlen in `## Freigabe`. Fehlt dafür eine Bibliothek, kommt
-    BibliothekFehlt durch, siehe `schneide_ausschnitte`.
+    BibliothekFehlt durch, siehe `schneide_ausschnitte`. Den Text einer
+    Wissenskarte prüft es erst danach, denn ihre Bildverweise zeigen auf die
+    Ausschnitte neben dem Entwurf (#71).
     """
     datei = sammelimport.entwurf(k)
     if not datei.is_file():
@@ -1165,21 +1225,28 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
     # also auf einer eigenen Zeile `---` enden, nicht nur irgendwo.
     if not felder or _frontmatter_ende(zeilen) is None:
         return Befund("kein lesbares Frontmatter")
+    wissen = k.sorte is WISSENSKARTE
     try:
-        if k.sorte is WISSENSKARTE:
-            pruefe_wissensentwurf(sammelimport, felder, rumpf)
+        if wissen:
+            pruefe_wissensentwurf(sammelimport, felder)
         else:
             pruefe_frontmatter(sammelimport, k, felder)
         vorschlaege, rueckfragen = lies_freigabe(rumpf, felder)
         ausschnitte = lies_ausschnitte(rumpf)
-        pruefe_ausschnitte(sammelimport, k, ausschnitte, felder)
+        pruefe_ausschnitte(sammelimport, k, ausschnitte, felder, rumpf)
+        if wissen:
+            pruefe_bildverweise(ausschnitte, rumpf)
         schneide_ausschnitte(sammelimport, k, ausschnitte)
-        pruefe_quellgrafiken_daneben(sammelimport, felder)
+        if wissen:
+            pruefe_wissenstext(sammelimport, rumpf)
+        else:
+            pruefe_quellgrafiken_daneben(sammelimport, felder)
     except Formfehler as fehler:
         return Befund(str(fehler))
-    aus_dem_bild = k.sorte is UEBUNGSKARTE and laut_auftrag_aus_dem_bild(sammelimport.auftrag(k))
+    aus_dem_bild = not wissen and laut_auftrag_aus_dem_bild(sammelimport.auftrag(k))
     return Befund(felder=felder, vorschlaege=vorschlaege, rueckfragen=rueckfragen,
-                  aus_dem_bild=aus_dem_bild, ausschnitte=ausschnitte)
+                  aus_dem_bild=aus_dem_bild, ausschnitte=ausschnitte,
+                  quellgrafiken=quellgrafiken_im_entwurf(k, felder, rumpf))
 
 
 # --------------------------------------------------------------------------
@@ -2310,8 +2377,9 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
     nicht in die Freigabe, von ihm stehen nur Status und Notiz da.
 
     `quellgrafiken` sind die, die der Entwurf in `schaubild:` nennt, in seiner
-    Reihenfolge, so wie sie auf die Karte kommen. Nennt er keine, ist die
-    Liste leer. `quellgrafik_fehlt` nennt die PDFs, deren Bild sich nicht
+    Reihenfolge, so wie sie auf die Karte kommen, bei einer Wissenskarte die
+    aus ihren Bildverweisen in der Reihenfolge des Texts (#71). Nennt er
+    keine, ist die Liste leer. `quellgrafik_fehlt` nennt die PDFs, deren Bild sich nicht
     ausschneiden ließ, relativ zum Quellenordner wie `dateien`. Der Skill sagt
     es bei der Freigabe dazu und nennt am Ende des Durchgangs die Karten, denen
     deshalb eine Quellgrafik fehlt.
@@ -2334,7 +2402,7 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
         "notiz": k.notiz,
         "entwurf": sammelimport.entwurf(k).as_posix(),
         "quellgrafiken": [(sammelimport.entwurfsordner / name).as_posix()
-                          for name in schaubilder(befund.felder.get("schaubild"))],
+                          for name in befund.quellgrafiken],
         "quellgrafik_fehlt": laut_auftrag_ohne_quellgrafik(sammelimport.auftrag(k), k),
         "ausschnitte": [{"name": a.name,
                          "pfad": (sammelimport.entwurfsordner / a.name).as_posix(),

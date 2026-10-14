@@ -1539,6 +1539,123 @@ class BilderDerWissenskarteTest(unittest.TestCase):
                 self.assertNotIn("## Ausschnitte", auftraege[art])
                 self.assertNotIn("quellgrafik.png", auftraege[art])
 
+    # Der Text eines Entwurfs mit zwei Bildern, jedes an seiner Kernaussage.
+    # Das Bild der zweiten steht vorn in der Liste der Ausschnitte, auf der
+    # Karte aber unten.
+    RUMPF = """
+        # Wie sieht das obere Zuspiel aus?
+
+        ## Kernaussagen
+
+        - Die Haende bilden ein Dreieck ueber der Stirn.
+
+          ![Bildreihe oberes Zuspiel](1.quellgrafik-2.jpg)
+
+        - Die Beine strecken sich mit dem Ball.
+
+          ![Kurve der Streckung](1.quellgrafik-1.png "Streckung")
+
+        ## Was das fürs Training heißt
+
+        1. Erst die Handhaltung ohne Ball, dann mit.
+        """
+
+    def plane(self, **kandidat) -> None:
+        """Der freigegebene Plan mit einer Wissenskarte aus Foto und PDF, bei `ausschnitt`."""
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["heft.pdf", "seite-26.jpg"], "ergebnis": "wissen",
+             **kandidat}], quellgrafik="ausschnitt")
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", ["Seite 1"], ["Seite 2"],
+                                      flaechen=[PdfFlaeche(2, BLAU, (10, 20, 60, 50))])
+
+    def lege_entwurf_an(self, rumpf: str = RUMPF, **felder) -> Path:
+        """Der Entwurf von Kandidat 1 mit seinen beiden Ausschnitten, ohne Angabe heil."""
+        return self.ordner.lege_wissensentwurf_an(
+            ORDNER, 1, titel="Wie sieht das obere Zuspiel aus?", rumpf=rumpf, **{
+                "ausschnitte": [
+                    "`1.quellgrafik-1.png`: `heft.pdf` S. 2, links 10, oben 20, rechts 60, unten 50",
+                    "`1.quellgrafik-2.jpg`: `seite-26.jpg`, links 10, oben 20, rechts 60, unten 70"],
+                **felder})
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_ein_entwurf_mit_ausschnitt_und_bildverweis_besteht_und_der_ausschnitt_liegt_daneben(
+            self) -> None:
+        # pruefen schneidet die Ausschnitte einer Wissenskarte wie die einer
+        # Uebung. Der Skill zeigt sie bei der Freigabe aus `ausschnitte`, und
+        # `quellgrafiken` nennt die Bilder so, wie sie auf die Karte kommen: in
+        # der Reihenfolge der Bildverweise im Text.
+        self.plane()
+        self.lege_entwurf_an()
+
+        fertig = self.ordner.starte("sammelimport.py", "pruefen", "--json", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        kandidat = json.loads(fertig.stdout)["kandidaten"][0]
+        self.assertEqual(kandidat["status"], "bereit", kandidat["notiz"])
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["1"]["Status"], "bereit")
+        with Image.open(self.entwuerfe / "1.quellgrafik-2.jpg") as bild:
+            self.assertEqual((bild.format, bild.size), ("JPEG", (500, 400)))
+        with Image.open(self.entwuerfe / "1.quellgrafik-1.png") as bild:
+            self.assertEqual(bild.format, "PNG")
+            mitte = bild.convert("RGB").getpixel((bild.width // 2, bild.height // 2))
+            self.assertTrue(all(abs(ist - soll) <= 8 for ist, soll in zip(mitte, BLAU)), mitte)
+        self.assertEqual([a["name"] for a in kandidat["ausschnitte"]],
+                         ["1.quellgrafik-1.png", "1.quellgrafik-2.jpg"])
+        self.assertEqual(kandidat["quellgrafiken"],
+                         [(self.entwuerfe / name).resolve().as_posix()
+                          for name in ("1.quellgrafik-2.jpg", "1.quellgrafik-1.png")])
+
+    @BRAUCHT_PILLOW
+    def test_bildverweis_ohne_quellgrafik_und_ausschnitt_ohne_bildverweis_weisen_ab(
+            self) -> None:
+        # Je Kandidat ein Fehler, sonst ist der Entwurf heil. Ein Bildverweis
+        # ohne Quellgrafik zeigte auf der Karte ins Leere, ein Ausschnitt ohne
+        # Bildverweis saehe der Trainer bei der Freigabe und vermisste ihn
+        # danach. Ein gestrichener Ausschnitt, dessen Datei noch vom letzten
+        # Lauf daneben liegt, kommt nicht auf die Karte, auch wenn sein
+        # Bildverweis stehen geblieben ist.
+        rechteck = "links 10, oben 20, rechts 60, unten 70"
+
+        def text(*bilder: str) -> str:
+            verweise = "".join(f"\n\n  ![Bild]({bild})" for bild in bilder)
+            return (f"# Frage?\n\n## Kernaussagen\n\n- Eine Kernaussage.{verweise}\n\n"
+                    f"## Was das fürs Training heißt\n\n1. Ein Punkt.\n")
+
+        faelle = {
+            "Bildverweis ohne Quellgrafik": (
+                ["{n}.quellgrafik.jpg", "{n}.quellgrafik-9.jpg"], ["{n}.quellgrafik.jpg"],
+                "{n}.quellgrafik-9.jpg"),
+            "Ausschnitt ohne Bildverweis": ([], ["{n}.quellgrafik.jpg"], "Bildverweis"),
+            "Bildverweis auf einen gestrichenen Ausschnitt": (
+                ["{n}.quellgrafik.jpg"], [], "{n}.quellgrafik.jpg"),
+        }
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": nr, "dateien": ["seite-26.jpg"], "ergebnis": "wissen"}
+            for nr in range(len(faelle) + 1)], quellgrafik="ausschnitt")
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        self.ordner.lege_wissensentwurf_an(
+            ORDNER, 0, titel="Heil?", rumpf=text("0.quellgrafik.jpg"),
+            ausschnitte=[f"`0.quellgrafik.jpg`: `seite-26.jpg`, {rechteck}"])
+        for nr, (fall, (verweise, ausschnitte, _)) in enumerate(faelle.items(), 1):
+            self.ordner.lege_wissensentwurf_an(
+                ORDNER, nr, titel=f"{fall}?", rumpf=text(*(v.format(n=nr) for v in verweise)),
+                ausschnitte=[f"`{a.format(n=nr)}`: `seite-26.jpg`, {rechteck}"
+                             for a in ausschnitte])
+        gestrichen = list(faelle).index("Bildverweis auf einen gestrichenen Ausschnitt") + 1
+        (self.entwuerfe / f"{gestrichen}.quellgrafik.jpg").write_bytes(b"vom letzten Lauf")
+
+        fertig = self.ordner.starte("sammelimport.py", "pruefen", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual(uebersicht["0"]["Status"], "bereit", uebersicht["0"]["Notiz"])
+        for nr, (fall, (_, _, stichwort)) in enumerate(faelle.items(), 1):
+            with self.subTest(fall):
+                self.assertEqual(uebersicht[str(nr)]["Status"], "offen")
+                self.assertIn(stichwort.format(n=nr), uebersicht[str(nr)]["Notiz"])
+
 
 class PlaneingabeTest(unittest.TestCase):
     """`vorbereiten --plan` legt an, woraus der Agent den Zerlegungsplan macht.
