@@ -231,11 +231,14 @@ class VorbereitenTest(unittest.TestCase):
         self.assertIn("Offen", fertig.stdout)
         self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
 
-    def test_ein_durchgang_legt_fuer_eine_wissen_zeile_keinen_auftrag_an(self) -> None:
-        # Der Zerlegungsplan plant Theorie als Wissenskarte (#69). Ihren
-        # Entwurf schreibt erst der Agent aus #70. Bis dahin bleibt die Zeile
-        # offen, und der Durchgang nimmt nur die Uebung, ohne an der Zeile
-        # abzubrechen.
+    def test_der_auftrag_fuer_wissen_nennt_steuerungsschwerpunkte_aber_kein_ablauf_aus_dem_bild(
+            self) -> None:
+        # Der Zerlegungsplan plant Theorie als Wissenskarte (#69), und ein
+        # Durchgang legt ihr einen Auftrag an wie einer Uebung (#70). Eine
+        # Wissenskarte darf auch einen Steuerungsschwerpunkt tragen, mit ihm
+        # findet der Saisonplaner sie. Die Regel "wenig Text" gilt nur fuer
+        # den Ablauf einer Uebung, eine Wissenskarte hat keinen. Die Ausgabe
+        # nennt je Auftrag die Sorte, daran waehlt der Skill den Agenten.
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 1, "dateien": ["seite-01.jpg"]},
             {"kandidat": 2, "dateien": ["seite-02.jpg"], "ergebnis": "wissen",
@@ -245,8 +248,19 @@ class VorbereitenTest(unittest.TestCase):
         fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout)
-        self.assertEqual(self.auftraege(), ["1.auftrag.md"])
-        self.assertEqual(self.ordner.uebersicht(ORDNER)["2"]["Status"], "offen")
+        self.assertEqual(self.auftraege(), ["1.auftrag.md", "2.auftrag.md"])
+        self.assertIn("uebungskarte", zeile_mit(fertig.stdout, "1.auftrag.md"))
+        self.assertIn("wissenskarte", zeile_mit(fertig.stdout, "2.auftrag.md"))
+        auftrag = auftrag_von(self.ordner, 2)
+        self.assertIn("Wann lohnt sich einarmige Abwehr?", zeile_mit(auftrag, "Was es ist"))
+        self.assertIn("`wissen`", zeile_mit(auftrag, "Typ"))
+        self.assertIn(f"{ORDNER}/seite-02.jpg", zeile_mit(auftrag, "quelldatei"))
+        self.assertIn("beide", zeile_mit(auftrag, "`standortbestimmung`"))
+        self.assertIn(
+            (self.ordner.pfad / "kartenentwuerfe" / ORDNER / "2.md").resolve().as_posix(),
+            zeile_mit(auftrag, "Zielpfad"))
+        self.assertNotIn("Ablauf aus dem Bild", auftrag)
+        self.assertIn("Ablauf aus dem Bild", auftrag_von(self.ordner, 1))
 
     def test_ein_unbekanntes_ergebnis_bricht_ab_und_schreibt_nichts(self) -> None:
         # Vertippt oder erfunden. Mit `wissen` gibt es ein Ergebnis mehr,
@@ -1855,22 +1869,6 @@ class PruefenTest(unittest.TestCase):
         self.assertEqual(zeile["Status"], "offen")
         self.assertIn("Frontmatter", zeile["Notiz"])
 
-    def test_eine_wissen_zeile_bleibt_offen_und_unberuehrt(self) -> None:
-        # Den Entwurf einer Wissenskarte schreibt und prueft erst #70. Bis
-        # dahin fasst pruefen die Zeile nicht an. Nahme es sie als
-        # Uebungskarte, setzte es sie ohne Entwurf auf "kein Entwurf", und ein
-        # Entwurf, der zufaellig daliegt, ginge als Uebungskarte durch.
-        self.plane({"kandidat": 1, "dateien": ["a.pdf"]},
-                   {"kandidat": 2, "dateien": ["b.pdf"], "ergebnis": "wissen",
-                    "was": "Wann lohnt sich einarmige Abwehr? Übungen: 1"})
-        self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Als Übung entworfen")
-        vorher = self.ordner.uebersicht(ORDNER)["2"]
-
-        uebersicht = self.pruefe()
-
-        self.assertEqual(uebersicht["2"], vorher)
-        self.assertEqual(uebersicht["1"]["Status"], "offen")
-
     def test_zeilen_mit_importiert_bleiben_unberuehrt(self) -> None:
         # Eine uebernommene Karte hat keinen Entwurf mehr. Faende pruefen sie
         # "offen", entwuerfe der naechste Durchgang dieselbe Uebung ein
@@ -2254,6 +2252,138 @@ class UebernehmenTest(unittest.TestCase):
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         self.assertTrue(entwurf.exists())
+
+
+class WissenskarteTest(unittest.TestCase):
+    """Eine `wissen`-Zeile geht vom Plan ueber Entwurf und Pruefung bis in wissen/ (#70).
+
+    Den Auftrag prueft VorbereitenTest. Hier geht es um das, was danach auf
+    der Platte liegt: den Entwurf, den der Agent `volleyball-wissenskarte`
+    schreibt, den Status, den `pruefen` daraus setzt, und die Karte, die
+    `uebernehmen` schreibt.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def plane(self, *kandidaten: dict) -> None:
+        """Der freigegebene Plan, jede Zeile ohne eigene Angabe eine Wissenskarte."""
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"ergebnis": "wissen", **k} for k in kandidaten])
+
+    def pruefe(self) -> dict[str, dict[str, str]]:
+        fertig = self.ordner.starte("sammelimport.py", "pruefen", ORDNER)
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        return self.ordner.uebersicht(ORDNER)
+
+    def test_ein_gueltiger_entwurf_ist_bereit_und_ohne_vermutung_rueckfrage(self) -> None:
+        # Wie beim Kartenentwurf: Eine Rueckfrage ohne Vermutung muss der
+        # Trainer einzeln beantworten, eine mit Vermutung bestaetigt er in der
+        # Tabelle. Kandidat 1 traegt dazu einen Steuerungsschwerpunkt, den
+        # nur eine Wissenskarte tragen darf, und einen Vorschlag, der auf
+        # einen Punkt in "Was das fuers Training heisst" zeigt.
+        self.plane({"kandidat": 1, "dateien": ["seite-01.jpg"]},
+                   {"kandidat": 2, "dateien": ["seite-02.jpg"]},
+                   {"kandidat": 3, "dateien": ["seite-03.jpg"]})
+        self.ordner.lege_wissensentwurf_an(
+            ORDNER, 1, titel="Wann lohnt sich einarmige Abwehr?",
+            schwerpunkt=["annahme", "standortbestimmung"],
+            vorschlaege=["`thema`: Die Quelle beschreibt eine Technik.",
+                         "`## Was das fürs Training heißt`, Punkt 1: abgeleitet aus "
+                         "der zweiten Kernaussage."])
+        self.ordner.lege_wissensentwurf_an(
+            ORDNER, 2, titel="Warum hilft Schlaf der Reaktion?",
+            rueckfragen=["Gilt das auch für Jugendliche? Vermutung im Entwurf: keine"])
+        self.ordner.lege_wissensentwurf_an(
+            ORDNER, 3, titel="Wie viel trinkt man im Training?",
+            rueckfragen=["Gilt das auch im Sand? "
+                         "Vermutung im Entwurf: ja, die Quelle trennt nicht."])
+
+        uebersicht = self.pruefe()
+
+        self.assertEqual((uebersicht["1"]["Status"], uebersicht["1"]["Notiz"]), ("bereit", ""))
+        self.assertEqual(uebersicht["2"]["Status"], "rückfrage")
+        self.assertIn("Rückfrage ohne Vermutung", uebersicht["2"]["Notiz"])
+        self.assertEqual(uebersicht["3"]["Status"], "bereit", uebersicht["3"]["Notiz"])
+
+    def test_ein_fehlerhafter_entwurf_geht_zurueck_auf_offen_mit_grund(self) -> None:
+        # Je Kandidat ein Fehler, sonst ist der Entwurf heil. Die Regeln sind
+        # die des Linters fuer die Wissenskarte, dazu die Form der Freigabe.
+        # Was hier durchkaeme, stuende nach der Freigabe so in wissen/.
+        ohne_abschnitt = """
+            # Wann lohnt sich einarmige Abwehr?
+
+            ## Kernaussagen
+
+            - Einarmig kommt man weiter, als beide Arme reichen.
+            """
+        faelle = {
+            "unbekanntes Thema": ({"thema": ["geschichte"]}, "geschichte"),
+            "fehlende Disziplin": ({"disziplin": []}, "disziplin"),
+            "Titel ohne Fragezeichen": ({"titel": "Einarmige Abwehr"}, "Fragezeichen"),
+            "unbekannte Kennung": ({"schwerpunkt": ["gibt-es-nicht"]}, "gibt-es-nicht"),
+            "Kennung mit falscher Disziplin": (
+                {"disziplin": ["halle"], "schwerpunkt": ["nur-beach"]}, "nur-beach"),
+            "Übung, die es nicht gibt": ({"uebungen": ["ue-000300"]}, "ue-000300"),
+            "fehlender Abschnitt": ({"rumpf": ohne_abschnitt}, "Was das fürs Training heißt"),
+            # Freiwillig ist ein Feld auf der Karte, im Entwurf steht es
+            # trotzdem, leer. Sonst ist nicht zu unterscheiden, ob der Agent
+            # keine Uebung gefunden oder das Feld vergessen hat.
+            "fehlendes Feld": ({"uebungen": OHNE}, "uebungen"),
+            # Die ID vergibt erst uebernehmen (ADR-0010).
+            "Entwurf mit id": ({"id": "wi-000099"}, "wi-000099"),
+            "quelldatei ohne Datei dahinter": (
+                {"quelldatei": f"{ORDNER}/fehlt.jpg"}, "fehlt.jpg"),
+            "Rückfrage ohne Vermutungsmarke": (
+                {"rueckfragen": ["Gilt das auch im Sand?"]}, "Vermutung im Entwurf"),
+            "Vorschlag zu einem Abschnitt, den es nicht gibt": (
+                {"vorschlaege": ["`## Was das fürs Training heisst`, Punkt 2: abgeleitet."]},
+                "heisst"),
+        }
+        self.plane(*({"kandidat": nr, "dateien": ["seite.jpg"]}
+                     for nr in range(len(faelle) + 2)))
+        self.ordner.lege_wissensentwurf_an(ORDNER, 0, titel="Heil?")
+        for nr, (fall, (felder, _)) in enumerate(faelle.items(), 1):
+            self.ordner.lege_wissensentwurf_an(ORDNER, nr, **felder)
+        # Ein Entwurf in der Form einer Uebungskarte, etwa von einem
+        # verirrten Aufruf des Kartenentwurfs. Die Zeile plant eine
+        # Wissenskarte, und als die wird er geprueft.
+        als_uebung = len(faelle) + 1
+        self.ordner.lege_kartenentwurf_an(ORDNER, als_uebung, titel="Als Übung entworfen")
+
+        uebersicht = self.pruefe()
+
+        self.assertEqual(uebersicht["0"]["Status"], "bereit", uebersicht["0"]["Notiz"])
+        for nr, (fall, (_, stichwort)) in enumerate(faelle.items(), 1):
+            with self.subTest(fall):
+                self.assertEqual(uebersicht[str(nr)]["Status"], "offen")
+                self.assertIn(stichwort, uebersicht[str(nr)]["Notiz"])
+        with self.subTest("in der Form einer Übungskarte"):
+            self.assertEqual(uebersicht[str(als_uebung)]["Status"], "offen")
+            self.assertIn("thema", uebersicht[str(als_uebung)]["Notiz"])
+
+    def test_json_nennt_die_sorte(self) -> None:
+        # Der Skill legt die Wissenskarten eines Durchgangs in einer eigenen
+        # Tabelle vor, mit Frage, Thema, Schwerpunkt und Disziplin. Welche
+        # Tabelle, sagt ihm die Sorte, die Felder kommen wie bei der Uebung.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-01.jpg"]},
+            {"kandidat": 2, "dateien": ["seite-02.jpg"], "ergebnis": "wissen"},
+        ])
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Eine Übung")
+        self.ordner.lege_wissensentwurf_an(ORDNER, 2, titel="Wann lohnt sich einarmige Abwehr?",
+                                           thema=["technik", "taktik"])
+
+        fertig = self.ordner.starte("sammelimport.py", "pruefen", "--json", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        kandidaten = {k["kandidat"]: k for k in json.loads(fertig.stdout)["kandidaten"]}
+        self.assertEqual(kandidaten["1"]["sorte"], "uebungskarte")
+        self.assertEqual(kandidaten["2"]["sorte"], "wissenskarte")
+        self.assertEqual(kandidaten["2"]["status"], "bereit", kandidaten["2"]["notiz"])
+        self.assertEqual(kandidaten["2"]["felder"]["thema"], ["technik", "taktik"])
+        self.assertFalse(kandidaten["2"]["ablauf_aus_dem_bild"])
 
 
 def auftrag_von(arbeitsordner: Arbeitsordner, kandidat: int) -> str:

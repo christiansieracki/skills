@@ -62,10 +62,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
-    DISZIPLIN_SPALTE, KARTENFELDER, UEBUNGSKARTE, WISSENSKARTE, Kartensorte, KeineId,
-    finde_wurzel, hole_index, interpreter, konsole_vorbereiten, lies_frontmatter,
+    DISZIPLIN_SPALTE, KARTENFELDER, UEBUNGSKARTE, WISSENSFELDER, WISSENSKARTE, Kartensorte,
+    KeineId, finde_wurzel, hole_index, interpreter, konsole_vorbereiten, lies_frontmatter,
     lies_karten, lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen, naechste_id,
-    pruefe_felder, schaubilder, tabellenzellen, trainer_dieses_rechners,
+    pruefe_felder, pruefe_wissensfelder, pruefe_wissensrumpf, schaubilder, tabellenzellen,
+    trainer_dieses_rechners,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -103,11 +104,15 @@ SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "
 SORTE_DES_ERGEBNISSES = {"uebung": UEBUNGSKARTE, "folge": UEBUNGSKARTE, "wissen": WISSENSKARTE}
 ERGEBNISSE = {*SORTE_DES_ERGEBNISSES, "zurückgestellt", "übersprungen"}
 
-# Die Sorten, für die es schon Auftrag, Agent und Prüfung gibt. Die
-# Wissenskarte kommt mit #70 dazu. Bis dahin wartet eine `wissen`-Zeile
-# `offen`: Ein Durchgang legt ihr keinen Auftrag an, und `pruefen` lässt sie,
-# wie sie ist.
-ENTWORFENE_SORTEN = (UEBUNGSKARTE,)
+# Die Sorten, für die es Auftrag, Agent und Prüfung gibt. Seit #70 sind es
+# beide. Eine Sorte, die hier fehlt, wartet `offen`: Ein Durchgang legt ihr
+# keinen Auftrag an, und `pruefen` lässt sie, wie sie ist.
+ENTWORFENE_SORTEN = (UEBUNGSKARTE, WISSENSKARTE)
+
+# Wie die Sorte in der Ausgabe von `vorbereiten` und in `pruefen --json`
+# heißt. Daran wählt der Skill den Agenten, der den Entwurf schreibt, und die
+# Tabelle, in der er ihn vorlegt.
+SORTENNAME = {UEBUNGSKARTE: "uebungskarte", WISSENSKARTE: "wissenskarte"}
 
 STATUS = {"offen", "bereit", "rückfrage", "importiert", "ergänzt", "übersprungen",
           "zurückgestellt"}
@@ -621,6 +626,12 @@ VERMUTUNG = "Vermutung im Entwurf:"
 # `id` und `angelegt` nicht. Die setzt `uebernehmen` bei der Freigabe.
 ENTWURFSFELDER = [f for f in KARTENFELDER if f not in ("id", "angelegt")]
 
+# Dasselbe für den Entwurf einer Wissenskarte (#70). Auch `schwerpunkt` und
+# `uebungen` stehen da, die auf der Karte freiwillig sind, dann als `[]`.
+# Fehlte eins, wäre nicht zu unterscheiden, ob der Agent nichts gefunden oder
+# das Feld vergessen hat.
+WISSENSENTWURFSFELDER = [f for f in WISSENSFELDER if f not in ("id", "angelegt")]
+
 
 @dataclass
 class Rueckfrage:
@@ -845,6 +856,30 @@ def pruefe_frontmatter(sammelimport: Sammelimport, k: Kandidat, felder: dict) ->
             raise Formfehler(f"Quellgrafik {name} liegt nicht neben dem Entwurf")
 
 
+def pruefe_wissensentwurf(sammelimport: Sammelimport, felder: dict, rumpf: str) -> None:
+    """Bricht mit Formfehler ab, wenn der Entwurf einer Wissenskarte keine Karte ergibt (#70).
+
+    Das Gegenstück zu `pruefe_frontmatter`, mit den Regeln, die der Linter
+    an eine Wissenskarte legt: `pruefe_wissensfelder` für das Frontmatter,
+    `pruefe_wissensrumpf` für die beiden Abschnitte und die Bildverweise,
+    aufgelöst gegen den Ordner des Entwurfs. Eine Karte aus einem Entwurf,
+    der hier besteht, hat dem Linter nichts zu melden. Gemeldet wird der
+    erste Fehler, wie bei der Übungskarte.
+    """
+    if "id" in felder:
+        raise Formfehler(f"Entwurf trägt id: {felder['id']}, die ID vergibt erst uebernehmen")
+    fehlend = [f for f in WISSENSENTWURFSFELDER if f not in felder]
+    if fehlend:
+        raise Formfehler(f"Frontmatter ohne {', '.join(fehlend)}")
+    befunde = pruefe_wissensfelder(felder, sammelimport.schwerpunkte, sammelimport.bekannt)
+    if befunde:
+        raise Formfehler(befunde[0])
+    pruefe_quelldatei(sammelimport.wurzel, felder.get("quelldatei"))
+    befunde = pruefe_wissensrumpf(rumpf, sammelimport.entwurfsordner)
+    if befunde:
+        raise Formfehler(befunde[0])
+
+
 def lies_vorschlag(nr: int, text: str, felder: dict, ueberschriften: set[str]) -> Vorschlag:
     """Ein Vorschlag, getrennt nach Feld oder Textstelle, an seinem Ziel in Backticks.
 
@@ -915,6 +950,12 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
     Abgewiesen wird ein Entwurf, der das Datenmodell bricht oder die Form der
     Freigabe nicht einhält. Der Agent hat nicht nachfragen können, und was
     hier durchkäme, stünde nach der Freigabe so auf der Karte.
+
+    Welche Sorte Karte der Entwurf werden soll, sagt das Ergebnis seiner
+    Zeile, nicht der Entwurf selbst (#70). Ein Entwurf in der Form einer
+    Übungskarte unter einer `wissen`-Zeile fällt so als Wissenskarte durch.
+    Die Form der Freigabe ist für beide Sorten dieselbe. Aus dem Bild kommt
+    nur der Ablauf einer Übung.
     """
     datei = sammelimport.entwurf(k)
     if not datei.is_file():
@@ -929,12 +970,16 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
     if not felder or _frontmatter_ende(zeilen) is None:
         return Befund("kein lesbares Frontmatter")
     try:
-        pruefe_frontmatter(sammelimport, k, felder)
+        if k.sorte is WISSENSKARTE:
+            pruefe_wissensentwurf(sammelimport, felder, rumpf)
+        else:
+            pruefe_frontmatter(sammelimport, k, felder)
         vorschlaege, rueckfragen = lies_freigabe(rumpf, felder)
     except Formfehler as fehler:
         return Befund(str(fehler))
+    aus_dem_bild = k.sorte is UEBUNGSKARTE and laut_auftrag_aus_dem_bild(sammelimport.auftrag(k))
     return Befund(felder=felder, vorschlaege=vorschlaege, rueckfragen=rueckfragen,
-                  aus_dem_bild=laut_auftrag_aus_dem_bild(sammelimport.auftrag(k)))
+                  aus_dem_bild=aus_dem_bild)
 
 
 # --------------------------------------------------------------------------
@@ -1579,6 +1624,11 @@ def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list
     """
     for altes in sammelimport.quellgrafiken(k):
         altes.unlink()
+    # Eine Wissenskarte hat kein `schaubild:`. Ihre Bilder stehen als Verweis
+    # im Text, und das größte eingebettete Bild eines PDF zeigt bei Theorie
+    # selten, was eine Kernaussage erklärt (#61).
+    if k.sorte is WISSENSKARTE:
+        return ["- Bilder: keine. Setz keinen Bildverweis in den Entwurf."], []
     if not sammelimport.quellgrafik_ausschneiden:
         return ["- Quellgrafik: wird bei dieser Quelle nicht ausgeschnitten."], []
     pdfs = [d.name for d in k.dateien if _ist_pdf(d.name)]
@@ -1734,9 +1784,16 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
     `quelldatei:` steht relativ zu `quellen/`, so wie auf der Karte, damit sie
     auf jedem Rechner stimmt, egal wo dort der Arbeitsordner liegt. Sie nennt
     die Dateien ohne Seitenbereich, die Seiten kommen in `quelle` (#64).
+
+    Der Auftrag einer Wissenskarte hat dieselbe Form, nur ohne die Zeile
+    „Ablauf aus dem Bild“ (#70): Eine Wissenskarte hat keinen Ablauf, den die
+    Regel „wenig Text“ zählen könnte. Die Kennungen kommen für beide Sorten
+    samt den Steuerungsschwerpunkten. Die stehen auf keiner Übungskarte, auf
+    einer Wissenskarte schon.
     """
     relativ = [f"{sammelimport.ordner}/{d.name}" for d in k.dateien]
     dateien, texte = dateien_im_auftrag(sammelimport, k, pdftotext)
+    ablauf = [ablauf_aus_dem_bild(sammelimport, texte)] if k.sorte is UEBUNGSKARTE else []
     teile = [
         f"# Auftrag für Kandidat {k.nummer}",
         "",
@@ -1745,7 +1802,7 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
         f"- Was es ist: {k.was}",
         f"- Typ laut Zerlegungsplan: `{k.ergebnis}`",
         f"- `quelldatei:` `{', '.join(relativ)}`",
-        ablauf_aus_dem_bild(sammelimport, texte),
+        *ablauf,
         *quellgrafikzeilen,
         f"- Zielpfad des Entwurfs: `{sammelimport.entwurf(k).as_posix()}`",
         "",
@@ -1871,7 +1928,7 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     for k in dran:
         quellgrafikzeilen, meldungen = lege_quellgrafiken_an(sammelimport, k)
         auftrag = schreibe_auftrag(sammelimport, k, kennungen, pdftotext, quellgrafikzeilen)
-        print(f"  {k.nummer}  {auftrag.as_posix()}")
+        print(f"  {k.nummer}  {SORTENNAME[k.sorte]}  {auftrag.as_posix()}")
         for meldung in meldungen:
             print(f"      {meldung}")
     return 0
@@ -1925,6 +1982,7 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
         "kandidat": k.nummer,
         "was": k.was,
         "ergebnis": k.ergebnis,
+        "sorte": SORTENNAME[k.sorte],
         "dateien": [d.name for d in k.dateien],
         "status": k.status,
         "notiz": k.notiz,
