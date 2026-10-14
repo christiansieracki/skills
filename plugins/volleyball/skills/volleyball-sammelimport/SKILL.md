@@ -1,6 +1,6 @@
 ---
 name: volleyball-sammelimport
-description: Führt den Sammelimport über einen ganzen Quellenordner im Gespräch, von den Absprachen über den Zerlegungsplan und die Kartenentwürfe der Plugin-Agenten bis zur Freigabe und Übernahme in die Übungsbibliothek. Use when the user asks for a Sammelimport über quellen/<ordner>, wants a whole folder of drill sources (PlayDrill PDFs, photographed magazine pages) imported at once, or says „weiter mit dem Sammelimport <ordner>“. Companion zu volleyball-uebungsimport, der einzelne Quellen importiert.
+description: Führt den Sammelimport über einen ganzen Quellenordner im Gespräch, von den Absprachen über den Zerlegungsplan und die Kartenentwürfe der Plugin-Agenten bis zur Freigabe und Übernahme in die Übungsbibliothek. Use when the user asks for a Sammelimport über quellen/<ordner>, wants a whole folder of drill sources (PlayDrill PDFs, photographed magazine pages) imported at once, or says „weiter mit dem Sammelimport <ordner>“ or „hol die zurückgestellten aus <ordner>“. Companion zu volleyball-uebungsimport, der einzelne Quellen importiert.
 ---
 
 # Sammelimport
@@ -44,12 +44,14 @@ Quellenordner relativ zu `quellen/`, etwa `playdrill`.
 
 ## Der Ablauf
 
-Bei jedem Einstieg, ob „Sammelimport über `quellen/<ordner>`“ oder „weiter mit
-dem Sammelimport `<ordner>`“:
+Bei jedem Einstieg, ob „Sammelimport über `quellen/<ordner>`“, „weiter mit
+dem Sammelimport `<ordner>`“ oder „hol die zurückgestellten aus `<ordner>`“:
 
 1. Liegt in `quellen/<ordner>/` keine `sammelimport.md`, die Absprachen
    anlegen.
-2. Der Zerlegungsplan für die Dateien, die neu sind.
+2. Der Zerlegungsplan für die Dateien, die neu sind. Beim Einstieg „hol die
+   zurückgestellten“ dazu für die Zeilen mit Status `zurückgestellt`, siehe
+   „Der Zerlegungsplan“. Sonst bleiben sie liegen.
 3. In den Einstellungen der `sammelimport.md` nachsehen, wer unter
    `in_arbeit` steht. Ist es ein anderer Trainer als der dieses Rechners laut
    `trainer:` in der Wurzeldatei, ihn und das Datum nennen und erst nach dem
@@ -163,7 +165,9 @@ angenommener Vorschlag oder als Ausnahme.
 
 1. `sammelimport.py vorbereiten --plan <ordner>`. Es schreibt
    `kartenentwuerfe/<ordner>/planeingabe.md`: jede Datei, die noch in keiner
-   Zeile der Übersicht steht und die `ohne` nicht auslässt.
+   Zeile der Übersicht steht und die `ohne` nicht auslässt. Holt der Trainer
+   die zurückgestellten, `vorbereiten --plan --zurueckgestellte <ordner>`:
+   Dann kommen die zurückgestellten Zeilen mit ihren Dateien dazu.
    - **„Keine neuen Dateien“:** Kein Agent, und kein Plan wird vorgelegt.
      Eine ältere Planeingabe und ein älterer Plan bleiben liegen. Weiter mit
      Schritt 3 des Ablaufs.
@@ -189,7 +193,8 @@ angenommener Vorschlag oder als Ausnahme.
 
    Vorgelegt werden zuerst die Rückfragen aus der Spalte Notiz, gebündelt wie
    unter „Gebündelt fragen“. Gruppen sind etwa „Kopie desselben Blatts“,
-   „Duplikat einer Karte“, „Variante“ und „Folge oder Übung“. Zu jedem
+   „Duplikat einer Karte“, „Variante“, „Folge oder Übung“ und „Fortsetzung
+   einer Wissenskarte“. Zu jedem
    Kandidaten stehen die Dateien und „Was es ist“. Eine Gruppe mit Duplikaten
    sagt, was geprüft ist und was dabei herauskam. Bestätigt die Prüfung einen
    Verdacht nicht, steht der Kandidat beim Rest. Lässt er sich nicht prüfen,
@@ -201,6 +206,9 @@ angenommener Vorschlag oder als Ausnahme.
    - **Streichen:** Ergebnis und Status `übersprungen`, der Grund in der
      Notiz. Die Zeile bleibt stehen, sonst gelten ihre Dateien beim nächsten
      Lauf als neu.
+   - **Zurückstellen:** Ergebnis und Status `zurückgestellt`, der Grund in
+     der Notiz. Der Trainer holt die Zeile später mit „hol die
+     zurückgestellten aus `<ordner>`“.
    - **Rückfragen beantworten:** Die Rückfrage verschwindet aus der Notiz. Was
      der Kartenentwurf aus der Antwort wissen muss, kommt in „Was es ist“. Die
      Notiz eines offenen Kandidaten überschreibt `pruefen`, „Was es ist“ liest
@@ -216,14 +224,23 @@ angenommener Vorschlag oder als Ausnahme.
      - Aufstellung, Spielerzahl oder Ziel sind anders: eine eigene Karte. Der
        Kandidat bleibt `offen`, und „Was es ist“ bekommt „Variante von
        ue-######“ dazu.
+   - **Verdacht auf eine Fortsetzung einer Wissenskarte:** Die Wissenskarte
+     aus der Rückfrage lesen und mit „Was es ist“ vorlegen.
+     - Dieselbe Frage: Der Kandidat bleibt `offen`, und „Was es ist“ bekommt
+       „ergänzt wi-######“ dazu, vor `Übungen:`, das am Ende bleibt.
+       Ergänzt wird bei der Freigabe des Durchgangs.
+     - Eine andere Frage: Die Rückfrage fällt weg, der Kandidat wird eine
+       eigene Wissenskarte.
 
    Fertig ist der Plan, wenn keine Notiz mehr eine Rückfrage trägt und der
    Trainer Ja sagt.
 4. Die Zeilen des Plans in die Übersicht der `sammelimport.md` übernehmen,
    genau in seiner Form: ein Kandidat je Textzeile, jede Datei in Backticks.
-   Gibt es dort schon Zeilen, kommen die neuen direkt darunter, ohne Leerzeile.
-   Sonst mit dem Kopf aus dem Plan. `plan_freigegeben` bekommt das Datum von
-   heute, `JJJJ-MM-TT`. Das ist die einzige Stelle, an der der Skill die
+   Eine Zeile, deren Nummer es in der Übersicht schon gibt, ersetzt dort die
+   alte, an ihrer Stelle. Das sind die Zeilen aus zurückgestellten. Die
+   übrigen kommen unter die letzte Zeile, ohne Leerzeile. Gibt es noch keine
+   Übersicht, mit dem Kopf aus dem Plan. `plan_freigegeben` bekommt das Datum
+   von heute, `JJJJ-MM-TT`. Das ist die einzige Stelle, an der der Skill die
    Übersicht schreibt. Danach schreibt nur noch das Skript hinein.
 5. `sammelimport.py vorbereiten --plan <ordner>` noch einmal. Erwartet ist
    „Keine neuen Dateien“. Nennt es Dateien, fehlen sie im Plan: mit dem
@@ -275,13 +292,13 @@ angenommener Vorschlag oder als Ausnahme.
 7. Übernehmen, mit allen Entscheidungen des Trainers in einem Aufruf:
 
    ```
-   sammelimport.py uebernehmen <ordner> --kandidat 12 "spieler_min auf 6" --kandidat 13 "unverändert" --uebersprungen 14 "Vorlage, keine Übung" --ergaenzt 15 ue-000027
+   sammelimport.py uebernehmen <ordner> --kandidat 12 "spieler_min auf 6" --kandidat 13 "unverändert" --uebersprungen 14 "Vorlage, keine Übung" --zurueckgestellt 16 "Spielzüge, später holen" --ergaenzt 15 ue-000027
    ```
 
    `--kandidat` mit dem, was der Trainer geändert hat, in wenigen Wörtern.
-   `--uebersprungen` mit dem Grund. `--ergaenzt` mit der ID der ergänzten
-   Karte. Was der Trainer offengelassen hat, fehlt im Aufruf und kommt bei der
-   nächsten Freigabe wieder.
+   `--uebersprungen` und `--zurueckgestellt` mit dem Grund. `--ergaenzt` mit
+   der ID der ergänzten Karte. Was der Trainer offengelassen hat, fehlt im
+   Aufruf und kommt bei der nächsten Freigabe wieder.
 
    Was nicht geklappt hat, nennt die Ausgabe je Kandidat, und der Exitcode ist
    ungleich 0. Entwurf und Status bleiben dann stehen, wie sie sind.
@@ -289,10 +306,10 @@ angenommener Vorschlag oder als Ausnahme.
      `uebernehmen` für diesen Kandidaten noch einmal. Liegt in `schaubilder/`
      schon eine Datei unter dem Namen der neuen Karte, dem Trainer sagen,
      welche. Was mit ihr geschieht, entscheidet er.
-   - **„nicht übersprungen“ oder „nicht ergänzt“:** Die Meldung sagt, warum:
-     Der Grund fehlt, die ID gibt es nicht, oder der Kandidat ist schon
-     erledigt. Mit dem Trainer klären und den Aufruf für diesen Kandidaten
-     wiederholen.
+   - **„nicht übersprungen“, „nicht zurückgestellt“ oder „nicht ergänzt“:**
+     Die Meldung sagt, warum: Der Grund fehlt, die ID gibt es nicht, oder
+     der Kandidat ist schon erledigt. Mit dem Trainer klären und den Aufruf
+     für diesen Kandidaten wiederholen.
    - **„Nichts übernommen.“ am Ende der Meldung:** Geschrieben ist nichts.
      Fehlt `quellen/<ordner>/` an diesem Rechner, gleicht die Nextcloud ihn
      nicht ab, und der Trainer muss das richten. Geht es um die ID, etwa weil
@@ -369,8 +386,10 @@ Unter der Tabelle steht:
 
 Der Trainer gibt pauschal frei, zeilenweise, oder korrigiert direkt, etwa
 „alles frei außer 14, 12 mit 8 bis 12 Spielern, 14 streichen, ist eine
-Vorlage“. Fertig ist die Freigabe, wenn jede Zeile freigegeben, korrigiert,
-gestrichen oder ausdrücklich offengelassen ist.
+Vorlage“. Statt zu streichen kann er einen Kandidaten zurückstellen, mit
+Grund, um ihn später zu holen. Fertig ist die Freigabe, wenn jede Zeile
+freigegeben, korrigiert, gestrichen, zurückgestellt oder ausdrücklich
+offengelassen ist.
 
 ## Einarbeiten
 
@@ -410,4 +429,6 @@ Was der Trainer hört:
 - die abgewiesenen Entwürfe mit Grund und die Kandidaten mit `kein Entwurf`;
 - ob noch etwas offen ist. Meldet `uebernehmen` „Nichts mehr offen“, ist der
   Sammelimport fertig. Sonst den nächsten Durchgang anbieten, gleich oder in
-  einer neuen Sitzung mit „weiter mit dem Sammelimport `<ordner>`“.
+  einer neuen Sitzung mit „weiter mit dem Sammelimport `<ordner>`“. Liegen
+  Zeilen mit Status `zurückgestellt` in der Übersicht, ihre Zahl nennen: Sie
+  kommen nur mit „hol die zurückgestellten aus `<ordner>`“ wieder.
