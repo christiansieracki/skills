@@ -661,6 +661,22 @@ class Vorschlag:
 
 
 @dataclass
+class Ausschnitt:
+    """Ein Ausschnitt aus `## Freigabe`: welche Quellgrafik woraus (#63).
+
+    `datei` steht relativ zum Quellenordner wie in der Spalte Dateien,
+    `seite` gibt es nur bei einem PDF und zählt dort ab 1. `rechteck` ist
+    links, oben, rechts, unten in Prozent der aufrechten Seite, wie bei
+    `ausschnitt.py`.
+    """
+
+    name: str
+    datei: str
+    seite: int | None
+    rechteck: tuple[int, int, int, int]
+
+
+@dataclass
 class Befund:
     """Was die Prüfung eines Kartenentwurfs ergeben hat.
 
@@ -673,6 +689,7 @@ class Befund:
     vorschlaege: list[Vorschlag] = field(default_factory=list)
     rueckfragen: list[Rueckfrage] = field(default_factory=list)
     aus_dem_bild: bool = False
+    ausschnitte: list[Ausschnitt] = field(default_factory=list)
 
     @property
     def mit_vermutung(self) -> list[Rueckfrage]:
@@ -683,7 +700,7 @@ class Befund:
         return [r for r in self.rueckfragen if r.vermutung is None]
 
 
-_LISTENKOPF = re.compile(r"^(Vorschläge|Rückfragen):\s*(.*)$")
+_LISTENKOPF = re.compile(r"^(Ausschnitte|Vorschläge|Rückfragen):\s*(.*)$")
 _PUNKT = re.compile(r"^(?:-|\d+\.)\s+(.*)$")
 _ZIEL = re.compile(r"`([^`]+)`(.*)")
 
@@ -841,19 +858,145 @@ def pruefe_frontmatter(sammelimport: Sammelimport, k: Kandidat, felder: dict) ->
     # Im Entwurf nennt `schaubild:` die Quellgrafiken neben ihm, einzeln oder als
     # Liste, und nur die eigenen: `uebernehmen` trägt sie nach schaubilder/,
     # unter den Namen der Karte. Ein fremdes fehlte danach seinem Kandidaten,
-    # und ein doppeltes ließe sich nur einmal verschieben.
+    # und ein doppeltes ließe sich nur einmal verschieben. Ob jede daneben
+    # liegt, prüft `pruefe_quellgrafiken_daneben`, erst nach dem Schneiden der
+    # Ausschnitte.
     gesehen: set[str] = set()
     for name in schaubilder(felder.get("schaubild")):
         if not sammelimport.ist_quellgrafik_von(k, name):
-            raise Formfehler(
-                f"schaubild: nennt {name}, das ist keine Quellgrafik dieses Kandidaten "
-                f"({sammelimport.quellgrafik(k).name}, bei mehreren "
-                f"{sammelimport.quellgrafik(k, 1).name} und weiter)")
+            raise Formfehler(f"schaubild: nennt {name}, das ist keine Quellgrafik dieses "
+                             f"Kandidaten ({_namen_der_quellgrafiken(sammelimport, k)})")
         if name in gesehen:
             raise Formfehler(f"schaubild: nennt {name} zweimal")
         gesehen.add(name)
+
+
+def _namen_der_quellgrafiken(sammelimport: Sammelimport, k: Kandidat) -> str:
+    """Wie die Quellgrafiken eines Kandidaten heißen, für eine Meldung."""
+    return (f"{sammelimport.quellgrafik(k).name}, bei mehreren "
+            f"{sammelimport.quellgrafik(k, 1).name} und weiter, ein Ausschnitt aus einem Foto "
+            f"auf .jpg")
+
+
+def pruefe_quellgrafiken_daneben(sammelimport: Sammelimport, felder: dict) -> None:
+    """Bricht mit Formfehler ab, wenn eine Quellgrafik aus `schaubild:` nicht neben dem Entwurf liegt.
+
+    Etwa weil sie jemand beim Aufräumen gelöscht hat. Die Karte zeigte nach
+    der Übernahme ins Leere.
+    """
+    for name in schaubilder(felder.get("schaubild")):
         if not (sammelimport.entwurfsordner / name).is_file():
             raise Formfehler(f"Quellgrafik {name} liegt nicht neben dem Entwurf")
+
+
+# Ein Ausschnitt in `## Freigabe`, die Form ist die Entscheidung aus #61:
+# `17.quellgrafik-2.png`: `Merkmale.pdf` S. 3, links 5, oben 20, rechts 95, unten 61
+_AUSSCHNITT = re.compile(
+    r"`(?P<name>[^`]+)`:\s*`(?P<datei>[^`]+)`(?:\s+S\.\s*(?P<seite>\d+))?\s*,\s*"
+    r"links\s+(?P<links>\d+)\s*,\s*oben\s+(?P<oben>\d+)\s*,\s*"
+    r"rechts\s+(?P<rechts>\d+)\s*,\s*unten\s+(?P<unten>\d+)\.?")
+
+
+def lies_ausschnitte(rumpf: str) -> list[Ausschnitt]:
+    """Die Liste `Ausschnitte:` unter `## Freigabe`, oder Formfehler, wenn ein Punkt sie verfehlt.
+
+    Die Liste gibt es nur, wenn der Entwurf Ausschnitte hat (#63). Ohne sie,
+    oder ohne `## Freigabe`, kommt eine leere Liste. Dass `## Freigabe`
+    fehlt, meldet `lies_freigabe`.
+    """
+    freigabe = _abschnitt(rumpf.splitlines(), "Freigabe") or []
+    ausschnitte = []
+    for nr, text in enumerate(_listen(freigabe).get("Ausschnitte", []), 1):
+        treffer = _AUSSCHNITT.fullmatch(text.strip())
+        if not treffer:
+            raise Formfehler(
+                f"Ausschnitt {nr} hat nicht die feste Form `<name>`: `<datei>` S. <seite>, "
+                f"links <zahl>, oben <zahl>, rechts <zahl>, unten <zahl>")
+        seite = treffer.group("seite")
+        ausschnitte.append(Ausschnitt(
+            treffer.group("name").strip(), treffer.group("datei").strip(),
+            int(seite) if seite else None,
+            tuple(int(treffer.group(name)) for name in ("links", "oben", "rechts", "unten"))))
+    return ausschnitte
+
+
+def _bereiche(eintraege: list[Datei]) -> list[Seitenbereich] | None:
+    """Die Seitenbereiche, mit denen eine Datei beim Kandidaten steht, None für die ganze Datei.
+
+    Steht sie einmal ohne Bereich da, gehört sie ganz zum Kandidaten. Einen
+    Bereich, den das Skript nicht lesen kann, hat `vorbereiten` schon
+    abgewiesen. Hier schränkt er nichts ein.
+    """
+    bereiche = []
+    for d in eintraege:
+        try:
+            bereich = d.seiten
+        except ValueError:
+            return None
+        if bereich is None:
+            return None
+        bereiche.append(bereich)
+    return bereiche
+
+
+def pruefe_ausschnitte(sammelimport: Sammelimport, k: Kandidat, ausschnitte: list[Ausschnitt],
+                       felder: dict) -> None:
+    """Bricht mit Formfehler ab, wenn ein Ausschnitt so nicht Quellgrafik werden kann (#63).
+
+    Geprüft wird, was sich ohne Schneiden prüfen lässt. Der Name ist der
+    einer Quellgrafik dieses Kandidaten und kommt einmal vor, sonst
+    überschriebe ein Ausschnitt den anderen. Die Datei ist eine des
+    Kandidaten, bei einem Seitenbereich auch die Seite. Die Endung passt zur
+    Datei, wie bei `ausschnitt.py`. Und `schaubild:` nennt den Ausschnitt,
+    denn auf die Karte kommt nur, was dort steht.
+    """
+    gesehen: set[str] = set()
+    eingetragen = set(schaubilder(felder.get("schaubild")))
+    for a in ausschnitte:
+        if not sammelimport.ist_quellgrafik_von(k, a.name):
+            raise Formfehler(f"Ausschnitt {a.name} ist kein Name für eine Quellgrafik dieses "
+                             f"Kandidaten ({_namen_der_quellgrafiken(sammelimport, k)})")
+        if a.name in gesehen:
+            raise Formfehler(f"Ausschnitt {a.name} steht zweimal da")
+        gesehen.add(a.name)
+        eintraege = [d for d in k.dateien if _nfc(d.name) == _nfc(a.datei)]
+        if not eintraege:
+            raise Formfehler(f"Ausschnitt {a.name} nennt {a.datei}, die Datei gehört nicht zu "
+                             f"Kandidat {k.nummer}")
+        try:
+            endung, form = ergebnis_des_ausschnitts(Path(a.datei))
+        except KeinAusschnitt as fehler:
+            raise Formfehler(f"Ausschnitt {a.name}: {fehler}") from None
+        if Path(a.name).suffix != endung:
+            raise Formfehler(f"Ausschnitt {a.name}: aus {a.datei} wird ein {form}, der Name "
+                             f"endet deshalb auf {endung}")
+        bereiche = _bereiche(eintraege)
+        if a.seite is not None and bereiche and not any(
+                b.erste <= a.seite <= b.letzte for b in bereiche):
+            raise Formfehler(f"Ausschnitt {a.name} nennt {a.datei} S. {a.seite}, zu Kandidat "
+                             f"{k.nummer} gehört nur {', '.join(map(str, bereiche))}")
+        if a.name not in eingetragen:
+            raise Formfehler(f"Ausschnitt {a.name} fehlt in schaubild:")
+
+
+def schneide_ausschnitte(sammelimport: Sammelimport, k: Kandidat,
+                         ausschnitte: list[Ausschnitt]) -> None:
+    """Schneidet jeden Ausschnitt neu aus und legt ihn neben den Entwurf (#63).
+
+    Bei jedem Lauf, über dieselbe Funktion wie `ausschnitt.py`. Hat der
+    Skill bei der Freigabe die Zahlen geändert, liegt danach der neue
+    Ausschnitt da. Lässt sich einer nicht schneiden, etwa weil es die Seite
+    nicht gibt, ist das ein Formfehler mit dem Grund aus `ausschnitt.py`.
+    Fehlt eine Bibliothek, kommt BibliothekFehlt durch: Das ist kein Fehler
+    des Entwurfs, und der Aufrufer bricht ab.
+    """
+    for a in ausschnitte:
+        datei = next(d for d in k.dateien if _nfc(d.name) == _nfc(a.datei))
+        try:
+            schneide_aus(sammelimport.quellordner / datei.name,
+                         sammelimport.entwurfsordner / a.name, a.rechteck, a.seite)
+        except KeinAusschnitt as fehler:
+            raise Formfehler(f"Ausschnitt {a.name}: {fehler}") from None
 
 
 def lies_vorschlag(nr: int, text: str, felder: dict, ueberschriften: set[str]) -> Vorschlag:
@@ -926,6 +1069,11 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
     Abgewiesen wird ein Entwurf, der das Datenmodell bricht oder die Form der
     Freigabe nicht einhält. Der Agent hat nicht nachfragen können, und was
     hier durchkäme, stünde nach der Freigabe so auf der Karte.
+
+    Die Ausschnitte eines Entwurfs, der sonst besteht, werden dabei neu
+    geschnitten, bei jedem Aufruf, der prüft: Was neben ihm liegt, folgt so
+    immer den Zahlen in `## Freigabe`. Fehlt dafür eine Bibliothek, kommt
+    BibliothekFehlt durch, siehe `schneide_ausschnitte`.
     """
     datei = sammelimport.entwurf(k)
     if not datei.is_file():
@@ -942,10 +1090,15 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
     try:
         pruefe_frontmatter(sammelimport, k, felder)
         vorschlaege, rueckfragen = lies_freigabe(rumpf, felder)
+        ausschnitte = lies_ausschnitte(rumpf)
+        pruefe_ausschnitte(sammelimport, k, ausschnitte, felder)
+        schneide_ausschnitte(sammelimport, k, ausschnitte)
+        pruefe_quellgrafiken_daneben(sammelimport, felder)
     except Formfehler as fehler:
         return Befund(str(fehler))
     return Befund(felder=felder, vorschlaege=vorschlaege, rueckfragen=rueckfragen,
-                  aus_dem_bild=laut_auftrag_aus_dem_bild(sammelimport.auftrag(k)))
+                  aus_dem_bild=laut_auftrag_aus_dem_bild(sammelimport.auftrag(k)),
+                  ausschnitte=ausschnitte)
 
 
 # --------------------------------------------------------------------------
@@ -1849,8 +2002,12 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     sammelimport.verlange_freigabe()
     trainer = trainer_fuer_auftraege(wurzel)
     verlange_freien_quellenordner(sammelimport, trainer, trotzdem)
-    offen = [k for k in sammelimport.kandidaten
-             if k.wartet and pruefe_entwurf(sammelimport, k).fehler]
+    try:
+        offen = [k for k in sammelimport.kandidaten
+                 if k.wartet and pruefe_entwurf(sammelimport, k).fehler]
+    except BibliothekFehlt as fehler:
+        raise Abbruch(f"Ein Entwurf nennt einen Ausschnitt.\n{fehler}\n\n"
+                      f"Es ist noch kein Auftrag geschrieben.") from None
     dran = offen[:sammelimport.je_durchgang]
     print(f"Aufträge für {len(dran)} von {len(offen)} offenen Kandidaten:")
     if not dran:
@@ -1935,6 +2092,11 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
         "quellgrafiken": [(sammelimport.entwurfsordner / name).as_posix()
                           for name in schaubilder(befund.felder.get("schaubild"))],
         "quellgrafik_fehlt": laut_auftrag_ohne_quellgrafik(sammelimport.auftrag(k), k),
+        "ausschnitte": [{"name": a.name,
+                         "pfad": (sammelimport.entwurfsordner / a.name).as_posix(),
+                         "datei": a.datei, "seite": a.seite,
+                         "rechteck": dict(zip(("links", "oben", "rechts", "unten"), a.rechteck))}
+                        for a in befund.ausschnitte],
         "ablauf_aus_dem_bild": befund.aus_dem_bild,
         "felder": befund.felder,
         "vorschlaege": {
@@ -1968,7 +2130,13 @@ def pruefen(wurzel: Path, ordner: str, als_json: bool = False) -> int:
     for k in sammelimport.kandidaten:
         if not k.wartet:
             continue
-        befund = pruefe_entwurf(sammelimport, k)
+        try:
+            befund = pruefe_entwurf(sammelimport, k)
+        except BibliothekFehlt as fehler:
+            # Kein Fehler des Entwurfs. Abgewiesen ginge er auf `offen` und
+            # würde neu entworfen, mit demselben Ergebnis.
+            raise Abbruch(f"Der Entwurf von Kandidat {k.nummer} nennt einen Ausschnitt.\n"
+                          f"{fehler}\n\nDie Übersicht ist nicht geändert.") from None
         setze_befund(k, befund)
         stand[k.status] = stand.get(k.status, 0) + 1
         if sammelimport.entwurf(k).is_file():
@@ -2129,7 +2297,12 @@ def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> st
     grund = warum_nicht_wartend(k)
     if grund or k is None:
         return grund
-    return pruefe_entwurf(sammelimport, k).fehler
+    try:
+        return pruefe_entwurf(sammelimport, k).fehler
+    except BibliothekFehlt as fehler:
+        # Für den Ausschnitt fehlt eine Bibliothek. Die übrigen Kandidaten
+        # gehen trotzdem durch, die Meldung steht in einer Zeile.
+        return " ".join(str(fehler).split())
 
 
 def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
