@@ -362,12 +362,29 @@ Seite. Steht hier, damit der Test sie im Auftrag wiederfindet.
 """
 
 
+def _dateiname(datei: str | tuple[str, str]) -> str:
+    """Der Name einer Datei aus `dateien`, ohne ihren Seitenbereich."""
+    return datei if isinstance(datei, str) else datei[0]
+
+
+def _als_zelle(datei: str | tuple[str, str]) -> str:
+    """Eine Datei aus `dateien` so, wie sie in der Spalte Dateien steht (#64).
+
+    Ein Name allein steht in Backticks. Ein Paar aus Name und Seitenbereich,
+    etwa `("heft.pdf", "S. 2–3")`, bekommt den Bereich dahinter.
+    """
+    if isinstance(datei, str):
+        return f"`{datei}`"
+    name, seiten = datei
+    return f"`{name}` {seiten}"
+
+
 def _als_sammelimport(kandidaten: list[dict], freigegeben: str | None,
                       je_durchgang: int, absprachen: str, einstellungen: dict) -> str:
     zeilen = ["| " + " | ".join(UEBERSICHT_SPALTEN) + " |",
               "|" + "---|" * len(UEBERSICHT_SPALTEN)]
     for k in kandidaten:
-        dateien = ", ".join(f"`{d}`" for d in k["dateien"])
+        dateien = ", ".join(_als_zelle(d) for d in k["dateien"])
         zellen = [str(k["kandidat"]), dateien, k.get("was", "Übung aus dem Test"),
                   k.get("ergebnis", "uebung"), k.get("status", "offen"),
                   k.get("karte", ""), k.get("notiz", "")]
@@ -793,11 +810,12 @@ class Arbeitsordner:
         """Legt einen Quellenordner mit `sammelimport.md` und Quelldateien an.
 
         `kandidaten` sind die Zeilen der Uebersicht. Jede nennt `kandidat` und
-        `dateien`, relativ zum Quellenordner. Die uebrigen Spalten haben einen
-        Standard: eine offene Uebung ohne Karte und Notiz. Jede genannte Datei
-        entsteht leer unter `quellen/<ordner>/`. Wer ihren Inhalt braucht,
-        etwa den Text eines PDF, legt sie danach mit `lege_quell_pdf_an`
-        neu an.
+        `dateien`, relativ zum Quellenordner. Eine Datei mit Seitenbereich
+        steht dort als Paar, etwa `("heft.pdf", "S. 2–3")`. Die uebrigen
+        Spalten haben einen Standard: eine offene Uebung ohne Karte und
+        Notiz. Jede genannte Datei entsteht leer unter `quellen/<ordner>/`.
+        Wer ihren Inhalt braucht, etwa den Text eines PDF, legt sie danach mit
+        `lege_quell_pdf_an` neu an.
 
         `freigegeben=None` ist der Plan, den der Trainer noch nicht
         freigegeben hat. Weitere Einstellungen, etwa `textmarke`, kommen
@@ -805,7 +823,7 @@ class Arbeitsordner:
         """
         for k in kandidaten:
             for datei in k["dateien"]:
-                self.lege_quelldatei_an(f"{ordner}/{datei}", b"")
+                self.lege_quelldatei_an(f"{ordner}/{_dateiname(datei)}", b"")
         datei = self.pfad / "quellen" / ordner / "sammelimport.md"
         datei.parent.mkdir(parents=True, exist_ok=True)
         datei.write_text(

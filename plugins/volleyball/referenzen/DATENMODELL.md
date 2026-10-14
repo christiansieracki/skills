@@ -372,12 +372,23 @@ die für jede Karte gelten, stehen zuletzt unter
 |---|---|---|---|---|---|---|
 | 1 | `Ü_Abwehr/Abwehr vom Kasten.pdf` | Abwehr gegen Angriffe vom Kasten | uebung | importiert | ue-000291 | spieler_min auf 6 |
 | 2 | `seite-24.jpg`, `seite-25.jpg` | Übung über zwei Seiten | uebung | offen | | kein Entwurf |
+| 3 | `volley-meets-school.pdf` S. 12–13 | Ballgewöhnung mit dem Luftballon | uebung | offen | | |
 ```
 
 - Die Spalte **Kandidat** trägt die Nummer des Kandidaten, fortlaufend je
   Quellenordner. Sie bleibt und benennt Entwurf und Auftrag. Ein zweiter Lauf
   zählt ab der höchsten Nummer in der Übersicht weiter.
-- **Dateien** stehen relativ zum Quellenordner, jede in Backticks.
+- **Dateien** stehen relativ zum Quellenordner, jede in Backticks. Hinter
+  einem PDF darf ein **Seitenbereich** stehen, `` `TechnikGuidelines.pdf` S. 12–15 ``
+  oder `` `Merkmale.pdf` S. 3 ``, mit Halbgeviertstrich oder Bindestrich.
+  Dann gehören nur diese Seiten zum Kandidaten, ohne Seitenbereich die ganze
+  Datei. So ergibt ein langes PDF mehrere Kandidaten, und eine Datei steht
+  mit verschiedenen Bereichen in mehreren Zeilen. Einen Seitenbereich gibt es
+  nur bei PDFs. Hat ein Kandidat des Durchgangs einen an einem Foto, einen
+  über die letzte Seite hinaus oder einen, der sich nicht lesen lässt, bricht
+  `vorbereiten` vor dem ersten Auftrag ab, und die Meldung nennt die Zeile.
+  Die letzte Seite kennt das Skript aus `pdftotext`. Ohne `pdftotext` merkt
+  es erst der Agent.
 - **Ergebnis** ist eins von `uebung`, `folge`, `zurückgestellt`, `übersprungen`.
   Aus `uebung` und `folge` wird eine Karte mit diesem `typ`.
 - **Status** ist eins von `offen`, `bereit`, `rückfrage`, `importiert`,
@@ -422,6 +433,10 @@ die Eingabe für den Zerlegungsplan: jede Datei des Quellenordners, die noch in
 keiner Zeile der Übersicht steht und die `ohne` nicht auslässt, bei PDFs ihr
 Text, die nächste freie Kandidatennummer, ohne Übersicht 1, und die
 Bibliotheksliste, in der die Karten aus diesem Quellenordner markiert sind.
+Eine Datei, die mit einem Seitenbereich in einer Zeile steht, ist nicht mehr
+neu, gleich welche Seiten die Zeile nennt. In der Planeingabe steht im Text
+eines PDF vor jeder Seite eine **Seitenmarke**, `=== Seite 3 ===`, auch vor
+einer Seite ohne Text. Daran nennt der Zerlegungsplan Seitenbereiche.
 Daneben schreibt der Agent `volleyball-zerlegungsplan` den Plan als
 `zerlegungsplan.md`, in der Form der Übersicht. Daraus wird nach der Freigabe
 die Übersicht. Der Rest ist nach der Nummer des Kandidaten benannt:
@@ -430,8 +445,12 @@ die Übersicht. Der Rest ist nach der Nummer des Kandidaten benannt:
 `17.quellgrafik-1.png`, `17.quellgrafik-2.png` und so weiter.
 
 Der Auftrag trägt unter jedem PDF des Kandidaten dessen ganzen Text, oder den
-Hinweis, dass der Agent das PDF selbst lesen muss. Er sagt, ob der Ablauf aus
-dem Bild kommt. Ist `quellgrafik_ausschneiden` an, schneidet `vorbereiten`
+Hinweis, dass der Agent das PDF selbst lesen muss. Nennt der Kandidat einen
+Seitenbereich, steht nur der Text dieser Seiten da, und der Auftrag sagt, dass
+der Agent im PDF nur diese Seiten öffnet, ohne Text, dass er diese Seiten
+selbst liest. `quelldatei` nennt auch dann nur die Datei, die Seiten stehen
+in `quelle`. Der Auftrag sagt, ob der Ablauf aus dem Bild kommt, gezählt
+wird dafür nur der Text dieser Seiten. Ist `quellgrafik_ausschneiden` an, schneidet `vorbereiten`
 aus jedem PDF des Kandidaten, das ein Bild einbettet, das größte Bild aus. Der
 durchsichtige Rand fällt weg. Eine einzelne Quellgrafik steht im Entwurf als
 `schaubild: 17.quellgrafik.png`. Mehrere nennt der Auftrag in der Reihenfolge

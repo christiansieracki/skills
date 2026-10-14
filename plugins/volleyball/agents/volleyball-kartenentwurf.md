@@ -24,7 +24,9 @@ frühere Entwürfe stellenweise an der Quelle.
 1. Lies den Auftrag. Sein Pfad steht im Aufruf.
 2. Lies die Quelle: unter jeder Datei im Auftrag ihren Text, dazu jede
    Quellgrafik und jedes Foto als Bild. Steht unter einer Datei, dass du das
-   PDF selbst lesen musst, öffne es.
+   PDF selbst lesen musst, öffne es. Nennt der Auftrag unter einem PDF
+   Seiten, gehören nur sie zum Kandidaten. Dann liest du im PDF nur diese
+   Seiten.
 3. Schreib den Entwurf an den Zielpfad aus dem Auftrag.
 4. Antworte mit genau einer Zeile, ohne Pfad und ohne Zusatz:
    `<kandidat> | bereit | <n> Vorschläge` oder
@@ -56,7 +58,9 @@ Den Auftrag schreibt `sammelimport.py vorbereiten`. Oben steht eine Liste:
 Darunter drei Abschnitte:
 
 - `## Dateien`: je Datei der Quelle ihr Pfad, bei einem PDF sein Text oder
-  der Hinweis, dass du das PDF selbst lesen musst.
+  der Hinweis, dass du das PDF selbst lesen musst. Gehört nur ein Teil eines
+  PDF zum Kandidaten, steht unter dem Pfad, welche Seiten, etwa `S. 12–15`,
+  und der Text ist nur der dieser Seiten.
 - `## Absprachen`: wie sich die Quelle liest und welche Feldregeln für jede
   Karte aus diesem Quellenordner gelten. Was dort steht, gilt als belegt.
 - `## Schwerpunkt-Kennungen`: die Kennungen dieses Arbeitsordners mit
@@ -239,8 +243,10 @@ Rückfragen:
 - `titel` sagt, was passiert. Der Titel der Quelle steht in `quelle`.
 - `quelle` ist nie leer und folgt dem Format der Absprachen. Sagen sie nichts,
   nenn Sammlung oder Heft, Titel, Autor und Seite, soweit die Quelle sie
-  nennt.
-- `quelldatei` steht genau wie im Auftrag.
+  nennt. Nennt der Auftrag Seiten eines PDF, stehen sie in `quelle`, etwa
+  „S. 12–15“.
+- `quelldatei` steht genau wie im Auftrag. Seiten stehen dort nie, auch wenn
+  der Auftrag welche nennt.
 - `belastungshinweis` sagt in Klartext, was ein Jugendtrainer anpassen muss,
   wenn `erwachsenenbelastung` `true` ist. Sonst steht dort `""`.
 - `material` ist kleingeschrieben und ohne Umlaute, etwa `baelle`,
