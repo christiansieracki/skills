@@ -222,8 +222,10 @@ auch nicht.
 
 `uebungen` nennt die Übungen, die zur Karte gehören, etwa die aus demselben
 Beitrag. Die Übungskarte trägt nichts davon. Welche Wissenskarten auf eine
-Übung zeigen, rechnet `index.py` aus. `index.py` meldet eine ID, die es in
-`uebungen/` nicht gibt.
+Übung zeigen, rechnet der Index aus, den `index.py` und `suche.py` bei jedem
+Aufruf neu bauen. `index.md` nennt sie bei der Übung in der Spalte
+„Hintergrund“, `suche.py --json` unter `hintergrund`. `index.py` meldet eine
+ID, die es in `uebungen/` nicht gibt.
 
 ### Bilder
 
@@ -243,6 +245,20 @@ Der Weg ist relativ zur Karte, so zeigt jede Markdown-Ansicht das Bild. Ein
 Bild ohne Zusammenhang erklärt auf einer Wissenskarte nichts, deshalb gibt es
 kein Feld dafür. `index.py` meldet einen Bildverweis, dessen Datei es nicht
 gibt.
+
+### Wissenskarten finden
+
+Eine Suche nach Thema und Schwerpunkt gibt es noch nicht. Gefunden wird eine
+Wissenskarte auf zwei Wegen:
+
+- `index.md` hat den Abschnitt „Wissenskarten“, nach Thema gegliedert. Eine
+  Karte mit zwei Themen steht unter beiden. Je Karte stehen da die Frage, die
+  ID und die IDs ihrer Übungen.
+- `suche.py --wissen` listet alle Wissenskarten, eine Zeile je Karte mit ID,
+  Frage, Thema und Schwerpunkt. Mit `--json` kommen dazu Disziplin, `quelle`,
+  `quelldatei`, `uebungen` und die Datei, darüber prüft ein Import Duplikate.
+  Zusammen mit einem Filter für Übungen, etwa `--element`, endet `--wissen`
+  mit einer Meldung. Ohne `--wissen` findet `suche.py` nur Übungen.
 
 ### Die ID einer Wissenskarte
 
@@ -820,8 +836,8 @@ noch einen Browser.
 
 | Skript | Wofür |
 |---|---|
-| `index.py` | Index neu bauen, Bibliothek prüfen, mit `--md` die Lesebrille schreiben |
-| `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek. Mit `--naechste-id` die ID für die nächste Übungskarte, mit `--naechste-id --wissen` die für die nächste Wissenskarte, mit `--plaene-mit-leseansicht` die Trainingspläne, die eine Karte nennen und schon eine Leseansicht haben |
+| `index.py` | Index neu bauen, Bibliothek prüfen, mit `--md` die Lesebrille schreiben, samt den Wissenskarten nach Thema |
+| `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek. Mit `--wissen` alle Wissenskarten, mit `--naechste-id` die ID für die nächste Übungskarte, mit `--naechste-id --wissen` die für die nächste Wissenskarte, mit `--plaene-mit-leseansicht` die Trainingspläne, die eine Karte nennen und schon eine Leseansicht haben |
 | `leseansicht.py` | aus einem Trainingsplan die HTML-Fassung fürs Handy erzeugen, samt den Schaubildern der verwendeten Übungen. Meldet jede Überschrift, deren Zeitangabe auf keinen Programmpunkt passt |
 | `export_pdf.py` | PDF zum Ausdrucken |
 | `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen, mit `--png` dazu eine Ansicht als PNG im Temp-Verzeichnis |
