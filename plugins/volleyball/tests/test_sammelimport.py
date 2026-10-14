@@ -26,9 +26,10 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from arbeitsordner import OHNE, Arbeitsordner, PdfBild, auffaelligkeiten
+from arbeitsordner import OHNE, Arbeitsordner, PdfBild, PdfFlaeche, auffaelligkeiten
 
 ORDNER = "stapel"
+BLAU = (30, 120, 200)
 
 # Gesucht wird hier nur im PATH. Das Skript sucht unter Windows auch neben
 # git.exe. Steht pdftotext nur dort, werden diese Tests uebersprungen, obwohl
@@ -43,6 +44,28 @@ except ImportError:
     HAT_PILLOW = False
 
 BRAUCHT_PILLOW = unittest.skipUnless(HAT_PILLOW, "Pillow ist nicht installiert")
+
+try:
+    import pypdfium2  # noqa: F401
+    HAT_PYPDFIUM2 = True
+except ImportError:
+    HAT_PYPDFIUM2 = False
+
+BRAUCHT_PYPDFIUM2 = unittest.skipUnless(HAT_PYPDFIUM2, "pypdfium2 ist nicht installiert")
+
+
+def blende_aus(test: unittest.TestCase, modul: str) -> dict[str, str]:
+    """Die Umgebung fuer einen Aufruf, in dem sich `modul` nicht importieren laesst.
+
+    Wie in test_bilder.py: Ein `<modul>.py`, das beim Import abbricht,
+    verdeckt das echte Paket, denn der PYTHONPATH kommt vor den
+    site-packages. So laeuft der Test auch dort, wo es installiert ist.
+    """
+    schatten = Path(tempfile.mkdtemp(prefix=f"ohne-{modul}-"))
+    test.addCleanup(shutil.rmtree, schatten, True)
+    (schatten / f"{modul}.py").write_text(
+        f'raise ImportError("{modul} ist fuer diesen Test ausgeblendet")\n', encoding="utf-8")
+    return {"PYTHONPATH": str(schatten)}
 
 
 class VorbereitenTest(unittest.TestCase):
@@ -231,6 +254,36 @@ class VorbereitenTest(unittest.TestCase):
         self.assertIn("Offen", fertig.stdout)
         self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
 
+    def test_ein_durchgang_legt_fuer_eine_wissen_zeile_keinen_auftrag_an(self) -> None:
+        # Der Zerlegungsplan plant Theorie als Wissenskarte (#69). Ihren
+        # Entwurf schreibt erst der Agent aus #70. Bis dahin bleibt die Zeile
+        # offen, und der Durchgang nimmt nur die Uebung, ohne an der Zeile
+        # abzubrechen.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-01.jpg"]},
+            {"kandidat": 2, "dateien": ["seite-02.jpg"], "ergebnis": "wissen",
+             "was": "Wann lohnt sich einarmige Abwehr? Übungen: 1"},
+        ])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertEqual(self.auftraege(), ["1.auftrag.md"])
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["2"]["Status"], "offen")
+
+    def test_ein_unbekanntes_ergebnis_bricht_ab_und_schreibt_nichts(self) -> None:
+        # Vertippt oder erfunden. Mit `wissen` gibt es ein Ergebnis mehr,
+        # aber nicht jedes: Gaelte "theorie" als erledigt, bliebe die Theorie
+        # still liegen.
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"], "ergebnis": "theorie"}])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("wissen", zeile_mit(fertig.stdout, "theorie"))
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
+
     def test_der_quellenordner_darf_mit_quellen_davor_kommen(self) -> None:
         # So nennt ihn der Trainer: "Sammelimport ueber quellen/stapel".
         self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"]}])
@@ -354,6 +407,9 @@ class SeitenbereichTest(unittest.TestCase):
         self.assertIn(HEFT[1][0], zwei)
         for seite in (1, 3, 4):
             self.assertNotIn(HEFT[seite - 1][0], zwei)
+        # Seitenmarken braucht der Auftrag nur fuer Ausschnitte (#63), ohne
+        # sie kosten sie nur Platz.
+        self.assertNotIn("=== Seite", eins)
 
     @BRAUCHT_PDFTOTEXT
     def test_ohne_seitenbereich_bekommt_der_auftrag_den_ganzen_text(self) -> None:
@@ -613,6 +669,65 @@ class QuellgrafikTest(unittest.TestCase):
         self.assertIn("schaubild: 3.quellgrafik.png", zeile)
 
     @BRAUCHT_PILLOW
+    def test_eingebettet_schneidet_aus_wie_quellgrafik_ausschneiden_true(self) -> None:
+        # `quellgrafik:` ersetzt die alte Einstellung (#63). Die
+        # playdrill/sammelimport.md aus #37 traegt noch die alte und soll ohne
+        # Anfassen weiter gelten. Beide Ordner ergeben dieselbe Quellgrafik.
+        for ordner, einstellung in (("neu", {"quellgrafik": "eingebettet"}),
+                                    ("alt", {"quellgrafik_ausschneiden": True})):
+            with self.subTest(ordner):
+                self.ordner.lege_quellenordner_an(
+                    ordner, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], **einstellung)
+                self.ordner.lege_quell_pdf_an(f"{ordner}/kasten.pdf", ["Abwehr vom Kasten"],
+                                              bilder=[PdfBild(90, 60, deckend=(12, 5, 80, 51))])
+
+                fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ordner)
+
+                self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+                quellgrafik = self.ordner.pfad / "kartenentwuerfe" / ordner / "3.quellgrafik.png"
+                with Image.open(quellgrafik) as bild:
+                    self.assertEqual(bild.size, (68, 46))
+
+    def test_keine_und_quellgrafik_ausschneiden_false_schneiden_nichts_aus(self) -> None:
+        # Auch ohne Einstellung nicht, wie vor #63. Das PDF bettet ein Bild
+        # ein, es liesse sich also ausschneiden.
+        for ordner, einstellung in (("keine", {"quellgrafik": "keine"}),
+                                    ("alt", {"quellgrafik_ausschneiden": False}),
+                                    ("ohne", {})):
+            with self.subTest(ordner):
+                self.ordner.lege_quellenordner_an(
+                    ordner, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], **einstellung)
+                self.ordner.lege_quell_pdf_an(f"{ordner}/kasten.pdf", ["Abwehr vom Kasten"],
+                                              bilder=[PdfBild(90, 60, deckend=(12, 5, 80, 51))])
+
+                fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ordner)
+
+                self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+                entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ordner
+                self.assertEqual(list(entwuerfe.glob("3.quellgrafik*")), [])
+                self.assertIn("nicht ausgeschnitten",
+                              zeile_mit((entwuerfe / "3.auftrag.md").read_text(encoding="utf-8"),
+                                        "Quellgrafik"))
+
+    def test_eine_einstellung_quellgrafik_die_nicht_stimmt_bricht_ab(self) -> None:
+        # Ein vertippter Wert schnitte still nichts aus. Stehen alte und neue
+        # Einstellung beide da, ist nicht klar, welche gilt.
+        for ordner, einstellung, stichwort in (
+                ("vertippt", {"quellgrafik": "eingeschnitten"}, "eingeschnitten"),
+                ("beide", {"quellgrafik": "ausschnitt", "quellgrafik_ausschneiden": True},
+                 "quellgrafik_ausschneiden"),
+                ("alt-vertippt", {"quellgrafik_ausschneiden": "ja"}, "ja")):
+            with self.subTest(ordner):
+                self.ordner.lege_quellenordner_an(
+                    ordner, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], **einstellung)
+
+                fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ordner)
+
+                self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+                self.assertIn(stichwort, zeile_mit(fertig.stdout, "quellgrafik"))
+                self.assertFalse((self.ordner.pfad / "kartenentwuerfe" / ordner).exists())
+
+    @BRAUCHT_PILLOW
     def test_jedes_pdf_mit_bild_gibt_eine_quellgrafik_in_der_reihenfolge_der_dateien(self) -> None:
         # Ein Zirkel (#39): vorn das Uebersichtsblatt, wie der Zerlegungsplan
         # es setzt (#35), dann zwei Stationen, dazwischen ein Blatt ohne
@@ -768,7 +883,8 @@ class QuellgrafikTest(unittest.TestCase):
     def test_mit_der_alten_einstellung_bricht_es_ab_und_nennt_die_neue(self) -> None:
         # Bis zum 02.10.2026 hiess die Einstellung anders (#49). Liefe
         # vorbereiten mit dem alten Namen weiter, schnitte es still nichts
-        # aus, und die Karten kaemen ohne Bild heraus.
+        # aus, und die Karten kaemen ohne Bild heraus. Die neue heisst seit
+        # #63 `quellgrafik`, und nur die nennt die Meldung.
         self.ordner.lege_quellenordner_an(
             ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], feldbild_ausschneiden=True)
 
@@ -776,7 +892,8 @@ class QuellgrafikTest(unittest.TestCase):
 
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
         self.assertIn("feldbild_ausschneiden", fertig.stdout)
-        self.assertIn("quellgrafik_ausschneiden", fertig.stdout)
+        self.assertIn("quellgrafik: eingebettet", fertig.stdout)
+        self.assertNotIn("quellgrafik_ausschneiden", fertig.stdout)
         self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
 
     def test_fehlt_die_eingetragene_quellgrafik_geht_der_kandidat_zurueck_auf_offen(self) -> None:
@@ -1017,6 +1134,347 @@ class QuellgrafikTest(unittest.TestCase):
         self.assertTrue((self.entwuerfe / "3.quellgrafik.png").exists())
 
 
+class AusschnittTest(unittest.TestCase):
+    """Bei `quellgrafik: ausschnitt` nennt der Entwurf seine Ausschnitte (#63).
+
+    Eine Magazinseite oder ein PDF, das nicht wie PlayDrill aufgebaut ist,
+    bettet das Bild der Uebung nicht als ein Bild ein. Der Agent nennt, wo es
+    auf der Seite liegt, `pruefen` schneidet es aus, und nach der Freigabe ist
+    es das Schaubild der Karte.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+        self.entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
+
+    def vorbereiten(self, ordner: str = ORDNER, **starte):
+        return self.ordner.starte("sammelimport.py", "vorbereiten", ordner, **starte)
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_vorbereiten_schneidet_nichts_vorab_aus_und_der_auftrag_nennt_form_und_namen(
+            self) -> None:
+        # Das PDF bettet ein Bild ein, bei `eingebettet` laege danach eine
+        # Quellgrafik da. Hier sagt der Auftrag nur, in welcher Form der
+        # Entwurf seine Ausschnitte nennt und wie sie heissen: aus einer
+        # PDF-Seite ein PNG, aus einem Foto ein JPEG.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 3, "dateien": ["kasten.pdf"]},
+            {"kandidat": 4, "dateien": ["seite-26.jpg"]}], quellgrafik="ausschnitt")
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/kasten.pdf", ["Abwehr vom Kasten"],
+                                      bilder=[PdfBild(90, 60, deckend=(12, 5, 80, 51))])
+
+        fertig = self.vorbereiten()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.iterdir()),
+                         ["3.auftrag.md", "4.auftrag.md"])
+        pdf = auftrag_von(self.ordner, 3)
+        self.assertIn("Ausschnitt", zeile_mit(pdf, "Quellgrafik"))
+        self.assertIn("Ausschnitte:\n- `3.quellgrafik.png`: `kasten.pdf` S. 1, links ", pdf)
+        self.assertIn("`3.quellgrafik-1.png`, `3.quellgrafik-2.png`", pdf)
+        foto = auftrag_von(self.ordner, 4)
+        self.assertIn("Ausschnitte:\n- `4.quellgrafik.jpg`: `seite-26.jpg`, links ", foto)
+        self.assertIn("`4.quellgrafik-1.jpg`, `4.quellgrafik-2.jpg`", foto)
+        self.assertNotIn(".png", foto)
+
+    @BRAUCHT_PDFTOTEXT
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_die_marken_im_text_nennen_die_seiten_wie_das_pdf_sie_zaehlt(self) -> None:
+        # Ein Ausschnitt nennt seine Seite im PDF. Mit Seitenbereich beginnt
+        # der Text im Auftrag mitten im Heft, und ohne Marke zaehlte der Agent
+        # ab 1. Die Marken tragen deshalb die Seiten des PDF (#64).
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": [("heft.pdf", "S. 2–3")]},
+            {"kandidat": 2, "dateien": ["heft.pdf"]}], quellgrafik="ausschnitt")
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", *HEFT)
+
+        fertig = self.vorbereiten()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        eins = unter_datei(auftrag_von(self.ordner, 1), "heft.pdf").splitlines()
+        for seite in (2, 3):
+            self.assertEqual(eins[eins.index(f"=== Seite {seite} ===") + 1], HEFT[seite - 1][0])
+        for seite in (1, 4):
+            self.assertNotIn(f"=== Seite {seite} ===", eins)
+        self.assertIn("`heft.pdf` S. 2, links", auftrag_von(self.ordner, 1))
+        zwei = unter_datei(auftrag_von(self.ordner, 2), "heft.pdf").splitlines()
+        for seite in (1, 2, 3, 4):
+            self.assertEqual(zwei[zwei.index(f"=== Seite {seite} ===") + 1], HEFT[seite - 1][0])
+
+    @BRAUCHT_PILLOW
+    def test_ohne_pypdfium2_bricht_nur_ein_durchgang_mit_pdf_ab(self) -> None:
+        # Eine PDF-Seite zeichnet pypdfium2, ein Foto schneidet Pillow allein
+        # (ADR-0013). Liegt das PDF hinter dem Durchgang, geht es weiter. Ohne
+        # Abbruch kaemen Entwuerfe mit Ausschnitten, die sich nicht schneiden
+        # lassen.
+        ohne = blende_aus(self, "pypdfium2")
+        for ordner, je_durchgang in (("mit-pdf", 2), ("ohne-pdf", 1)):
+            self.ordner.lege_quellenordner_an(ordner, [
+                {"kandidat": 1, "dateien": ["seite-26.jpg"]},
+                {"kandidat": 2, "dateien": ["heft.pdf"]}],
+                je_durchgang=je_durchgang, quellgrafik="ausschnitt")
+        vorher = (self.ordner.pfad / "quellen" / "mit-pdf" / "sammelimport.md").read_text(
+            encoding="utf-8")
+
+        gestoppt = self.vorbereiten("mit-pdf", umgebung=ohne)
+        weiter = self.vorbereiten("ohne-pdf", umgebung=ohne)
+
+        self.assertNotEqual(gestoppt.returncode, 0, gestoppt.stdout)
+        self.assertIn("pip install pypdfium2", gestoppt.stdout)
+        self.assertIn("quellgrafik: ausschnitt", gestoppt.stdout)
+        self.assertEqual((self.ordner.pfad / "quellen" / "mit-pdf" / "sammelimport.md").read_text(
+            encoding="utf-8"), vorher)
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe" / "mit-pdf").exists())
+        self.assertEqual(weiter.returncode, 0, weiter.stdout + weiter.stderr)
+        self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "kartenentwuerfe"
+                                                 / "ohne-pdf").iterdir()), ["1.auftrag.md"])
+
+    def test_ohne_pillow_bricht_ein_durchgang_mit_ausschnitt_ab(self) -> None:
+        # Pillow schneidet jeden Ausschnitt, auch den aus einem Foto.
+        self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["seite-26.jpg"]}],
+                                          quellgrafik="ausschnitt")
+
+        fertig = self.vorbereiten(umgebung=blende_aus(self, "PIL"))
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("pip install Pillow", fertig.stdout)
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
+
+    def plane(self, *kandidaten: dict) -> None:
+        """Der freigegebene Plan mit `quellgrafik: ausschnitt`."""
+        self.ordner.lege_quellenordner_an(ORDNER, list(kandidaten), quellgrafik="ausschnitt")
+
+    def pruefe(self, *argumente: str):
+        fertig = self.ordner.starte("sammelimport.py", "pruefen", *argumente, ORDNER)
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        return fertig
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_nach_pruefen_liegt_der_ausschnitt_neben_dem_entwurf_nach_einer_aenderung_der_neue(
+            self) -> None:
+        # Bei der Freigabe aendert der Skill die Zahlen, laesst pruefen laufen
+        # und zeigt den neuen Ausschnitt. Das Foto hat 1000 x 800 Pixel, die
+        # zweite Seite des PDF eine blaue Flaeche dort, wo der Ausschnitt liegt.
+        self.plane({"kandidat": 1, "dateien": ["seite-26.jpg"]},
+                   {"kandidat": 2, "dateien": ["heft.pdf"]})
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", ["Seite 1"], ["Seite 2"],
+                                      flaechen=[PdfFlaeche(2, BLAU, (10, 20, 60, 50))])
+        foto = self.ordner.lege_kartenentwurf_an(
+            ORDNER, 1, titel="Vom Foto", schaubild="1.quellgrafik.jpg", ausschnitte=[
+                "`1.quellgrafik.jpg`: `seite-26.jpg`, links 10, oben 20, rechts 60, unten 70"])
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 2, titel="Von der PDF-Seite", schaubild="2.quellgrafik.png", ausschnitte=[
+                "`2.quellgrafik.png`: `heft.pdf` S. 2, links 10, oben 20, rechts 60, unten 50"])
+
+        self.pruefe()
+
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        for kandidat in ("1", "2"):
+            self.assertEqual(uebersicht[kandidat]["Status"], "bereit",
+                             uebersicht[kandidat]["Notiz"])
+        with Image.open(self.entwuerfe / "1.quellgrafik.jpg") as bild:
+            self.assertEqual((bild.format, bild.size), ("JPEG", (500, 400)))
+        with Image.open(self.entwuerfe / "2.quellgrafik.png") as bild:
+            self.assertEqual(bild.format, "PNG")
+            mitte = bild.convert("RGB").getpixel((bild.width // 2, bild.height // 2))
+            self.assertTrue(all(abs(ist - soll) <= 8 for ist, soll in zip(mitte, BLAU)), mitte)
+
+        foto.write_text(foto.read_text(encoding="utf-8").replace(
+            "links 10, oben 20, rechts 60, unten 70", "links 0, oben 0, rechts 30, unten 40"),
+            encoding="utf-8")
+        self.pruefe()
+
+        with Image.open(self.entwuerfe / "1.quellgrafik.jpg") as bild:
+            self.assertEqual(bild.size, (300, 320))
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_ein_ausschnitt_der_nicht_passt_weist_den_entwurf_ab(self) -> None:
+        # Je Kandidat ein Fehler, sonst ist der Entwurf heil, und `schaubild:`
+        # nennt seine Ausschnitte. Durchkaeme der Entwurf, bekaeme die Karte
+        # kein Bild oder ein falsches. Die Notiz nennt, woran es lag. Das PDF
+        # hat zwei Seiten.
+        faelle = {
+            "Seite, die es nicht gibt": (
+                "heft.pdf", ["`{n}.quellgrafik.png`: `heft.pdf` S. 9, {r}"], "Seite 9"),
+            "Endung, die nicht zur Quelle passt": (
+                "seite-26.jpg", ["`{n}.quellgrafik.png`: `seite-26.jpg`, {r}"], ".jpg"),
+            "Name, der doppelt vorkommt": (
+                "seite-26.jpg", ["`{n}.quellgrafik-1.jpg`: `seite-26.jpg`, {r}",
+                                 "`{n}.quellgrafik-1.jpg`: `seite-26.jpg`, {r}"], "zweimal"),
+            "Datei, die nicht zum Kandidaten gehoert": (
+                "seite-26.jpg", ["`{n}.quellgrafik.jpg`: `fremd.jpg`, {r}"], "fremd.jpg"),
+            "Seite ausserhalb des Seitenbereichs": (
+                ("heft.pdf", "S. 1"), ["`{n}.quellgrafik.png`: `heft.pdf` S. 2, {r}"], "S. 1"),
+            "Name einer fremden Quellgrafik": (
+                "seite-26.jpg", ["`99.quellgrafik.jpg`: `seite-26.jpg`, {r}"],
+                "99.quellgrafik.jpg"),
+            "Rechteck, das nicht stimmt": (
+                "seite-26.jpg", ["`{n}.quellgrafik.jpg`: `seite-26.jpg`, "
+                                 "links 60, oben 20, rechts 10, unten 70"], "links"),
+            "Zeile ohne die feste Form": (
+                "seite-26.jpg", ["`{n}.quellgrafik.jpg`: `seite-26.jpg`, links 10, oben 20"],
+                "Form"),
+        }
+        rechteck = "links 10, oben 20, rechts 60, unten 70"
+        self.plane({"kandidat": 0, "dateien": ["seite-26.jpg"]},
+                   {"kandidat": 98, "dateien": ["fremd.jpg"]},
+                   *({"kandidat": nr, "dateien": [datei]}
+                     for nr, (datei, _, _) in enumerate(faelle.values(), 1)))
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", ["Seite 1"], ["Seite 2"])
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 0, titel="Heil", schaubild="0.quellgrafik.jpg",
+            ausschnitte=[f"`0.quellgrafik.jpg`: `seite-26.jpg`, {rechteck}"])
+        for nr, (fall, (_, ausschnitte, _)) in enumerate(faelle.items(), 1):
+            ausschnitte = [a.format(n=nr, r=rechteck) for a in ausschnitte]
+            namen = list(dict.fromkeys(re.match(r"`([^`]+)`", a).group(1) for a in ausschnitte))
+            self.ordner.lege_kartenentwurf_an(ORDNER, nr, titel=fall, schaubild=namen,
+                                              ausschnitte=ausschnitte)
+
+        self.pruefe()
+
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual(uebersicht["0"]["Status"], "bereit", uebersicht["0"]["Notiz"])
+        for nr, (fall, (_, _, stichwort)) in enumerate(faelle.items(), 1):
+            with self.subTest(fall):
+                self.assertEqual(uebersicht[str(nr)]["Status"], "offen")
+                self.assertIn(stichwort, uebersicht[str(nr)]["Notiz"])
+
+    @BRAUCHT_PILLOW
+    def test_ein_entwurf_mit_ausschnitt_besteht_wenn_schaubild_ihn_nennt(self) -> None:
+        # Auf die Karte kommt, was `schaubild:` nennt. Ein Ausschnitt, den es
+        # nicht nennt, saehe der Trainer bei der Freigabe und vermisste ihn
+        # danach auf der Karte.
+        self.plane({"kandidat": 1, "dateien": ["seite-26.jpg"]},
+                   {"kandidat": 2, "dateien": ["seite-26.jpg"]})
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        for kandidat, schaubild in ((1, "1.quellgrafik.jpg"), (2, None)):
+            self.ordner.lege_kartenentwurf_an(
+                ORDNER, kandidat, titel=f"Kandidat {kandidat}", schaubild=schaubild,
+                ausschnitte=[f"`{kandidat}.quellgrafik.jpg`: `seite-26.jpg`, "
+                             f"links 10, oben 20, rechts 60, unten 70"])
+
+        self.pruefe()
+
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual(uebersicht["1"]["Status"], "bereit", uebersicht["1"]["Notiz"])
+        self.assertEqual(uebersicht["2"]["Status"], "offen")
+        self.assertIn("schaubild", uebersicht["2"]["Notiz"])
+
+    @BRAUCHT_PILLOW
+    def test_json_nennt_die_ausschnitte_mit_pfad(self) -> None:
+        # Der Skill zeigt jeden Ausschnitt im Chat. Mit der Datei, der Seite
+        # und dem Rechteck aendert er die Zahlen, wenn der Trainer korrigiert.
+        self.plane({"kandidat": 1, "dateien": ["seite-26.jpg"]})
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 1, titel="Zwei Bilder", schaubild=["1.quellgrafik-1.jpg", "1.quellgrafik-2.jpg"],
+            ausschnitte=["`1.quellgrafik-1.jpg`: `seite-26.jpg`, links 10, oben 20, rechts 60, unten 70",
+                         "`1.quellgrafik-2.jpg`: `seite-26.jpg`, links 5, oben 5, rechts 95, unten 15"])
+
+        kandidat = json.loads(self.pruefe("--json").stdout)["kandidaten"][0]
+
+        self.assertEqual(kandidat["status"], "bereit", kandidat["notiz"])
+        self.assertEqual(kandidat["ausschnitte"], [
+            {"name": "1.quellgrafik-1.jpg",
+             "pfad": (self.entwuerfe / "1.quellgrafik-1.jpg").resolve().as_posix(),
+             "datei": "seite-26.jpg", "seite": None,
+             "rechteck": {"links": 10, "oben": 20, "rechts": 60, "unten": 70}},
+            {"name": "1.quellgrafik-2.jpg",
+             "pfad": (self.entwuerfe / "1.quellgrafik-2.jpg").resolve().as_posix(),
+             "datei": "seite-26.jpg", "seite": None,
+             "rechteck": {"links": 5, "oben": 5, "rechts": 95, "unten": 15}},
+        ])
+        for ausschnitt in kandidat["ausschnitte"]:
+            self.assertTrue(Path(ausschnitt["pfad"]).is_file(), ausschnitt["pfad"])
+
+    def test_ohne_pypdfium2_bricht_pruefen_ab_und_laesst_die_uebersicht_stehen(self) -> None:
+        # Kein Fehler des Entwurfs: Abgewiesen ginge er auf `offen` und wuerde
+        # neu entworfen, mit demselben Ergebnis.
+        self.plane({"kandidat": 1, "dateien": ["heft.pdf"], "status": "bereit"})
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 1, titel="Von der PDF-Seite", schaubild="1.quellgrafik.png", ausschnitte=[
+                "`1.quellgrafik.png`: `heft.pdf` S. 1, links 10, oben 20, rechts 60, unten 50"])
+        datei = self.ordner.pfad / "quellen" / ORDNER / "sammelimport.md"
+        vorher = datei.read_text(encoding="utf-8")
+
+        fertig = self.ordner.starte("sammelimport.py", "pruefen", ORDNER,
+                                    umgebung=blende_aus(self, "pypdfium2"))
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("pip install pypdfium2", fertig.stdout)
+        self.assertEqual(datei.read_text(encoding="utf-8"), vorher)
+
+    def test_ohne_pypdfium2_schreiben_vorbereiten_und_uebernehmen_nichts_zum_entwurf(
+            self) -> None:
+        # Beide pruefen einen Entwurf wie `pruefen` und schneiden dabei. Ohne
+        # pypdfium2 schriebe vorbereiten sonst einen neuen Auftrag fuer einen
+        # Entwurf, der nichts falsch macht, und uebernehmen eine Karte, deren
+        # Ausschnitt nicht neu geschnitten ist. uebernehmen nennt den
+        # Kandidaten und wie pypdfium2 dazukommt.
+        self.ordner.lege_karte_an(id="ue-000009", titel="Die bisher höchste ID")
+        self.plane({"kandidat": 1, "dateien": ["heft.pdf"], "status": "bereit"},
+                   {"kandidat": 2, "dateien": ["seite-26.jpg"]})
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 1, titel="Von der PDF-Seite", schaubild="1.quellgrafik.png", ausschnitte=[
+                "`1.quellgrafik.png`: `heft.pdf` S. 1, links 10, oben 20, rechts 60, unten 50"])
+        ohne = blende_aus(self, "pypdfium2")
+
+        vorbereitet = self.vorbereiten(umgebung=ohne)
+        uebernommen = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER,
+                                         "--kandidat", "1", "", umgebung=ohne)
+
+        self.assertNotEqual(vorbereitet.returncode, 0, vorbereitet.stdout)
+        self.assertIn("pip install pypdfium2", vorbereitet.stdout)
+        self.assertEqual(uebernommen.returncode, 1, uebernommen.stdout + uebernommen.stderr)
+        self.assertIn("pypdfium2", zeile_mit(uebernommen.stdout, "nicht übernommen"))
+        self.assertEqual(list((self.ordner.pfad / "uebungen").glob("ue-000010-*")), [])
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.iterdir()), ["1.md"])
+
+    @BRAUCHT_PILLOW
+    def test_uebernehmen_legt_einen_jpeg_ausschnitt_unter_dem_kartennamen_ab(self) -> None:
+        # Wie eine Quellgrafik aus PlayDrill, nur mit der Endung des
+        # Ausschnitts. Mit .png stuende ein JPEG unter falscher Endung in
+        # schaubilder/. Danach liegt neben dem Entwurf nichts mehr.
+        self.ordner.lege_karte_an(id="ue-000009", titel="Die bisher höchste ID")
+        self.plane({"kandidat": 3, "dateien": ["seite-26.jpg"], "status": "bereit"})
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 3, titel="Abwehr vom Kasten", schaubild="3.quellgrafik.jpg", ausschnitte=[
+                "`3.quellgrafik.jpg`: `seite-26.jpg`, links 10, oben 20, rechts 60, unten 70"])
+
+        fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, "--kandidat", "3", "")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        name = "ue-000010-abwehr-vom-kasten"
+        with Image.open(self.ordner.pfad / "schaubilder" / f"{name}.jpg") as bild:
+            self.assertEqual((bild.format, bild.size), ("JPEG", (500, 400)))
+        karte = (self.ordner.pfad / "uebungen" / f"{name}.md").read_text(encoding="utf-8")
+        self.assertIn(f"\nschaubild: {name}.jpg\n", karte)
+        self.assertNotIn("Ausschnitte", karte)
+        self.assertFalse(self.entwuerfe.exists())
+        self.assertEqual(auffaelligkeiten(self.ordner.starte("index.py").stdout), [])
+
+    def test_vorbereiten_raeumt_einen_alten_ausschnitt_weg(self) -> None:
+        # Ein Entwurf, der die Pruefung nicht besteht, wird neu entworfen.
+        # Sein alter Ausschnitt gehoert zu keinem Entwurf mehr, und der neue
+        # nennt vielleicht keinen.
+        self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 3, "dateien": ["seite-26.jpg"]}])
+        self.entwuerfe.mkdir(parents=True)
+        (self.entwuerfe / "3.quellgrafik-1.jpg").write_bytes(b"der alte Ausschnitt")
+
+        fertig = self.vorbereiten()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.iterdir()), ["3.auftrag.md"])
+
+
 class PlaneingabeTest(unittest.TestCase):
     """`vorbereiten --plan` legt an, woraus der Agent den Zerlegungsplan macht.
 
@@ -1029,8 +1487,9 @@ class PlaneingabeTest(unittest.TestCase):
         self.ordner = Arbeitsordner()
         self.addCleanup(self.ordner.raeume_auf)
 
-    def plane(self, **starte):
-        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", "--plan", ORDNER, **starte)
+    def plane(self, *schalter: str, **starte):
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", "--plan", *schalter, ORDNER,
+                                    **starte)
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         return fertig
 
@@ -1274,9 +1733,14 @@ class PlaneingabeTest(unittest.TestCase):
         # Auch der Agent muss es wissen, sonst haelt er den Anfang fuer alles.
         self.assertIn("ersten Zeilen", self.planeingabe().split("## Dateien", 1)[0])
 
-    def bibliothek(self) -> dict[str, dict[str, str]]:
-        """Die Bibliotheksliste der Planeingabe, je ID eine Zeile."""
+    def bibliothek(self, teil: str) -> dict[str, dict[str, str]]:
+        """Ein Teil der Bibliotheksliste, je ID eine Zeile.
+
+        `teil` ist die Ueberschrift unter `## Bibliothek`, `Übungskarten`
+        oder `Wissenskarten`. Gelesen wird die Tabelle darunter.
+        """
         abschnitt = self.planeingabe().split("## Bibliothek", 1)[1]
+        abschnitt = abschnitt.split(f"### {teil}\n", 1)[1].split("\n#", 1)[0]
         zeilen = [[z.strip() for z in zeile.strip().strip("|").split("|")]
                   for zeile in abschnitt.splitlines() if zeile.startswith("|")]
         kopf, _trenner, *rest = zeilen
@@ -1297,7 +1761,7 @@ class PlaneingabeTest(unittest.TestCase):
 
         self.plane()
 
-        liste = self.bibliothek()
+        liste = self.bibliothek("Übungskarten")
         self.assertEqual(sorted(liste), sorted(self.ordner.ids))
         kasten = liste["ue-000006"]
         self.assertEqual(kasten["Titel"], "Abwehr vom Kasten")
@@ -1305,6 +1769,118 @@ class PlaneingabeTest(unittest.TestCase):
         self.assertEqual(kasten["quelldatei"], f"{ORDNER}/Ü_Abwehr/kasten.pdf")
         self.assertEqual({uid for uid, zeile in liste.items() if zeile["Aus diesem Ordner"]},
                          {"ue-000006", "ue-000007"})
+
+    def test_die_bibliotheksliste_nennt_die_wissenskarten_und_markiert_die_aus_diesem_ordner(
+            self) -> None:
+        # Daran erkennt der Agent eine Wissenskarte, die schon importiert ist,
+        # und die Fortsetzung eines Beitrags aus einem frueheren Heft (#69).
+        # Die Frage ist ihr Titel, das Thema sagt, wovon sie handelt.
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000001", titel="Wann lohnt sich einarmige Abwehr?",
+            thema=["technik", "taktik"], quelldatei=f"{ORDNER}/seite-26.jpg")
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000002", titel="Wie lange schläft ein Spieler vor dem Spiel?",
+            thema=["physiologie"], quelldatei=f"{ORDNER}-alt/seite-03.jpg")
+        self.ordner.lege_wissenskarte_an(id="wi-000003", titel="Was steht in keinem Heft?")
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-27.jpg", b"")
+
+        self.plane()
+
+        liste = self.bibliothek("Wissenskarten")
+        self.assertEqual(sorted(liste), ["wi-000001", "wi-000002", "wi-000003"])
+        einarmig = liste["wi-000001"]
+        self.assertEqual(einarmig["Frage"], "Wann lohnt sich einarmige Abwehr?")
+        self.assertEqual(einarmig["Thema"], "technik, taktik")
+        self.assertEqual(einarmig["quelldatei"], f"{ORDNER}/seite-26.jpg")
+        self.assertEqual({uid for uid, zeile in liste.items() if zeile["Aus diesem Ordner"]},
+                         {"wi-000001"})
+        self.assertEqual(sorted(self.bibliothek("Übungskarten")), sorted(self.ordner.ids))
+
+    def lege_zurueckgestellte_an(self) -> None:
+        """Ein Plan nach dem ersten Lauf, mit zwei zurueckgestellten Zeilen und einer neuen Datei.
+
+        Kandidat 2 hat der Zerlegungsplan zurueckgestellt, als es noch keine
+        Wissenskarte gab. Kandidat 3 hat der Trainer bei der Freigabe
+        zurueckgestellt, sein Ergebnis ist noch `uebung`.
+        """
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-01.jpg"], "status": "importiert",
+             "karte": "ue-000001"},
+            {"kandidat": 2, "dateien": ["seite-02.jpg", "seite-03.jpg"],
+             "was": "Einarmig gehts auch, Teil 2, S. 26–27", "ergebnis": "zurückgestellt",
+             "status": "zurückgestellt", "notiz": "Theorie"},
+            {"kandidat": 3, "dateien": ["seite-04.jpg"], "was": "Spielzug über die Mitte",
+             "status": "zurückgestellt", "notiz": "erst nach der Saison"},
+            {"kandidat": 4, "dateien": ["seite-05.jpg"], "ergebnis": "übersprungen",
+             "status": "übersprungen", "notiz": "Werbung"},
+        ])
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-06.jpg", b"")
+
+    def zurueckgestellte(self) -> dict[str, dict[str, str]]:
+        """Die zurueckgestellten Zeilen, die die Planeingabe nennt, je Nummer eine."""
+        abschnitt = self.planeingabe().split("## Zurückgestellt\n", 1)[1].split("\n## ", 1)[0]
+        zeilen = [[z.strip() for z in zeile.strip().strip("|").split("|")]
+                  for zeile in abschnitt.splitlines() if zeile.startswith("|")]
+        kopf, _trenner, *rest = zeilen
+        return {z[0]: dict(zip(kopf, z)) for z in rest}
+
+    def test_ohne_den_schalter_kommt_keine_zurueckgestellte_zeile_wieder(self) -> None:
+        # Bewusst Zurueckgestelltes soll nicht bei jedem Lauf auftauchen
+        # (#69). Ihre Dateien stehen in einer Zeile und sind nicht neu.
+        self.lege_zurueckgestellte_an()
+
+        self.plane()
+
+        self.assertEqual(self.genannte_dateien(), ["seite-06.jpg"])
+        self.assertNotIn("Zurückgestellt", self.planeingabe())
+
+    def test_mit_dem_schalter_stehen_die_zurueckgestellten_zeilen_und_ihre_dateien_da(
+            self) -> None:
+        # "Hol die zurueckgestellten aus stapel" (#69). Der Agent sieht die
+        # alten Zeilen mit Nummer, Dateien, "Was es ist" und Notiz und plant
+        # ihre Dateien neu, zusammen mit dem, was neu ist. Die erste Zeile,
+        # die er aus einer alten macht, traegt deren Nummer, weitere zaehlen
+        # ab der naechsten freien.
+        self.lege_zurueckgestellte_an()
+
+        self.plane("--zurueckgestellte")
+
+        self.assertEqual(sorted(self.genannte_dateien()),
+                         ["seite-02.jpg", "seite-03.jpg", "seite-04.jpg", "seite-06.jpg"])
+        zeilen = self.zurueckgestellte()
+        self.assertEqual(sorted(zeilen), ["2", "3"])
+        self.assertEqual(
+            {spalte: zeilen["2"][spalte] for spalte in ("Dateien", "Was es ist", "Notiz")},
+            {"Dateien": "`seite-02.jpg`, `seite-03.jpg`",
+             "Was es ist": "Einarmig gehts auch, Teil 2, S. 26–27", "Notiz": "Theorie"})
+        self.assertEqual(zeilen["3"]["Notiz"], "erst nach der Saison")
+        self.assertEqual(self.naechste_nummer(), 5)
+
+    @BRAUCHT_PDFTOTEXT
+    def test_von_einem_pdf_kommen_nur_die_zurueckgestellten_seiten(self) -> None:
+        # Der Rest des Hefts steht schon in anderen Zeilen. Kaeme er wieder,
+        # plante der Agent ihn ein zweites Mal, denn von einem aufgeteilten
+        # PDF soll jede Seite in einer Zeile stehen. Neue Dateien gibt es
+        # keine, die Planeingabe entsteht trotzdem.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": [("heft.pdf", "S. 1")], "ergebnis": "übersprungen",
+             "status": "übersprungen", "notiz": "Inhaltsverzeichnis"},
+            {"kandidat": 2, "dateien": [("heft.pdf", "S. 2–3")], "ergebnis": "zurückgestellt",
+             "status": "zurückgestellt", "notiz": "Theorie"},
+        ])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", ["Inhalt des Hefts"],
+                                      ["Wann lohnt sich einarmige Abwehr?"],
+                                      ["Einarmig spart den Schritt zum Ball."])
+
+        self.plane("--zurueckgestellte")
+
+        heft = self.zu_datei("heft.pdf")
+        self.assertNotIn("Inhalt des Hefts", heft)
+        self.assertNotIn("=== Seite 1 ===", heft)
+        for zeile in ("=== Seite 2 ===", "Wann lohnt sich einarmige Abwehr?",
+                      "=== Seite 3 ===", "Einarmig spart den Schritt zum Ball."):
+            self.assertIn(zeile, heft)
+        self.assertIn("S. 2–3", zeile_mit(heft, "Nur"))
 
     def test_ein_foto_ueber_2_mb_ergibt_den_hinweis_auf_die_bildaufbereitung(self) -> None:
         # So schwer ist eine abfotografierte Magazinseite mit 50 Megapixeln.
@@ -1707,6 +2283,22 @@ class PruefenTest(unittest.TestCase):
         self.assertEqual(zeile["Status"], "offen")
         self.assertIn("Frontmatter", zeile["Notiz"])
 
+    def test_eine_wissen_zeile_bleibt_offen_und_unberuehrt(self) -> None:
+        # Den Entwurf einer Wissenskarte schreibt und prueft erst #70. Bis
+        # dahin fasst pruefen die Zeile nicht an. Nahme es sie als
+        # Uebungskarte, setzte es sie ohne Entwurf auf "kein Entwurf", und ein
+        # Entwurf, der zufaellig daliegt, ginge als Uebungskarte durch.
+        self.plane({"kandidat": 1, "dateien": ["a.pdf"]},
+                   {"kandidat": 2, "dateien": ["b.pdf"], "ergebnis": "wissen",
+                    "was": "Wann lohnt sich einarmige Abwehr? Übungen: 1"})
+        self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Als Übung entworfen")
+        vorher = self.ordner.uebersicht(ORDNER)["2"]
+
+        uebersicht = self.pruefe()
+
+        self.assertEqual(uebersicht["2"], vorher)
+        self.assertEqual(uebersicht["1"]["Status"], "offen")
+
     def test_zeilen_mit_importiert_bleiben_unberuehrt(self) -> None:
         # Eine uebernommene Karte hat keinen Entwurf mehr. Faende pruefen sie
         # "offen", entwuerfe der naechste Durchgang dieselbe Uebung ein
@@ -1904,6 +2496,26 @@ class UebernehmenTest(unittest.TestCase):
         self.assertEqual((zeile["Status"], zeile["Notiz"]),
                          ("rückfrage", "1 Rückfrage ohne Vermutung"))
 
+    def test_aus_einer_wissen_zeile_wird_keine_uebungskarte(self) -> None:
+        # Die Zeile plant eine Wissenskarte. Liegt daneben ein Entwurf in der
+        # Form einer Uebungskarte, etwa von Hand oder aus einem verirrten
+        # Aufruf, kaeme sonst eine Uebung mit ID in uebungen/, die keiner
+        # wollte. Entwurf und Status bleiben stehen.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "ergebnis": "wissen", "status": "bereit"},
+        ])
+        entwurf = self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Als Übung entworfen")
+        vorher = sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir())
+
+        fertig = self.uebernimm("--kandidat", "1", "")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("nicht übernommen", zeile_mit(fertig.stdout, "  1  "))
+        self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir()),
+                         vorher)
+        self.assertTrue(entwurf.exists())
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["1"]["Status"], "bereit")
+
     def test_ist_nichts_mehr_offen_verschwindet_der_entwurfsordner(self) -> None:
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
@@ -1955,6 +2567,43 @@ class UebernehmenTest(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in entwuerfe.iterdir()), [])
         self.assertEqual(uebersicht["3"]["Status"], "offen")
 
+    def test_zurueckgestellt_setzt_den_status_mit_grund_und_es_entsteht_keine_karte(
+            self) -> None:
+        # Bei der Freigabe stellt der Trainer einen Kandidaten zurueck, statt
+        # ihn zu streichen, damit er ihn spaeter holt (#69). Wie beim
+        # Streichen verschwinden Entwurf, Auftrag und Quellgrafik, das
+        # Ergebnis bleibt. Kandidat 3 haelt den Entwurfsordner fest.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
+            {"kandidat": 2, "dateien": ["b.pdf"], "status": "bereit"},
+            {"kandidat": 3, "dateien": ["c.pdf"]},
+        ])
+        entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Spielzüge",
+                                          schaubild="1.quellgrafik.png")
+        (entwuerfe / "1.auftrag.md").write_text("# Auftrag\n", encoding="utf-8")
+        (entwuerfe / "1.quellgrafik.png").write_bytes(b"ein Bild")
+        zweiter = self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Ohne Grund")
+        vorher = sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir())
+
+        fertig = self.uebernimm("--zurueckgestellt", "1", "Spielzüge, dafür gibt es keine Sorte",
+                                "--zurueckgestellt", "2", " ")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual(
+            {spalte: uebersicht["1"][spalte] for spalte in ("Ergebnis", "Status", "Karte", "Notiz")},
+            {"Ergebnis": "uebung", "Status": "zurückgestellt", "Karte": "",
+             "Notiz": "Spielzüge, dafür gibt es keine Sorte"})
+        self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir()),
+                         vorher)
+        self.assertFalse((self.ordner.pfad / "schaubilder").exists())
+        self.assertEqual(sorted(p.name for p in entwuerfe.iterdir()), ["2.md"])
+        # Ohne Grund wuesste spaeter niemand, warum er liegt.
+        self.assertIn("Grund", zeile_mit(fertig.stdout, "  2  "))
+        self.assertEqual(uebersicht["2"]["Status"], "bereit")
+        self.assertTrue(zweiter.exists())
+
     def test_ergaenzt_mit_unbekannter_id_und_gestrichen_ohne_grund_aendern_nichts(self) -> None:
         # Vertippt. Die Uebersicht zeigte sonst auf eine Karte, die es nicht
         # gibt, und niemand faende, wohin das Duplikat gegangen ist. Ein
@@ -2000,6 +2649,25 @@ class UebernehmenTest(unittest.TestCase):
         uebersicht = self.ordner.uebersicht(ORDNER)
         self.assertEqual([(z["Status"], z["Karte"]) for z in uebersicht.values()],
                          [("importiert", "ue-000010"), ("importiert", "ue-000011")])
+
+    def test_solange_eine_wissen_zeile_offen_ist_bleiben_entwurfsordner_und_in_arbeit(
+            self) -> None:
+        # Auch eine Wissenskarte wartet auf ihren Entwurf, selbst wenn erst
+        # #70 ihn schreibt. Gaelte die Zeile als erledigt, verschwaenden mit
+        # der letzten Uebung Entwurfsordner und in_arbeit, und es hiesse
+        # "Nichts mehr offen", waehrend die Theorie noch aussteht.
+        datei = self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
+            {"kandidat": 2, "dateien": ["b.pdf"], "ergebnis": "wissen"},
+        ], in_arbeit="test, 2026-10-01")
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Die letzte Übung")
+
+        fertig = self.uebernimm("--kandidat", "1", "")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertNotIn("Nichts mehr offen", fertig.stdout)
+        self.assertTrue((self.ordner.pfad / "kartenentwuerfe" / ORDNER).is_dir())
+        self.assertIn('in_arbeit: "test, 2026-10-01"\n', datei.read_text(encoding="utf-8"))
 
     def test_solange_etwas_offen_ist_bleibt_der_entwurfsordner(self) -> None:
         # Die Gegenprobe: Ein Durchgang ist fertig, der naechste nicht.

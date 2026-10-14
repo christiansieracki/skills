@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Führt einen Sammelimport über einen Quellenordner, Kandidat für Kandidat.
 
-    <python> sammelimport.py vorbereiten --plan <ordner>
+    <python> sammelimport.py vorbereiten --plan <ordner> [--zurueckgestellte]
     <python> sammelimport.py vorbereiten <ordner> [--trotzdem]
     <python> sammelimport.py pruefen <ordner> [--json]
     <python> sammelimport.py uebernehmen <ordner> --kandidat 3 "Notiz" ...
-                 --uebersprungen 4 "Grund" ... --ergaenzt 5 ue-000027 ...
+                 --uebersprungen 4 "Grund" ... --zurueckgestellt 6 "Grund" ...
+                 --ergaenzt 5 ue-000027 ...
 
 `<ordner>` ist der Quellenordner, relativ zu `quellen/`. In ihm liegt die
 `sammelimport.md` mit den Einstellungen im Frontmatter, den Absprachen und der
@@ -14,24 +15,29 @@
 `vorbereiten --plan` legt vor dem Zerlegungsplan die Planeingabe an: jede
 Datei, die noch in keiner Zeile der Übersicht steht und die `ohne:` nicht
 auslässt, bei PDFs ihr Text mit einer Marke, wo jede Seite beginnt, dazu die
-nächste freie Kandidatennummer und die Bibliotheksliste. Ein zweiter Lauf über
-denselben Ordner nimmt so nur, was neu ist, und zählt weiter. Den Text liest
-`pdftotext`, wenn es da ist (ADR-0008).
+nächste freie Kandidatennummer und die Bibliotheksliste mit Übungs- und
+Wissenskarten. Ein zweiter Lauf über denselben Ordner nimmt so nur, was neu
+ist, und zählt weiter. Zurückgestellte Zeilen holt er nur mit
+`--zurueckgestellte`. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
 
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
-nächsten offenen Kandidaten an, mit dem Text jedes PDF, bei einem
-Seitenbereich nur dem dieser Seiten, und der Angabe, ob der
-Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein, welcher Trainer
+nächsten offenen Kandidaten an, bis #70 nur für Übungskarten, mit dem Text
+jedes PDF, bei einem Seitenbereich nur dem dieser Seiten, und der Angabe, ob
+der Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein, welcher Trainer
 daran arbeitet. Arbeitet laut Eintrag ein anderer daran, geht es nur mit
-`--trotzdem` weiter. Wenn die Einstellungen es wollen, schneidet es
+`--trotzdem` weiter. Bei `quellgrafik: eingebettet` schneidet es
 daneben aus jedem PDF mit Bild die Quellgrafik aus, dafür braucht es Pillow
-(ADR-0005). `pruefen` setzt den Status aus den Kartenentwürfen, die dort auf
-der Platte liegen, und weist ab, was das Datenmodell bricht oder die Form der
+(ADR-0005). Bei `quellgrafik: ausschnitt` schneidet es nichts vorab, der
+Auftrag sagt, wie der Entwurf seine Ausschnitte nennt, und Pillow, bei einem
+PDF auch `pypdfium2`, muss da sein (ADR-0013). `pruefen` setzt den Status aus
+den Kartenentwürfen, die dort auf der Platte liegen, schneidet ihre
+Ausschnitte neu aus und weist ab, was das Datenmodell bricht oder die Form der
 Freigabe nicht einhält. Mit `--json` gibt es aus, was die Freigabe im Chat
 braucht. `uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`,
 erst jetzt mit ID (ADR-0010), und legt die Quellgrafiken als ihre Schaubilder ab.
 Ein freigegebener Entwurf, der die Prüfung nicht besteht, bleibt mit seinem
-Status stehen. Gestrichene und ergänzende Kandidaten bekommen nur ihren Status.
+Status stehen. Gestrichene, zurückgestellte und ergänzende Kandidaten
+bekommen nur ihren Status.
 Ist nichts mehr offen, löscht es `in_arbeit`.
 
 Nach der Freigabe des Plans schreibt nur noch dieses Skript in die Übersicht.
@@ -56,13 +62,17 @@ from functools import cache, cached_property
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ausschnitt import BibliothekFehlt, KeinAusschnitt, schneide_aus, verlange_bibliotheken  # noqa: E402
+from ausschnitt import FOTO as AUS_DEM_FOTO  # noqa: E402
+from ausschnitt import PDF as AUS_DEM_PDF  # noqa: E402
+from ausschnitt import ergebnis as ergebnis_des_ausschnitts  # noqa: E402
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
-    DISZIPLIN_SPALTE, KARTENFELDER, TYPEN, KeineId, finde_wurzel, hole_index, interpreter,
-    konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_schwerpunkte,
-    lies_uebungen, naechste_id, pruefe_felder, schaubilder, tabellenzellen,
-    trainer_dieses_rechners,
+    DISZIPLIN_SPALTE, KARTENFELDER, UEBUNGSKARTE, WISSENSKARTE, Kartensorte, KeineId,
+    finde_wurzel, hole_index, interpreter, konsole_vorbereiten, lies_frontmatter,
+    lies_karten, lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen, naechste_id,
+    pruefe_felder, schaubilder, tabellenzellen, trainer_dieses_rechners,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -92,8 +102,23 @@ AUS_DEM_BILD = "Ablauf aus dem Bild"
 KEINE_AUSGESCHNITTEN = "- Quellgrafik: keine ausgeschnitten,"
 KEINE_QUELLGRAFIK_AUS = "- Keine Quellgrafik aus"
 
+# Die Werte der Einstellung `quellgrafik:` (#63), siehe Sammelimport.art_der_quellgrafik.
+QUELLGRAFIK = ("eingebettet", "ausschnitt", "keine")
+
 SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "Notiz"]
-ERGEBNISSE = {"uebung", "folge", "zurückgestellt", "übersprungen"}
+
+# Je Ergebnis, aus dem eine Karte wird, ihre Sorte (#69). Aus `uebung` und
+# `folge` wird eine Übungskarte mit diesem `typ`, aus `wissen` eine
+# Wissenskarte. `zurückgestellt` und `übersprungen` werden keine Karte.
+SORTE_DES_ERGEBNISSES = {"uebung": UEBUNGSKARTE, "folge": UEBUNGSKARTE, "wissen": WISSENSKARTE}
+ERGEBNISSE = {*SORTE_DES_ERGEBNISSES, "zurückgestellt", "übersprungen"}
+
+# Die Sorten, für die es schon Auftrag, Agent und Prüfung gibt. Die
+# Wissenskarte kommt mit #70 dazu. Bis dahin wartet eine `wissen`-Zeile
+# `offen`: Ein Durchgang legt ihr keinen Auftrag an, und `pruefen` lässt sie,
+# wie sie ist.
+ENTWORFENE_SORTEN = (UEBUNGSKARTE,)
+
 STATUS = {"offen", "bereit", "rückfrage", "importiert", "ergänzt", "übersprungen",
           "zurückgestellt"}
 
@@ -249,9 +274,26 @@ class Kandidat:
         return self.zellen["Notiz"]
 
     @property
+    def sorte(self) -> Kartensorte | None:
+        """Die Sorte der Karte, die aus dem Kandidaten wird, None, wenn keine wird."""
+        return SORTE_DES_ERGEBNISSES.get(self.ergebnis)
+
+    @property
     def wartet(self) -> bool:
-        """Aus dem Kandidaten soll eine Karte werden, und es gibt sie noch nicht."""
-        return self.ergebnis in TYPEN and self.status in NOCH_OFFEN
+        """Aus dem Kandidaten soll eine Karte werden, gleich welcher Sorte, und es gibt sie noch nicht.
+
+        Solange einer wartet, ist im Quellenordner etwas offen, und
+        `uebernehmen` räumt nicht auf.
+        """
+        return self.sorte is not None and self.status in NOCH_OFFEN
+
+    @property
+    def wartet_auf_entwurf(self) -> bool:
+        """Er wartet, und für seine Sorte gibt es schon Auftrag und Prüfung.
+
+        Nur diese Kandidaten nimmt ein Durchgang und prüft `pruefen`.
+        """
+        return self.wartet and self.sorte in ENTWORFENE_SORTEN
 
     @property
     def dateien(self) -> list[Datei]:
@@ -374,13 +416,20 @@ class Sammelimport:
 
         Bis zum 02.10.2026 hieß die Einstellung zum Ausschneiden anders (#49).
         Ginge `vorbereiten` über den alten Namen hinweg, schnitte es still
-        nichts aus, und die Karten kämen ohne Bild heraus.
+        nichts aus, und die Karten kämen ohne Bild heraus. Genannt wird der
+        Name, den sie seit #63 hat. `quellgrafik_ausschneiden` dazwischen
+        gilt weiter, siehe `art_der_quellgrafik`.
         """
         if "feldbild_ausschneiden" in self.einstellungen:
             raise Abbruch(f"In quellen/{self.ordner}/{SAMMELIMPORT} steht noch "
-                          f"feldbild_ausschneiden. Die Einstellung heißt jetzt "
-                          f"quellgrafik_ausschneiden, benenn sie um.\n"
+                          f"feldbild_ausschneiden. Die Einstellung heißt jetzt quellgrafik:\n"
+                          f"aus feldbild_ausschneiden: true wird quellgrafik: eingebettet, "
+                          f"aus false wird quellgrafik: keine.\n"
                           f"Es ist noch kein Auftrag geschrieben.")
+        try:
+            self.art_der_quellgrafik
+        except Abbruch as fehler:
+            raise Abbruch(f"{fehler}\nEs ist noch kein Auftrag geschrieben.") from None
 
     @property
     def in_arbeit(self) -> InArbeit | None:
@@ -460,14 +509,42 @@ class Sammelimport:
         return str(wert).strip() or None
 
     @property
-    def quellgrafik_ausschneiden(self) -> bool:
-        wert = self.einstellungen.get("quellgrafik_ausschneiden")
+    def art_der_quellgrafik(self) -> str:
+        """Woher die Quellgrafik kommt: `eingebettet`, `ausschnitt` oder `keine` (#63).
+
+        `eingebettet` ist das größte eingebettete Bild eines PDF, wie bei
+        PlayDrill, `ausschnitt` heißt, der Entwurf nennt seine Ausschnitte.
+        Bis #63 hieß die Einstellung `quellgrafik_ausschneiden`, und
+        die `sammelimport.md` von PlayDrill trägt sie noch: `true` gilt als
+        `eingebettet`, `false` als `keine`. Ohne Einstellung gilt `keine`, wie
+        vorher. Stehen beide da, bricht das Skript ab, statt eine zu wählen.
+        """
+        datei = f"quellen/{self.ordner}/{SAMMELIMPORT}"
+        alt = self.einstellungen.get("quellgrafik_ausschneiden")
+        wert = self.einstellungen.get("quellgrafik")
+        if wert is not None and alt is not None:
+            raise Abbruch(f"In {datei} stehen quellgrafik und quellgrafik_ausschneiden. "
+                          f"Es gilt quellgrafik, lösch quellgrafik_ausschneiden.")
         if wert is None:
-            return False
-        if not isinstance(wert, bool):
-            raise Abbruch(f"quellgrafik_ausschneiden in quellen/{self.ordner}/{SAMMELIMPORT} "
-                          f"ist {wert!r}, erwartet ist true oder false.")
+            if alt is None:
+                return "keine"
+            if not isinstance(alt, bool):
+                raise Abbruch(f"quellgrafik_ausschneiden in {datei} ist {alt!r}, erwartet ist "
+                              f"true oder false. Es heißt jetzt quellgrafik, mit "
+                              f"{', '.join(QUELLGRAFIK)}.")
+            return "eingebettet" if alt else "keine"
+        if wert not in QUELLGRAFIK:
+            raise Abbruch(f"quellgrafik in {datei} ist {wert!r}, erwartet ist "
+                          f"{', '.join(QUELLGRAFIK)}.")
         return wert
+
+    @property
+    def quellgrafik_angabe(self) -> str:
+        """Die Einstellung zur Quellgrafik, so wie sie in der Datei steht, für eine Meldung."""
+        alt = self.einstellungen.get("quellgrafik_ausschneiden")
+        if self.einstellungen.get("quellgrafik") is None and alt is not None:
+            return f"quellgrafik_ausschneiden: {'true' if alt else 'false'}"
+        return f"quellgrafik: {self.art_der_quellgrafik}"
 
     @property
     def textmarke(self) -> str | None:
@@ -534,19 +611,20 @@ class Sammelimport:
     def auftrag(self, k: Kandidat) -> Path:
         return self.entwurfsordner / f"{k.nummer}.auftrag.md"
 
-    def quellgrafik(self, k: Kandidat, nr: int | None = None) -> Path:
+    def quellgrafik(self, k: Kandidat, nr: int | None = None, endung: str = ".png") -> Path:
         """Wo eine Quellgrafik des Kandidaten liegt.
 
         Ohne Nummer die einzige, `17.quellgrafik.png`. Hat der Kandidat
         mehrere, etwa ein Zirkel mit einem Bild je Blatt, heißen sie
         `17.quellgrafik-1.png`, `17.quellgrafik-2.png` und so weiter (#39).
+        Ein Ausschnitt aus einem Foto ist ein JPEG und endet auf `.jpg` (#63).
         """
-        endung = "" if nr is None else f"-{nr}"
-        return self.entwurfsordner / f"{k.nummer}.quellgrafik{endung}.png"
+        nummer = "" if nr is None else f"-{nr}"
+        return self.entwurfsordner / f"{k.nummer}.quellgrafik{nummer}{endung}"
 
     def ist_quellgrafik_von(self, k: Kandidat, name: str) -> bool:
-        """Ist `name` eine Quellgrafik dieses Kandidaten, einzeln oder mit Nummer?"""
-        muster = rf"{re.escape(k.nummer)}\.quellgrafik(-[1-9]\d*)?\.png"
+        """Ist `name` eine Quellgrafik dieses Kandidaten, einzeln oder mit Nummer, PNG oder JPEG?"""
+        muster = rf"{re.escape(k.nummer)}\.quellgrafik(-[1-9]\d*)?\.(png|jpg)"
         return re.fullmatch(muster, name) is not None
 
     def quellgrafiken(self, k: Kandidat) -> list[Path]:
@@ -618,6 +696,22 @@ class Vorschlag:
 
 
 @dataclass
+class Ausschnitt:
+    """Ein Ausschnitt aus `## Freigabe`: welche Quellgrafik woraus (#63).
+
+    `datei` steht relativ zum Quellenordner wie in der Spalte Dateien,
+    `seite` gibt es nur bei einem PDF und zählt dort ab 1. `rechteck` ist
+    links, oben, rechts, unten in Prozent der aufrechten Seite, wie bei
+    `ausschnitt.py`.
+    """
+
+    name: str
+    datei: str
+    seite: int | None
+    rechteck: tuple[int, int, int, int]
+
+
+@dataclass
 class Befund:
     """Was die Prüfung eines Kartenentwurfs ergeben hat.
 
@@ -630,6 +724,7 @@ class Befund:
     vorschlaege: list[Vorschlag] = field(default_factory=list)
     rueckfragen: list[Rueckfrage] = field(default_factory=list)
     aus_dem_bild: bool = False
+    ausschnitte: list[Ausschnitt] = field(default_factory=list)
 
     @property
     def mit_vermutung(self) -> list[Rueckfrage]:
@@ -640,7 +735,7 @@ class Befund:
         return [r for r in self.rueckfragen if r.vermutung is None]
 
 
-_LISTENKOPF = re.compile(r"^(Vorschläge|Rückfragen):\s*(.*)$")
+_LISTENKOPF = re.compile(r"^(Ausschnitte|Vorschläge|Rückfragen):\s*(.*)$")
 _PUNKT = re.compile(r"^(?:-|\d+\.)\s+(.*)$")
 _ZIEL = re.compile(r"`([^`]+)`(.*)")
 
@@ -798,19 +893,145 @@ def pruefe_frontmatter(sammelimport: Sammelimport, k: Kandidat, felder: dict) ->
     # Im Entwurf nennt `schaubild:` die Quellgrafiken neben ihm, einzeln oder als
     # Liste, und nur die eigenen: `uebernehmen` trägt sie nach schaubilder/,
     # unter den Namen der Karte. Ein fremdes fehlte danach seinem Kandidaten,
-    # und ein doppeltes ließe sich nur einmal verschieben.
+    # und ein doppeltes ließe sich nur einmal verschieben. Ob jede daneben
+    # liegt, prüft `pruefe_quellgrafiken_daneben`, erst nach dem Schneiden der
+    # Ausschnitte.
     gesehen: set[str] = set()
     for name in schaubilder(felder.get("schaubild")):
         if not sammelimport.ist_quellgrafik_von(k, name):
-            raise Formfehler(
-                f"schaubild: nennt {name}, das ist keine Quellgrafik dieses Kandidaten "
-                f"({sammelimport.quellgrafik(k).name}, bei mehreren "
-                f"{sammelimport.quellgrafik(k, 1).name} und weiter)")
+            raise Formfehler(f"schaubild: nennt {name}, das ist keine Quellgrafik dieses "
+                             f"Kandidaten ({_namen_der_quellgrafiken(sammelimport, k)})")
         if name in gesehen:
             raise Formfehler(f"schaubild: nennt {name} zweimal")
         gesehen.add(name)
+
+
+def _namen_der_quellgrafiken(sammelimport: Sammelimport, k: Kandidat) -> str:
+    """Wie die Quellgrafiken eines Kandidaten heißen, für eine Meldung."""
+    return (f"{sammelimport.quellgrafik(k).name}, bei mehreren "
+            f"{sammelimport.quellgrafik(k, 1).name} und weiter, ein Ausschnitt aus einem Foto "
+            f"auf .jpg")
+
+
+def pruefe_quellgrafiken_daneben(sammelimport: Sammelimport, felder: dict) -> None:
+    """Bricht mit Formfehler ab, wenn eine Quellgrafik aus `schaubild:` nicht neben dem Entwurf liegt.
+
+    Etwa weil sie jemand beim Aufräumen gelöscht hat. Die Karte zeigte nach
+    der Übernahme ins Leere.
+    """
+    for name in schaubilder(felder.get("schaubild")):
         if not (sammelimport.entwurfsordner / name).is_file():
             raise Formfehler(f"Quellgrafik {name} liegt nicht neben dem Entwurf")
+
+
+# Ein Ausschnitt in `## Freigabe`, die Form ist die Entscheidung aus #61:
+# `17.quellgrafik-2.png`: `Merkmale.pdf` S. 3, links 5, oben 20, rechts 95, unten 61
+_AUSSCHNITT = re.compile(
+    r"`(?P<name>[^`]+)`:\s*`(?P<datei>[^`]+)`(?:\s+S\.\s*(?P<seite>\d+))?\s*,\s*"
+    r"links\s+(?P<links>\d+)\s*,\s*oben\s+(?P<oben>\d+)\s*,\s*"
+    r"rechts\s+(?P<rechts>\d+)\s*,\s*unten\s+(?P<unten>\d+)\.?")
+
+
+def lies_ausschnitte(rumpf: str) -> list[Ausschnitt]:
+    """Die Liste `Ausschnitte:` unter `## Freigabe`, oder Formfehler, wenn ein Punkt sie verfehlt.
+
+    Die Liste gibt es nur, wenn der Entwurf Ausschnitte hat (#63). Ohne sie,
+    oder ohne `## Freigabe`, kommt eine leere Liste. Dass `## Freigabe`
+    fehlt, meldet `lies_freigabe`.
+    """
+    freigabe = _abschnitt(rumpf.splitlines(), "Freigabe") or []
+    ausschnitte = []
+    for nr, text in enumerate(_listen(freigabe).get("Ausschnitte", []), 1):
+        treffer = _AUSSCHNITT.fullmatch(text.strip())
+        if not treffer:
+            raise Formfehler(
+                f"Ausschnitt {nr} hat nicht die feste Form `<name>`: `<datei>` S. <seite>, "
+                f"links <zahl>, oben <zahl>, rechts <zahl>, unten <zahl>")
+        seite = treffer.group("seite")
+        ausschnitte.append(Ausschnitt(
+            treffer.group("name").strip(), treffer.group("datei").strip(),
+            int(seite) if seite else None,
+            tuple(int(treffer.group(name)) for name in ("links", "oben", "rechts", "unten"))))
+    return ausschnitte
+
+
+def _bereiche(eintraege: list[Datei]) -> list[Seitenbereich] | None:
+    """Die Seitenbereiche, mit denen eine Datei beim Kandidaten steht, None für die ganze Datei.
+
+    Steht sie einmal ohne Bereich da, gehört sie ganz zum Kandidaten. Einen
+    Bereich, den das Skript nicht lesen kann, hat `vorbereiten` schon
+    abgewiesen. Hier schränkt er nichts ein.
+    """
+    bereiche = []
+    for d in eintraege:
+        try:
+            bereich = d.seiten
+        except ValueError:
+            return None
+        if bereich is None:
+            return None
+        bereiche.append(bereich)
+    return bereiche
+
+
+def pruefe_ausschnitte(sammelimport: Sammelimport, k: Kandidat, ausschnitte: list[Ausschnitt],
+                       felder: dict) -> None:
+    """Bricht mit Formfehler ab, wenn ein Ausschnitt so nicht Quellgrafik werden kann (#63).
+
+    Geprüft wird, was sich ohne Schneiden prüfen lässt. Der Name ist der
+    einer Quellgrafik dieses Kandidaten und kommt einmal vor, sonst
+    überschriebe ein Ausschnitt den anderen. Die Datei ist eine des
+    Kandidaten, bei einem Seitenbereich auch die Seite. Die Endung passt zur
+    Datei, wie bei `ausschnitt.py`. Und `schaubild:` nennt den Ausschnitt,
+    denn auf die Karte kommt nur, was dort steht.
+    """
+    gesehen: set[str] = set()
+    eingetragen = set(schaubilder(felder.get("schaubild")))
+    for a in ausschnitte:
+        if not sammelimport.ist_quellgrafik_von(k, a.name):
+            raise Formfehler(f"Ausschnitt {a.name} ist kein Name für eine Quellgrafik dieses "
+                             f"Kandidaten ({_namen_der_quellgrafiken(sammelimport, k)})")
+        if a.name in gesehen:
+            raise Formfehler(f"Ausschnitt {a.name} steht zweimal da")
+        gesehen.add(a.name)
+        eintraege = [d for d in k.dateien if _nfc(d.name) == _nfc(a.datei)]
+        if not eintraege:
+            raise Formfehler(f"Ausschnitt {a.name} nennt {a.datei}, die Datei gehört nicht zu "
+                             f"Kandidat {k.nummer}")
+        try:
+            endung, form = ergebnis_des_ausschnitts(Path(a.datei))
+        except KeinAusschnitt as fehler:
+            raise Formfehler(f"Ausschnitt {a.name}: {fehler}") from None
+        if Path(a.name).suffix != endung:
+            raise Formfehler(f"Ausschnitt {a.name}: aus {a.datei} wird ein {form}, der Name "
+                             f"endet deshalb auf {endung}")
+        bereiche = _bereiche(eintraege)
+        if a.seite is not None and bereiche and not any(
+                b.erste <= a.seite <= b.letzte for b in bereiche):
+            raise Formfehler(f"Ausschnitt {a.name} nennt {a.datei} S. {a.seite}, zu Kandidat "
+                             f"{k.nummer} gehört nur {', '.join(map(str, bereiche))}")
+        if a.name not in eingetragen:
+            raise Formfehler(f"Ausschnitt {a.name} fehlt in schaubild:")
+
+
+def schneide_ausschnitte(sammelimport: Sammelimport, k: Kandidat,
+                         ausschnitte: list[Ausschnitt]) -> None:
+    """Schneidet jeden Ausschnitt neu aus und legt ihn neben den Entwurf (#63).
+
+    Bei jedem Lauf, über dieselbe Funktion wie `ausschnitt.py`. Hat der
+    Skill bei der Freigabe die Zahlen geändert, liegt danach der neue
+    Ausschnitt da. Lässt sich einer nicht schneiden, etwa weil es die Seite
+    nicht gibt, ist das ein Formfehler mit dem Grund aus `ausschnitt.py`.
+    Fehlt eine Bibliothek, kommt BibliothekFehlt durch: Das ist kein Fehler
+    des Entwurfs, und der Aufrufer bricht ab.
+    """
+    for a in ausschnitte:
+        datei = next(d for d in k.dateien if _nfc(d.name) == _nfc(a.datei))
+        try:
+            schneide_aus(sammelimport.quellordner / datei.name,
+                         sammelimport.entwurfsordner / a.name, a.rechteck, a.seite)
+        except KeinAusschnitt as fehler:
+            raise Formfehler(f"Ausschnitt {a.name}: {fehler}") from None
 
 
 def lies_vorschlag(nr: int, text: str, felder: dict, ueberschriften: set[str]) -> Vorschlag:
@@ -883,6 +1104,11 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
     Abgewiesen wird ein Entwurf, der das Datenmodell bricht oder die Form der
     Freigabe nicht einhält. Der Agent hat nicht nachfragen können, und was
     hier durchkäme, stünde nach der Freigabe so auf der Karte.
+
+    Die Ausschnitte eines Entwurfs, der sonst besteht, werden dabei neu
+    geschnitten, bei jedem Aufruf, der prüft: Was neben ihm liegt, folgt so
+    immer den Zahlen in `## Freigabe`. Fehlt dafür eine Bibliothek, kommt
+    BibliothekFehlt durch, siehe `schneide_ausschnitte`.
     """
     datei = sammelimport.entwurf(k)
     if not datei.is_file():
@@ -899,10 +1125,15 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
     try:
         pruefe_frontmatter(sammelimport, k, felder)
         vorschlaege, rueckfragen = lies_freigabe(rumpf, felder)
+        ausschnitte = lies_ausschnitte(rumpf)
+        pruefe_ausschnitte(sammelimport, k, ausschnitte, felder)
+        schneide_ausschnitte(sammelimport, k, ausschnitte)
+        pruefe_quellgrafiken_daneben(sammelimport, felder)
     except Formfehler as fehler:
         return Befund(str(fehler))
     return Befund(felder=felder, vorschlaege=vorschlaege, rueckfragen=rueckfragen,
-                  aus_dem_bild=laut_auftrag_aus_dem_bild(sammelimport.auftrag(k)))
+                  aus_dem_bild=laut_auftrag_aus_dem_bild(sammelimport.auftrag(k)),
+                  ausschnitte=ausschnitte)
 
 
 # --------------------------------------------------------------------------
@@ -939,10 +1170,31 @@ def neue_dateien(quellordner: Path, sammelimport: Sammelimport | None) -> dict[s
     """
     im_plan = ({_nfc(d.name) for k in sammelimport.kandidaten for d in k.dateien}
                if sammelimport else set())
-    alle = {_nfc(p.relative_to(quellordner).as_posix()): p for p in quellordner.rglob("*")
-            if p.is_file() and p.name != SAMMELIMPORT}
+    alle = _auf_der_platte(quellordner)
     return {name: alle[name] for name in sorted(alle)
             if name not in im_plan and not (sammelimport and sammelimport.ausgelassen(name))}
+
+
+def _auf_der_platte(quellordner: Path) -> dict[str, Path]:
+    """Jede Datei des Quellenordners samt Unterordnern, außer der `sammelimport.md`.
+
+    Der Schlüssel ist der Name relativ zum Quellenordner in NFC, der Wert der
+    Pfad, wie er auf der Platte steht, siehe `neue_dateien`.
+    """
+    return {_nfc(p.relative_to(quellordner).as_posix()): p for p in quellordner.rglob("*")
+            if p.is_file() and p.name != SAMMELIMPORT}
+
+
+def zurueckgestellte_dateien(quellordner: Path, geholt: list[Kandidat]) -> dict[str, Path]:
+    """Die Dateien der zurückgestellten Zeilen, die der Trainer holt (#69).
+
+    Der Schlüssel ist der Name wie in `neue_dateien`. Fehlt eine Datei auf der
+    Platte, steht sie trotzdem da, mit dem Pfad aus der Zeile. Der Agent
+    merkt es beim Öffnen und sagt es im Plan.
+    """
+    alle = _auf_der_platte(quellordner)
+    namen = {_nfc(d.name) for k in geholt for d in k.dateien}
+    return {name: alle.get(name, quellordner / name) for name in sorted(namen)}
 
 
 def naechste_kandidatennummer(sammelimport: Sammelimport | None) -> int:
@@ -1028,19 +1280,30 @@ def pdf_text(seiten: tuple[str, ...] | None) -> str | None:
 SEITENMARKE = "=== Seite {} ==="
 
 
-def mit_seitenmarken(seiten: tuple[str, ...] | None) -> str | None:
+def mit_seitenmarken(seiten: tuple[str, ...] | None,
+                     nur: set[int] | None = None) -> str | None:
     """Der Text eines PDF am Stück, vor jeder Seite ihre Marke, gezählt ab 1.
 
     Daran nennt der Zerlegungsplan Seitenbereiche. Auch eine Seite ohne Text
     bekommt ihre Marke, sonst verrutschte die Zählung danach. Hat keine Seite
     Text, bleibt es leer wie bei `pdf_text`: Marken allein wären kein Text,
     und der Agent soll lesen, dass er das PDF selbst öffnen muss.
+
+    `nur` beschränkt den Text auf diese Seiten, etwa die einer
+    zurückgestellten Zeile (#69). Ihre Marken tragen die Nummer im PDF.
+
+    Im Auftrag stehen die Marken bei `quellgrafik: ausschnitt`, denn ein
+    Ausschnitt nennt seine Seite (#63). Bei einem Seitenbereich ist `nur`
+    der Bereich, und die Marken zählen auch dort wie im PDF.
     """
-    text = pdf_text(seiten)
-    if not text:
-        return text
+    if seiten is None:
+        return None
+    gewaehlt = [(nummer, seite) for nummer, seite in enumerate(seiten, 1)
+                if nur is None or nummer in nur]
+    if not any(seite for _, seite in gewaehlt):
+        return ""
     zeilen: list[str] = []
-    for nummer, seite in enumerate(seiten, 1):
+    for nummer, seite in gewaehlt:
         zeilen += [SEITENMARKE.format(nummer), *([seite] if seite else [])]
     return "\n".join(zeilen)
 
@@ -1090,22 +1353,37 @@ def aus_diesem_ordner(quelldatei: object, ordner: str) -> bool:
                for teil in str(quelldatei).split(","))
 
 
+def _als_text(wert: object) -> str:
+    """Ein Feld einer Karte für eine Zelle, eine Liste durch Komma getrennt."""
+    if isinstance(wert, list):
+        return ", ".join(map(str, wert))
+    return str(wert or "")
+
+
 def bibliotheksliste(wurzel: Path, ordner: str) -> list[str]:
-    """Jede Karte der Bibliothek als Tabelle, die aus diesem Quellenordner markiert.
+    """Jede Karte der Bibliothek als Tabelle je Sorte, die aus diesem Quellenordner markiert.
 
     Daran erkennt der Agent für den Zerlegungsplan, was schon importiert ist,
-    und führt es als `importiert` mit seiner ID. Titel und Element braucht er,
-    um einen Verdacht auf ein Duplikat zu äußern.
+    und führt es als `importiert` mit seiner ID. Titel und Element einer
+    Übungskarte braucht er, um einen Verdacht auf ein Duplikat zu äußern.
+    Bei einer Wissenskarte sind es Frage und Thema, und dazu kommt der
+    Verdacht, dass ein Beitrag die Fortsetzung einer Karte aus einem
+    früheren Heft ist (#69).
     """
-    zeilen = ["| ID | Titel | Element | quelldatei | Aus diesem Ordner |",
-              "|---|---|---|---|---|"]
-    for karte in sorted(lies_uebungen(wurzel), key=lambda k: str(k["id"])):
-        element = karte.get("element") or []
-        element = ", ".join(map(str, element)) if isinstance(element, list) else str(element)
-        zellen = [karte["id"], karte.get("titel") or "", element, karte.get("quelldatei") or "",
-                  "ja" if aus_diesem_ordner(karte.get("quelldatei"), ordner) else ""]
-        zeilen.append("| " + " | ".join(_zelle(z) for z in zellen) + " |")
-    return zeilen
+    teile = [(UEBUNGSKARTE, "Übungskarten", ["Titel", "Element"], ["titel", "element"]),
+             (WISSENSKARTE, "Wissenskarten", ["Frage", "Thema"], ["titel", "thema"])]
+    zeilen: list[str] = []
+    for sorte, ueberschrift, spalten, felder in teile:
+        kopf = ["ID", *spalten, "quelldatei", "Aus diesem Ordner"]
+        zeilen += [f"### {ueberschrift}", "",
+                   "| " + " | ".join(kopf) + " |", "|" + "---|" * len(kopf)]
+        for karte in sorted(lies_karten(wurzel, sorte), key=lambda k: str(k["id"])):
+            zellen = [karte["id"], *(_als_text(karte.get(f)) for f in felder),
+                      _als_text(karte.get("quelldatei")),
+                      "ja" if aus_diesem_ordner(karte.get("quelldatei"), ordner) else ""]
+            zeilen.append("| " + " | ".join(_zelle(z) for z in zellen) + " |")
+        zeilen.append("")
+    return zeilen[:-1]
 
 
 def melde_unlesbare_fotos(ordner: str, quellordner: Path,
@@ -1153,7 +1431,49 @@ def _text_oder_grund(text: str | None, pdftotext: str | None,
     return [f"{grund} Das PDF selbst lesen{nur}."]
 
 
-def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
+def seitenbereiche_der_zeilen(geholt: list[Kandidat]) -> dict[str, list[Seitenbereich]]:
+    """Je Datei der geholten Zeilen die Seitenbereiche, die sie nennen (#69).
+
+    Der Rest eines aufgeteilten PDF steht schon in anderen Zeilen. Käme er
+    wieder, plante der Agent ihn ein zweites Mal. Nennt eine der Zeilen die
+    Datei ohne Bereich, oder mit einem, der sich nicht lesen lässt, gehört
+    sie ganz dazu und fehlt hier. Den Bereich, so wie er dasteht, sieht der
+    Agent dann unter „Zurückgestellt“.
+    """
+    ganz: set[str] = set()
+    bereiche: dict[str, set[Seitenbereich]] = {}
+    for k in geholt:
+        for d in k.dateien:
+            try:
+                bereich = d.seiten
+            except ValueError:
+                bereich = None
+            if bereich is None:
+                ganz.add(_nfc(d.name))
+            else:
+                bereiche.setdefault(_nfc(d.name), set()).add(bereich)
+    return {name: sorted(menge, key=lambda b: (b.erste, b.letzte))
+            for name, menge in bereiche.items() if name not in ganz}
+
+
+def zurueckgestellt_teil(geholt: list[Kandidat]) -> list[str]:
+    """Der Abschnitt der Planeingabe mit den zurückgestellten Zeilen, die der Trainer holt.
+
+    Je Zeile Nummer, Dateien, „Was es ist“ und Notiz (#69). Daraus weiß der
+    Agent, was ein früherer Lauf über die Dateien schon gesagt hat, und
+    welche Nummer seine erste Zeile daraus trägt.
+    """
+    zeilen = ["## Zurückgestellt", "",
+              "Diese Zeilen der Übersicht sind zurückgestellt, und der Trainer holt sie "
+              "jetzt. Ihre Dateien stehen unter „Dateien“.", "",
+              "| Kandidat | Dateien | Was es ist | Notiz |", "|---|---|---|---|"]
+    for k in geholt:
+        zellen = [k.nummer, ", ".join(map(str, k.dateien)), k.was, k.notiz]
+        zeilen.append("| " + " | ".join(_zelle(z) for z in zellen) + " |")
+    return [*zeilen, ""]
+
+
+def lege_planeingabe_an(wurzel: Path, ordner: str, zurueckgestellte: bool = False) -> int:
     """Legt die Eingabe für den Zerlegungsplan an.
 
     Der Agent liest sie in einem Aufruf: jede Datei, die noch in keiner Zeile
@@ -1162,21 +1482,35 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     Der Quellenordner steht einmal absolut im Kopf, denn Fotos und PDFs ohne
     Text öffnet der Agent selbst. Dazu die nächste freie Kandidatennummer, ab
     der er zählt.
+
+    Mit `zurueckgestellte` holt der Trainer die zurückgestellten Zeilen
+    (#69): Ihre Dateien kommen zu den neuen, und die Zeilen selbst stehen
+    unter „Zurückgestellt“. Ohne den Schalter kommt keine wieder, auch nicht
+    eine, die der Trainer bewusst zurückgestellt hat.
     """
     sammelimport = vorhandener_sammelimport(wurzel, ordner)
     quellordner = wurzel / "quellen" / ordner
-    dateien = neue_dateien(quellordner, sammelimport)
+    neu = neue_dateien(quellordner, sammelimport)
+    geholt = ([k for k in sammelimport.kandidaten if k.status == "zurückgestellt"]
+              if zurueckgestellte and sammelimport else [])
+    aus_geholten = zurueckgestellte_dateien(quellordner, geholt)
+    dateien = dict(sorted({**neu, **aus_geholten}.items()))
     melde_unlesbare_fotos(ordner, quellordner, sammelimport)
     if not dateien:
         wo = ("in der Übersicht oder unter ohne" if sammelimport and sammelimport.ohne
               else "in der Übersicht")
-        print(f"Keine neuen Dateien in quellen/{ordner}/, jede steht schon {wo}.")
+        keine = ", und keine Zeile ist zurückgestellt" if zurueckgestellte else ""
+        print(f"Keine neuen Dateien in quellen/{ordner}/, jede steht schon {wo}{keine}.")
         return 0
     pdfs = {name for name in dateien if _ist_pdf(name)}
     pdftotext = finde_pdftotext() if pdfs else None
     if pdfs and not pdftotext:
         melde_ohne_pdftotext("die Planeingabe", "den Zerlegungsplan")
-    texte = ({name: mit_seitenmarken(pdf_seiten(pdftotext, dateien[name])) for name in pdfs}
+    nur = seitenbereiche_der_zeilen(geholt)
+    seiten_von = {name: {n for b in bereiche for n in range(b.erste, b.letzte + 1)}
+                  for name, bereiche in nur.items()}
+    texte = ({name: mit_seitenmarken(pdf_seiten(pdftotext, dateien[name]), seiten_von.get(name))
+              for name in pdfs}
              if pdftotext else {})
 
     zeichen = sum(len(t) for t in texte.values() if t)
@@ -1196,10 +1530,18 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     teile = [f"# Planeingabe für quellen/{ordner}/", "",
              f"Quellenordner: `{quellordner.as_posix()}/`", "",
              f"Nächste freie Kandidatennummer: {naechste_kandidatennummer(sammelimport)}", "",
-             f"{len(dateien)} Dateien, die noch in keiner Zeile der Übersicht stehen, "
-             f"relativ zum Quellenordner.", *textlage, "", "## Dateien", ""]
+             f"{len(neu)} Dateien, die noch in keiner Zeile der Übersicht stehen, "
+             f"relativ zum Quellenordner.",
+             *([f"Dazu {len(aus_geholten)} Dateien aus {len(geholt)} zurückgestellten "
+                f"Zeilen, siehe „Zurückgestellt“."] if geholt else []),
+             *textlage, "",
+             *(zurueckgestellt_teil(geholt) if geholt else []),
+             "## Dateien", ""]
     for datei in dateien:
         teile += [f"### `{datei}`", ""]
+        if datei in pdfs and datei in nur:
+            teile += [f"Nur {', '.join(map(str, nur[datei]))}, aus den zurückgestellten Zeilen. "
+                      f"Die übrigen Seiten stehen schon in anderen Zeilen.", ""]
         if datei in pdfs:
             teile += [*_text_oder_grund(texte.get(datei), pdftotext), ""]
     teile += ["## Bibliothek", "",
@@ -1417,13 +1759,35 @@ def verlange_pillow(sammelimport: Sammelimport) -> None:
     except ImportError:
         raise Abbruch(
             f"Für das Ausschneiden der Quellgrafik fehlt Pillow. In quellen/"
-            f"{sammelimport.ordner}/{SAMMELIMPORT} steht quellgrafik_ausschneiden: true.\n\n"
+            f"{sammelimport.ordner}/{SAMMELIMPORT} steht {sammelimport.quellgrafik_angabe}.\n\n"
             f"Installieren mit:\n  {interpreter()} -m pip install Pillow\n\n"
             f"Es ist noch kein Auftrag geschrieben.") from None
 
 
+def verlange_bibliotheken_fuer_ausschnitte(sammelimport: Sammelimport,
+                                           dran: list[Kandidat]) -> None:
+    """Bricht ab, wenn den Ausschnitten des Durchgangs eine Bibliothek fehlt (ADR-0013).
+
+    Pillow braucht jeder Ausschnitt, `pypdfium2` nur einer aus einem PDF.
+    Gefragt wird deshalb nach `pypdfium2` nur, wenn ein Kandidat des
+    Durchgangs ein PDF hat. Vor dem ersten Auftrag, aus demselben Grund wie
+    bei `verlange_pillow`: Sonst kämen Entwürfe mit Ausschnitten, die
+    `pruefen` nicht schneiden kann.
+    """
+    try:
+        verlange_bibliotheken(any(_ist_pdf(d.name) for k in dran for d in k.dateien))
+    except BibliothekFehlt as fehler:
+        raise Abbruch(f"In quellen/{sammelimport.ordner}/{SAMMELIMPORT} steht "
+                      f"{sammelimport.quellgrafik_angabe}.\n{fehler}\n\n"
+                      f"Es ist noch kein Auftrag geschrieben.") from None
+
+
 def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list[str], list[str]]:
-    """Schneidet die Quellgrafiken eines Kandidaten aus, wenn die Einstellungen es wollen.
+    """Schneidet die Quellgrafiken eines Kandidaten aus, bei `quellgrafik: eingebettet`.
+
+    Alte Quellgrafiken neben dem Entwurf räumt es vorher in jedem Fall weg,
+    auch Ausschnitte. Bei `ausschnitt` schneidet es nichts, die Zeile im
+    Auftrag verweist auf `## Ausschnitte`, siehe `ausschnitte_im_auftrag`.
 
     Zurück kommen die Zeilen für den Auftrag und, was das Skript dazu sagt,
     wenn etwas nicht geklappt hat. Jedes PDF des Kandidaten, das ein Bild
@@ -1440,7 +1804,12 @@ def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list
     """
     for altes in sammelimport.quellgrafiken(k):
         altes.unlink()
-    if not sammelimport.quellgrafik_ausschneiden:
+    if sammelimport.art_der_quellgrafik == "ausschnitt":
+        # Vorab geschnitten wird nichts, der Entwurf nennt seine Ausschnitte,
+        # und `pruefen` schneidet sie (#63).
+        return ["- Quellgrafik: als Ausschnitt, wenn die Quelle ein Bild der Übung zeigt, "
+                "siehe `## Ausschnitte`."], []
+    if sammelimport.art_der_quellgrafik != "eingebettet":
         return ["- Quellgrafik: wird bei dieser Quelle nicht ausgeschnitten."], []
     pdfs = [d.name for d in k.dateien if _ist_pdf(d.name)]
     if not pdfs:
@@ -1565,7 +1934,12 @@ def dateien_im_auftrag(sammelimport: Sammelimport, k: Kandidat,
     Nennt der Kandidat Seiten, steht nur deren Text da, und der Abschnitt
     sagt, welche Seiten der Agent im PDF öffnet (#64). Der Text je Datei geht
     an die Regel „wenig Text“, None bei einem Foto oder ohne Text.
+
+    Bei `quellgrafik: ausschnitt` steht vor jeder Seite ihre Marke, gezählt
+    wie im PDF, auch bei einem Seitenbereich. Ein Ausschnitt nennt seine
+    Seite, und ab 1 gezählt träfe er bei einem Bereich die falsche.
     """
+    marken = sammelimport.art_der_quellgrafik == "ausschnitt"
     zeilen: list[str] = []
     texte: list[str | None] = []
     for d in k.dateien:
@@ -1578,13 +1952,77 @@ def dateien_im_auftrag(sammelimport: Sammelimport, k: Kandidat,
         if bereich:
             zeilen += [f"Zu diesem Kandidaten gehören nur {bereich}. Öffnest du das PDF, "
                        f"lies nur diese Seiten.", ""]
-        seiten = pdf_seiten(pdftotext, pfad) if pdftotext else None
-        if bereich and seiten is not None:
-            seiten = seiten[bereich.erste - 1:bereich.letzte]
+        alle = pdf_seiten(pdftotext, pfad) if pdftotext else None
+        seiten = alle
+        if bereich and alle is not None:
+            seiten = alle[bereich.erste - 1:bereich.letzte]
         text = pdf_text(seiten)
         texte.append(text)
+        if marken and text:
+            text = mit_seitenmarken(
+                alle, set(range(bereich.erste, bereich.letzte + 1)) if bereich else None)
         zeilen += [*_text_oder_grund(text, pdftotext, bereich), ""]
     return zeilen, texte
+
+
+def endung_des_ausschnitts(datei: str) -> str | None:
+    """Die Endung eines Ausschnitts aus dieser Datei: `.jpg` beim Foto, `.png` beim PDF.
+
+    None für eine Datei, aus der `ausschnitt.py` nichts schneidet, etwa ein
+    TIFF, das noch nicht aufbereitet ist.
+    """
+    try:
+        return ergebnis_des_ausschnitts(Path(datei))[0]
+    except KeinAusschnitt:
+        return None
+
+
+def ausschnitte_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> list[str]:
+    """Der Abschnitt `## Ausschnitte` eines Auftrags bei `quellgrafik: ausschnitt` (#63).
+
+    Er sagt dem Agenten, in welcher Form der Entwurf seine Ausschnitte nennt
+    und wie sie heißen, mit einer Datei dieses Kandidaten als Beispiel. Die
+    Endung folgt der Quelle, wie bei `ausschnitt.py`: aus einer PDF-Seite ein
+    PNG, aus einem Foto ein JPEG. Genannt werden nur die Endungen, die bei
+    diesem Kandidaten vorkommen. Die Seite eines PDF zählt wie die Marken im
+    Text, bei einem Seitenbereich ist das Beispiel seine erste Seite.
+    """
+    moeglich = [(d, endung) for d in k.dateien if (endung := endung_des_ausschnitts(d.name))]
+    if not moeglich:
+        return ["## Ausschnitte", "",
+                "Aus keiner Datei dieses Kandidaten lässt sich ein Ausschnitt schneiden, nur aus "
+                "einem Foto (JPEG, PNG) oder einem PDF. Es gibt keinen, und `schaubild:` ist "
+                "`null`.", ""]
+    datei, endung = moeglich[0]
+    pdf, foto = AUS_DEM_PDF[0], AUS_DEM_FOTO[0]
+    seite = f" S. {datei.seiten.erste if datei.seiten else 1}" if endung == pdf else ""
+    einzeln = sammelimport.quellgrafik(k, endung=endung).name
+    mehrere = [sammelimport.quellgrafik(k, nr, endung).name for nr in (1, 2)]
+    endungen = {e for _, e in moeglich}
+    regeln = {pdf: (f"`{pdf}` aus einer PDF-Seite",
+                    "Bei einem PDF steht dahinter die Seite, gezählt im PDF ab 1 wie in den "
+                    "Marken `=== Seite 1 ===` im Text, nicht die Seitenzahl, die auf der Seite "
+                    "gedruckt ist."),
+              foto: (f"`{foto}` aus einem Foto", "Bei einem Foto steht keine Seite.")}
+    gilt = [regeln[e] for e in (pdf, foto) if e in endungen]
+    return [
+        "## Ausschnitte", "",
+        "Zeigt die Quelle ein Bild der Übung, nennst du es als Ausschnitt: unter `## Freigabe` "
+        "in einer eigenen Liste vor den Vorschlägen, ein Punkt je Ausschnitt, und `schaubild:` "
+        "trägt seinen Namen. Hat die Quelle kein Bild der Übung, gibt es keinen Ausschnitt und "
+        "keine Liste, und `schaubild:` ist `null`.", "",
+        "```markdown",
+        "Ausschnitte:",
+        f"- `{einzeln}`: `{datei.name}`{seite}, links 8, oben 42, rechts 94, unten 88",
+        "```", "",
+        f"- Name: ein einzelner Ausschnitt heißt `{einzeln}`, mehrere `{mehrere[0]}`, "
+        f"`{mehrere[1]}` und weiter, in `schaubild:` als Liste in derselben Reihenfolge. "
+        f"Die Endung ist {', '.join(e for e, _ in gilt)}.",
+        f"- Datei: wie unter `## Dateien`, relativ zum Quellenordner. "
+        f"{' '.join(regel for _, regel in gilt)}",
+        "- Rechteck: links, oben, rechts, unten in ganzen Prozent der Seite, wie sie aufrecht "
+        "steht. Links ist kleiner als rechts, oben kleiner als unten.", "",
+    ]
 
 
 def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[str],
@@ -1598,6 +2036,8 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
     """
     relativ = [f"{sammelimport.ordner}/{d.name}" for d in k.dateien]
     dateien, texte = dateien_im_auftrag(sammelimport, k, pdftotext)
+    ausschnitte = (ausschnitte_im_auftrag(sammelimport, k)
+                   if sammelimport.art_der_quellgrafik == "ausschnitt" else [])
     teile = [
         f"# Auftrag für Kandidat {k.nummer}",
         "",
@@ -1613,6 +2053,7 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
         "## Dateien",
         "",
         *dateien,
+        *ausschnitte,
         "## Absprachen",
         "",
         sammelimport.absprachen or "Keine.",
@@ -1709,14 +2150,20 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     sammelimport.verlange_freigabe()
     trainer = trainer_fuer_auftraege(wurzel)
     verlange_freien_quellenordner(sammelimport, trainer, trotzdem)
-    offen = [k for k in sammelimport.kandidaten
-             if k.wartet and pruefe_entwurf(sammelimport, k).fehler]
+    try:
+        offen = [k for k in sammelimport.kandidaten
+                 if k.wartet_auf_entwurf and pruefe_entwurf(sammelimport, k).fehler]
+    except BibliothekFehlt as fehler:
+        raise Abbruch(f"Ein Entwurf nennt einen Ausschnitt.\n{fehler}\n\n"
+                      f"Es ist noch kein Auftrag geschrieben.") from None
     dran = offen[:sammelimport.je_durchgang]
     print(f"Aufträge für {len(dran)} von {len(offen)} offenen Kandidaten:")
     if not dran:
         return 0
-    if sammelimport.quellgrafik_ausschneiden:
+    if sammelimport.art_der_quellgrafik == "eingebettet":
         verlange_pillow(sammelimport)
+    elif sammelimport.art_der_quellgrafik == "ausschnitt":
+        verlange_bibliotheken_fuer_ausschnitte(sammelimport, dran)
     pdftotext = None
     if any(_ist_pdf(d.name) for k in dran for d in k.dateien):
         pdftotext = finde_pdftotext()
@@ -1779,6 +2226,11 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
     es bei der Freigabe dazu und nennt am Ende des Durchgangs die Karten, denen
     deshalb eine Quellgrafik fehlt.
 
+    `ausschnitte` nennt jeden Ausschnitt aus `## Freigabe` mit dem Pfad, unter
+    dem `pruefen` ihn eben geschnitten hat, dazu Datei, Seite und Rechteck
+    (#63). Der Skill zeigt jeden im Chat, und korrigiert der Trainer ihn, ändert
+    der Skill die Zahlen im Entwurf.
+
     Gefragt wird nur nach einem Kandidaten, dessen Entwurf auf der Platte
     liegt, siehe `pruefen`.
     """
@@ -1793,6 +2245,11 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
         "quellgrafiken": [(sammelimport.entwurfsordner / name).as_posix()
                           for name in schaubilder(befund.felder.get("schaubild"))],
         "quellgrafik_fehlt": laut_auftrag_ohne_quellgrafik(sammelimport.auftrag(k), k),
+        "ausschnitte": [{"name": a.name,
+                         "pfad": (sammelimport.entwurfsordner / a.name).as_posix(),
+                         "datei": a.datei, "seite": a.seite,
+                         "rechteck": dict(zip(("links", "oben", "rechts", "unten"), a.rechteck))}
+                        for a in befund.ausschnitte],
         "ablauf_aus_dem_bild": befund.aus_dem_bild,
         "felder": befund.felder,
         "vorschlaege": {
@@ -1824,9 +2281,15 @@ def pruefen(wurzel: Path, ordner: str, als_json: bool = False) -> int:
     stand: dict[str, int] = {}
     freigabe = []
     for k in sammelimport.kandidaten:
-        if not k.wartet:
+        if not k.wartet_auf_entwurf:
             continue
-        befund = pruefe_entwurf(sammelimport, k)
+        try:
+            befund = pruefe_entwurf(sammelimport, k)
+        except BibliothekFehlt as fehler:
+            # Kein Fehler des Entwurfs. Abgewiesen ginge er auf `offen` und
+            # würde neu entworfen, mit demselben Ergebnis.
+            raise Abbruch(f"Der Entwurf von Kandidat {k.nummer} nennt einen Ausschnitt.\n"
+                          f"{fehler}\n\nDie Übersicht ist nicht geändert.") from None
         setze_befund(k, befund)
         stand[k.status] = stand.get(k.status, 0) + 1
         if sammelimport.entwurf(k).is_file():
@@ -1900,7 +2363,8 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     dieselbe Karte ein zweites Mal.
 
     Die Quellgrafik bekommt den Namen der Karte, wie jedes PlayDrill-Bild in
-    schaubilder/. Mehrere bekommen ihn mit Nummer, in der Reihenfolge, in der
+    schaubilder/, mit ihrer Endung, ein Ausschnitt aus einem Foto also `.jpg`
+    (#63). Mehrere bekommen ihn mit Nummer, in der Reihenfolge, in der
     der Entwurf sie nennt (#39). Liegt dort schon eine Datei unter einem
     dieser Namen, wird nichts geschrieben, auch die Karte nicht: Überschrieben
     wird in schaubilder/ nichts.
@@ -1954,7 +2418,8 @@ def schliesse_ab(sammelimport: Sammelimport, k: Kandidat, status: str, notiz: st
     wieder offen aus.
 
     Die Quellgrafiken verschwinden auch dann, wenn der Entwurf sie nicht
-    eingetragen hat. Sie ließen sich jederzeit neu aus dem PDF schneiden.
+    eingetragen hat. Sie ließen sich jederzeit neu aus dem PDF schneiden, ein
+    Ausschnitt aus Foto oder PDF-Seite ebenso.
     """
     k.setze(status, notiz, karte=karte)
     sammelimport.speichere()
@@ -1987,17 +2452,30 @@ def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> st
     grund = warum_nicht_wartend(k)
     if grund or k is None:
         return grund
-    return pruefe_entwurf(sammelimport, k).fehler
+    # Eine Wissenskarte übernimmt das Skript erst mit #70. Bis dahin wäre ein
+    # Entwurf unter einer `wissen`-Zeile als Übungskarte geprüft und
+    # geschrieben worden.
+    if not k.wartet_auf_entwurf:
+        return "wird laut Plan eine Wissenskarte, und die übernimmt das Skript noch nicht"
+    try:
+        return pruefe_entwurf(sammelimport, k).fehler
+    except BibliothekFehlt as fehler:
+        # Für den Ausschnitt fehlt eine Bibliothek. Die übrigen Kandidaten
+        # gehen trotzdem durch, die Meldung steht in einer Zeile.
+        return " ".join(str(fehler).split())
 
 
 def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
-                uebersprungen: list[tuple[str, str]], ergaenzt: list[tuple[str, str]]) -> int:
+                uebersprungen: list[tuple[str, str]], ergaenzt: list[tuple[str, str]],
+                zurueckgestellt: list[tuple[str, str]] = ()) -> int:
     """Erledigt die Kandidaten, über die der Trainer bei der Freigabe entschieden hat.
 
     Freigegebene werden Karte. Gestrichene werden `übersprungen`, der Grund
-    steht in der Notiz. Ein bestätigtes Duplikat hat der Skill schon in die
-    bestehende Karte eingearbeitet, der Kandidat wird `ergänzt` und zeigt auf
-    sie. Aus den beiden letzten entsteht keine Karte.
+    steht in der Notiz. Zurückgestellte werden `zurückgestellt`, auch mit
+    Grund, und kommen wieder, wenn der Trainer sie holt (#69). Ein
+    bestätigtes Duplikat hat der Skill schon in die bestehende Karte
+    eingearbeitet, der Kandidat wird `ergänzt` und zeigt auf sie. Aus den
+    drei letzten entsteht keine Karte.
 
     Vor allem anderen muss der Quellenordner da sein (#40). Gleicht die
     Nextcloud eines Rechners quellen/ nicht ab, liegen dort die Entwürfe,
@@ -2008,9 +2486,10 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
                       f"Gleicht die Nextcloud quellen/ hier ab?\nNichts übernommen.")
     sammelimport = Sammelimport(wurzel, ordner)
     sammelimport.verlange_freigabe()
-    if not (freigegeben or uebersprungen or ergaenzt):
+    if not (freigegeben or uebersprungen or ergaenzt or zurueckgestellt):
         raise Abbruch("Kein Kandidat genannt. Je Kandidat: --kandidat <nr> \"<notiz>\", "
-                      "--uebersprungen <nr> \"<grund>\" oder --ergaenzt <nr> <id>")
+                      "--uebersprungen <nr> \"<grund>\", --zurueckgestellt <nr> \"<grund>\" "
+                      "oder --ergaenzt <nr> <id>")
     # Gibt es an diesem Rechner keine ID, dann für keinen Kandidaten. Das
     # steht einmal da, bevor irgendetwas geschrieben ist, statt je Kandidat.
     # Gestrichene und ergänzende Kandidaten brauchen keine ID.
@@ -2038,8 +2517,10 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
     # `bekannt` kennt auch die Karten, die dieser Aufruf eben geschrieben
     # hat. Auch eine davon kann die ergänzte sein.
     ohne_karte = [
-        (nummer, "übersprungen", grund.strip(), None, "" if grund.strip() else "ohne Grund")
-        for nummer, grund in uebersprungen
+        (nummer, status, grund.strip(), None, "" if grund.strip() else "ohne Grund")
+        for status, mit_grund in (("übersprungen", uebersprungen),
+                                  ("zurückgestellt", zurueckgestellt))
+        for nummer, grund in mit_grund
     ] + [
         (nummer, "ergänzt", "", uid,
          "" if uid in sammelimport.bekannt else f"{uid} gibt es nicht in uebungen/")
@@ -2111,6 +2592,9 @@ def main() -> int:
     vor.add_argument("ordner", type=quellenordner, help=hilfe)
     vor.add_argument("--plan", action="store_true",
                      help="statt der Aufträge die Eingabe für den Zerlegungsplan anlegen")
+    vor.add_argument("--zurueckgestellte", action="store_true",
+                     help="mit --plan: dazu die Dateien der zurückgestellten Zeilen, die der "
+                          "Trainer jetzt holt")
     vor.add_argument("--trotzdem", action="store_true",
                      help="ohne --plan: weiter, auch wenn laut in_arbeit ein anderer Trainer "
                           "daran arbeitet")
@@ -2126,12 +2610,17 @@ def main() -> int:
     ue.add_argument("--uebersprungen", nargs=2, action="append", default=[],
                     metavar=("NR", "GRUND"),
                     help="ein Kandidat, den der Trainer gestrichen hat, und warum")
+    ue.add_argument("--zurueckgestellt", nargs=2, action="append", default=[],
+                    metavar=("NR", "GRUND"),
+                    help="ein Kandidat, den der Trainer später holen will, und warum")
     ue.add_argument("--ergaenzt", nargs=2, action="append", default=[],
                     metavar=("NR", "ID"),
                     help="ein Kandidat, der als Duplikat eine bestehende Karte ergänzt hat")
     a = ap.parse_args()
     if a.befehl == "vorbereiten" and a.plan and a.trotzdem:
         ap.error("--trotzdem gilt nur ohne --plan, die Planeingabe trägt nicht ein, wer arbeitet")
+    if a.befehl == "vorbereiten" and a.zurueckgestellte and not a.plan:
+        ap.error("--zurueckgestellte gilt nur mit --plan, geholt wird in den Zerlegungsplan")
 
     wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
     try:
@@ -2140,9 +2629,10 @@ def main() -> int:
         if a.befehl == "uebernehmen":
             return uebernehmen(wurzel, a.ordner, [tuple(p) for p in a.kandidat],
                                [tuple(p) for p in a.uebersprungen],
-                               [tuple(p) for p in a.ergaenzt])
+                               [tuple(p) for p in a.ergaenzt],
+                               [tuple(p) for p in a.zurueckgestellt])
         if a.plan:
-            return lege_planeingabe_an(wurzel, a.ordner)
+            return lege_planeingabe_an(wurzel, a.ordner, zurueckgestellte=a.zurueckgestellte)
         return vorbereiten(wurzel, a.ordner, trotzdem=a.trotzdem)
     except Abbruch as fehler:
         print(fehler)
