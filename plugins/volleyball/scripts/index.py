@@ -12,7 +12,10 @@ Nextcloud: sonst schreibt bei mehreren Trainern jeder Lauf dieselbe Datei neu
 und der Sync legt Konfliktkopien an.
 
 index.md dagegen ist die Lesebrille fuer Menschen und gehoert in die Wurzel.
-Sie wird nur mit --md geschrieben, also auf ausdrueckliche Ansage.
+Sie wird nur mit --md geschrieben, also auf ausdrueckliche Ansage. Sie zeigt
+die Uebungen nach Element und, wo es welche gibt, die Wissenskarten nach
+Thema. Zeigt eine Wissenskarte auf eine Uebung, steht ihre ID dort unter
+"Hintergrund".
 """
 
 from __future__ import annotations
