@@ -1059,8 +1059,9 @@ class PlaneingabeTest(unittest.TestCase):
         self.ordner = Arbeitsordner()
         self.addCleanup(self.ordner.raeume_auf)
 
-    def plane(self, **starte):
-        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", "--plan", ORDNER, **starte)
+    def plane(self, *schalter: str, **starte):
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", "--plan", *schalter, ORDNER,
+                                    **starte)
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         return fertig
 
@@ -1366,6 +1367,92 @@ class PlaneingabeTest(unittest.TestCase):
         self.assertEqual({uid for uid, zeile in liste.items() if zeile["Aus diesem Ordner"]},
                          {"wi-000001"})
         self.assertEqual(sorted(self.bibliothek("Übungskarten")), sorted(self.ordner.ids))
+
+    def lege_zurueckgestellte_an(self) -> None:
+        """Ein Plan nach dem ersten Lauf, mit zwei zurueckgestellten Zeilen und einer neuen Datei.
+
+        Kandidat 2 hat der Zerlegungsplan zurueckgestellt, als es noch keine
+        Wissenskarte gab. Kandidat 3 hat der Trainer bei der Freigabe
+        zurueckgestellt, sein Ergebnis ist noch `uebung`.
+        """
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-01.jpg"], "status": "importiert",
+             "karte": "ue-000001"},
+            {"kandidat": 2, "dateien": ["seite-02.jpg", "seite-03.jpg"],
+             "was": "Einarmig gehts auch, Teil 2, S. 26–27", "ergebnis": "zurückgestellt",
+             "status": "zurückgestellt", "notiz": "Theorie"},
+            {"kandidat": 3, "dateien": ["seite-04.jpg"], "was": "Spielzug über die Mitte",
+             "status": "zurückgestellt", "notiz": "erst nach der Saison"},
+            {"kandidat": 4, "dateien": ["seite-05.jpg"], "ergebnis": "übersprungen",
+             "status": "übersprungen", "notiz": "Werbung"},
+        ])
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-06.jpg", b"")
+
+    def zurueckgestellte(self) -> dict[str, dict[str, str]]:
+        """Die zurueckgestellten Zeilen, die die Planeingabe nennt, je Nummer eine."""
+        abschnitt = self.planeingabe().split("## Zurückgestellt\n", 1)[1].split("\n## ", 1)[0]
+        zeilen = [[z.strip() for z in zeile.strip().strip("|").split("|")]
+                  for zeile in abschnitt.splitlines() if zeile.startswith("|")]
+        kopf, _trenner, *rest = zeilen
+        return {z[0]: dict(zip(kopf, z)) for z in rest}
+
+    def test_ohne_den_schalter_kommt_keine_zurueckgestellte_zeile_wieder(self) -> None:
+        # Bewusst Zurueckgestelltes soll nicht bei jedem Lauf auftauchen
+        # (#69). Ihre Dateien stehen in einer Zeile und sind nicht neu.
+        self.lege_zurueckgestellte_an()
+
+        self.plane()
+
+        self.assertEqual(self.genannte_dateien(), ["seite-06.jpg"])
+        self.assertNotIn("Zurückgestellt", self.planeingabe())
+
+    def test_mit_dem_schalter_stehen_die_zurueckgestellten_zeilen_und_ihre_dateien_da(
+            self) -> None:
+        # "Hol die zurueckgestellten aus stapel" (#69). Der Agent sieht die
+        # alten Zeilen mit Nummer, Dateien, "Was es ist" und Notiz und plant
+        # ihre Dateien neu, zusammen mit dem, was neu ist. Die erste Zeile,
+        # die er aus einer alten macht, traegt deren Nummer, weitere zaehlen
+        # ab der naechsten freien.
+        self.lege_zurueckgestellte_an()
+
+        self.plane("--zurueckgestellte")
+
+        self.assertEqual(sorted(self.genannte_dateien()),
+                         ["seite-02.jpg", "seite-03.jpg", "seite-04.jpg", "seite-06.jpg"])
+        zeilen = self.zurueckgestellte()
+        self.assertEqual(sorted(zeilen), ["2", "3"])
+        self.assertEqual(
+            {spalte: zeilen["2"][spalte] for spalte in ("Dateien", "Was es ist", "Notiz")},
+            {"Dateien": "`seite-02.jpg`, `seite-03.jpg`",
+             "Was es ist": "Einarmig gehts auch, Teil 2, S. 26–27", "Notiz": "Theorie"})
+        self.assertEqual(zeilen["3"]["Notiz"], "erst nach der Saison")
+        self.assertEqual(self.naechste_nummer(), 5)
+
+    @BRAUCHT_PDFTOTEXT
+    def test_von_einem_pdf_kommen_nur_die_zurueckgestellten_seiten(self) -> None:
+        # Der Rest des Hefts steht schon in anderen Zeilen. Kaeme er wieder,
+        # plante der Agent ihn ein zweites Mal, denn von einem aufgeteilten
+        # PDF soll jede Seite in einer Zeile stehen. Neue Dateien gibt es
+        # keine, die Planeingabe entsteht trotzdem.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": [("heft.pdf", "S. 1")], "ergebnis": "übersprungen",
+             "status": "übersprungen", "notiz": "Inhaltsverzeichnis"},
+            {"kandidat": 2, "dateien": [("heft.pdf", "S. 2–3")], "ergebnis": "zurückgestellt",
+             "status": "zurückgestellt", "notiz": "Theorie"},
+        ])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", ["Inhalt des Hefts"],
+                                      ["Wann lohnt sich einarmige Abwehr?"],
+                                      ["Einarmig spart den Schritt zum Ball."])
+
+        self.plane("--zurueckgestellte")
+
+        heft = self.zu_datei("heft.pdf")
+        self.assertNotIn("Inhalt des Hefts", heft)
+        self.assertNotIn("=== Seite 1 ===", heft)
+        for zeile in ("=== Seite 2 ===", "Wann lohnt sich einarmige Abwehr?",
+                      "=== Seite 3 ===", "Einarmig spart den Schritt zum Ball."):
+            self.assertIn(zeile, heft)
+        self.assertIn("S. 2–3", zeile_mit(heft, "Nur"))
 
     def test_ein_foto_ueber_2_mb_ergibt_den_hinweis_auf_die_bildaufbereitung(self) -> None:
         # So schwer ist eine abfotografierte Magazinseite mit 50 Megapixeln.

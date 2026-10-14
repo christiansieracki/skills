@@ -970,10 +970,31 @@ def neue_dateien(quellordner: Path, sammelimport: Sammelimport | None) -> dict[s
     """
     im_plan = ({_nfc(d.name) for k in sammelimport.kandidaten for d in k.dateien}
                if sammelimport else set())
-    alle = {_nfc(p.relative_to(quellordner).as_posix()): p for p in quellordner.rglob("*")
-            if p.is_file() and p.name != SAMMELIMPORT}
+    alle = _auf_der_platte(quellordner)
     return {name: alle[name] for name in sorted(alle)
             if name not in im_plan and not (sammelimport and sammelimport.ausgelassen(name))}
+
+
+def _auf_der_platte(quellordner: Path) -> dict[str, Path]:
+    """Jede Datei des Quellenordners samt Unterordnern, außer der `sammelimport.md`.
+
+    Der Schlüssel ist der Name relativ zum Quellenordner in NFC, der Wert der
+    Pfad, wie er auf der Platte steht, siehe `neue_dateien`.
+    """
+    return {_nfc(p.relative_to(quellordner).as_posix()): p for p in quellordner.rglob("*")
+            if p.is_file() and p.name != SAMMELIMPORT}
+
+
+def zurueckgestellte_dateien(quellordner: Path, geholt: list[Kandidat]) -> dict[str, Path]:
+    """Die Dateien der zurückgestellten Zeilen, die der Trainer holt (#69).
+
+    Der Schlüssel ist der Name wie in `neue_dateien`. Fehlt eine Datei auf der
+    Platte, steht sie trotzdem da, mit dem Pfad aus der Zeile. Der Agent
+    merkt es beim Öffnen und sagt es im Plan.
+    """
+    alle = _auf_der_platte(quellordner)
+    namen = {_nfc(d.name) for k in geholt for d in k.dateien}
+    return {name: alle.get(name, quellordner / name) for name in sorted(namen)}
 
 
 def naechste_kandidatennummer(sammelimport: Sammelimport | None) -> int:
@@ -1059,19 +1080,26 @@ def pdf_text(seiten: tuple[str, ...] | None) -> str | None:
 SEITENMARKE = "=== Seite {} ==="
 
 
-def mit_seitenmarken(seiten: tuple[str, ...] | None) -> str | None:
+def mit_seitenmarken(seiten: tuple[str, ...] | None,
+                     nur: set[int] | None = None) -> str | None:
     """Der Text eines PDF am Stück, vor jeder Seite ihre Marke, gezählt ab 1.
 
     Daran nennt der Zerlegungsplan Seitenbereiche. Auch eine Seite ohne Text
     bekommt ihre Marke, sonst verrutschte die Zählung danach. Hat keine Seite
     Text, bleibt es leer wie bei `pdf_text`: Marken allein wären kein Text,
     und der Agent soll lesen, dass er das PDF selbst öffnen muss.
+
+    `nur` beschränkt den Text auf diese Seiten, etwa die einer
+    zurückgestellten Zeile (#69). Ihre Marken tragen die Nummer im PDF.
     """
-    text = pdf_text(seiten)
-    if not text:
-        return text
+    if seiten is None:
+        return None
+    gewaehlt = [(nummer, seite) for nummer, seite in enumerate(seiten, 1)
+                if nur is None or nummer in nur]
+    if not any(seite for _, seite in gewaehlt):
+        return ""
     zeilen: list[str] = []
-    for nummer, seite in enumerate(seiten, 1):
+    for nummer, seite in gewaehlt:
         zeilen += [SEITENMARKE.format(nummer), *([seite] if seite else [])]
     return "\n".join(zeilen)
 
@@ -1199,7 +1227,49 @@ def _text_oder_grund(text: str | None, pdftotext: str | None,
     return [f"{grund} Das PDF selbst lesen{nur}."]
 
 
-def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
+def seitenbereiche_der_zeilen(geholt: list[Kandidat]) -> dict[str, list[Seitenbereich]]:
+    """Je Datei der geholten Zeilen die Seitenbereiche, die sie nennen (#69).
+
+    Der Rest eines aufgeteilten PDF steht schon in anderen Zeilen. Käme er
+    wieder, plante der Agent ihn ein zweites Mal. Nennt eine der Zeilen die
+    Datei ohne Bereich, oder mit einem, der sich nicht lesen lässt, gehört
+    sie ganz dazu und fehlt hier. Den Bereich, so wie er dasteht, sieht der
+    Agent dann unter „Zurückgestellt“.
+    """
+    ganz: set[str] = set()
+    bereiche: dict[str, set[Seitenbereich]] = {}
+    for k in geholt:
+        for d in k.dateien:
+            try:
+                bereich = d.seiten
+            except ValueError:
+                bereich = None
+            if bereich is None:
+                ganz.add(_nfc(d.name))
+            else:
+                bereiche.setdefault(_nfc(d.name), set()).add(bereich)
+    return {name: sorted(menge, key=lambda b: (b.erste, b.letzte))
+            for name, menge in bereiche.items() if name not in ganz}
+
+
+def zurueckgestellt_teil(geholt: list[Kandidat]) -> list[str]:
+    """Der Abschnitt der Planeingabe mit den zurückgestellten Zeilen, die der Trainer holt.
+
+    Je Zeile Nummer, Dateien, „Was es ist“ und Notiz (#69). Daraus weiß der
+    Agent, was ein früherer Lauf über die Dateien schon gesagt hat, und
+    welche Nummer seine erste Zeile daraus trägt.
+    """
+    zeilen = ["## Zurückgestellt", "",
+              "Diese Zeilen der Übersicht sind zurückgestellt, und der Trainer holt sie "
+              "jetzt. Ihre Dateien stehen unter „Dateien“.", "",
+              "| Kandidat | Dateien | Was es ist | Notiz |", "|---|---|---|---|"]
+    for k in geholt:
+        zellen = [k.nummer, ", ".join(map(str, k.dateien)), k.was, k.notiz]
+        zeilen.append("| " + " | ".join(_zelle(z) for z in zellen) + " |")
+    return [*zeilen, ""]
+
+
+def lege_planeingabe_an(wurzel: Path, ordner: str, zurueckgestellte: bool = False) -> int:
     """Legt die Eingabe für den Zerlegungsplan an.
 
     Der Agent liest sie in einem Aufruf: jede Datei, die noch in keiner Zeile
@@ -1208,21 +1278,35 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     Der Quellenordner steht einmal absolut im Kopf, denn Fotos und PDFs ohne
     Text öffnet der Agent selbst. Dazu die nächste freie Kandidatennummer, ab
     der er zählt.
+
+    Mit `zurueckgestellte` holt der Trainer die zurückgestellten Zeilen
+    (#69): Ihre Dateien kommen zu den neuen, und die Zeilen selbst stehen
+    unter „Zurückgestellt“. Ohne den Schalter kommt keine wieder, auch nicht
+    eine, die der Trainer bewusst zurückgestellt hat.
     """
     sammelimport = vorhandener_sammelimport(wurzel, ordner)
     quellordner = wurzel / "quellen" / ordner
-    dateien = neue_dateien(quellordner, sammelimport)
+    neu = neue_dateien(quellordner, sammelimport)
+    geholt = ([k for k in sammelimport.kandidaten if k.status == "zurückgestellt"]
+              if zurueckgestellte and sammelimport else [])
+    aus_geholten = zurueckgestellte_dateien(quellordner, geholt)
+    dateien = dict(sorted({**neu, **aus_geholten}.items()))
     melde_unlesbare_fotos(ordner, quellordner, sammelimport)
     if not dateien:
         wo = ("in der Übersicht oder unter ohne" if sammelimport and sammelimport.ohne
               else "in der Übersicht")
-        print(f"Keine neuen Dateien in quellen/{ordner}/, jede steht schon {wo}.")
+        keine = ", und keine Zeile ist zurückgestellt" if zurueckgestellte else ""
+        print(f"Keine neuen Dateien in quellen/{ordner}/, jede steht schon {wo}{keine}.")
         return 0
     pdfs = {name for name in dateien if _ist_pdf(name)}
     pdftotext = finde_pdftotext() if pdfs else None
     if pdfs and not pdftotext:
         melde_ohne_pdftotext("die Planeingabe", "den Zerlegungsplan")
-    texte = ({name: mit_seitenmarken(pdf_seiten(pdftotext, dateien[name])) for name in pdfs}
+    nur = seitenbereiche_der_zeilen(geholt)
+    seiten_von = {name: {n for b in bereiche for n in range(b.erste, b.letzte + 1)}
+                  for name, bereiche in nur.items()}
+    texte = ({name: mit_seitenmarken(pdf_seiten(pdftotext, dateien[name]), seiten_von.get(name))
+              for name in pdfs}
              if pdftotext else {})
 
     zeichen = sum(len(t) for t in texte.values() if t)
@@ -1242,10 +1326,18 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     teile = [f"# Planeingabe für quellen/{ordner}/", "",
              f"Quellenordner: `{quellordner.as_posix()}/`", "",
              f"Nächste freie Kandidatennummer: {naechste_kandidatennummer(sammelimport)}", "",
-             f"{len(dateien)} Dateien, die noch in keiner Zeile der Übersicht stehen, "
-             f"relativ zum Quellenordner.", *textlage, "", "## Dateien", ""]
+             f"{len(neu)} Dateien, die noch in keiner Zeile der Übersicht stehen, "
+             f"relativ zum Quellenordner.",
+             *([f"Dazu {len(aus_geholten)} Dateien aus {len(geholt)} zurückgestellten "
+                f"Zeilen, siehe „Zurückgestellt“."] if geholt else []),
+             *textlage, "",
+             *(zurueckgestellt_teil(geholt) if geholt else []),
+             "## Dateien", ""]
     for datei in dateien:
         teile += [f"### `{datei}`", ""]
+        if datei in pdfs and datei in nur:
+            teile += [f"Nur {', '.join(map(str, nur[datei]))}, aus den zurückgestellten Zeilen. "
+                      f"Die übrigen Seiten stehen schon in anderen Zeilen.", ""]
         if datei in pdfs:
             teile += [*_text_oder_grund(texte.get(datei), pdftotext), ""]
     teile += ["## Bibliothek", "",
@@ -2168,6 +2260,9 @@ def main() -> int:
     vor.add_argument("ordner", type=quellenordner, help=hilfe)
     vor.add_argument("--plan", action="store_true",
                      help="statt der Aufträge die Eingabe für den Zerlegungsplan anlegen")
+    vor.add_argument("--zurueckgestellte", action="store_true",
+                     help="mit --plan: dazu die Dateien der zurückgestellten Zeilen, die der "
+                          "Trainer jetzt holt")
     vor.add_argument("--trotzdem", action="store_true",
                      help="ohne --plan: weiter, auch wenn laut in_arbeit ein anderer Trainer "
                           "daran arbeitet")
@@ -2192,6 +2287,8 @@ def main() -> int:
     a = ap.parse_args()
     if a.befehl == "vorbereiten" and a.plan and a.trotzdem:
         ap.error("--trotzdem gilt nur ohne --plan, die Planeingabe trägt nicht ein, wer arbeitet")
+    if a.befehl == "vorbereiten" and a.zurueckgestellte and not a.plan:
+        ap.error("--zurueckgestellte gilt nur mit --plan, geholt wird in den Zerlegungsplan")
 
     wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
     try:
@@ -2203,7 +2300,7 @@ def main() -> int:
                                [tuple(p) for p in a.ergaenzt],
                                [tuple(p) for p in a.zurueckgestellt])
         if a.plan:
-            return lege_planeingabe_an(wurzel, a.ordner)
+            return lege_planeingabe_an(wurzel, a.ordner, zurueckgestellte=a.zurueckgestellte)
         return vorbereiten(wurzel, a.ordner, trotzdem=a.trotzdem)
     except Abbruch as fehler:
         print(fehler)
