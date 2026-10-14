@@ -2,7 +2,7 @@
 
     <python> -m unittest discover -s plugins/volleyball/tests
 
-Die beiden Agenten unter `agents/` haben keine Kommandozeile, also gibt es
+Die drei Agenten unter `agents/` haben keine Kommandozeile, also gibt es
 nichts zu starten. Ihr Prompt schreibt die kontrollierten Werte und die Felder
 der Karte aus, weil der Agent nur `Read` und `Write` hat und `tpdaten.py` nicht
 fragen kann (ADR-0009). Ausgeschrieben laufen sie dem Datenmodell still
@@ -25,11 +25,11 @@ sys.path.insert(0, str(PLUGIN / "scripts"))
 
 import tpdaten  # noqa: E402
 
-AGENTEN = ["volleyball-kartenentwurf", "volleyball-zerlegungsplan"]
+AGENTEN = ["volleyball-kartenentwurf", "volleyball-zerlegungsplan", "volleyball-wissenskarte"]
 
-# Je Feld die Werte aus tpdaten.py. Die Level stehen als Liste, ihre
-# Reihenfolge zaehlt: level_min darf nicht ueber level_max liegen.
-KONTROLLIERT = {
+# Je Feld der Uebungskarte die Werte aus tpdaten.py. Die Level stehen als
+# Liste, ihre Reihenfolge zaehlt: level_min darf nicht ueber level_max liegen.
+UEBUNGSWERTE = {
     "typ": tpdaten.TYPEN,
     "disziplin": tpdaten.DISZIPLINEN,
     "element": tpdaten.ELEMENTE,
@@ -37,6 +37,25 @@ KONTROLLIERT = {
     "form": tpdaten.FORMEN,
     "level_min": tpdaten.LEVEL,
     "level_max": tpdaten.LEVEL,
+}
+
+# Je Agent die Felder, deren Werte er ausschreibt. Der Agent fuer die
+# Wissenskarte braucht nur die beiden kontrollierten Felder seiner Karte (#70),
+# die Kennungen bekommt er wie die anderen aus dem Auftrag.
+KONTROLLIERT = {
+    "volleyball-kartenentwurf": UEBUNGSWERTE,
+    "volleyball-zerlegungsplan": UEBUNGSWERTE,
+    "volleyball-wissenskarte": {
+        "thema": tpdaten.THEMEN,
+        "disziplin": tpdaten.DISZIPLINEN,
+    },
+}
+
+# Je Agent, der Entwuerfe schreibt, die Felder im Schema seines Entwurfs:
+# jedes Feld seiner Karte ausser `id` und `angelegt`.
+ENTWURFSFELDER = {
+    "volleyball-kartenentwurf": tpdaten.KARTENFELDER,
+    "volleyball-wissenskarte": tpdaten.WISSENSFELDER,
 }
 
 
@@ -104,7 +123,7 @@ class AgentenTest(unittest.TestCase):
         felder, _ = tpdaten.lies_frontmatter(definition(name))
         return felder
 
-    def test_beide_agenten_liegen_im_plugin_mit_name_und_beschreibung(self) -> None:
+    def test_alle_drei_agenten_liegen_im_plugin_mit_name_und_beschreibung(self) -> None:
         for name in AGENTEN:
             with self.subTest(name):
                 self.assertTrue(definition(name).is_file(), definition(name))
@@ -131,20 +150,22 @@ class AgentenTest(unittest.TestCase):
         for name in AGENTEN:
             with self.subTest(name):
                 werte = kontrollierte_werte(definition(name).read_text(encoding="utf-8"))
-                self.assertEqual(sorted(werte), sorted(KONTROLLIERT))
-                for feld, erwartet in KONTROLLIERT.items():
+                self.assertEqual(sorted(werte), sorted(KONTROLLIERT[name]))
+                for feld, erwartet in KONTROLLIERT[name].items():
                     if isinstance(erwartet, list):
                         self.assertEqual(werte[feld], erwartet, feld)
                     else:
                         self.assertEqual(sorted(werte[feld]), sorted(erwartet), feld)
 
-    def test_der_kartenentwurf_traegt_jedes_feld_der_karte_ausser_id_und_angelegt(self) -> None:
-        # pruefen verlangt jedes dieser Felder, auch die mit null. Ein Feld,
-        # das im Schema fehlt, fehlt in jedem Entwurf, und jeder neue Aufruf
-        # kostet rund 91 000 Tokens.
-        text = definition("volleyball-kartenentwurf").read_text(encoding="utf-8")
-        erwartet = [f for f in tpdaten.KARTENFELDER if f not in ("id", "angelegt")]
-        self.assertEqual(entwurfsfelder(text), erwartet)
+    def test_der_entwurf_traegt_jedes_feld_der_karte_ausser_id_und_angelegt(self) -> None:
+        # pruefen verlangt jedes dieser Felder, auch die mit null oder leer.
+        # Ein Feld, das im Schema fehlt, fehlt in jedem Entwurf, und jeder
+        # neue Aufruf des Kartenentwurfs kostet rund 91 000 Tokens.
+        for name, felder in ENTWURFSFELDER.items():
+            with self.subTest(name):
+                text = definition(name).read_text(encoding="utf-8")
+                erwartet = [f for f in felder if f not in ("id", "angelegt")]
+                self.assertEqual(entwurfsfelder(text), erwartet)
 
 
 if __name__ == "__main__":
