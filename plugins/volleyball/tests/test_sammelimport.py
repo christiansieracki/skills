@@ -3141,6 +3141,216 @@ class WissenskarteTest(unittest.TestCase):
         self.assertEqual(auffaelligkeiten(index.stdout), [], index.stdout)
 
 
+class UebungenAusDemselbenBeitragTest(unittest.TestCase):
+    """Die Wissenskarte zeigt nach dem Uebernehmen auf die Uebungen aus ihrem Beitrag (#72).
+
+    Der Fall aus vm_09 im Kleinen: Kandidat 1 ist die Theorie von Seite 26,
+    die Kandidaten 2 und 3 sind die Uebungen von Seite 28 und 29, und der
+    Beitrag nennt dazu ue-000004, die schon Karte ist. Die IDs entstehen erst
+    beim Uebernehmen, und welcher Kandidat zuerst kommt, steht nicht fest.
+    Die Fixture-Karten enden bei ue-000005, die Uebungen werden also ue-000006
+    und ue-000007, die Wissenskarte wi-000001.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def plane(self, uebungen: str = "2, 3, ue-000004", im_entwurf: list[str] | None = None,
+              weitere: tuple[dict, ...] = ()) -> None:
+        """Der freigegebene Plan mit den Entwuerfen, alle bereit.
+
+        `uebungen` steht hinter `Übungen:` in der `wissen`-Zeile. `im_entwurf`
+        ist, was der Agent laut Auftrag in `uebungen` geschrieben hat.
+        `weitere` sind weitere Uebungen, jede mit Entwurf.
+        """
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-26.jpg"], "ergebnis": "wissen",
+             "status": "bereit", "was": f"Wann lohnt sich einarmige Abwehr? Übungen: {uebungen}"},
+            {"kandidat": 2, "dateien": ["seite-28.jpg"], "status": "bereit"},
+            {"kandidat": 3, "dateien": ["seite-29.jpg"], "status": "bereit"},
+            *({"status": "bereit", **k} for k in weitere),
+        ])
+        self.ordner.lege_wissensentwurf_an(ORDNER, 1, titel="Wann lohnt sich einarmige Abwehr?",
+                                           uebungen=im_entwurf or [])
+        for nr in (2, 3, *(k["kandidat"] for k in weitere)):
+            self.ordner.lege_kartenentwurf_an(ORDNER, nr, titel=f"Einarmige Abwehr {nr}")
+
+    def uebernimm(self, *argumente: str):
+        fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, *argumente)
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        return fertig
+
+    def uebungen_auf(self, wid: str) -> list[str]:
+        """Die IDs in `uebungen` der Wissenskarte, so wie sie in der Datei stehen."""
+        treffer = list((self.ordner.pfad / "wissen").glob(f"{wid}-*.md"))
+        self.assertEqual(len(treffer), 1, [p.name for p in treffer])
+        zeile = re.search(r"^uebungen: \[(.*)\]$", treffer[0].read_text(encoding="utf-8"),
+                          re.MULTILINE)
+        self.assertIsNotNone(zeile, treffer[0].read_text(encoding="utf-8"))
+        return [uid.strip() for uid in zeile.group(1).split(",") if uid.strip()]
+
+    def test_erst_die_wissenskarte_dann_die_uebungen_die_karte_traegt_danach_alle_ids(
+            self) -> None:
+        # Die Wissenskarte kommt zuerst. Ihre Uebungen sind noch Entwurf und
+        # haben keine ID, auf der Karte steht nur die, die es schon gibt.
+        # Kommen die Uebungen spaeter, traegt `uebernehmen` ihre IDs nach.
+        self.plane()
+
+        self.uebernimm("--kandidat", "1", "")
+        self.assertEqual(self.uebungen_auf("wi-000001"), ["ue-000004"])
+
+        self.uebernimm("--kandidat", "2", "", "--kandidat", "3", "")
+
+        self.assertEqual(self.uebungen_auf("wi-000001"), ["ue-000004", "ue-000006", "ue-000007"])
+
+    def test_erst_die_uebungen_dann_die_wissenskarte_ergibt_dasselbe(self) -> None:
+        # Die andere Reihenfolge: Die Uebungen sind schon importiert, wenn
+        # die Wissenskarte kommt, und ihre IDs stehen in der Spalte Karte.
+        self.plane()
+
+        self.uebernimm("--kandidat", "2", "", "--kandidat", "3", "")
+        self.uebernimm("--kandidat", "1", "")
+
+        self.assertEqual(self.uebungen_auf("wi-000001"), ["ue-000004", "ue-000006", "ue-000007"])
+
+    def test_alles_in_einem_aufruf_ergibt_dasselbe_und_keine_id_steht_doppelt(self) -> None:
+        # Die Wissenskarte steht im Aufruf zwischen ihren Uebungen. Der Agent
+        # hat ue-000004 laut Auftrag schon in den Entwurf geschrieben, und
+        # `Übungen:` nennt sie auch. Auf der Karte steht sie einmal.
+        self.plane(im_entwurf=["ue-000004"])
+
+        self.uebernimm("--kandidat", "2", "", "--kandidat", "1", "", "--kandidat", "3", "")
+
+        self.assertEqual(self.uebungen_auf("wi-000001"), ["ue-000004", "ue-000006", "ue-000007"])
+
+    def test_eine_id_aus_uebungen_steht_gleich_nach_dem_uebernehmen_auf_der_karte(self) -> None:
+        # Eine Uebung, die schon Karte ist, braucht kein spaeteres
+        # Uebernehmen. Auch wenn der Entwurf sie nicht traegt, etwa weil der
+        # Trainer sie bei der Freigabe gestrichen hat, kommt sie aus
+        # `Übungen:` auf die Karte.
+        self.plane(uebungen="ue-000004, ue-000002")
+
+        self.uebernimm("--kandidat", "1", "")
+
+        self.assertEqual(self.uebungen_auf("wi-000001"), ["ue-000002", "ue-000004"])
+
+    def test_wer_uebersprungen_oder_zurueckgestellt_wird_kommt_nicht_auf_die_karte(
+            self) -> None:
+        # Kandidat 3 streicht der Trainer bei der Freigabe, Kandidat 4 stellt
+        # er zurueck. Beide behalten ihr Ergebnis `uebung` und stehen weiter
+        # hinter `Übungen:`, Karte werden sie nicht. Kandidat 5 ergaenzt
+        # ue-000005, und die ergaenzte Karte gehoert auf die Wissenskarte,
+        # auch wenn er im Aufruf nach ihr kommt.
+        self.plane(uebungen="2, 3, 4, 5", weitere=(
+            {"kandidat": 4, "dateien": ["seite-30.jpg"]},
+            {"kandidat": 5, "dateien": ["seite-31.jpg"]}))
+
+        self.uebernimm("--kandidat", "1", "", "--kandidat", "2", "",
+                       "--uebersprungen", "3", "Vorlage ohne Übung",
+                       "--zurueckgestellt", "4", "Spielzüge, später holen",
+                       "--ergaenzt", "5", "ue-000005")
+
+        self.assertEqual(self.uebungen_auf("wi-000001"), ["ue-000005", "ue-000006"])
+
+    def test_danach_meldet_der_linter_nichts_und_der_index_traegt_die_gegenrichtung(
+            self) -> None:
+        # Die Uebungskarte traegt nichts. Welche Wissenskarte auf sie zeigt,
+        # rechnet der Index aus `uebungen` der Wissenskarte aus (#61).
+        self.plane()
+        self.uebernimm("--kandidat", "1", "", "--kandidat", "2", "", "--kandidat", "3", "")
+
+        fertig = self.ordner.starte("index.py")
+        still = self.ordner.starte("index.py", "--still")
+
+        self.assertEqual(auffaelligkeiten(fertig.stdout), [], fertig.stdout)
+        index = json.loads(Path(still.stdout.strip()).read_text(encoding="utf-8"))
+        hintergrund = {e["id"]: e["hintergrund"] for e in index["uebungen"] if e["hintergrund"]}
+        self.assertEqual(hintergrund, {"ue-000004": ["wi-000001"], "ue-000006": ["wi-000001"],
+                                       "ue-000007": ["wi-000001"]})
+
+    def test_eine_angabe_in_uebungen_die_keine_uebung_ist_bricht_vorbereiten_ab(self) -> None:
+        # Der Plan ist freigegeben, aber hinter `Übungen:` steht etwas, das
+        # nie eine ID auf der Karte ergibt: eine Nummer ohne Zeile, eine
+        # andere Wissenskarte, eine gestrichene Zeile, eine ID, die es nicht
+        # gibt, oder ein Wort. Still uebergangen, fehlte die Uebung spaeter
+        # auf der Karte. Die Meldung nennt die Zeile, und kein Auftrag ist
+        # geschrieben.
+        faelle = {
+            "Nummer ohne Zeile": "9",
+            "andere Wissenskarte": "3",
+            "gestrichene Zeile": "4",
+            "ID, die es nicht gibt": "ue-000300",
+            "weder Nummer noch ID": "Abwehr",
+        }
+        for fall, angabe in faelle.items():
+            with self.subTest(fall):
+                self.ordner.lege_quellenordner_an(ORDNER, [
+                    {"kandidat": 1, "dateien": ["seite-26.jpg"], "ergebnis": "wissen",
+                     "was": f"Wann lohnt sich einarmige Abwehr? Übungen: 2, {angabe}"},
+                    {"kandidat": 2, "dateien": ["seite-28.jpg"]},
+                    {"kandidat": 3, "dateien": ["seite-27.jpg"], "ergebnis": "wissen",
+                     "was": "Wie viel trinkt man im Training?"},
+                    {"kandidat": 4, "dateien": ["seite-29.jpg"], "ergebnis": "übersprungen",
+                     "status": "übersprungen", "notiz": "Werbung"},
+                ])
+
+                fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+                self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+                self.assertIn(angabe, zeile_mit(fertig.stdout, "Kandidat 1"))
+                self.assertIn("kein Auftrag", fertig.stdout)
+                self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
+
+    def test_der_auftrag_nennt_die_uebungen_die_schon_karte_sind_mit_id(self) -> None:
+        # Der Agent kennt die Bibliothek nicht. Was er in `uebungen` schreibt,
+        # sagt ihm der Auftrag: die genannte ID, die Karte des importierten
+        # Kandidaten 1 und die, die Kandidat 3 ergaenzt hat. Kandidat 2
+        # wartet noch, seine ID gibt es nicht. Eine Wissenskarte ohne
+        # `Übungen:` bekommt keine.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-24.jpg"], "status": "importiert",
+             "karte": "ue-000002"},
+            {"kandidat": 2, "dateien": ["seite-25.jpg"]},
+            {"kandidat": 3, "dateien": ["seite-28.jpg"], "status": "ergänzt",
+             "karte": "ue-000003"},
+            {"kandidat": 4, "dateien": ["seite-26.jpg"], "ergebnis": "wissen",
+             "was": "Wann lohnt sich einarmige Abwehr? Übungen: 1, 2, 3, ue-000005"},
+            {"kandidat": 5, "dateien": ["seite-27.jpg"], "ergebnis": "wissen",
+             "was": "Wie viel trinkt man im Training?"},
+        ])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout)
+        zeile = zeile_mit(auftrag_von(self.ordner, 4), "Übungen aus demselben Beitrag")
+        self.assertEqual(re.findall(r"ue-\d{6}", zeile), ["ue-000002", "ue-000003", "ue-000005"])
+        ohne = zeile_mit(auftrag_von(self.ordner, 5), "Übungen aus demselben Beitrag")
+        self.assertEqual(re.findall(r"ue-\d{6}", ohne), [])
+        self.assertIn("keine", ohne)
+        self.assertNotIn("Übungen aus demselben Beitrag", auftrag_von(self.ordner, 2))
+
+    def test_eine_von_hand_verdorbene_angabe_in_uebungen_haelt_nur_die_wissenskarte_auf(
+            self) -> None:
+        # Nach dem Auftrag hat jemand "Was es ist" von Hand geaendert, und
+        # Kandidat 7 gibt es nicht. Die Wissenskarte wird nicht Karte, Entwurf
+        # und Status bleiben, die Ausgabe nennt den Grund. Ihre Uebung kommt
+        # trotzdem durch, und der Exitcode sagt, dass nicht alles geklappt hat.
+        self.plane(uebungen="2, 7")
+        entwurf = self.ordner.pfad / "kartenentwuerfe" / ORDNER / "1.md"
+
+        fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER,
+                                    "--kandidat", "1", "", "--kandidat", "2", "")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("7", zeile_mit(fertig.stdout, "  1  nicht übernommen"))
+        self.assertFalse((self.ordner.pfad / "wissen").exists())
+        self.assertTrue(entwurf.exists())
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual((uebersicht["1"]["Status"], uebersicht["2"]["Karte"]),
+                         ("bereit", "ue-000006"))
+
+
 def auftrag_von(arbeitsordner: Arbeitsordner, kandidat: int) -> str:
     """Der Auftrag, den `vorbereiten` fuer einen Kandidaten angelegt hat."""
     return (arbeitsordner.pfad / "kartenentwuerfe" / ORDNER / f"{kandidat}.auftrag.md").read_text(

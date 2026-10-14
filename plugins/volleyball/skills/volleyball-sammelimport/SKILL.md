@@ -278,6 +278,11 @@ angenommener Vorschlag oder als Ausnahme.
      Durchgang, Pillow bei `eingebettet` nur mit einer Übung im Durchgang.
    - **pdftotext fehlt:** Den Installationshinweis einmal weitergeben. Die
      Aufträge sind geschrieben, die Agenten lesen die PDFs selbst.
+   - **Hinter `Übungen:` steht etwas, das keine Übung ist:** Die Meldung
+     nennt die Zeile und die Angabe. Geschrieben ist nichts. Dem Trainer
+     sagen, was dort steht, und mit ihm klären, welche Übung gemeint ist. Die
+     Zeile in der Übersicht richtet er selbst, danach `vorbereiten` noch
+     einmal.
 2. Je Auftrag den Agenten seiner Sorte starten: bei `wissenskarte`
    `volleyball:volleyball-wissenskarte`, sonst
    `volleyball:volleyball-kartenentwurf`. Der Aufruf ist der absolute Pfad
@@ -316,7 +321,9 @@ angenommener Vorschlag oder als Ausnahme.
    `--kandidat` mit dem, was der Trainer geändert hat, in wenigen Wörtern,
    für Übungen wie Wissenskarten. Eine Übung kommt nach `uebungen/` mit einer
    `ue-`-ID, eine Wissenskarte nach `wissen/` mit einer `wi-`-ID, jede Sorte
-   aus ihrem eigenen Zähler. `--uebersprungen` und `--zurueckgestellt` mit
+   aus ihrem eigenen Zähler. Die IDs der Übungen aus `Übungen:` trägt das
+   Skript selbst in die Wissenskarte ein, in jeder Reihenfolge, auch über
+   mehrere Durchgänge. `--uebersprungen` und `--zurueckgestellt` mit
    dem Grund. `--ergaenzt` mit der ID der ergänzten Karte. Was der Trainer
    offengelassen hat, fehlt im Aufruf und kommt bei der nächsten Freigabe
    wieder.
@@ -326,7 +333,9 @@ angenommener Vorschlag oder als Ausnahme.
    - **„nicht übernommen“:** Den Grund im Entwurf beheben, `pruefen`, und
      `uebernehmen` für diesen Kandidaten noch einmal. Liegt in `schaubilder/`
      schon eine Datei unter dem Namen der neuen Karte, dem Trainer sagen,
-     welche. Was mit ihr geschieht, entscheidet er.
+     welche. Was mit ihr geschieht, entscheidet er. Nennt der Grund
+     `Übungen:`, liegt er nicht im Entwurf, sondern in der Zeile der
+     Übersicht, wie bei `vorbereiten`.
    - **„nicht übersprungen“, „nicht zurückgestellt“ oder „nicht ergänzt“:**
      Die Meldung sagt, warum: Der Grund fehlt, die ID gibt es nicht, oder
      der Kandidat ist schon erledigt. Mit dem Trainer klären und den Aufruf
@@ -429,13 +438,17 @@ Fertig sind die Ausschnitte, wenn jeder behalten oder gestrichen ist.
 **Die Tabelle der Wissenskarten** hat eine Zeile je Kandidat mit `sorte`
 `wissenskarte`:
 
-| Kandidat | Frage | Thema | Schwerpunkt | Disziplin | Bilder | Vorschläge | Vermutungen |
-|---|---|---|---|---|---|---|---|
-| 16 | Wann lohnt sich einarmige Abwehr? | *technik, taktik* | abwehr | *halle, beach* | 1 | Training, Punkt 2: aus der zweiten Kernaussage abgeleitet | Gilt das auch für Jugendliche? → ja |
+| Kandidat | Frage | Thema | Schwerpunkt | Disziplin | Übungen | Bilder | Vorschläge | Vermutungen |
+|---|---|---|---|---|---|---|---|---|
+| 16 | Wann lohnt sich einarmige Abwehr? | *technik, taktik* | abwehr | *halle, beach* | 12, ue-000022 | 1 | Training, Punkt 2: aus der zweiten Kernaussage abgeleitet | Gilt das auch für Jugendliche? → ja |
 
 - Die Frage ist `titel` aus `felder`, Thema, Schwerpunkt und Disziplin die
   Felder dazu. Ein Wert, der ein Vorschlag ist, steht kursiv wie bei den
   Übungen.
+- **Übungen:** was in „Was es ist“ hinter `Übungen:` steht, Kandidatennummern
+  und IDs, sonst leer. Eine Nummer wird beim Übernehmen zur ID, sobald die
+  Übung Karte ist, gleich ob vor oder nach der Wissenskarte. Steht in
+  `felder.uebungen` eine ID, die dort fehlt, kommt sie dazu.
 - **Bilder:** wie viele Bilder auf die Karte kommen, die Zahl der Einträge in
   `quellgrafiken`, ohne Bild `–`. Gezeigt hat sie der Trainer schon bei den
   Ausschnitten.
