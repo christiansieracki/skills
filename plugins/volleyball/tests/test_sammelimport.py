@@ -1539,6 +1539,23 @@ class BilderDerWissenskarteTest(unittest.TestCase):
                 self.assertNotIn("## Ausschnitte", auftraege[art])
                 self.assertNotIn("quellgrafik.png", auftraege[art])
 
+    def test_bei_eingebettet_braucht_ein_durchgang_nur_mit_wissenskarten_kein_pillow(
+            self) -> None:
+        # Bei `eingebettet` schneidet vorbereiten nur fuer Uebungen eine
+        # Quellgrafik aus. Ein Durchgang nur mit Wissenskarten schneidet
+        # nichts, und ohne Pillow abzubrechen hielte ihn grundlos auf. Bei
+        # `ausschnitt` braucht auch eine Wissenskarte Pillow, das prueft
+        # AusschnittTest fuer beide Sorten gleich.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["merkmale.pdf"], "ergebnis": "wissen"},
+            {"kandidat": 2, "dateien": ["kasten.pdf"]}], je_durchgang=1, quellgrafik="eingebettet")
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER,
+                                    umgebung=blende_aus(self, "PIL"))
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.iterdir()), ["1.auftrag.md"])
+
     # Der Text eines Entwurfs mit zwei Bildern, jedes an seiner Kernaussage.
     # Das Bild der zweiten steht vorn in der Liste der Ausschnitte, auf der
     # Karte aber unten.

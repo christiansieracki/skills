@@ -2317,8 +2317,12 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     print(f"Aufträge für {len(dran)} von {len(offen)} offenen Kandidaten:")
     if not dran:
         return 0
+    # Eingebettet bekommt nur eine Übung ihre Quellgrafik, als Ausschnitt
+    # beide Sorten (#71). Ein Durchgang nur mit Wissenskarten schneidet bei
+    # `eingebettet` nichts und braucht kein Pillow.
     if sammelimport.art_der_quellgrafik == "eingebettet":
-        verlange_pillow(sammelimport)
+        if any(k.sorte is UEBUNGSKARTE for k in dran):
+            verlange_pillow(sammelimport)
     elif sammelimport.art_der_quellgrafik == "ausschnitt":
         verlange_bibliotheken_fuer_ausschnitte(sammelimport, dran)
     pdftotext = None
