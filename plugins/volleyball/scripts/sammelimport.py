@@ -92,6 +92,9 @@ AUS_DEM_BILD = "Ablauf aus dem Bild"
 KEINE_AUSGESCHNITTEN = "- Quellgrafik: keine ausgeschnitten,"
 KEINE_QUELLGRAFIK_AUS = "- Keine Quellgrafik aus"
 
+# Die Werte der Einstellung `quellgrafik:` (#63), siehe Sammelimport.art_der_quellgrafik.
+QUELLGRAFIK = ("eingebettet", "ausschnitt", "keine")
+
 SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "Notiz"]
 ERGEBNISSE = {"uebung", "folge", "zurückgestellt", "übersprungen"}
 STATUS = {"offen", "bereit", "rückfrage", "importiert", "ergänzt", "übersprungen",
@@ -374,13 +377,20 @@ class Sammelimport:
 
         Bis zum 02.10.2026 hieß die Einstellung zum Ausschneiden anders (#49).
         Ginge `vorbereiten` über den alten Namen hinweg, schnitte es still
-        nichts aus, und die Karten kämen ohne Bild heraus.
+        nichts aus, und die Karten kämen ohne Bild heraus. Genannt wird der
+        Name, den sie seit #63 hat. `quellgrafik_ausschneiden` dazwischen
+        gilt weiter, siehe `art_der_quellgrafik`.
         """
         if "feldbild_ausschneiden" in self.einstellungen:
             raise Abbruch(f"In quellen/{self.ordner}/{SAMMELIMPORT} steht noch "
-                          f"feldbild_ausschneiden. Die Einstellung heißt jetzt "
-                          f"quellgrafik_ausschneiden, benenn sie um.\n"
+                          f"feldbild_ausschneiden. Die Einstellung heißt jetzt quellgrafik:\n"
+                          f"aus feldbild_ausschneiden: true wird quellgrafik: eingebettet, "
+                          f"aus false wird quellgrafik: keine.\n"
                           f"Es ist noch kein Auftrag geschrieben.")
+        try:
+            self.art_der_quellgrafik
+        except Abbruch as fehler:
+            raise Abbruch(f"{fehler}\nEs ist noch kein Auftrag geschrieben.") from None
 
     @property
     def in_arbeit(self) -> InArbeit | None:
@@ -460,14 +470,42 @@ class Sammelimport:
         return str(wert).strip() or None
 
     @property
-    def quellgrafik_ausschneiden(self) -> bool:
-        wert = self.einstellungen.get("quellgrafik_ausschneiden")
+    def art_der_quellgrafik(self) -> str:
+        """Woher die Quellgrafik kommt: `eingebettet`, `ausschnitt` oder `keine` (#63).
+
+        `eingebettet` ist das größte eingebettete Bild eines PDF, wie bei
+        PlayDrill, `ausschnitt` heißt, der Entwurf nennt seine Ausschnitte.
+        Bis #63 hieß die Einstellung `quellgrafik_ausschneiden`, und
+        die `sammelimport.md` von PlayDrill trägt sie noch: `true` gilt als
+        `eingebettet`, `false` als `keine`. Ohne Einstellung gilt `keine`, wie
+        vorher. Stehen beide da, bricht das Skript ab, statt eine zu wählen.
+        """
+        datei = f"quellen/{self.ordner}/{SAMMELIMPORT}"
+        alt = self.einstellungen.get("quellgrafik_ausschneiden")
+        wert = self.einstellungen.get("quellgrafik")
+        if wert is not None and alt is not None:
+            raise Abbruch(f"In {datei} stehen quellgrafik und quellgrafik_ausschneiden. "
+                          f"Es gilt quellgrafik, lösch quellgrafik_ausschneiden.")
         if wert is None:
-            return False
-        if not isinstance(wert, bool):
-            raise Abbruch(f"quellgrafik_ausschneiden in quellen/{self.ordner}/{SAMMELIMPORT} "
-                          f"ist {wert!r}, erwartet ist true oder false.")
+            if alt is None:
+                return "keine"
+            if not isinstance(alt, bool):
+                raise Abbruch(f"quellgrafik_ausschneiden in {datei} ist {alt!r}, erwartet ist "
+                              f"true oder false. Es heißt jetzt quellgrafik, mit "
+                              f"{', '.join(QUELLGRAFIK)}.")
+            return "eingebettet" if alt else "keine"
+        if wert not in QUELLGRAFIK:
+            raise Abbruch(f"quellgrafik in {datei} ist {wert!r}, erwartet ist "
+                          f"{', '.join(QUELLGRAFIK)}.")
         return wert
+
+    @property
+    def quellgrafik_angabe(self) -> str:
+        """Die Einstellung zur Quellgrafik, so wie sie in der Datei steht, für eine Meldung."""
+        alt = self.einstellungen.get("quellgrafik_ausschneiden")
+        if self.einstellungen.get("quellgrafik") is None and alt is not None:
+            return f"quellgrafik_ausschneiden: {'true' if alt else 'false'}"
+        return f"quellgrafik: {self.art_der_quellgrafik}"
 
     @property
     def textmarke(self) -> str | None:
@@ -1417,7 +1455,7 @@ def verlange_pillow(sammelimport: Sammelimport) -> None:
     except ImportError:
         raise Abbruch(
             f"Für das Ausschneiden der Quellgrafik fehlt Pillow. In quellen/"
-            f"{sammelimport.ordner}/{SAMMELIMPORT} steht quellgrafik_ausschneiden: true.\n\n"
+            f"{sammelimport.ordner}/{SAMMELIMPORT} steht {sammelimport.quellgrafik_angabe}.\n\n"
             f"Installieren mit:\n  {interpreter()} -m pip install Pillow\n\n"
             f"Es ist noch kein Auftrag geschrieben.") from None
 
@@ -1440,7 +1478,7 @@ def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list
     """
     for altes in sammelimport.quellgrafiken(k):
         altes.unlink()
-    if not sammelimport.quellgrafik_ausschneiden:
+    if sammelimport.art_der_quellgrafik != "eingebettet":
         return ["- Quellgrafik: wird bei dieser Quelle nicht ausgeschnitten."], []
     pdfs = [d.name for d in k.dateien if _ist_pdf(d.name)]
     if not pdfs:
@@ -1715,7 +1753,7 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     print(f"Aufträge für {len(dran)} von {len(offen)} offenen Kandidaten:")
     if not dran:
         return 0
-    if sammelimport.quellgrafik_ausschneiden:
+    if sammelimport.art_der_quellgrafik == "eingebettet":
         verlange_pillow(sammelimport)
     pdftotext = None
     if any(_ist_pdf(d.name) for k in dran for d in k.dateien):

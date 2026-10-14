@@ -613,6 +613,65 @@ class QuellgrafikTest(unittest.TestCase):
         self.assertIn("schaubild: 3.quellgrafik.png", zeile)
 
     @BRAUCHT_PILLOW
+    def test_eingebettet_schneidet_aus_wie_quellgrafik_ausschneiden_true(self) -> None:
+        # `quellgrafik:` ersetzt die alte Einstellung (#63). Die
+        # playdrill/sammelimport.md aus #37 traegt noch die alte und soll ohne
+        # Anfassen weiter gelten. Beide Ordner ergeben dieselbe Quellgrafik.
+        for ordner, einstellung in (("neu", {"quellgrafik": "eingebettet"}),
+                                    ("alt", {"quellgrafik_ausschneiden": True})):
+            with self.subTest(ordner):
+                self.ordner.lege_quellenordner_an(
+                    ordner, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], **einstellung)
+                self.ordner.lege_quell_pdf_an(f"{ordner}/kasten.pdf", ["Abwehr vom Kasten"],
+                                              bilder=[PdfBild(90, 60, deckend=(12, 5, 80, 51))])
+
+                fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ordner)
+
+                self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+                quellgrafik = self.ordner.pfad / "kartenentwuerfe" / ordner / "3.quellgrafik.png"
+                with Image.open(quellgrafik) as bild:
+                    self.assertEqual(bild.size, (68, 46))
+
+    def test_keine_und_quellgrafik_ausschneiden_false_schneiden_nichts_aus(self) -> None:
+        # Auch ohne Einstellung nicht, wie vor #63. Das PDF bettet ein Bild
+        # ein, es liesse sich also ausschneiden.
+        for ordner, einstellung in (("keine", {"quellgrafik": "keine"}),
+                                    ("alt", {"quellgrafik_ausschneiden": False}),
+                                    ("ohne", {})):
+            with self.subTest(ordner):
+                self.ordner.lege_quellenordner_an(
+                    ordner, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], **einstellung)
+                self.ordner.lege_quell_pdf_an(f"{ordner}/kasten.pdf", ["Abwehr vom Kasten"],
+                                              bilder=[PdfBild(90, 60, deckend=(12, 5, 80, 51))])
+
+                fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ordner)
+
+                self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+                entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ordner
+                self.assertEqual(list(entwuerfe.glob("3.quellgrafik*")), [])
+                self.assertIn("nicht ausgeschnitten",
+                              zeile_mit((entwuerfe / "3.auftrag.md").read_text(encoding="utf-8"),
+                                        "Quellgrafik"))
+
+    def test_eine_einstellung_quellgrafik_die_nicht_stimmt_bricht_ab(self) -> None:
+        # Ein vertippter Wert schnitte still nichts aus. Stehen alte und neue
+        # Einstellung beide da, ist nicht klar, welche gilt.
+        for ordner, einstellung, stichwort in (
+                ("vertippt", {"quellgrafik": "eingeschnitten"}, "eingeschnitten"),
+                ("beide", {"quellgrafik": "ausschnitt", "quellgrafik_ausschneiden": True},
+                 "quellgrafik_ausschneiden"),
+                ("alt-vertippt", {"quellgrafik_ausschneiden": "ja"}, "ja")):
+            with self.subTest(ordner):
+                self.ordner.lege_quellenordner_an(
+                    ordner, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], **einstellung)
+
+                fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ordner)
+
+                self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+                self.assertIn(stichwort, zeile_mit(fertig.stdout, "quellgrafik"))
+                self.assertFalse((self.ordner.pfad / "kartenentwuerfe" / ordner).exists())
+
+    @BRAUCHT_PILLOW
     def test_jedes_pdf_mit_bild_gibt_eine_quellgrafik_in_der_reihenfolge_der_dateien(self) -> None:
         # Ein Zirkel (#39): vorn das Uebersichtsblatt, wie der Zerlegungsplan
         # es setzt (#35), dann zwei Stationen, dazwischen ein Blatt ohne
@@ -768,7 +827,8 @@ class QuellgrafikTest(unittest.TestCase):
     def test_mit_der_alten_einstellung_bricht_es_ab_und_nennt_die_neue(self) -> None:
         # Bis zum 02.10.2026 hiess die Einstellung anders (#49). Liefe
         # vorbereiten mit dem alten Namen weiter, schnitte es still nichts
-        # aus, und die Karten kaemen ohne Bild heraus.
+        # aus, und die Karten kaemen ohne Bild heraus. Die neue heisst seit
+        # #63 `quellgrafik`, und nur die nennt die Meldung.
         self.ordner.lege_quellenordner_an(
             ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], feldbild_ausschneiden=True)
 
@@ -776,7 +836,8 @@ class QuellgrafikTest(unittest.TestCase):
 
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
         self.assertIn("feldbild_ausschneiden", fertig.stdout)
-        self.assertIn("quellgrafik_ausschneiden", fertig.stdout)
+        self.assertIn("quellgrafik: eingebettet", fertig.stdout)
+        self.assertNotIn("quellgrafik_ausschneiden", fertig.stdout)
         self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
 
     def test_fehlt_die_eingetragene_quellgrafik_geht_der_kandidat_zurueck_auf_offen(self) -> None:
