@@ -492,9 +492,12 @@ darunter.
 Daneben schreibt der Agent `volleyball-zerlegungsplan` den Plan als
 `zerlegungsplan.md`, in der Form der Übersicht. Daraus wird nach der Freigabe
 die Übersicht. Der Rest ist nach der Nummer des Kandidaten benannt:
-`17.auftrag.md` ist der Auftrag für den Agenten `volleyball-kartenentwurf`,
-`17.md` der Kartenentwurf, `17.quellgrafik.png` die Quellgrafik, bei mehreren
-`17.quellgrafik-1.png`, `17.quellgrafik-2.png` und so weiter.
+`17.auftrag.md` ist der Auftrag, `17.md` der Kartenentwurf,
+`17.quellgrafik.png` die Quellgrafik, bei mehreren `17.quellgrafik-1.png`,
+`17.quellgrafik-2.png` und so weiter. Den Entwurf schreibt bei `uebung` und
+`folge` der Agent `volleyball-kartenentwurf`, bei `wissen` der Agent
+`volleyball-wissenskarte`. `vorbereiten` nennt je Auftrag die Sorte,
+`uebungskarte` oder `wissenskarte`, daran wählt der Skill den Agenten.
 
 Der Auftrag trägt unter jedem PDF des Kandidaten dessen ganzen Text, oder den
 Hinweis, dass der Agent das PDF selbst lesen muss. Nennt der Kandidat einen
@@ -516,6 +519,12 @@ ihre Quellgrafiken trotzdem, und für die Übersicht lässt sich danach mit
 dem der Agent selbst nachsieht. Eine fremde Quellgrafik darf der Entwurf nicht
 nennen.
 
+Der Auftrag einer Wissenskarte hat dieselbe Form, nur ohne die Angabe zum
+Ablauf aus dem Bild, denn eine Wissenskarte hat keinen Ablauf. Die Kennungen
+stehen darin samt den Steuerungsschwerpunkten. Eine Quellgrafik schneidet
+`vorbereiten` für sie nicht aus, sie hat kein `schaubild:`, und der Auftrag
+sagt, dass sie keine Bilder bekommt.
+
 Ein Kartenentwurf hat das Frontmatter der Karte ohne `id` (ADR-0010), die
 Abschnitte der Karte und am Ende `## Freigabe` mit beiden Listen:
 
@@ -534,6 +543,14 @@ endet auf `Vermutung im Entwurf: …` oder auf `Vermutung im Entwurf: keine`.
 Ein Vorschlag beginnt mit seinem Ziel in Backticks: dem Feld, oder der
 Überschrift des Abschnitts samt `##`, dahinter, wo im Abschnitt, etwa
 `` `## Ablauf`, Schritt 2: … ``. Eine leere Liste heißt `Vorschläge: keine`.
+
+Der Entwurf einer Wissenskarte hat das Frontmatter der Wissenskarte ohne `id`
+und `angelegt`, auch `schwerpunkt` und `uebungen`, dann als `[]`, dazu ihre
+beiden Abschnitte und `## Freigabe` in derselben Form. Was die Quelle sagt,
+steht in ihm ohne Weiteres. Was daraus abgeleitet ist, steht als Vorschlag
+unter `## Freigabe` und zeigt auf seinen Punkt:
+`` `## Was das fürs Training heißt`, Punkt 2: … ``. So kommt keine Ableitung
+ohne das Ja des Trainers auf die Karte.
 
 `sammelimport.py pruefen` weist einen Entwurf ab, wenn er das Datenmodell
 bricht oder die Form der Freigabe nicht einhält. Der Kandidat geht dann auf
@@ -558,10 +575,23 @@ wird:
   Form oben. Ein Vorschlag nennt ein Feld aus dem Frontmatter oder einen
   Abschnitt, den der Entwurf hat.
 
+Welche Sorte Karte ein Entwurf werden soll, sagt das Ergebnis seiner Zeile,
+nicht der Entwurf. Den Entwurf einer Wissenskarte prüft `pruefen` mit den
+Regeln, die der Linter an eine Wissenskarte legt: das Frontmatter mit jedem
+Feld der Wissenskarte außer `id` und `angelegt`, und keine `id`; ein Titel,
+der auf `?` endet; `thema` und `disziplin` mit bekannten Werten; Kennungen
+aus `schwerpunkte.md`, die zur Disziplin der Karte passen, auch
+Steuerungsschwerpunkte; jede ID in `uebungen` aus `uebungen/`; `quelldatei`
+wie oben; beide Abschnitte, und jeder Bildverweis zeigt auf eine Datei, die
+es neben dem Entwurf gibt; `## Freigabe` wie oben. Ein Entwurf in der Form
+einer Übungskarte fällt unter einer `wissen`-Zeile durch. Den Status
+`rückfrage` bekommt eine Wissenskarte nur durch eine Rückfrage ohne Vermutung.
+
 Mit `--json` gibt `pruefen` je Kandidat mit Entwurf aus, was die Freigabe im
-Chat braucht: die Felder des Entwurfs, die Vorschläge getrennt nach Feldern und
-Textstellen, die Rückfragen getrennt nach mit und ohne Vermutung, ob der Ablauf
-aus dem Bild kommt, den Pfad des Entwurfs und als Liste `quellgrafiken` die
+Chat braucht: unter `sorte` `uebungskarte` oder `wissenskarte`, die Felder des
+Entwurfs, die Vorschläge getrennt nach Feldern und Textstellen, die
+Rückfragen getrennt nach mit und ohne Vermutung, ob der Ablauf aus dem Bild
+kommt, den Pfad des Entwurfs und als Liste `quellgrafiken` die
 Pfade der Quellgrafiken, die er einträgt, in seiner Reihenfolge. Kandidaten
 ohne Entwurf stehen nur in der Übersicht. Die Textstellen ergeben in
 der Tabelle die Spalte „aus dem Bild“. Als Liste `quellgrafik_fehlt` stehen die
@@ -572,10 +602,14 @@ diese Angabe.
 
 Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
 mit `angelegt` von heute und ohne `## Freigabe`. Entwurf und Auftrag
-verschwinden dann. Die Quellgrafik kommt unter dem Namen der Karte nach
-`schaubilder/`, etwa `ue-000291-abwehr-vom-kasten.png`, und `schaubild:` zeigt
-darauf. Mehrere bekommen den Namen der Karte mit Nummer, in der Reihenfolge
-des Entwurfs, etwa `ue-000291-zirkel-1.png`, und `schaubild:` trägt sie als
+verschwinden dann. Der Entwurf einer Wissenskarte wird ebenso
+`wissen/wi-######-<slug>.md`, mit der nächsten freien `wi-`-ID und dem Slug
+aus der Frage ohne Fragezeichen. Fehlt `wissen/`, legt `uebernehmen` es an.
+Übungen und Wissenskarten zählen getrennt, auch in einem Aufruf. Die
+Quellgrafik einer Übung kommt unter dem Namen der Karte nach `schaubilder/`,
+etwa `ue-000291-abwehr-vom-kasten.png`, und `schaubild:` zeigt darauf.
+Mehrere bekommen den Namen der Karte mit Nummer, in der Reihenfolge des
+Entwurfs, etwa `ue-000291-zirkel-1.png`, und `schaubild:` trägt sie als
 Liste. Eine einzelne Quellgrafik bleibt ein einzelner Name, auch wenn der
 Entwurf sie in eckigen Klammern nennt. Streicht der Trainer einen Kandidaten,
 wird er `übersprungen`, mit dem Grund in der Notiz. Stellt er ihn zurück, um
