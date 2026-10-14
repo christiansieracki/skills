@@ -6,7 +6,7 @@ Fünf Skills, die zusammen auf einem Markdown-Ordner arbeiten.
 |---|---|
 | `volleyball-saisonplaner` | Saisonplan und Mesozyklen für ein Team |
 | `volleyball-trainingsdesign` | einzelne Trainingseinheiten |
-| `volleyball-uebungsimport` | neue Übungskarten aus PDFs, Screenshots und Links |
+| `volleyball-uebungsimport` | neue Übungskarten und Wissenskarten aus PDFs, Screenshots und Links |
 | `volleyball-sammelimport` | einen ganzen Quellenordner auf einmal importieren, mit Freigabe im Chat |
 | `volleyball-schaubild` | Schaubilder zu einer Übung, aus einer Szene gezeichnet |
 
