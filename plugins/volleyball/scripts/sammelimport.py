@@ -59,10 +59,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
-    DISZIPLIN_SPALTE, KARTENFELDER, TYPEN, KeineId, finde_wurzel, hole_index, interpreter,
-    konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_schwerpunkte,
-    lies_uebungen, naechste_id, pruefe_felder, schaubilder, tabellenzellen,
-    trainer_dieses_rechners,
+    DISZIPLIN_SPALTE, KARTENFELDER, UEBUNGSKARTE, WISSENSKARTE, Kartensorte, KeineId,
+    finde_wurzel, hole_index, interpreter, konsole_vorbereiten, lies_frontmatter,
+    lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen, naechste_id, pruefe_felder,
+    schaubilder, tabellenzellen, trainer_dieses_rechners,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -93,7 +93,19 @@ KEINE_AUSGESCHNITTEN = "- Quellgrafik: keine ausgeschnitten,"
 KEINE_QUELLGRAFIK_AUS = "- Keine Quellgrafik aus"
 
 SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "Notiz"]
-ERGEBNISSE = {"uebung", "folge", "zurückgestellt", "übersprungen"}
+
+# Je Ergebnis, aus dem eine Karte wird, ihre Sorte (#69). Aus `uebung` und
+# `folge` wird eine Übungskarte mit diesem `typ`, aus `wissen` eine
+# Wissenskarte. `zurückgestellt` und `übersprungen` werden keine Karte.
+SORTE_DES_ERGEBNISSES = {"uebung": UEBUNGSKARTE, "folge": UEBUNGSKARTE, "wissen": WISSENSKARTE}
+ERGEBNISSE = {*SORTE_DES_ERGEBNISSES, "zurückgestellt", "übersprungen"}
+
+# Die Sorten, für die es schon Auftrag, Agent und Prüfung gibt. Die
+# Wissenskarte kommt mit #70 dazu. Bis dahin wartet eine `wissen`-Zeile
+# `offen`: Ein Durchgang legt ihr keinen Auftrag an, und `pruefen` lässt sie,
+# wie sie ist.
+ENTWORFENE_SORTEN = (UEBUNGSKARTE,)
+
 STATUS = {"offen", "bereit", "rückfrage", "importiert", "ergänzt", "übersprungen",
           "zurückgestellt"}
 
@@ -249,9 +261,26 @@ class Kandidat:
         return self.zellen["Notiz"]
 
     @property
+    def sorte(self) -> Kartensorte | None:
+        """Die Sorte der Karte, die aus dem Kandidaten wird, None, wenn keine wird."""
+        return SORTE_DES_ERGEBNISSES.get(self.ergebnis)
+
+    @property
     def wartet(self) -> bool:
-        """Aus dem Kandidaten soll eine Karte werden, und es gibt sie noch nicht."""
-        return self.ergebnis in TYPEN and self.status in NOCH_OFFEN
+        """Aus dem Kandidaten soll eine Karte werden, gleich welcher Sorte, und es gibt sie noch nicht.
+
+        Solange einer wartet, ist im Quellenordner etwas offen, und
+        `uebernehmen` räumt nicht auf.
+        """
+        return self.sorte is not None and self.status in NOCH_OFFEN
+
+    @property
+    def wartet_auf_entwurf(self) -> bool:
+        """Er wartet, und für seine Sorte gibt es schon Auftrag und Prüfung.
+
+        Nur diese Kandidaten nimmt ein Durchgang und prüft `pruefen`.
+        """
+        return self.wartet and self.sorte in ENTWORFENE_SORTEN
 
     @property
     def dateien(self) -> list[Datei]:
@@ -1710,7 +1739,7 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     trainer = trainer_fuer_auftraege(wurzel)
     verlange_freien_quellenordner(sammelimport, trainer, trotzdem)
     offen = [k for k in sammelimport.kandidaten
-             if k.wartet and pruefe_entwurf(sammelimport, k).fehler]
+             if k.wartet_auf_entwurf and pruefe_entwurf(sammelimport, k).fehler]
     dran = offen[:sammelimport.je_durchgang]
     print(f"Aufträge für {len(dran)} von {len(offen)} offenen Kandidaten:")
     if not dran:
@@ -1824,7 +1853,7 @@ def pruefen(wurzel: Path, ordner: str, als_json: bool = False) -> int:
     stand: dict[str, int] = {}
     freigabe = []
     for k in sammelimport.kandidaten:
-        if not k.wartet:
+        if not k.wartet_auf_entwurf:
             continue
         befund = pruefe_entwurf(sammelimport, k)
         setze_befund(k, befund)
@@ -1987,6 +2016,11 @@ def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> st
     grund = warum_nicht_wartend(k)
     if grund or k is None:
         return grund
+    # Eine Wissenskarte übernimmt das Skript erst mit #70. Bis dahin wäre ein
+    # Entwurf unter einer `wissen`-Zeile als Übungskarte geprüft und
+    # geschrieben worden.
+    if not k.wartet_auf_entwurf:
+        return "wird laut Plan eine Wissenskarte, und die übernimmt das Skript noch nicht"
     return pruefe_entwurf(sammelimport, k).fehler
 
 

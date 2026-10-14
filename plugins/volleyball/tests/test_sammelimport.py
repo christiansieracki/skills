@@ -231,6 +231,36 @@ class VorbereitenTest(unittest.TestCase):
         self.assertIn("Offen", fertig.stdout)
         self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
 
+    def test_ein_durchgang_legt_fuer_eine_wissen_zeile_keinen_auftrag_an(self) -> None:
+        # Der Zerlegungsplan plant Theorie als Wissenskarte (#69). Ihren
+        # Entwurf schreibt erst der Agent aus #70. Bis dahin bleibt die Zeile
+        # offen, und der Durchgang nimmt nur die Uebung, ohne an der Zeile
+        # abzubrechen.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-01.jpg"]},
+            {"kandidat": 2, "dateien": ["seite-02.jpg"], "ergebnis": "wissen",
+             "was": "Wann lohnt sich einarmige Abwehr? Übungen: 1"},
+        ])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertEqual(self.auftraege(), ["1.auftrag.md"])
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["2"]["Status"], "offen")
+
+    def test_ein_unbekanntes_ergebnis_bricht_ab_und_schreibt_nichts(self) -> None:
+        # Vertippt oder erfunden. Mit `wissen` gibt es ein Ergebnis mehr,
+        # aber nicht jedes: Gaelte "theorie" als erledigt, bliebe die Theorie
+        # still liegen.
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"], "ergebnis": "theorie"}])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("wissen", zeile_mit(fertig.stdout, "theorie"))
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
+
     def test_der_quellenordner_darf_mit_quellen_davor_kommen(self) -> None:
         # So nennt ihn der Trainer: "Sammelimport ueber quellen/stapel".
         self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"]}])
@@ -1707,6 +1737,22 @@ class PruefenTest(unittest.TestCase):
         self.assertEqual(zeile["Status"], "offen")
         self.assertIn("Frontmatter", zeile["Notiz"])
 
+    def test_eine_wissen_zeile_bleibt_offen_und_unberuehrt(self) -> None:
+        # Den Entwurf einer Wissenskarte schreibt und prueft erst #70. Bis
+        # dahin fasst pruefen die Zeile nicht an. Nahme es sie als
+        # Uebungskarte, setzte es sie ohne Entwurf auf "kein Entwurf", und ein
+        # Entwurf, der zufaellig daliegt, ginge als Uebungskarte durch.
+        self.plane({"kandidat": 1, "dateien": ["a.pdf"]},
+                   {"kandidat": 2, "dateien": ["b.pdf"], "ergebnis": "wissen",
+                    "was": "Wann lohnt sich einarmige Abwehr? Übungen: 1"})
+        self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Als Übung entworfen")
+        vorher = self.ordner.uebersicht(ORDNER)["2"]
+
+        uebersicht = self.pruefe()
+
+        self.assertEqual(uebersicht["2"], vorher)
+        self.assertEqual(uebersicht["1"]["Status"], "offen")
+
     def test_zeilen_mit_importiert_bleiben_unberuehrt(self) -> None:
         # Eine uebernommene Karte hat keinen Entwurf mehr. Faende pruefen sie
         # "offen", entwuerfe der naechste Durchgang dieselbe Uebung ein
@@ -1904,6 +1950,26 @@ class UebernehmenTest(unittest.TestCase):
         self.assertEqual((zeile["Status"], zeile["Notiz"]),
                          ("rückfrage", "1 Rückfrage ohne Vermutung"))
 
+    def test_aus_einer_wissen_zeile_wird_keine_uebungskarte(self) -> None:
+        # Die Zeile plant eine Wissenskarte. Liegt daneben ein Entwurf in der
+        # Form einer Uebungskarte, etwa von Hand oder aus einem verirrten
+        # Aufruf, kaeme sonst eine Uebung mit ID in uebungen/, die keiner
+        # wollte. Entwurf und Status bleiben stehen.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "ergebnis": "wissen", "status": "bereit"},
+        ])
+        entwurf = self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Als Übung entworfen")
+        vorher = sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir())
+
+        fertig = self.uebernimm("--kandidat", "1", "")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("nicht übernommen", zeile_mit(fertig.stdout, "  1  "))
+        self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir()),
+                         vorher)
+        self.assertTrue(entwurf.exists())
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["1"]["Status"], "bereit")
+
     def test_ist_nichts_mehr_offen_verschwindet_der_entwurfsordner(self) -> None:
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
@@ -2000,6 +2066,25 @@ class UebernehmenTest(unittest.TestCase):
         uebersicht = self.ordner.uebersicht(ORDNER)
         self.assertEqual([(z["Status"], z["Karte"]) for z in uebersicht.values()],
                          [("importiert", "ue-000010"), ("importiert", "ue-000011")])
+
+    def test_solange_eine_wissen_zeile_offen_ist_bleiben_entwurfsordner_und_in_arbeit(
+            self) -> None:
+        # Auch eine Wissenskarte wartet auf ihren Entwurf, selbst wenn erst
+        # #70 ihn schreibt. Gaelte die Zeile als erledigt, verschwaenden mit
+        # der letzten Uebung Entwurfsordner und in_arbeit, und es hiesse
+        # "Nichts mehr offen", waehrend die Theorie noch aussteht.
+        datei = self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
+            {"kandidat": 2, "dateien": ["b.pdf"], "ergebnis": "wissen"},
+        ], in_arbeit="test, 2026-10-01")
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Die letzte Übung")
+
+        fertig = self.uebernimm("--kandidat", "1", "")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertNotIn("Nichts mehr offen", fertig.stdout)
+        self.assertTrue((self.ordner.pfad / "kartenentwuerfe" / ORDNER).is_dir())
+        self.assertIn('in_arbeit: "test, 2026-10-01"\n', datei.read_text(encoding="utf-8"))
 
     def test_solange_etwas_offen_ist_bleibt_der_entwurfsordner(self) -> None:
         # Die Gegenprobe: Ein Durchgang ist fertig, der naechste nicht.
