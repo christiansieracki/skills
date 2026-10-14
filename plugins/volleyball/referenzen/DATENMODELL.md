@@ -554,10 +554,13 @@ ein Kandidat des Durchgangs ein PDF und `pypdfium2` fehlt, bricht
 
 Der Auftrag einer Wissenskarte hat dieselbe Form, nur ohne die Angabe zum
 Ablauf aus dem Bild, denn eine Wissenskarte hat keinen Ablauf. Die Kennungen
-stehen darin samt den Steuerungsschwerpunkten. Bilder bekommt sie keine, bei
-keiner Einstellung von `quellgrafik:`: `vorbereiten` schneidet für sie nichts
-aus, ihr Auftrag hat kein `## Ausschnitte` und sagt, dass sie keine Bilder
-bekommt.
+stehen darin samt den Steuerungsschwerpunkten. Bilder bekommt sie nur bei
+`quellgrafik: ausschnitt`: Ihr Auftrag hat dann `## Ausschnitte` wie der einer
+Übung, nur setzt der Entwurf jeden Ausschnitt als Bildverweis an die
+Kernaussage, die er zeigt. Bei `eingebettet` und `keine` schneidet
+`vorbereiten` für sie nichts aus, ihr Auftrag hat kein `## Ausschnitte` und
+sagt, dass sie keine Bilder bekommt. Ein Durchgang nur mit Wissenskarten
+braucht bei `eingebettet` deshalb kein Pillow.
 
 Unter „Übungen aus demselben Beitrag“ nennt der Auftrag einer Wissenskarte die
 Übungen aus `Übungen:`, die schon Karte sind, mit ID: die genannten IDs und die
@@ -593,7 +596,9 @@ Ein Ausschnitt nennt den Namen der Quellgrafik, die Datei des Kandidaten
 relativ zum Quellenordner, bei einem PDF die Seite, gezählt ab 1, und das
 Rechteck: links, oben, rechts, unten in ganzen Prozent der Seite, wie sie
 aufrecht steht. Die Übungskarte trägt die Namen in `schaubild:`, wie eine
-Quellgrafik, die `vorbereiten` ausgeschnitten hat.
+Quellgrafik, die `vorbereiten` ausgeschnitten hat. Die Wissenskarte setzt jeden
+Ausschnitt als Bildverweis an die Kernaussage, die er zeigt, mit seinem Namen
+als Pfad: `![Bildreihe oberes Zuspiel](17.quellgrafik-1.png)`.
 
 Der Entwurf einer Wissenskarte hat das Frontmatter der Wissenskarte ohne `id`
 und `angelegt`, auch `schwerpunkt` und `uebungen`, dann als `[]`, dazu ihre
@@ -628,7 +633,8 @@ wird:
 - die Ausschnitte: jeder in der Form oben, mit dem Namen einer eigenen
   Quellgrafik, der nur einmal vorkommt, einer Datei des Kandidaten, bei einem
   Seitenbereich einer Seite daraus, einer Endung, die zur Datei passt, und
-  eingetragen in `schaubild:`. Dann schneidet `pruefen` jeden neu aus, über
+  bei einer Übung eingetragen in `schaubild:`, bei einer Wissenskarte in einem
+  Bildverweis im Text. Dann schneidet `pruefen` jeden neu aus, über
   dieselbe Funktion wie `ausschnitt.py`, und legt ihn neben den Entwurf, bei
   jedem Lauf. Nach einer Änderung der Zahlen liegt danach der neue da. Lässt
   er sich nicht schneiden, etwa weil es die Seite nicht gibt, wird der Entwurf
@@ -643,9 +649,11 @@ Feld der Wissenskarte außer `id` und `angelegt`, und keine `id`; ein Titel,
 der auf `?` endet; `thema` und `disziplin` mit bekannten Werten; Kennungen
 aus `schwerpunkte.md`, die zur Disziplin der Karte passen, auch
 Steuerungsschwerpunkte; jede ID in `uebungen` aus `uebungen/`; `quelldatei`
-wie oben; beide Abschnitte, und jeder Bildverweis zeigt auf eine Datei, die
-es neben dem Entwurf gibt; `## Freigabe` wie oben. Ein Entwurf in der Form
-einer Übungskarte fällt unter einer `wissen`-Zeile durch. Den Status
+wie oben; beide Abschnitte; `## Freigabe` wie oben. Jeder Bildverweis nennt
+einen Ausschnitt aus der Liste, der nach dem Schneiden neben dem Entwurf
+liegt. Ein Verweis auf einen gestrichenen Ausschnitt weist den Entwurf ab,
+auch wenn dessen Datei vom letzten Lauf noch daneben liegt. Ein Entwurf in
+der Form einer Übungskarte fällt unter einer `wissen`-Zeile durch. Den Status
 `rückfrage` bekommt eine Wissenskarte nur durch eine Rückfrage ohne Vermutung.
 
 Mit `--json` gibt `pruefen` je Kandidat mit Entwurf aus, was die Freigabe im
@@ -653,7 +661,8 @@ Chat braucht: unter `sorte` `uebungskarte` oder `wissenskarte`, die Felder des
 Entwurfs, die Vorschläge getrennt nach Feldern und Textstellen, die
 Rückfragen getrennt nach mit und ohne Vermutung, ob der Ablauf aus dem Bild
 kommt, den Pfad des Entwurfs und als Liste `quellgrafiken` die Pfade der
-Quellgrafiken, die er einträgt, in seiner Reihenfolge. Als Liste
+Quellgrafiken, die er einträgt, in seiner Reihenfolge, bei einer Wissenskarte
+die aus ihren Bildverweisen in der Reihenfolge des Texts. Als Liste
 `ausschnitte` steht jeder Ausschnitt da, mit `name`, `pfad`, `datei`, `seite`
 und `rechteck` (`links`, `oben`, `rechts`, `unten`). Kandidaten
 ohne Entwurf stehen nur in der Übersicht. Die Textstellen ergeben in
@@ -676,8 +685,12 @@ behält ihre Endung, ein Ausschnitt aus einem Foto wird also
 Nummer, in der Reihenfolge des Entwurfs, etwa `ue-000291-zirkel-1.png`, und
 `schaubild:` trägt sie als
 Liste. Eine einzelne Quellgrafik bleibt ein einzelner Name, auch wenn der
-Entwurf sie in eckigen Klammern nennt. Streicht der Trainer einen Kandidaten,
-wird er `übersprungen`, mit dem Grund in der Notiz. Stellt er ihn zurück, um
+Entwurf sie in eckigen Klammern nennt. Die Quellgrafiken einer Wissenskarte
+kommen ebenso unter ihrem Namen nach `schaubilder/`, mehrere nummeriert in der
+Reihenfolge ihrer Bildverweise im Text, und die Verweise zeigen danach von
+`wissen/` aus dorthin, etwa auf `../schaubilder/wi-000003-oberes-zuspiel-1.png`.
+Streicht der Trainer einen Kandidaten, wird er `übersprungen`, mit dem Grund
+in der Notiz. Stellt er ihn zurück, um
 ihn später zu holen, wird er `zurückgestellt`, auch mit Grund, und sein
 Ergebnis bleibt. Ergänzt er als Duplikat eine bestehende Karte, wird er
 `ergänzt`, mit deren ID in der Spalte Karte. Aus allen dreien entsteht keine

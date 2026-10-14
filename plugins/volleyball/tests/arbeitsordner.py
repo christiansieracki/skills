@@ -875,14 +875,16 @@ class Arbeitsordner:
                                vorschlaege: list[str] | None = None,
                                rueckfragen: list[str] | None = None,
                                rumpf: str | None = None,
+                               ausschnitte: list[str] | None = None,
                                **felder) -> Path:
         """Legt den Entwurf einer Wissenskarte so ab, wie der Agent ihn schreibt (#70).
 
         Das Gegenstueck zu `lege_kartenentwurf_an`: das Frontmatter der
         Wissenskarte ohne `id` und `angelegt`, mit den Standardwerten aus
         WISSENSKARTE, `quelldatei` ohne Angabe laut Uebersicht. `rumpf`
-        ersetzt den Text mit den beiden Abschnitten, etwa ohne einen davon.
-        Am Ende steht `## Freigabe` mit beiden Listen.
+        ersetzt den Text mit den beiden Abschnitten, etwa ohne einen davon
+        oder mit Bildverweisen. Am Ende steht `## Freigabe` mit beiden Listen,
+        mit `ausschnitte` davor die Liste der Ausschnitte (#71).
         """
         if "quelldatei" not in felder:
             felder["quelldatei"] = self._quelldatei_laut_plan(ordner, kandidat)
@@ -895,7 +897,7 @@ class Arbeitsordner:
         datei = self.pfad / "kartenentwuerfe" / ordner / f"{kandidat}.md"
         datei.parent.mkdir(parents=True, exist_ok=True)
         datei.write_text(f"---\n{frontmatter}\n---\n{text}\n"
-                         + _als_freigabe(vorschlaege or [], rueckfragen or []),
+                         + _als_freigabe(vorschlaege or [], rueckfragen or [], ausschnitte),
                          encoding="utf-8")
         return datei
 

@@ -90,10 +90,12 @@ einzeln fragen, jede Frage mit einem Vorschlag aus dem, was du gesehen hast:
   jeden Ausschnitt bei der Freigabe. Das geht bei Fotos von Seiten und bei
   jedem PDF. `eingebettet` passt nur, wenn jedes PDF eine Übung ist und ihr
   Feldbild als ein Bild einbettet, wie bei PlayDrill. `keine`, wenn die Karten
-  ihr Bild später mit `volleyball-schaubild` bekommen. Ein Ausschnitt braucht
-  Pillow, einer aus einem PDF dazu `pypdfium2`. Eine ältere `sammelimport.md`
-  mit `quellgrafik_ausschneiden: true` gilt als `eingebettet` und bleibt, wie
-  sie ist.
+  ihr Bild später mit `volleyball-schaubild` bekommen. Wissenskarten bekommen
+  Bilder nur bei `ausschnitt`, als Bildverweis an der Kernaussage, die sie
+  zeigen. Ein Ausschnitt braucht Pillow, einer aus einem PDF dazu
+  `pypdfium2`. Eine ältere `sammelimport.md` mit
+  `quellgrafik_ausschneiden: true` gilt als `eingebettet` und bleibt, wie sie
+  ist.
 - **Textmarke und Platzhalter:** ab welchem Wort eine Datei ihren Ablauf
   beschreibt, und was dort steht, wenn sie keinen hat. Daran erkennt
   `vorbereiten`, dass der Ablauf aus dem Bild kommt. Beide sind optional.
@@ -273,7 +275,7 @@ angenommener Vorschlag oder als Ausnahme.
    - **Pillow oder `pypdfium2` fehlt:** Den Installationshinweis weitergeben
      und warten, bis es da ist. Geschrieben ist noch nichts. `pypdfium2`
      braucht es nur bei `quellgrafik: ausschnitt` und einem PDF im
-     Durchgang.
+     Durchgang, Pillow bei `eingebettet` nur mit einer Übung im Durchgang.
    - **pdftotext fehlt:** Den Installationshinweis einmal weitergeben. Die
      Aufträge sind geschrieben, die Agenten lesen die PDFs selbst.
    - **Hinter `Übungen:` steht etwas, das keine Übung ist:** Die Meldung
@@ -387,9 +389,11 @@ wenn jede eine Antwort hat und jedes Angebot für die Absprachen ein Ja oder
 Nein.
 
 **Die Ausschnitte** kommen danach, jeder aus `ausschnitte` einzeln, Kandidat
-für Kandidat. Zu jedem stehen „Was es ist“, die Datei, bei einem PDF die
-Seite, und das Bild unter `pfad`. Gezeigt wird es mit dem, was die Umgebung
-hergibt, sonst den Pfad nennen. Der Trainer sagt:
+für Kandidat, für Übungen wie Wissenskarten. Zu jedem stehen „Was es ist“,
+die Datei, bei einem PDF die Seite, bei einer Wissenskarte die Kernaussage,
+unter der sein Bildverweis im Entwurf steht, und das Bild unter `pfad`.
+Gezeigt wird es mit dem, was die Umgebung hergibt, sonst den Pfad nennen.
+Der Trainer sagt:
 
 - **behalten:** Nichts zu tun.
 - **korrigieren**, mit einem Satz wie „etwas weiter nach unten“ oder „rechts
@@ -402,9 +406,13 @@ hergibt, sonst den Pfad nennen. Der Trainer sagt:
   und den neuen Ausschnitt zeigen, bis der Trainer ihn behält oder streicht.
   Steht der Kandidat danach auf `offen`, ließ sich der Ausschnitt so nicht
   schneiden. Der Grund steht in `notiz`, die Zahlen richten und noch einmal.
-- **streichen:** Die Zeile fällt aus `Ausschnitte:` und der Name aus
-  `schaubild:`. War es der letzte, fällt die Liste `Ausschnitte:` ganz weg,
-  und `schaubild:` wird `null`. Danach `pruefen` wie beim Korrigieren.
+  Gehört das Bild einer Wissenskarte an eine andere Kernaussage, wandert nur
+  sein Bildverweis dorthin.
+- **streichen:** Die Zeile fällt aus `Ausschnitte:`, bei einer Übung der Name
+  aus `schaubild:`, bei einer Wissenskarte der Bildverweis aus dem Text, die
+  ganze Zeile. War es der letzte, fällt die Liste `Ausschnitte:` ganz weg,
+  und bei einer Übung wird `schaubild:` `null`. Danach `pruefen` wie beim
+  Korrigieren. Ein Bildverweis ohne seinen Ausschnitt weist den Entwurf ab.
 
 Fertig sind die Ausschnitte, wenn jeder behalten oder gestrichen ist.
 
@@ -430,9 +438,9 @@ Fertig sind die Ausschnitte, wenn jeder behalten oder gestrichen ist.
 **Die Tabelle der Wissenskarten** hat eine Zeile je Kandidat mit `sorte`
 `wissenskarte`:
 
-| Kandidat | Frage | Thema | Schwerpunkt | Disziplin | Übungen | Vorschläge | Vermutungen |
-|---|---|---|---|---|---|---|---|
-| 16 | Wann lohnt sich einarmige Abwehr? | *technik, taktik* | abwehr | *halle, beach* | 12, ue-000022 | Training, Punkt 2: aus der zweiten Kernaussage abgeleitet | Gilt das auch für Jugendliche? → ja |
+| Kandidat | Frage | Thema | Schwerpunkt | Disziplin | Übungen | Bilder | Vorschläge | Vermutungen |
+|---|---|---|---|---|---|---|---|---|
+| 16 | Wann lohnt sich einarmige Abwehr? | *technik, taktik* | abwehr | *halle, beach* | 12, ue-000022 | 1 | Training, Punkt 2: aus der zweiten Kernaussage abgeleitet | Gilt das auch für Jugendliche? → ja |
 
 - Die Frage ist `titel` aus `felder`, Thema, Schwerpunkt und Disziplin die
   Felder dazu. Ein Wert, der ein Vorschlag ist, steht kursiv wie bei den
@@ -441,6 +449,9 @@ Fertig sind die Ausschnitte, wenn jeder behalten oder gestrichen ist.
   und IDs, sonst leer. Eine Nummer wird beim Übernehmen zur ID, sobald die
   Übung Karte ist, gleich ob vor oder nach der Wissenskarte. Steht in
   `felder.uebungen` eine ID, die dort fehlt, kommt sie dazu.
+- **Bilder:** wie viele Bilder auf die Karte kommen, die Zahl der Einträge in
+  `quellgrafiken`, ohne Bild `–`. Gezeigt hat sie der Trainer schon bei den
+  Ausschnitten.
 - **Vorschläge:** die Vorschläge aus `vorschlaege.textstellen`, je Punkt aus
   „Was das fürs Training heißt“ die Stelle und die Begründung. Das sind die
   Ableitungen, und keine kommt ohne das Ja des Trainers auf die Karte.
