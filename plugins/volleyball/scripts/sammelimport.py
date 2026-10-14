@@ -5,7 +5,8 @@
     <python> sammelimport.py vorbereiten <ordner> [--trotzdem]
     <python> sammelimport.py pruefen <ordner> [--json]
     <python> sammelimport.py uebernehmen <ordner> --kandidat 3 "Notiz" ...
-                 --uebersprungen 4 "Grund" ... --ergaenzt 5 ue-000027 ...
+                 --uebersprungen 4 "Grund" ... --zurueckgestellt 6 "Grund" ...
+                 --ergaenzt 5 ue-000027 ...
 
 `<ordner>` ist der Quellenordner, relativ zu `quellen/`. In ihm liegt die
 `sammelimport.md` mit den Einstellungen im Frontmatter, den Absprachen und der
@@ -31,7 +32,8 @@ Freigabe nicht einhält. Mit `--json` gibt es aus, was die Freigabe im Chat
 braucht. `uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`,
 erst jetzt mit ID (ADR-0010), und legt die Quellgrafiken als ihre Schaubilder ab.
 Ein freigegebener Entwurf, der die Prüfung nicht besteht, bleibt mit seinem
-Status stehen. Gestrichene und ergänzende Kandidaten bekommen nur ihren Status.
+Status stehen. Gestrichene, zurückgestellte und ergänzende Kandidaten
+bekommen nur ihren Status.
 Ist nichts mehr offen, löscht es `in_arbeit`.
 
 Nach der Freigabe des Plans schreibt nur noch dieses Skript in die Übersicht.
@@ -2025,13 +2027,16 @@ def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> st
 
 
 def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
-                uebersprungen: list[tuple[str, str]], ergaenzt: list[tuple[str, str]]) -> int:
+                uebersprungen: list[tuple[str, str]], ergaenzt: list[tuple[str, str]],
+                zurueckgestellt: list[tuple[str, str]] = ()) -> int:
     """Erledigt die Kandidaten, über die der Trainer bei der Freigabe entschieden hat.
 
     Freigegebene werden Karte. Gestrichene werden `übersprungen`, der Grund
-    steht in der Notiz. Ein bestätigtes Duplikat hat der Skill schon in die
-    bestehende Karte eingearbeitet, der Kandidat wird `ergänzt` und zeigt auf
-    sie. Aus den beiden letzten entsteht keine Karte.
+    steht in der Notiz. Zurückgestellte werden `zurückgestellt`, auch mit
+    Grund, und kommen wieder, wenn der Trainer sie holt (#69). Ein
+    bestätigtes Duplikat hat der Skill schon in die bestehende Karte
+    eingearbeitet, der Kandidat wird `ergänzt` und zeigt auf sie. Aus den
+    drei letzten entsteht keine Karte.
 
     Vor allem anderen muss der Quellenordner da sein (#40). Gleicht die
     Nextcloud eines Rechners quellen/ nicht ab, liegen dort die Entwürfe,
@@ -2042,9 +2047,10 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
                       f"Gleicht die Nextcloud quellen/ hier ab?\nNichts übernommen.")
     sammelimport = Sammelimport(wurzel, ordner)
     sammelimport.verlange_freigabe()
-    if not (freigegeben or uebersprungen or ergaenzt):
+    if not (freigegeben or uebersprungen or ergaenzt or zurueckgestellt):
         raise Abbruch("Kein Kandidat genannt. Je Kandidat: --kandidat <nr> \"<notiz>\", "
-                      "--uebersprungen <nr> \"<grund>\" oder --ergaenzt <nr> <id>")
+                      "--uebersprungen <nr> \"<grund>\", --zurueckgestellt <nr> \"<grund>\" "
+                      "oder --ergaenzt <nr> <id>")
     # Gibt es an diesem Rechner keine ID, dann für keinen Kandidaten. Das
     # steht einmal da, bevor irgendetwas geschrieben ist, statt je Kandidat.
     # Gestrichene und ergänzende Kandidaten brauchen keine ID.
@@ -2072,8 +2078,10 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
     # `bekannt` kennt auch die Karten, die dieser Aufruf eben geschrieben
     # hat. Auch eine davon kann die ergänzte sein.
     ohne_karte = [
-        (nummer, "übersprungen", grund.strip(), None, "" if grund.strip() else "ohne Grund")
-        for nummer, grund in uebersprungen
+        (nummer, status, grund.strip(), None, "" if grund.strip() else "ohne Grund")
+        for status, mit_grund in (("übersprungen", uebersprungen),
+                                  ("zurückgestellt", zurueckgestellt))
+        for nummer, grund in mit_grund
     ] + [
         (nummer, "ergänzt", "", uid,
          "" if uid in sammelimport.bekannt else f"{uid} gibt es nicht in uebungen/")
@@ -2160,6 +2168,9 @@ def main() -> int:
     ue.add_argument("--uebersprungen", nargs=2, action="append", default=[],
                     metavar=("NR", "GRUND"),
                     help="ein Kandidat, den der Trainer gestrichen hat, und warum")
+    ue.add_argument("--zurueckgestellt", nargs=2, action="append", default=[],
+                    metavar=("NR", "GRUND"),
+                    help="ein Kandidat, den der Trainer später holen will, und warum")
     ue.add_argument("--ergaenzt", nargs=2, action="append", default=[],
                     metavar=("NR", "ID"),
                     help="ein Kandidat, der als Duplikat eine bestehende Karte ergänzt hat")
@@ -2174,7 +2185,8 @@ def main() -> int:
         if a.befehl == "uebernehmen":
             return uebernehmen(wurzel, a.ordner, [tuple(p) for p in a.kandidat],
                                [tuple(p) for p in a.uebersprungen],
-                               [tuple(p) for p in a.ergaenzt])
+                               [tuple(p) for p in a.ergaenzt],
+                               [tuple(p) for p in a.zurueckgestellt])
         if a.plan:
             return lege_planeingabe_an(wurzel, a.ordner)
         return vorbereiten(wurzel, a.ordner, trotzdem=a.trotzdem)

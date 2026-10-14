@@ -2021,6 +2021,43 @@ class UebernehmenTest(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in entwuerfe.iterdir()), [])
         self.assertEqual(uebersicht["3"]["Status"], "offen")
 
+    def test_zurueckgestellt_setzt_den_status_mit_grund_und_es_entsteht_keine_karte(
+            self) -> None:
+        # Bei der Freigabe stellt der Trainer einen Kandidaten zurueck, statt
+        # ihn zu streichen, damit er ihn spaeter holt (#69). Wie beim
+        # Streichen verschwinden Entwurf, Auftrag und Quellgrafik, das
+        # Ergebnis bleibt. Kandidat 3 haelt den Entwurfsordner fest.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
+            {"kandidat": 2, "dateien": ["b.pdf"], "status": "bereit"},
+            {"kandidat": 3, "dateien": ["c.pdf"]},
+        ])
+        entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Spielzüge",
+                                          schaubild="1.quellgrafik.png")
+        (entwuerfe / "1.auftrag.md").write_text("# Auftrag\n", encoding="utf-8")
+        (entwuerfe / "1.quellgrafik.png").write_bytes(b"ein Bild")
+        zweiter = self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Ohne Grund")
+        vorher = sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir())
+
+        fertig = self.uebernimm("--zurueckgestellt", "1", "Spielzüge, dafür gibt es keine Sorte",
+                                "--zurueckgestellt", "2", " ")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual(
+            {spalte: uebersicht["1"][spalte] for spalte in ("Ergebnis", "Status", "Karte", "Notiz")},
+            {"Ergebnis": "uebung", "Status": "zurückgestellt", "Karte": "",
+             "Notiz": "Spielzüge, dafür gibt es keine Sorte"})
+        self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir()),
+                         vorher)
+        self.assertFalse((self.ordner.pfad / "schaubilder").exists())
+        self.assertEqual(sorted(p.name for p in entwuerfe.iterdir()), ["2.md"])
+        # Ohne Grund wuesste spaeter niemand, warum er liegt.
+        self.assertIn("Grund", zeile_mit(fertig.stdout, "  2  "))
+        self.assertEqual(uebersicht["2"]["Status"], "bereit")
+        self.assertTrue(zweiter.exists())
+
     def test_ergaenzt_mit_unbekannter_id_und_gestrichen_ohne_grund_aendern_nichts(self) -> None:
         # Vertippt. Die Uebersicht zeigte sonst auf eine Karte, die es nicht
         # gibt, und niemand faende, wohin das Duplikat gegangen ist. Ein
