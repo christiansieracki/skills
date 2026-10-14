@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Führt einen Sammelimport über einen Quellenordner, Kandidat für Kandidat.
 
-    <python> sammelimport.py vorbereiten --plan <ordner>
+    <python> sammelimport.py vorbereiten --plan <ordner> [--zurueckgestellte]
     <python> sammelimport.py vorbereiten <ordner> [--trotzdem]
     <python> sammelimport.py pruefen <ordner> [--json]
     <python> sammelimport.py uebernehmen <ordner> --kandidat 3 "Notiz" ...
-                 --uebersprungen 4 "Grund" ... --ergaenzt 5 ue-000027 ...
+                 --uebersprungen 4 "Grund" ... --zurueckgestellt 6 "Grund" ...
+                 --ergaenzt 5 ue-000027 ...
 
 `<ordner>` ist der Quellenordner, relativ zu `quellen/`. In ihm liegt die
 `sammelimport.md` mit den Einstellungen im Frontmatter, den Absprachen und der
@@ -14,14 +15,15 @@
 `vorbereiten --plan` legt vor dem Zerlegungsplan die Planeingabe an: jede
 Datei, die noch in keiner Zeile der Übersicht steht und die `ohne:` nicht
 auslässt, bei PDFs ihr Text mit einer Marke, wo jede Seite beginnt, dazu die
-nächste freie Kandidatennummer und die Bibliotheksliste. Ein zweiter Lauf über
-denselben Ordner nimmt so nur, was neu ist, und zählt weiter. Den Text liest
-`pdftotext`, wenn es da ist (ADR-0008).
+nächste freie Kandidatennummer und die Bibliotheksliste mit Übungs- und
+Wissenskarten. Ein zweiter Lauf über denselben Ordner nimmt so nur, was neu
+ist, und zählt weiter. Zurückgestellte Zeilen holt er nur mit
+`--zurueckgestellte`. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
 
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
-nächsten offenen Kandidaten an, mit dem Text jedes PDF, bei einem
-Seitenbereich nur dem dieser Seiten, und der Angabe, ob der
-Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein, welcher Trainer
+nächsten offenen Kandidaten an, bis #70 nur für Übungskarten, mit dem Text
+jedes PDF, bei einem Seitenbereich nur dem dieser Seiten, und der Angabe, ob
+der Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein, welcher Trainer
 daran arbeitet. Arbeitet laut Eintrag ein anderer daran, geht es nur mit
 `--trotzdem` weiter. Wenn die Einstellungen es wollen, schneidet es
 daneben aus jedem PDF mit Bild die Quellgrafik aus, dafür braucht es Pillow
@@ -31,7 +33,8 @@ Freigabe nicht einhält. Mit `--json` gibt es aus, was die Freigabe im Chat
 braucht. `uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`,
 erst jetzt mit ID (ADR-0010), und legt die Quellgrafiken als ihre Schaubilder ab.
 Ein freigegebener Entwurf, der die Prüfung nicht besteht, bleibt mit seinem
-Status stehen. Gestrichene und ergänzende Kandidaten bekommen nur ihren Status.
+Status stehen. Gestrichene, zurückgestellte und ergänzende Kandidaten
+bekommen nur ihren Status.
 Ist nichts mehr offen, löscht es `in_arbeit`.
 
 Nach der Freigabe des Plans schreibt nur noch dieses Skript in die Übersicht.
@@ -59,10 +62,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
-    DISZIPLIN_SPALTE, KARTENFELDER, TYPEN, KeineId, finde_wurzel, hole_index, interpreter,
-    konsole_vorbereiten, lies_frontmatter, lies_schwerpunkt_zeilen, lies_schwerpunkte,
-    lies_uebungen, naechste_id, pruefe_felder, schaubilder, tabellenzellen,
-    trainer_dieses_rechners,
+    DISZIPLIN_SPALTE, KARTENFELDER, UEBUNGSKARTE, WISSENSKARTE, Kartensorte, KeineId,
+    finde_wurzel, hole_index, interpreter, konsole_vorbereiten, lies_frontmatter,
+    lies_karten, lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen, naechste_id,
+    pruefe_felder, schaubilder, tabellenzellen, trainer_dieses_rechners,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -93,7 +96,19 @@ KEINE_AUSGESCHNITTEN = "- Quellgrafik: keine ausgeschnitten,"
 KEINE_QUELLGRAFIK_AUS = "- Keine Quellgrafik aus"
 
 SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "Notiz"]
-ERGEBNISSE = {"uebung", "folge", "zurückgestellt", "übersprungen"}
+
+# Je Ergebnis, aus dem eine Karte wird, ihre Sorte (#69). Aus `uebung` und
+# `folge` wird eine Übungskarte mit diesem `typ`, aus `wissen` eine
+# Wissenskarte. `zurückgestellt` und `übersprungen` werden keine Karte.
+SORTE_DES_ERGEBNISSES = {"uebung": UEBUNGSKARTE, "folge": UEBUNGSKARTE, "wissen": WISSENSKARTE}
+ERGEBNISSE = {*SORTE_DES_ERGEBNISSES, "zurückgestellt", "übersprungen"}
+
+# Die Sorten, für die es schon Auftrag, Agent und Prüfung gibt. Die
+# Wissenskarte kommt mit #70 dazu. Bis dahin wartet eine `wissen`-Zeile
+# `offen`: Ein Durchgang legt ihr keinen Auftrag an, und `pruefen` lässt sie,
+# wie sie ist.
+ENTWORFENE_SORTEN = (UEBUNGSKARTE,)
+
 STATUS = {"offen", "bereit", "rückfrage", "importiert", "ergänzt", "übersprungen",
           "zurückgestellt"}
 
@@ -249,9 +264,26 @@ class Kandidat:
         return self.zellen["Notiz"]
 
     @property
+    def sorte(self) -> Kartensorte | None:
+        """Die Sorte der Karte, die aus dem Kandidaten wird, None, wenn keine wird."""
+        return SORTE_DES_ERGEBNISSES.get(self.ergebnis)
+
+    @property
     def wartet(self) -> bool:
-        """Aus dem Kandidaten soll eine Karte werden, und es gibt sie noch nicht."""
-        return self.ergebnis in TYPEN and self.status in NOCH_OFFEN
+        """Aus dem Kandidaten soll eine Karte werden, gleich welcher Sorte, und es gibt sie noch nicht.
+
+        Solange einer wartet, ist im Quellenordner etwas offen, und
+        `uebernehmen` räumt nicht auf.
+        """
+        return self.sorte is not None and self.status in NOCH_OFFEN
+
+    @property
+    def wartet_auf_entwurf(self) -> bool:
+        """Er wartet, und für seine Sorte gibt es schon Auftrag und Prüfung.
+
+        Nur diese Kandidaten nimmt ein Durchgang und prüft `pruefen`.
+        """
+        return self.wartet and self.sorte in ENTWORFENE_SORTEN
 
     @property
     def dateien(self) -> list[Datei]:
@@ -939,10 +971,31 @@ def neue_dateien(quellordner: Path, sammelimport: Sammelimport | None) -> dict[s
     """
     im_plan = ({_nfc(d.name) for k in sammelimport.kandidaten for d in k.dateien}
                if sammelimport else set())
-    alle = {_nfc(p.relative_to(quellordner).as_posix()): p for p in quellordner.rglob("*")
-            if p.is_file() and p.name != SAMMELIMPORT}
+    alle = _auf_der_platte(quellordner)
     return {name: alle[name] for name in sorted(alle)
             if name not in im_plan and not (sammelimport and sammelimport.ausgelassen(name))}
+
+
+def _auf_der_platte(quellordner: Path) -> dict[str, Path]:
+    """Jede Datei des Quellenordners samt Unterordnern, außer der `sammelimport.md`.
+
+    Der Schlüssel ist der Name relativ zum Quellenordner in NFC, der Wert der
+    Pfad, wie er auf der Platte steht, siehe `neue_dateien`.
+    """
+    return {_nfc(p.relative_to(quellordner).as_posix()): p for p in quellordner.rglob("*")
+            if p.is_file() and p.name != SAMMELIMPORT}
+
+
+def zurueckgestellte_dateien(quellordner: Path, geholt: list[Kandidat]) -> dict[str, Path]:
+    """Die Dateien der zurückgestellten Zeilen, die der Trainer holt (#69).
+
+    Der Schlüssel ist der Name wie in `neue_dateien`. Fehlt eine Datei auf der
+    Platte, steht sie trotzdem da, mit dem Pfad aus der Zeile. Der Agent
+    merkt es beim Öffnen und sagt es im Plan.
+    """
+    alle = _auf_der_platte(quellordner)
+    namen = {_nfc(d.name) for k in geholt for d in k.dateien}
+    return {name: alle.get(name, quellordner / name) for name in sorted(namen)}
 
 
 def naechste_kandidatennummer(sammelimport: Sammelimport | None) -> int:
@@ -1028,19 +1081,26 @@ def pdf_text(seiten: tuple[str, ...] | None) -> str | None:
 SEITENMARKE = "=== Seite {} ==="
 
 
-def mit_seitenmarken(seiten: tuple[str, ...] | None) -> str | None:
+def mit_seitenmarken(seiten: tuple[str, ...] | None,
+                     nur: set[int] | None = None) -> str | None:
     """Der Text eines PDF am Stück, vor jeder Seite ihre Marke, gezählt ab 1.
 
     Daran nennt der Zerlegungsplan Seitenbereiche. Auch eine Seite ohne Text
     bekommt ihre Marke, sonst verrutschte die Zählung danach. Hat keine Seite
     Text, bleibt es leer wie bei `pdf_text`: Marken allein wären kein Text,
     und der Agent soll lesen, dass er das PDF selbst öffnen muss.
+
+    `nur` beschränkt den Text auf diese Seiten, etwa die einer
+    zurückgestellten Zeile (#69). Ihre Marken tragen die Nummer im PDF.
     """
-    text = pdf_text(seiten)
-    if not text:
-        return text
+    if seiten is None:
+        return None
+    gewaehlt = [(nummer, seite) for nummer, seite in enumerate(seiten, 1)
+                if nur is None or nummer in nur]
+    if not any(seite for _, seite in gewaehlt):
+        return ""
     zeilen: list[str] = []
-    for nummer, seite in enumerate(seiten, 1):
+    for nummer, seite in gewaehlt:
         zeilen += [SEITENMARKE.format(nummer), *([seite] if seite else [])]
     return "\n".join(zeilen)
 
@@ -1090,22 +1150,37 @@ def aus_diesem_ordner(quelldatei: object, ordner: str) -> bool:
                for teil in str(quelldatei).split(","))
 
 
+def _als_text(wert: object) -> str:
+    """Ein Feld einer Karte für eine Zelle, eine Liste durch Komma getrennt."""
+    if isinstance(wert, list):
+        return ", ".join(map(str, wert))
+    return str(wert or "")
+
+
 def bibliotheksliste(wurzel: Path, ordner: str) -> list[str]:
-    """Jede Karte der Bibliothek als Tabelle, die aus diesem Quellenordner markiert.
+    """Jede Karte der Bibliothek als Tabelle je Sorte, die aus diesem Quellenordner markiert.
 
     Daran erkennt der Agent für den Zerlegungsplan, was schon importiert ist,
-    und führt es als `importiert` mit seiner ID. Titel und Element braucht er,
-    um einen Verdacht auf ein Duplikat zu äußern.
+    und führt es als `importiert` mit seiner ID. Titel und Element einer
+    Übungskarte braucht er, um einen Verdacht auf ein Duplikat zu äußern.
+    Bei einer Wissenskarte sind es Frage und Thema, und dazu kommt der
+    Verdacht, dass ein Beitrag die Fortsetzung einer Karte aus einem
+    früheren Heft ist (#69).
     """
-    zeilen = ["| ID | Titel | Element | quelldatei | Aus diesem Ordner |",
-              "|---|---|---|---|---|"]
-    for karte in sorted(lies_uebungen(wurzel), key=lambda k: str(k["id"])):
-        element = karte.get("element") or []
-        element = ", ".join(map(str, element)) if isinstance(element, list) else str(element)
-        zellen = [karte["id"], karte.get("titel") or "", element, karte.get("quelldatei") or "",
-                  "ja" if aus_diesem_ordner(karte.get("quelldatei"), ordner) else ""]
-        zeilen.append("| " + " | ".join(_zelle(z) for z in zellen) + " |")
-    return zeilen
+    teile = [(UEBUNGSKARTE, "Übungskarten", ["Titel", "Element"], ["titel", "element"]),
+             (WISSENSKARTE, "Wissenskarten", ["Frage", "Thema"], ["titel", "thema"])]
+    zeilen: list[str] = []
+    for sorte, ueberschrift, spalten, felder in teile:
+        kopf = ["ID", *spalten, "quelldatei", "Aus diesem Ordner"]
+        zeilen += [f"### {ueberschrift}", "",
+                   "| " + " | ".join(kopf) + " |", "|" + "---|" * len(kopf)]
+        for karte in sorted(lies_karten(wurzel, sorte), key=lambda k: str(k["id"])):
+            zellen = [karte["id"], *(_als_text(karte.get(f)) for f in felder),
+                      _als_text(karte.get("quelldatei")),
+                      "ja" if aus_diesem_ordner(karte.get("quelldatei"), ordner) else ""]
+            zeilen.append("| " + " | ".join(_zelle(z) for z in zellen) + " |")
+        zeilen.append("")
+    return zeilen[:-1]
 
 
 def melde_unlesbare_fotos(ordner: str, quellordner: Path,
@@ -1153,7 +1228,49 @@ def _text_oder_grund(text: str | None, pdftotext: str | None,
     return [f"{grund} Das PDF selbst lesen{nur}."]
 
 
-def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
+def seitenbereiche_der_zeilen(geholt: list[Kandidat]) -> dict[str, list[Seitenbereich]]:
+    """Je Datei der geholten Zeilen die Seitenbereiche, die sie nennen (#69).
+
+    Der Rest eines aufgeteilten PDF steht schon in anderen Zeilen. Käme er
+    wieder, plante der Agent ihn ein zweites Mal. Nennt eine der Zeilen die
+    Datei ohne Bereich, oder mit einem, der sich nicht lesen lässt, gehört
+    sie ganz dazu und fehlt hier. Den Bereich, so wie er dasteht, sieht der
+    Agent dann unter „Zurückgestellt“.
+    """
+    ganz: set[str] = set()
+    bereiche: dict[str, set[Seitenbereich]] = {}
+    for k in geholt:
+        for d in k.dateien:
+            try:
+                bereich = d.seiten
+            except ValueError:
+                bereich = None
+            if bereich is None:
+                ganz.add(_nfc(d.name))
+            else:
+                bereiche.setdefault(_nfc(d.name), set()).add(bereich)
+    return {name: sorted(menge, key=lambda b: (b.erste, b.letzte))
+            for name, menge in bereiche.items() if name not in ganz}
+
+
+def zurueckgestellt_teil(geholt: list[Kandidat]) -> list[str]:
+    """Der Abschnitt der Planeingabe mit den zurückgestellten Zeilen, die der Trainer holt.
+
+    Je Zeile Nummer, Dateien, „Was es ist“ und Notiz (#69). Daraus weiß der
+    Agent, was ein früherer Lauf über die Dateien schon gesagt hat, und
+    welche Nummer seine erste Zeile daraus trägt.
+    """
+    zeilen = ["## Zurückgestellt", "",
+              "Diese Zeilen der Übersicht sind zurückgestellt, und der Trainer holt sie "
+              "jetzt. Ihre Dateien stehen unter „Dateien“.", "",
+              "| Kandidat | Dateien | Was es ist | Notiz |", "|---|---|---|---|"]
+    for k in geholt:
+        zellen = [k.nummer, ", ".join(map(str, k.dateien)), k.was, k.notiz]
+        zeilen.append("| " + " | ".join(_zelle(z) for z in zellen) + " |")
+    return [*zeilen, ""]
+
+
+def lege_planeingabe_an(wurzel: Path, ordner: str, zurueckgestellte: bool = False) -> int:
     """Legt die Eingabe für den Zerlegungsplan an.
 
     Der Agent liest sie in einem Aufruf: jede Datei, die noch in keiner Zeile
@@ -1162,21 +1279,35 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     Der Quellenordner steht einmal absolut im Kopf, denn Fotos und PDFs ohne
     Text öffnet der Agent selbst. Dazu die nächste freie Kandidatennummer, ab
     der er zählt.
+
+    Mit `zurueckgestellte` holt der Trainer die zurückgestellten Zeilen
+    (#69): Ihre Dateien kommen zu den neuen, und die Zeilen selbst stehen
+    unter „Zurückgestellt“. Ohne den Schalter kommt keine wieder, auch nicht
+    eine, die der Trainer bewusst zurückgestellt hat.
     """
     sammelimport = vorhandener_sammelimport(wurzel, ordner)
     quellordner = wurzel / "quellen" / ordner
-    dateien = neue_dateien(quellordner, sammelimport)
+    neu = neue_dateien(quellordner, sammelimport)
+    geholt = ([k for k in sammelimport.kandidaten if k.status == "zurückgestellt"]
+              if zurueckgestellte and sammelimport else [])
+    aus_geholten = zurueckgestellte_dateien(quellordner, geholt)
+    dateien = dict(sorted({**neu, **aus_geholten}.items()))
     melde_unlesbare_fotos(ordner, quellordner, sammelimport)
     if not dateien:
         wo = ("in der Übersicht oder unter ohne" if sammelimport and sammelimport.ohne
               else "in der Übersicht")
-        print(f"Keine neuen Dateien in quellen/{ordner}/, jede steht schon {wo}.")
+        keine = ", und keine Zeile ist zurückgestellt" if zurueckgestellte else ""
+        print(f"Keine neuen Dateien in quellen/{ordner}/, jede steht schon {wo}{keine}.")
         return 0
     pdfs = {name for name in dateien if _ist_pdf(name)}
     pdftotext = finde_pdftotext() if pdfs else None
     if pdfs and not pdftotext:
         melde_ohne_pdftotext("die Planeingabe", "den Zerlegungsplan")
-    texte = ({name: mit_seitenmarken(pdf_seiten(pdftotext, dateien[name])) for name in pdfs}
+    nur = seitenbereiche_der_zeilen(geholt)
+    seiten_von = {name: {n for b in bereiche for n in range(b.erste, b.letzte + 1)}
+                  for name, bereiche in nur.items()}
+    texte = ({name: mit_seitenmarken(pdf_seiten(pdftotext, dateien[name]), seiten_von.get(name))
+              for name in pdfs}
              if pdftotext else {})
 
     zeichen = sum(len(t) for t in texte.values() if t)
@@ -1196,10 +1327,18 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     teile = [f"# Planeingabe für quellen/{ordner}/", "",
              f"Quellenordner: `{quellordner.as_posix()}/`", "",
              f"Nächste freie Kandidatennummer: {naechste_kandidatennummer(sammelimport)}", "",
-             f"{len(dateien)} Dateien, die noch in keiner Zeile der Übersicht stehen, "
-             f"relativ zum Quellenordner.", *textlage, "", "## Dateien", ""]
+             f"{len(neu)} Dateien, die noch in keiner Zeile der Übersicht stehen, "
+             f"relativ zum Quellenordner.",
+             *([f"Dazu {len(aus_geholten)} Dateien aus {len(geholt)} zurückgestellten "
+                f"Zeilen, siehe „Zurückgestellt“."] if geholt else []),
+             *textlage, "",
+             *(zurueckgestellt_teil(geholt) if geholt else []),
+             "## Dateien", ""]
     for datei in dateien:
         teile += [f"### `{datei}`", ""]
+        if datei in pdfs and datei in nur:
+            teile += [f"Nur {', '.join(map(str, nur[datei]))}, aus den zurückgestellten Zeilen. "
+                      f"Die übrigen Seiten stehen schon in anderen Zeilen.", ""]
         if datei in pdfs:
             teile += [*_text_oder_grund(texte.get(datei), pdftotext), ""]
     teile += ["## Bibliothek", "",
@@ -1710,7 +1849,7 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     trainer = trainer_fuer_auftraege(wurzel)
     verlange_freien_quellenordner(sammelimport, trainer, trotzdem)
     offen = [k for k in sammelimport.kandidaten
-             if k.wartet and pruefe_entwurf(sammelimport, k).fehler]
+             if k.wartet_auf_entwurf and pruefe_entwurf(sammelimport, k).fehler]
     dran = offen[:sammelimport.je_durchgang]
     print(f"Aufträge für {len(dran)} von {len(offen)} offenen Kandidaten:")
     if not dran:
@@ -1824,7 +1963,7 @@ def pruefen(wurzel: Path, ordner: str, als_json: bool = False) -> int:
     stand: dict[str, int] = {}
     freigabe = []
     for k in sammelimport.kandidaten:
-        if not k.wartet:
+        if not k.wartet_auf_entwurf:
             continue
         befund = pruefe_entwurf(sammelimport, k)
         setze_befund(k, befund)
@@ -1987,17 +2126,25 @@ def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> st
     grund = warum_nicht_wartend(k)
     if grund or k is None:
         return grund
+    # Eine Wissenskarte übernimmt das Skript erst mit #70. Bis dahin wäre ein
+    # Entwurf unter einer `wissen`-Zeile als Übungskarte geprüft und
+    # geschrieben worden.
+    if not k.wartet_auf_entwurf:
+        return "wird laut Plan eine Wissenskarte, und die übernimmt das Skript noch nicht"
     return pruefe_entwurf(sammelimport, k).fehler
 
 
 def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
-                uebersprungen: list[tuple[str, str]], ergaenzt: list[tuple[str, str]]) -> int:
+                uebersprungen: list[tuple[str, str]], ergaenzt: list[tuple[str, str]],
+                zurueckgestellt: list[tuple[str, str]] = ()) -> int:
     """Erledigt die Kandidaten, über die der Trainer bei der Freigabe entschieden hat.
 
     Freigegebene werden Karte. Gestrichene werden `übersprungen`, der Grund
-    steht in der Notiz. Ein bestätigtes Duplikat hat der Skill schon in die
-    bestehende Karte eingearbeitet, der Kandidat wird `ergänzt` und zeigt auf
-    sie. Aus den beiden letzten entsteht keine Karte.
+    steht in der Notiz. Zurückgestellte werden `zurückgestellt`, auch mit
+    Grund, und kommen wieder, wenn der Trainer sie holt (#69). Ein
+    bestätigtes Duplikat hat der Skill schon in die bestehende Karte
+    eingearbeitet, der Kandidat wird `ergänzt` und zeigt auf sie. Aus den
+    drei letzten entsteht keine Karte.
 
     Vor allem anderen muss der Quellenordner da sein (#40). Gleicht die
     Nextcloud eines Rechners quellen/ nicht ab, liegen dort die Entwürfe,
@@ -2008,9 +2155,10 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
                       f"Gleicht die Nextcloud quellen/ hier ab?\nNichts übernommen.")
     sammelimport = Sammelimport(wurzel, ordner)
     sammelimport.verlange_freigabe()
-    if not (freigegeben or uebersprungen or ergaenzt):
+    if not (freigegeben or uebersprungen or ergaenzt or zurueckgestellt):
         raise Abbruch("Kein Kandidat genannt. Je Kandidat: --kandidat <nr> \"<notiz>\", "
-                      "--uebersprungen <nr> \"<grund>\" oder --ergaenzt <nr> <id>")
+                      "--uebersprungen <nr> \"<grund>\", --zurueckgestellt <nr> \"<grund>\" "
+                      "oder --ergaenzt <nr> <id>")
     # Gibt es an diesem Rechner keine ID, dann für keinen Kandidaten. Das
     # steht einmal da, bevor irgendetwas geschrieben ist, statt je Kandidat.
     # Gestrichene und ergänzende Kandidaten brauchen keine ID.
@@ -2038,8 +2186,10 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
     # `bekannt` kennt auch die Karten, die dieser Aufruf eben geschrieben
     # hat. Auch eine davon kann die ergänzte sein.
     ohne_karte = [
-        (nummer, "übersprungen", grund.strip(), None, "" if grund.strip() else "ohne Grund")
-        for nummer, grund in uebersprungen
+        (nummer, status, grund.strip(), None, "" if grund.strip() else "ohne Grund")
+        for status, mit_grund in (("übersprungen", uebersprungen),
+                                  ("zurückgestellt", zurueckgestellt))
+        for nummer, grund in mit_grund
     ] + [
         (nummer, "ergänzt", "", uid,
          "" if uid in sammelimport.bekannt else f"{uid} gibt es nicht in uebungen/")
@@ -2111,6 +2261,9 @@ def main() -> int:
     vor.add_argument("ordner", type=quellenordner, help=hilfe)
     vor.add_argument("--plan", action="store_true",
                      help="statt der Aufträge die Eingabe für den Zerlegungsplan anlegen")
+    vor.add_argument("--zurueckgestellte", action="store_true",
+                     help="mit --plan: dazu die Dateien der zurückgestellten Zeilen, die der "
+                          "Trainer jetzt holt")
     vor.add_argument("--trotzdem", action="store_true",
                      help="ohne --plan: weiter, auch wenn laut in_arbeit ein anderer Trainer "
                           "daran arbeitet")
@@ -2126,12 +2279,17 @@ def main() -> int:
     ue.add_argument("--uebersprungen", nargs=2, action="append", default=[],
                     metavar=("NR", "GRUND"),
                     help="ein Kandidat, den der Trainer gestrichen hat, und warum")
+    ue.add_argument("--zurueckgestellt", nargs=2, action="append", default=[],
+                    metavar=("NR", "GRUND"),
+                    help="ein Kandidat, den der Trainer später holen will, und warum")
     ue.add_argument("--ergaenzt", nargs=2, action="append", default=[],
                     metavar=("NR", "ID"),
                     help="ein Kandidat, der als Duplikat eine bestehende Karte ergänzt hat")
     a = ap.parse_args()
     if a.befehl == "vorbereiten" and a.plan and a.trotzdem:
         ap.error("--trotzdem gilt nur ohne --plan, die Planeingabe trägt nicht ein, wer arbeitet")
+    if a.befehl == "vorbereiten" and a.zurueckgestellte and not a.plan:
+        ap.error("--zurueckgestellte gilt nur mit --plan, geholt wird in den Zerlegungsplan")
 
     wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
     try:
@@ -2140,9 +2298,10 @@ def main() -> int:
         if a.befehl == "uebernehmen":
             return uebernehmen(wurzel, a.ordner, [tuple(p) for p in a.kandidat],
                                [tuple(p) for p in a.uebersprungen],
-                               [tuple(p) for p in a.ergaenzt])
+                               [tuple(p) for p in a.ergaenzt],
+                               [tuple(p) for p in a.zurueckgestellt])
         if a.plan:
-            return lege_planeingabe_an(wurzel, a.ordner)
+            return lege_planeingabe_an(wurzel, a.ordner, zurueckgestellte=a.zurueckgestellte)
         return vorbereiten(wurzel, a.ordner, trotzdem=a.trotzdem)
     except Abbruch as fehler:
         print(fehler)

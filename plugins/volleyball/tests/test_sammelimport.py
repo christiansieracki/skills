@@ -231,6 +231,36 @@ class VorbereitenTest(unittest.TestCase):
         self.assertIn("Offen", fertig.stdout)
         self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
 
+    def test_ein_durchgang_legt_fuer_eine_wissen_zeile_keinen_auftrag_an(self) -> None:
+        # Der Zerlegungsplan plant Theorie als Wissenskarte (#69). Ihren
+        # Entwurf schreibt erst der Agent aus #70. Bis dahin bleibt die Zeile
+        # offen, und der Durchgang nimmt nur die Uebung, ohne an der Zeile
+        # abzubrechen.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-01.jpg"]},
+            {"kandidat": 2, "dateien": ["seite-02.jpg"], "ergebnis": "wissen",
+             "was": "Wann lohnt sich einarmige Abwehr? Übungen: 1"},
+        ])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertEqual(self.auftraege(), ["1.auftrag.md"])
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["2"]["Status"], "offen")
+
+    def test_ein_unbekanntes_ergebnis_bricht_ab_und_schreibt_nichts(self) -> None:
+        # Vertippt oder erfunden. Mit `wissen` gibt es ein Ergebnis mehr,
+        # aber nicht jedes: Gaelte "theorie" als erledigt, bliebe die Theorie
+        # still liegen.
+        self.ordner.lege_quellenordner_an(
+            ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"], "ergebnis": "theorie"}])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("wissen", zeile_mit(fertig.stdout, "theorie"))
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
+
     def test_der_quellenordner_darf_mit_quellen_davor_kommen(self) -> None:
         # So nennt ihn der Trainer: "Sammelimport ueber quellen/stapel".
         self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["a.pdf"]}])
@@ -1029,8 +1059,9 @@ class PlaneingabeTest(unittest.TestCase):
         self.ordner = Arbeitsordner()
         self.addCleanup(self.ordner.raeume_auf)
 
-    def plane(self, **starte):
-        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", "--plan", ORDNER, **starte)
+    def plane(self, *schalter: str, **starte):
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", "--plan", *schalter, ORDNER,
+                                    **starte)
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         return fertig
 
@@ -1274,9 +1305,14 @@ class PlaneingabeTest(unittest.TestCase):
         # Auch der Agent muss es wissen, sonst haelt er den Anfang fuer alles.
         self.assertIn("ersten Zeilen", self.planeingabe().split("## Dateien", 1)[0])
 
-    def bibliothek(self) -> dict[str, dict[str, str]]:
-        """Die Bibliotheksliste der Planeingabe, je ID eine Zeile."""
+    def bibliothek(self, teil: str) -> dict[str, dict[str, str]]:
+        """Ein Teil der Bibliotheksliste, je ID eine Zeile.
+
+        `teil` ist die Ueberschrift unter `## Bibliothek`, `Übungskarten`
+        oder `Wissenskarten`. Gelesen wird die Tabelle darunter.
+        """
         abschnitt = self.planeingabe().split("## Bibliothek", 1)[1]
+        abschnitt = abschnitt.split(f"### {teil}\n", 1)[1].split("\n#", 1)[0]
         zeilen = [[z.strip() for z in zeile.strip().strip("|").split("|")]
                   for zeile in abschnitt.splitlines() if zeile.startswith("|")]
         kopf, _trenner, *rest = zeilen
@@ -1297,7 +1333,7 @@ class PlaneingabeTest(unittest.TestCase):
 
         self.plane()
 
-        liste = self.bibliothek()
+        liste = self.bibliothek("Übungskarten")
         self.assertEqual(sorted(liste), sorted(self.ordner.ids))
         kasten = liste["ue-000006"]
         self.assertEqual(kasten["Titel"], "Abwehr vom Kasten")
@@ -1305,6 +1341,118 @@ class PlaneingabeTest(unittest.TestCase):
         self.assertEqual(kasten["quelldatei"], f"{ORDNER}/Ü_Abwehr/kasten.pdf")
         self.assertEqual({uid for uid, zeile in liste.items() if zeile["Aus diesem Ordner"]},
                          {"ue-000006", "ue-000007"})
+
+    def test_die_bibliotheksliste_nennt_die_wissenskarten_und_markiert_die_aus_diesem_ordner(
+            self) -> None:
+        # Daran erkennt der Agent eine Wissenskarte, die schon importiert ist,
+        # und die Fortsetzung eines Beitrags aus einem frueheren Heft (#69).
+        # Die Frage ist ihr Titel, das Thema sagt, wovon sie handelt.
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000001", titel="Wann lohnt sich einarmige Abwehr?",
+            thema=["technik", "taktik"], quelldatei=f"{ORDNER}/seite-26.jpg")
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000002", titel="Wie lange schläft ein Spieler vor dem Spiel?",
+            thema=["physiologie"], quelldatei=f"{ORDNER}-alt/seite-03.jpg")
+        self.ordner.lege_wissenskarte_an(id="wi-000003", titel="Was steht in keinem Heft?")
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-27.jpg", b"")
+
+        self.plane()
+
+        liste = self.bibliothek("Wissenskarten")
+        self.assertEqual(sorted(liste), ["wi-000001", "wi-000002", "wi-000003"])
+        einarmig = liste["wi-000001"]
+        self.assertEqual(einarmig["Frage"], "Wann lohnt sich einarmige Abwehr?")
+        self.assertEqual(einarmig["Thema"], "technik, taktik")
+        self.assertEqual(einarmig["quelldatei"], f"{ORDNER}/seite-26.jpg")
+        self.assertEqual({uid for uid, zeile in liste.items() if zeile["Aus diesem Ordner"]},
+                         {"wi-000001"})
+        self.assertEqual(sorted(self.bibliothek("Übungskarten")), sorted(self.ordner.ids))
+
+    def lege_zurueckgestellte_an(self) -> None:
+        """Ein Plan nach dem ersten Lauf, mit zwei zurueckgestellten Zeilen und einer neuen Datei.
+
+        Kandidat 2 hat der Zerlegungsplan zurueckgestellt, als es noch keine
+        Wissenskarte gab. Kandidat 3 hat der Trainer bei der Freigabe
+        zurueckgestellt, sein Ergebnis ist noch `uebung`.
+        """
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-01.jpg"], "status": "importiert",
+             "karte": "ue-000001"},
+            {"kandidat": 2, "dateien": ["seite-02.jpg", "seite-03.jpg"],
+             "was": "Einarmig gehts auch, Teil 2, S. 26–27", "ergebnis": "zurückgestellt",
+             "status": "zurückgestellt", "notiz": "Theorie"},
+            {"kandidat": 3, "dateien": ["seite-04.jpg"], "was": "Spielzug über die Mitte",
+             "status": "zurückgestellt", "notiz": "erst nach der Saison"},
+            {"kandidat": 4, "dateien": ["seite-05.jpg"], "ergebnis": "übersprungen",
+             "status": "übersprungen", "notiz": "Werbung"},
+        ])
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-06.jpg", b"")
+
+    def zurueckgestellte(self) -> dict[str, dict[str, str]]:
+        """Die zurueckgestellten Zeilen, die die Planeingabe nennt, je Nummer eine."""
+        abschnitt = self.planeingabe().split("## Zurückgestellt\n", 1)[1].split("\n## ", 1)[0]
+        zeilen = [[z.strip() for z in zeile.strip().strip("|").split("|")]
+                  for zeile in abschnitt.splitlines() if zeile.startswith("|")]
+        kopf, _trenner, *rest = zeilen
+        return {z[0]: dict(zip(kopf, z)) for z in rest}
+
+    def test_ohne_den_schalter_kommt_keine_zurueckgestellte_zeile_wieder(self) -> None:
+        # Bewusst Zurueckgestelltes soll nicht bei jedem Lauf auftauchen
+        # (#69). Ihre Dateien stehen in einer Zeile und sind nicht neu.
+        self.lege_zurueckgestellte_an()
+
+        self.plane()
+
+        self.assertEqual(self.genannte_dateien(), ["seite-06.jpg"])
+        self.assertNotIn("Zurückgestellt", self.planeingabe())
+
+    def test_mit_dem_schalter_stehen_die_zurueckgestellten_zeilen_und_ihre_dateien_da(
+            self) -> None:
+        # "Hol die zurueckgestellten aus stapel" (#69). Der Agent sieht die
+        # alten Zeilen mit Nummer, Dateien, "Was es ist" und Notiz und plant
+        # ihre Dateien neu, zusammen mit dem, was neu ist. Die erste Zeile,
+        # die er aus einer alten macht, traegt deren Nummer, weitere zaehlen
+        # ab der naechsten freien.
+        self.lege_zurueckgestellte_an()
+
+        self.plane("--zurueckgestellte")
+
+        self.assertEqual(sorted(self.genannte_dateien()),
+                         ["seite-02.jpg", "seite-03.jpg", "seite-04.jpg", "seite-06.jpg"])
+        zeilen = self.zurueckgestellte()
+        self.assertEqual(sorted(zeilen), ["2", "3"])
+        self.assertEqual(
+            {spalte: zeilen["2"][spalte] for spalte in ("Dateien", "Was es ist", "Notiz")},
+            {"Dateien": "`seite-02.jpg`, `seite-03.jpg`",
+             "Was es ist": "Einarmig gehts auch, Teil 2, S. 26–27", "Notiz": "Theorie"})
+        self.assertEqual(zeilen["3"]["Notiz"], "erst nach der Saison")
+        self.assertEqual(self.naechste_nummer(), 5)
+
+    @BRAUCHT_PDFTOTEXT
+    def test_von_einem_pdf_kommen_nur_die_zurueckgestellten_seiten(self) -> None:
+        # Der Rest des Hefts steht schon in anderen Zeilen. Kaeme er wieder,
+        # plante der Agent ihn ein zweites Mal, denn von einem aufgeteilten
+        # PDF soll jede Seite in einer Zeile stehen. Neue Dateien gibt es
+        # keine, die Planeingabe entsteht trotzdem.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": [("heft.pdf", "S. 1")], "ergebnis": "übersprungen",
+             "status": "übersprungen", "notiz": "Inhaltsverzeichnis"},
+            {"kandidat": 2, "dateien": [("heft.pdf", "S. 2–3")], "ergebnis": "zurückgestellt",
+             "status": "zurückgestellt", "notiz": "Theorie"},
+        ])
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", ["Inhalt des Hefts"],
+                                      ["Wann lohnt sich einarmige Abwehr?"],
+                                      ["Einarmig spart den Schritt zum Ball."])
+
+        self.plane("--zurueckgestellte")
+
+        heft = self.zu_datei("heft.pdf")
+        self.assertNotIn("Inhalt des Hefts", heft)
+        self.assertNotIn("=== Seite 1 ===", heft)
+        for zeile in ("=== Seite 2 ===", "Wann lohnt sich einarmige Abwehr?",
+                      "=== Seite 3 ===", "Einarmig spart den Schritt zum Ball."):
+            self.assertIn(zeile, heft)
+        self.assertIn("S. 2–3", zeile_mit(heft, "Nur"))
 
     def test_ein_foto_ueber_2_mb_ergibt_den_hinweis_auf_die_bildaufbereitung(self) -> None:
         # So schwer ist eine abfotografierte Magazinseite mit 50 Megapixeln.
@@ -1707,6 +1855,22 @@ class PruefenTest(unittest.TestCase):
         self.assertEqual(zeile["Status"], "offen")
         self.assertIn("Frontmatter", zeile["Notiz"])
 
+    def test_eine_wissen_zeile_bleibt_offen_und_unberuehrt(self) -> None:
+        # Den Entwurf einer Wissenskarte schreibt und prueft erst #70. Bis
+        # dahin fasst pruefen die Zeile nicht an. Nahme es sie als
+        # Uebungskarte, setzte es sie ohne Entwurf auf "kein Entwurf", und ein
+        # Entwurf, der zufaellig daliegt, ginge als Uebungskarte durch.
+        self.plane({"kandidat": 1, "dateien": ["a.pdf"]},
+                   {"kandidat": 2, "dateien": ["b.pdf"], "ergebnis": "wissen",
+                    "was": "Wann lohnt sich einarmige Abwehr? Übungen: 1"})
+        self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Als Übung entworfen")
+        vorher = self.ordner.uebersicht(ORDNER)["2"]
+
+        uebersicht = self.pruefe()
+
+        self.assertEqual(uebersicht["2"], vorher)
+        self.assertEqual(uebersicht["1"]["Status"], "offen")
+
     def test_zeilen_mit_importiert_bleiben_unberuehrt(self) -> None:
         # Eine uebernommene Karte hat keinen Entwurf mehr. Faende pruefen sie
         # "offen", entwuerfe der naechste Durchgang dieselbe Uebung ein
@@ -1904,6 +2068,26 @@ class UebernehmenTest(unittest.TestCase):
         self.assertEqual((zeile["Status"], zeile["Notiz"]),
                          ("rückfrage", "1 Rückfrage ohne Vermutung"))
 
+    def test_aus_einer_wissen_zeile_wird_keine_uebungskarte(self) -> None:
+        # Die Zeile plant eine Wissenskarte. Liegt daneben ein Entwurf in der
+        # Form einer Uebungskarte, etwa von Hand oder aus einem verirrten
+        # Aufruf, kaeme sonst eine Uebung mit ID in uebungen/, die keiner
+        # wollte. Entwurf und Status bleiben stehen.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "ergebnis": "wissen", "status": "bereit"},
+        ])
+        entwurf = self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Als Übung entworfen")
+        vorher = sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir())
+
+        fertig = self.uebernimm("--kandidat", "1", "")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("nicht übernommen", zeile_mit(fertig.stdout, "  1  "))
+        self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir()),
+                         vorher)
+        self.assertTrue(entwurf.exists())
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["1"]["Status"], "bereit")
+
     def test_ist_nichts_mehr_offen_verschwindet_der_entwurfsordner(self) -> None:
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
@@ -1955,6 +2139,43 @@ class UebernehmenTest(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in entwuerfe.iterdir()), [])
         self.assertEqual(uebersicht["3"]["Status"], "offen")
 
+    def test_zurueckgestellt_setzt_den_status_mit_grund_und_es_entsteht_keine_karte(
+            self) -> None:
+        # Bei der Freigabe stellt der Trainer einen Kandidaten zurueck, statt
+        # ihn zu streichen, damit er ihn spaeter holt (#69). Wie beim
+        # Streichen verschwinden Entwurf, Auftrag und Quellgrafik, das
+        # Ergebnis bleibt. Kandidat 3 haelt den Entwurfsordner fest.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
+            {"kandidat": 2, "dateien": ["b.pdf"], "status": "bereit"},
+            {"kandidat": 3, "dateien": ["c.pdf"]},
+        ])
+        entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Spielzüge",
+                                          schaubild="1.quellgrafik.png")
+        (entwuerfe / "1.auftrag.md").write_text("# Auftrag\n", encoding="utf-8")
+        (entwuerfe / "1.quellgrafik.png").write_bytes(b"ein Bild")
+        zweiter = self.ordner.lege_kartenentwurf_an(ORDNER, 2, titel="Ohne Grund")
+        vorher = sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir())
+
+        fertig = self.uebernimm("--zurueckgestellt", "1", "Spielzüge, dafür gibt es keine Sorte",
+                                "--zurueckgestellt", "2", " ")
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual(
+            {spalte: uebersicht["1"][spalte] for spalte in ("Ergebnis", "Status", "Karte", "Notiz")},
+            {"Ergebnis": "uebung", "Status": "zurückgestellt", "Karte": "",
+             "Notiz": "Spielzüge, dafür gibt es keine Sorte"})
+        self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir()),
+                         vorher)
+        self.assertFalse((self.ordner.pfad / "schaubilder").exists())
+        self.assertEqual(sorted(p.name for p in entwuerfe.iterdir()), ["2.md"])
+        # Ohne Grund wuesste spaeter niemand, warum er liegt.
+        self.assertIn("Grund", zeile_mit(fertig.stdout, "  2  "))
+        self.assertEqual(uebersicht["2"]["Status"], "bereit")
+        self.assertTrue(zweiter.exists())
+
     def test_ergaenzt_mit_unbekannter_id_und_gestrichen_ohne_grund_aendern_nichts(self) -> None:
         # Vertippt. Die Uebersicht zeigte sonst auf eine Karte, die es nicht
         # gibt, und niemand faende, wohin das Duplikat gegangen ist. Ein
@@ -2000,6 +2221,25 @@ class UebernehmenTest(unittest.TestCase):
         uebersicht = self.ordner.uebersicht(ORDNER)
         self.assertEqual([(z["Status"], z["Karte"]) for z in uebersicht.values()],
                          [("importiert", "ue-000010"), ("importiert", "ue-000011")])
+
+    def test_solange_eine_wissen_zeile_offen_ist_bleiben_entwurfsordner_und_in_arbeit(
+            self) -> None:
+        # Auch eine Wissenskarte wartet auf ihren Entwurf, selbst wenn erst
+        # #70 ihn schreibt. Gaelte die Zeile als erledigt, verschwaenden mit
+        # der letzten Uebung Entwurfsordner und in_arbeit, und es hiesse
+        # "Nichts mehr offen", waehrend die Theorie noch aussteht.
+        datei = self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["a.pdf"], "status": "bereit"},
+            {"kandidat": 2, "dateien": ["b.pdf"], "ergebnis": "wissen"},
+        ], in_arbeit="test, 2026-10-01")
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Die letzte Übung")
+
+        fertig = self.uebernimm("--kandidat", "1", "")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertNotIn("Nichts mehr offen", fertig.stdout)
+        self.assertTrue((self.ordner.pfad / "kartenentwuerfe" / ORDNER).is_dir())
+        self.assertIn('in_arbeit: "test, 2026-10-01"\n', datei.read_text(encoding="utf-8"))
 
     def test_solange_etwas_offen_ist_bleibt_der_entwurfsordner(self) -> None:
         # Die Gegenprobe: Ein Durchgang ist fertig, der naechste nicht.
