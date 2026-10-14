@@ -403,12 +403,18 @@ def _als_sammelimport(kandidaten: list[dict], freigegeben: str | None,
     )
 
 
-def _als_freigabe(vorschlaege: list[str], rueckfragen: list[str]) -> str:
+def _als_freigabe(vorschlaege: list[str], rueckfragen: list[str],
+                  ausschnitte: list[str] | None = None) -> str:
     """Der Abschnitt `## Freigabe` am Ende eines Kartenentwurfs, Form aus #29.
 
-    Eine leere Liste heisst dort "keine", beide Listen stehen immer da.
+    Eine leere Liste heisst dort "keine", beide Listen stehen immer da. Die
+    Liste der Ausschnitte (#63) steht vorn und nur, wenn es welche gibt. Je
+    Ausschnitt ein Punkt wie `` `3.quellgrafik.jpg`: `seite-26.jpg`, links
+    8, oben 42, rechts 94, unten 88 ``.
     """
     teile = ["## Freigabe", ""]
+    if ausschnitte:
+        teile += ["Ausschnitte:", *(f"- {a}" for a in ausschnitte), ""]
     if vorschlaege:
         teile += ["Vorschläge:", *(f"- {v}" for v in vorschlaege)]
     else:
@@ -836,6 +842,7 @@ class Arbeitsordner:
                               vorschlaege: list[str] | None = None,
                               rueckfragen: list[str] | None = None,
                               freigabe: str | None = None,
+                              ausschnitte: list[str] | None = None,
                               **felder) -> Path:
         """Legt einen Kartenentwurf so ab, wie der Agent ihn schreibt.
 
@@ -846,16 +853,17 @@ class Arbeitsordner:
         dafuer schon da sein, wie im Betrieb: Der Agent entwirft nach dem
         freigegebenen Plan.
 
-        Am Ende steht `## Freigabe` mit beiden Listen. `freigabe` ersetzt
-        diesen Abschnitt woertlich, fuer die Entwuerfe, deren Form nicht
-        stimmen soll. `freigabe=""` laesst ihn weg.
+        Am Ende steht `## Freigabe` mit beiden Listen, mit `ausschnitte`
+        davor die Liste der Ausschnitte. `freigabe` ersetzt diesen Abschnitt
+        woertlich, fuer die Entwuerfe, deren Form nicht stimmen soll.
+        `freigabe=""` laesst ihn weg.
         """
         if "quelldatei" not in felder:
             felder["quelldatei"] = self._quelldatei_laut_plan(ordner, kandidat)
         karte = {k: v for k, v in {**KARTE, "id": OHNE, **felder}.items() if v is not OHNE}
         text = _als_karte(karte)
         if freigabe is None:
-            freigabe = _als_freigabe(vorschlaege or [], rueckfragen or [])
+            freigabe = _als_freigabe(vorschlaege or [], rueckfragen or [], ausschnitte)
         if freigabe:
             text += "\n" + freigabe
         datei = self.pfad / "kartenentwuerfe" / ordner / f"{kandidat}.md"

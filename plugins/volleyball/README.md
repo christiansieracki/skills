@@ -6,7 +6,7 @@ Fünf Skills, die zusammen auf einem Markdown-Ordner arbeiten.
 |---|---|
 | `volleyball-saisonplaner` | Saisonplan und Mesozyklen für ein Team |
 | `volleyball-trainingsdesign` | einzelne Trainingseinheiten |
-| `volleyball-uebungsimport` | neue Übungskarten aus PDFs, Screenshots und Links |
+| `volleyball-uebungsimport` | neue Übungskarten und Wissenskarten aus PDFs, Screenshots und Links |
 | `volleyball-sammelimport` | einen ganzen Quellenordner auf einmal importieren, Übungen und Wissenskarten, mit Freigabe im Chat |
 | `volleyball-schaubild` | Schaubilder zu einer Übung, aus einer Szene gezeichnet |
 
@@ -85,14 +85,14 @@ Aufruf des Browsers kostet einige Sekunden.
 
 Python 3 für die Skripte, nur Standardbibliothek. Begrenzte Ausnahmen sind
 Pillow, `pdftotext` und `pypdfium2`. Pillow braucht `bilder_aufbereiten.py`
-und `ausschnitt.py`, dazu `sammelimport.py`, wenn es Quellgrafiken aus PDFs
-ausschneiden soll. Fehlt es, sagen alle drei im Klartext, wie es zu
+und `ausschnitt.py`, dazu `sammelimport.py`, wenn es Quellgrafiken
+ausschneiden soll, eingebettet oder als Ausschnitt. Fehlt es, sagen alle drei im Klartext, wie es zu
 installieren ist, und schreiben nichts. Fotos im HEIC-Format vom iPhone öffnet
 Pillow erst mit `pillow-heif`. Fehlt es, lässt `bilder_aufbereiten.py` sie
 liegen, sagt, wie es zu installieren ist, und bereitet die übrigen auf.
 `pdftotext` liest im Sammelimport den Text der PDFs. Ohne es geht es weiter,
 die Agenten lesen die PDFs dann selbst. Unter Windows bringt Git für Windows es
-mit. `pypdfium2` zeichnet für `ausschnitt.py` eine PDF-Seite, bevor Pillow den
+mit. `pypdfium2` zeichnet für `ausschnitt.py` und den Sammelimport eine PDF-Seite, bevor Pillow den
 Ausschnitt schneidet. Fehlt es, sagt das Skript bei einem PDF, wie es zu
 installieren ist, ein Foto schneidet es ohne. Die übrigen Skripte hängen an
 keinem der drei, eine frische Installation ist also sofort benutzbar.

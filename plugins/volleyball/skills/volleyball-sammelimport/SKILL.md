@@ -84,9 +84,16 @@ einzeln fragen, jede Frage mit einem Vorschlag aus dem, was du gesehen hast:
 - **`level_min`:** woher es kommt, etwa aus einer Kategorie im Dateinamen
   oder einer Rubrik auf der Seite. Sagt die Quelle nichts, schlägt der Entwurf
   es vor.
-- **Was als Schaubild gilt:** Bettet ein PDF eine Feldskizze ein, die auf die
-  Karte soll, heißt das `quellgrafik_ausschneiden: true`. Bei Fotos von Seiten
-  `false`, die Karten bekommen ihr Bild später mit `volleyball-schaubild`.
+- **`quellgrafik`:** woher das Bild der Übung auf der Karte kommt. Für einen
+  neuen Quellenordner `ausschnitt` vorschlagen: Der Entwurf nennt, wo das Bild
+  auf der Seite liegt, das Skript schneidet es aus, und der Trainer sieht
+  jeden Ausschnitt bei der Freigabe. Das geht bei Fotos von Seiten und bei
+  jedem PDF. `eingebettet` passt nur, wenn jedes PDF eine Übung ist und ihr
+  Feldbild als ein Bild einbettet, wie bei PlayDrill. `keine`, wenn die Karten
+  ihr Bild später mit `volleyball-schaubild` bekommen. Ein Ausschnitt braucht
+  Pillow, einer aus einem PDF dazu `pypdfium2`. Eine ältere `sammelimport.md`
+  mit `quellgrafik_ausschneiden: true` gilt als `eingebettet` und bleibt, wie
+  sie ist.
 - **Textmarke und Platzhalter:** ab welchem Wort eine Datei ihren Ablauf
   beschreibt, und was dort steht, wenn sie keinen hat. Daran erkennt
   `vorbereiten`, dass der Ablauf aus dem Bild kommt. Beide sind optional.
@@ -106,7 +113,7 @@ kandidaten_je_durchgang: 30
 plan_freigegeben: null
 textmarke: "Ausführung:"
 platzhalter: "hier könnte ihr Text stehen"
-quellgrafik_ausschneiden: true
+quellgrafik: ausschnitt
 ohne: [Vorlagen, notizen.md]
 ---
 
@@ -185,7 +192,8 @@ angenommener Vorschlag oder als Ausnahme.
    - **Text:** Steht unter beiden PDFs in der Planeingabe derselbe Text? Ist
      er dort gekürzt, sind es nur die ersten Zeilen. Das gehört dann zum
      Befund.
-   - **Quellgrafik:** Sind die Quellgrafiken pixelgleich, untereinander oder
+   - **Quellgrafik:** Bei `quellgrafik: eingebettet`: Sind die Quellgrafiken
+     pixelgleich, untereinander oder
      mit der einer Karte unter `schaubilder/`? Ausgeschnitten wird wie bei
      `vorbereiten`, mit `schneide_quellgrafik_aus(pdf, ziel)` aus
      `${CLAUDE_PLUGIN_ROOT}/scripts/sammelimport.py`, ins Temp-Verzeichnis
@@ -262,8 +270,10 @@ angenommener Vorschlag oder als Ausnahme.
      Lauf stammt. Nach dem Ja `vorbereiten <ordner> --trotzdem`.
    - **Der Rechner gehört zu keinem Trainer:** Es gilt „Wenn es keine ID
      gibt“ im Import-Skill. Danach `vorbereiten` noch einmal.
-   - **Pillow fehlt:** Den Installationshinweis weitergeben und warten, bis
-     Pillow da ist. Geschrieben ist noch nichts.
+   - **Pillow oder `pypdfium2` fehlt:** Den Installationshinweis weitergeben
+     und warten, bis es da ist. Geschrieben ist noch nichts. `pypdfium2`
+     braucht es nur bei `quellgrafik: ausschnitt` und einem PDF im
+     Durchgang.
    - **pdftotext fehlt:** Den Installationshinweis einmal weitergeben. Die
      Aufträge sind geschrieben, die Agenten lesen die PDFs selbst.
 2. Je Auftrag den Agenten seiner Sorte starten: bei `wissenskarte`
@@ -282,9 +292,11 @@ angenommener Vorschlag oder als Ausnahme.
    Kandidat gestrichen wird oder ob er die Datei vorher richtet, etwa mit der
    Bildaufbereitung.
 3. `sammelimport.py pruefen <ordner> --json`. Es setzt den Status aus den
-   Entwürfen auf der Platte und gibt je Kandidat mit Entwurf aus, was die
-   Freigabe braucht, mit seiner `sorte`. Ein abgewiesener Entwurf steht mit
-   `offen` und dem Grund in `notiz` da und kommt in den nächsten Durchgang.
+   Entwürfen auf der Platte, schneidet ihre Ausschnitte aus und gibt je
+   Kandidat mit Entwurf aus, was die Freigabe braucht, mit seiner `sorte`. Ein
+   abgewiesener Entwurf steht mit `offen` und dem Grund in `notiz` da und
+   kommt in den nächsten Durchgang. Bricht es ab, weil für einen Ausschnitt
+   Pillow oder `pypdfium2` fehlt, gilt dasselbe wie bei `vorbereiten`.
 4. Die Freigabe, siehe unten.
 5. Die Antworten in die Entwürfe einarbeiten, siehe unten.
 6. `sammelimport.py pruefen <ordner> --json` gleich danach. Ist ein
@@ -327,8 +339,8 @@ angenommener Vorschlag oder als Ausnahme.
 
 Über alle Kandidaten mit `bereit` oder `rückfrage` aus der letzten Ausgabe von
 `pruefen --json`. Erst die Rückfragen, gebündelt und einzeln, dann die
-Tabellen: eine für die Übungen, eine für die Wissenskarten. Welche Sorte ein
-Kandidat ist, steht unter `sorte`.
+Ausschnitte, dann die Tabellen: eine für die Übungen, eine für die
+Wissenskarten. Welche Sorte ein Kandidat ist, steht unter `sorte`.
 
 **Gebündelt** kommt jede Rückfrage aus `rueckfragen.ohne_vermutung`, die sich
 ohne Bild beantworten lässt, wie unter „Gebündelt fragen“. Gruppen sind etwa
@@ -364,6 +376,28 @@ Dazu je Kandidat:
 Die Einzelfragen kommen eine nach der anderen. Fertig sind die Rückfragen,
 wenn jede eine Antwort hat und jedes Angebot für die Absprachen ein Ja oder
 Nein.
+
+**Die Ausschnitte** kommen danach, jeder aus `ausschnitte` einzeln, Kandidat
+für Kandidat. Zu jedem stehen „Was es ist“, die Datei, bei einem PDF die
+Seite, und das Bild unter `pfad`. Gezeigt wird es mit dem, was die Umgebung
+hergibt, sonst den Pfad nennen. Der Trainer sagt:
+
+- **behalten:** Nichts zu tun.
+- **korrigieren**, mit einem Satz wie „etwas weiter nach unten“ oder „rechts
+  fehlt die Beschriftung“: Der Skill ändert die Zahlen in der Zeile des
+  Ausschnitts unter `## Freigabe` im Entwurf. „Etwas“ sind etwa fünf
+  Prozentpunkte. „Weiter nach unten“ verschiebt oben und unten zugleich,
+  „unten mehr“ nur unten. Jede Zahl bleibt von 0 bis 100, links kleiner als
+  rechts, oben kleiner als unten. Liegt das Bild auf einer anderen Seite,
+  ändert sich auch die Seite. Dann `sammelimport.py pruefen <ordner> --json`
+  und den neuen Ausschnitt zeigen, bis der Trainer ihn behält oder streicht.
+  Steht der Kandidat danach auf `offen`, ließ sich der Ausschnitt so nicht
+  schneiden. Der Grund steht in `notiz`, die Zahlen richten und noch einmal.
+- **streichen:** Die Zeile fällt aus `Ausschnitte:` und der Name aus
+  `schaubild:`. War es der letzte, fällt die Liste `Ausschnitte:` ganz weg,
+  und `schaubild:` wird `null`. Danach `pruefen` wie beim Korrigieren.
+
+Fertig sind die Ausschnitte, wenn jeder behalten oder gestrichen ist.
 
 **Die Tabelle der Übungen** hat eine Zeile je Kandidat mit `sorte`
 `uebungskarte`:

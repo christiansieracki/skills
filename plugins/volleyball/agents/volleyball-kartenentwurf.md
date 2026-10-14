@@ -26,15 +26,17 @@ frühere Entwürfe stellenweise an der Quelle.
    Quellgrafik und jedes Foto als Bild. Steht unter einer Datei, dass du das
    PDF selbst lesen musst, öffne es. Nennt der Auftrag unter einem PDF
    Seiten, gehören nur sie zum Kandidaten. Dann liest du im PDF nur diese
-   Seiten.
+   Seiten. Kommt die Quellgrafik als Ausschnitt, öffnest du jedes PDF und
+   siehst dir seine Seiten als Bild an, denn dort suchst du das Bild der
+   Übung.
 3. Schreib den Entwurf an den Zielpfad aus dem Auftrag.
 4. Antworte mit genau einer Zeile, ohne Pfad und ohne Zusatz:
    `<kandidat> | bereit | <n> Vorschläge` oder
    `<kandidat> | rückfrage | <n> Rückfragen, <m> Vorschläge`.
-   `rückfrage` heißt wie in der Übersicht: Der Trainer muss einzeln gefragt
-   werden. Das gilt, wenn eine Rückfrage keine Vermutung hat oder der Auftrag
-   `Ablauf aus dem Bild: ja` sagt. Sonst `bereit`, auch mit Rückfragen, die
-   eine Vermutung haben.
+   `rückfrage` heißt wie in der Übersicht: Der Trainer muss eine Frage
+   beantworten, bevor er freigibt. Das gilt, wenn eine Rückfrage keine
+   Vermutung hat oder der Auftrag `Ablauf aus dem Bild: ja` sagt. Sonst
+   `bereit`, auch mit Rückfragen, die eine Vermutung haben.
 
 Lies nur, was im Auftrag steht, und schreib nur den Entwurf. Lässt sich eine
 Datei der Quelle nicht öffnen, schreibst du keinen Entwurf und antwortest
@@ -51,16 +53,19 @@ Den Auftrag schreibt `sammelimport.py vorbereiten`. Oben steht eine Liste:
 - **Typ laut Zerlegungsplan:** `uebung` oder `folge`. Das ist `typ:`.
 - **`quelldatei:`** der Wert für das Feld. Übernimm ihn genau so.
 - **Ablauf aus dem Bild:** `nein`, `ja` oder `entscheidest du`, siehe unten.
-- **Quellgrafik** oder **Quellgrafiken:** was in `schaubild:` steht, siehe
-  unten.
+- **Quellgrafik** oder **Quellgrafiken:** was in `schaubild:` steht, oder
+  dass du Ausschnitte nennst, siehe unten.
 - **Zielpfad des Entwurfs:** wohin du schreibst.
 
-Darunter drei Abschnitte:
+Darunter diese Abschnitte:
 
 - `## Dateien`: je Datei der Quelle ihr Pfad, bei einem PDF sein Text oder
   der Hinweis, dass du das PDF selbst lesen musst. Gehört nur ein Teil eines
   PDF zum Kandidaten, steht unter dem Pfad, welche Seiten, etwa `S. 12–15`,
   und der Text ist nur der dieser Seiten.
+- `## Ausschnitte`, nur wenn die Quellgrafik als Ausschnitt kommt: Form,
+  Namen und Endung deiner Ausschnitte, siehe unten. Dann beginnt im Text
+  jede Seite eines PDF mit ihrer Marke, etwa `=== Seite 12 ===`.
 - `## Absprachen`: wie sich die Quelle liest und welche Feldregeln für jede
   Karte aus diesem Quellenordner gelten. Was dort steht, gilt als belegt.
 - `## Schwerpunkt-Kennungen`: die Kennungen dieses Arbeitsordners mit
@@ -135,13 +140,47 @@ Der Auftrag sagt, was in `schaubild:` steht:
   `schaubild: 17.quellgrafik.png`.
 - `Quellgrafiken: …` mit mehreren Pfaden: die Liste, genau in der Reihenfolge
   des Auftrags, etwa `schaubild: [17.quellgrafik-1.png, 17.quellgrafik-2.png]`.
+- `Quellgrafik: als Ausschnitt`: deine Ausschnitte, siehe „Der Ausschnitt“.
 - Jede andere Angabe, etwa „wird bei dieser Quelle nicht ausgeschnitten“ oder
   „keine ausgeschnitten“: `schaubild: null`.
 
-`schaubild:` nennt nur Namen aus dem Auftrag, nie ein Foto oder ein PDF.
-Sieh dir jede Quellgrafik als Bild an. Steht im Auftrag „Keine Quellgrafik
-aus …“ oder „Sieh dir das Bild im PDF selbst an“, öffne das genannte PDF und
-sieh dir dort das Bild an.
+`schaubild:` nennt nur Namen aus dem Auftrag oder deine Ausschnitte, nie ein
+Foto oder ein PDF. Sieh dir jede Quellgrafik als Bild an. Steht im Auftrag
+„Keine Quellgrafik aus …“ oder „Sieh dir das Bild im PDF selbst an“, öffne
+das genannte PDF und sieh dir dort das Bild an.
+
+### Der Ausschnitt
+
+Sagt der Auftrag „als Ausschnitt“, suchst du in der Quelle das Bild der
+Übung: eine Skizze, ein Feldbild, eine Bildreihe, ein Foto der Übung. Sieh dir
+dafür jedes Foto des Kandidaten an, bei einem PDF jede Seite, die zu ihm
+gehört. Wo das Bild liegt, nennst du als Ausschnitt, und `sammelimport.py`
+schneidet es aus.
+
+- Ein Bild der Übung ist ein Ausschnitt. Eine Bildreihe, etwa fünf Bilder
+  einer Bewegung nebeneinander, ist ein Ausschnitt, nicht fünf.
+- Kein Bild der Übung sind Kopfleiste, Logo, Werbung, ein Porträt oder ein
+  Foto, das die Übung nicht zeigt. Hat die Quelle kein Bild der Übung, gibt es
+  keinen Ausschnitt, keine Liste `Ausschnitte:` und `schaubild: null`.
+- Das Rechteck fasst das ganze Bild samt Beschriftung, mit etwas Rand, aber
+  nicht die halbe Seite. Lieber zwei Prozent zu viel als eine Ecke
+  abgeschnitten. Der Trainer sieht jeden Ausschnitt bei der Freigabe und
+  korrigiert ihn.
+- Die Zahlen sind ganze Prozent der Seite, wie sie aufrecht steht: links,
+  oben, rechts, unten, jede gemessen von der linken oder der oberen Kante.
+  Links ist kleiner als rechts, oben kleiner als unten.
+- Die Datei steht genau wie in ihrer Überschrift unter `## Dateien`. Bei
+  einem PDF folgt die Seite, `S. 3`, gezählt im PDF ab 1 wie die Marken
+  `=== Seite 3 ===` im Text, nicht die Seitenzahl, die auf der Seite gedruckt
+  ist. Bei einem Foto steht keine Seite.
+- Namen und Endung nennt der Auftrag unter `## Ausschnitte`: ein einzelner
+  heißt etwa `17.quellgrafik.jpg`, mehrere `17.quellgrafik-1.jpg`,
+  `17.quellgrafik-2.png` und weiter. `.jpg` aus einem Foto, `.png` aus einer
+  PDF-Seite.
+- `schaubild:` trägt jeden Ausschnitt, einen als Name, mehrere als Liste in
+  der Reihenfolge der Liste `Ausschnitte:`.
+
+Die Liste steht unter `## Freigabe`, siehe „Die Freigabe“.
 
 ## Kontrollierte Werte
 
@@ -281,6 +320,14 @@ abgewiesen und neu entworfen.
 - `## Freigabe` ist der letzte Abschnitt und hat immer beide Listen,
   `Vorschläge:` und `Rückfragen:`. Eine leere Liste heißt `Vorschläge: keine`
   oder `Rückfragen: keine`.
+- Hast du Ausschnitte, steht davor die Liste `Ausschnitte:`, sonst fehlt sie.
+  Jeder Punkt hat genau diese Form, bei einem Foto ohne Seite:
+
+  ```markdown
+  Ausschnitte:
+  - `17.quellgrafik-1.jpg`: `seite-26.jpg`, links 8, oben 42, rechts 94, unten 88
+  - `17.quellgrafik-2.png`: `Merkmale.pdf` S. 3, links 5, oben 20, rechts 95, unten 61
+  ```
 - Ein Vorschlag beginnt mit seinem Ziel in Backticks, dann ein Doppelpunkt und
   die Begründung in einem Satz. Das Ziel ist ein Feld aus dem Frontmatter,
   etwa `` `spieler_min`: … ``. Bei einer Textstelle ist es die Überschrift
@@ -304,6 +351,7 @@ Geh den Entwurf einmal durch:
 - Hat das Frontmatter jedes Feld aus dem Schema, ohne `id` und `angelegt`?
 - Stehen nur kontrollierte Werte und Kennungen aus dem Auftrag darin?
 - Sind `quelldatei` und `schaubild` genau wie im Auftrag?
+- Hat jeder Ausschnitt die feste Form, und nennt `schaubild:` jeden?
 - Beginnt jeder Vorschlag mit einem Feld oder einer Überschrift samt `##` in
   Backticks?
 - Hat jede Rückfrage genau ein Fragezeichen und endet auf ihre Vermutung oder
