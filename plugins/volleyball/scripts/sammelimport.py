@@ -21,17 +21,20 @@ ist, und zählt weiter. Zurückgestellte Zeilen holt er nur mit
 `--zurueckgestellte`. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
 
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
-nächsten offenen Kandidaten an, bis #70 nur für Übungskarten, mit dem Text
-jedes PDF, bei einem Seitenbereich nur dem dieser Seiten, und der Angabe, ob
-der Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein, welcher Trainer
-daran arbeitet. Arbeitet laut Eintrag ein anderer daran, geht es nur mit
-`--trotzdem` weiter. Wenn die Einstellungen es wollen, schneidet es
+nächsten offenen Kandidaten an, für Übungs- wie Wissenskarten, mit dem Text
+jedes PDF, bei einem Seitenbereich nur dem dieser Seiten, bei einer Übung mit
+der Angabe, ob der Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein,
+welcher Trainer daran arbeitet. Arbeitet laut Eintrag ein anderer daran, geht
+es nur mit `--trotzdem` weiter. Wenn die Einstellungen es wollen, schneidet es
 daneben aus jedem PDF mit Bild die Quellgrafik aus, dafür braucht es Pillow
 (ADR-0005). `pruefen` setzt den Status aus den Kartenentwürfen, die dort auf
 der Platte liegen, und weist ab, was das Datenmodell bricht oder die Form der
-Freigabe nicht einhält. Mit `--json` gibt es aus, was die Freigabe im Chat
-braucht. `uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`,
-erst jetzt mit ID (ADR-0010), und legt die Quellgrafiken als ihre Schaubilder ab.
+Freigabe nicht einhält. Welche Sorte Karte ein Entwurf werden soll, sagt das
+Ergebnis seiner Zeile. Mit `--json` gibt es aus, was die Freigabe im Chat
+braucht.
+`uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/` oder
+`wissen/`, erst jetzt mit ID (ADR-0010), je Sorte aus dem eigenen Zähler, und
+legt die Quellgrafiken als ihre Schaubilder ab.
 Ein freigegebener Entwurf, der die Prüfung nicht besteht, bleibt mit seinem
 Status stehen. Gestrichene, zurückgestellte und ergänzende Kandidaten
 bekommen nur ihren Status.
@@ -62,11 +65,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
-    DISZIPLIN_SPALTE, KARTENFELDER, UEBUNGSKARTE, WISSENSFELDER, WISSENSKARTE, Kartensorte,
-    KeineId, finde_wurzel, hole_index, interpreter, konsole_vorbereiten, lies_frontmatter,
-    lies_karten, lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen, naechste_id,
-    pruefe_felder, pruefe_wissensfelder, pruefe_wissensrumpf, schaubilder, tabellenzellen,
-    trainer_dieses_rechners,
+    DISZIPLIN_SPALTE, KARTENFELDER, SORTEN, UEBUNGSKARTE, WISSENSFELDER, WISSENSKARTE,
+    Kartensorte, KeineId, finde_wurzel, hole_index, interpreter, konsole_vorbereiten,
+    lies_frontmatter, lies_karten, lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen,
+    naechste_id, pruefe_felder, pruefe_wissensfelder, pruefe_wissensrumpf, schaubilder,
+    tabellenzellen, trainer_dieses_rechners,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -2101,17 +2104,25 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     der Entwurf sie nennt (#39). Liegt dort schon eine Datei unter einem
     dieser Namen, wird nichts geschrieben, auch die Karte nicht: Überschrieben
     wird in schaubilder/ nichts.
+
+    Ordner und ID kommen aus der Sorte des Kandidaten (#70). Eine
+    Wissenskarte kommt nach wissen/, mit der nächsten freien `wi`-ID aus dem
+    eigenen Zähler, so zählen Übungen und Wissenskarten auch in einem Aufruf
+    getrennt. Den Ordner legt erst sie an, ein Arbeitsordner von vor der
+    Wissenskarte hat keinen. Der Slug kommt aus der Frage, das Fragezeichen
+    fällt dabei weg.
     """
     entwurf = sammelimport.entwurf(k)
     felder, _ = lies_frontmatter(entwurf)
+    sorte = k.sorte
     # Vor der Schleife in `uebernehmen` gab es schon eine. Scheitert sie hier,
     # ist der Bereich mitten im Durchgang voll geworden.
     try:
-        uid = naechste_id(sammelimport.wurzel)
+        uid = naechste_id(sammelimport.wurzel, sorte)
     except KeineId as fehler:
         raise NichtUebernommen(str(fehler)) from None
     name = f"{uid}-{slug(str(felder['titel']))}"
-    ziel = sammelimport.wurzel / "uebungen" / f"{name}.md"
+    ziel = sammelimport.wurzel / sorte.ordner / f"{name}.md"
     # Welche Quellgrafiken, hat `pruefe_entwurf` sichergestellt: nur die
     # eigenen, jede einmal, und jede liegt da.
     quellgrafiken = [sammelimport.entwurfsordner / bild
@@ -2128,12 +2139,15 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
                      [bild.name for bild in verschoben.values()])
     # "x" legt nur neu an. Eine Datei unter dieser ID gibt es laut
     # naechste_id() nicht, und falls doch, wird sie nicht überschrieben.
+    ziel.parent.mkdir(exist_ok=True)
     with ziel.open("x", encoding="utf-8") as datei:
         datei.write(text)
     for quellgrafik, schaubild in verschoben.items():
         schaubild.parent.mkdir(exist_ok=True)
         shutil.move(quellgrafik, schaubild)
-    sammelimport.bekannt.add(uid)
+    # `bekannt` sind die IDs in uebungen/, eine Wissenskarte gehört nicht dazu.
+    if sorte is UEBUNGSKARTE:
+        sammelimport.bekannt.add(uid)
     schliesse_ab(sammelimport, k, "importiert", notiz, karte=uid)
     return uid
 
@@ -2184,11 +2198,6 @@ def pruefe_fuer_uebernahme(sammelimport: Sammelimport, k: Kandidat | None) -> st
     grund = warum_nicht_wartend(k)
     if grund or k is None:
         return grund
-    # Eine Wissenskarte übernimmt das Skript erst mit #70. Bis dahin wäre ein
-    # Entwurf unter einer `wissen`-Zeile als Übungskarte geprüft und
-    # geschrieben worden.
-    if not k.wartet_auf_entwurf:
-        return "wird laut Plan eine Wissenskarte, und die übernimmt das Skript noch nicht"
     return pruefe_entwurf(sammelimport, k).fehler
 
 
@@ -2217,15 +2226,21 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
         raise Abbruch("Kein Kandidat genannt. Je Kandidat: --kandidat <nr> \"<notiz>\", "
                       "--uebersprungen <nr> \"<grund>\", --zurueckgestellt <nr> \"<grund>\" "
                       "oder --ergaenzt <nr> <id>")
+    nach_nummer = {k.nummer: k for k in sammelimport.kandidaten}
     # Gibt es an diesem Rechner keine ID, dann für keinen Kandidaten. Das
     # steht einmal da, bevor irgendetwas geschrieben ist, statt je Kandidat.
-    # Gestrichene und ergänzende Kandidaten brauchen keine ID.
+    # Gestrichene und ergänzende Kandidaten brauchen keine ID. Gefragt wird
+    # je Sorte, die freigegeben ist: Eine vierstellige ID in uebungen/ hält
+    # keine Wissenskarte auf. Nennt der Aufruf nur Nummern ohne Zeile, wird
+    # gefragt wie vor der Wissenskarte, nach einer Übung.
     if freigegeben:
-        try:
-            naechste_id(wurzel)
-        except KeineId as fehler:
-            raise Abbruch(f"{fehler}\nNichts übernommen.") from None
-    nach_nummer = {k.nummer: k for k in sammelimport.kandidaten}
+        genannt = [nach_nummer.get(nummer) for nummer, _ in freigegeben]
+        sorten = [s for s in SORTEN if any(k is not None and k.sorte is s for k in genannt)]
+        for sorte in sorten or [UEBUNGSKARTE]:
+            try:
+                naechste_id(wurzel, sorte)
+            except KeineId as fehler:
+                raise Abbruch(f"{fehler}\nNichts übernommen.") from None
 
     abgewiesen = 0
     for nummer, notiz in freigegeben:

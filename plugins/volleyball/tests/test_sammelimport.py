@@ -2069,8 +2069,11 @@ class UebernehmenTest(unittest.TestCase):
     def test_aus_einer_wissen_zeile_wird_keine_uebungskarte(self) -> None:
         # Die Zeile plant eine Wissenskarte. Liegt daneben ein Entwurf in der
         # Form einer Uebungskarte, etwa von Hand oder aus einem verirrten
-        # Aufruf, kaeme sonst eine Uebung mit ID in uebungen/, die keiner
-        # wollte. Entwurf und Status bleiben stehen.
+        # Aufruf des Kartenentwurfs, kaeme sonst eine Uebung mit ID in
+        # uebungen/, die keiner wollte. Geprueft wird er als Wissenskarte
+        # (#70), und als die faellt er durch: Ihm fehlt etwa `thema`. Es
+        # entsteht keine Karte, weder in uebungen/ noch in wissen/, und
+        # Entwurf und Status bleiben stehen.
         self.ordner.lege_quellenordner_an(ORDNER, [
             {"kandidat": 1, "dateien": ["a.pdf"], "ergebnis": "wissen", "status": "bereit"},
         ])
@@ -2081,8 +2084,10 @@ class UebernehmenTest(unittest.TestCase):
 
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
         self.assertIn("nicht übernommen", zeile_mit(fertig.stdout, "  1  "))
+        self.assertIn("thema", zeile_mit(fertig.stdout, "  1  "))
         self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir()),
                          vorher)
+        self.assertFalse((self.ordner.pfad / "wissen").exists())
         self.assertTrue(entwurf.exists())
         self.assertEqual(self.ordner.uebersicht(ORDNER)["1"]["Status"], "bereit")
 
@@ -2222,8 +2227,8 @@ class UebernehmenTest(unittest.TestCase):
 
     def test_solange_eine_wissen_zeile_offen_ist_bleiben_entwurfsordner_und_in_arbeit(
             self) -> None:
-        # Auch eine Wissenskarte wartet auf ihren Entwurf, selbst wenn erst
-        # #70 ihn schreibt. Gaelte die Zeile als erledigt, verschwaenden mit
+        # Auch eine Wissenskarte wartet auf ihren Entwurf, wie eine Uebung
+        # (#69, #70). Gaelte die Zeile als erledigt, verschwaenden mit
         # der letzten Uebung Entwurfsordner und in_arbeit, und es hiesse
         # "Nichts mehr offen", waehrend die Theorie noch aussteht.
         datei = self.ordner.lege_quellenordner_an(ORDNER, [
@@ -2384,6 +2389,86 @@ class WissenskarteTest(unittest.TestCase):
         self.assertEqual(kandidaten["2"]["status"], "bereit", kandidaten["2"]["notiz"])
         self.assertEqual(kandidaten["2"]["felder"]["thema"], ["technik", "taktik"])
         self.assertFalse(kandidaten["2"]["ablauf_aus_dem_bild"])
+
+    def uebernimm(self, *argumente: str):
+        return self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, *argumente)
+
+    def test_die_wissenskarte_kommt_mit_der_ersten_wi_id_nach_wissen(self) -> None:
+        # Erst die Freigabe gibt der Karte ihre ID (ADR-0010), aus dem
+        # eigenen Zaehler der Wissenskarten. Der Slug kommt aus der Frage,
+        # ohne Fragezeichen. Der Arbeitsordner des Fixtures hat noch kein
+        # wissen/, wie einer aus der Zeit vor der Wissenskarte.
+        self.plane({"kandidat": 1, "dateien": ["seite-01.jpg"], "status": "bereit"})
+        entwurf = self.ordner.lege_wissensentwurf_an(
+            ORDNER, 1, titel="Wann lohnt sich einarmige Abwehr?",
+            vorschlaege=["`thema`: Die Quelle beschreibt eine Technik."])
+        uebungen = sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir())
+
+        fertig = self.uebernimm("--kandidat", "1", "thema ohne taktik")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertIn("wi-000001", zeile_mit(fertig.stdout, "  1  "))
+        karte = (self.ordner.pfad / "wissen"
+                 / "wi-000001-wann-lohnt-sich-einarmige-abwehr.md").read_text(encoding="utf-8")
+        self.assertTrue(karte.startswith("---\nid: wi-000001\n"), karte)
+        self.assertIn(f"\nangelegt: {date.today().isoformat()}\n", karte)
+        self.assertIn("\n## Kernaussagen\n", karte)
+        self.assertIn("\n## Was das fürs Training heißt\n", karte)
+        self.assertNotIn("## Freigabe", karte)
+        self.assertNotIn("Vorschläge", karte)
+        zeile = self.ordner.uebersicht(ORDNER)["1"]
+        self.assertEqual((zeile["Status"], zeile["Karte"], zeile["Notiz"]),
+                         ("importiert", "wi-000001", "thema ohne taktik"))
+        self.assertFalse(entwurf.exists())
+        self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "uebungen").iterdir()),
+                         uebungen)
+
+    def test_eine_vierstellige_uebung_haelt_die_wissenskarte_nicht_auf(self) -> None:
+        # Vor dem Umstellen gibt es keine neue Uebung, damit keine zwei
+        # Karten dieselbe Nummer bekommen (ADR-0011). Wissenskarten gab es
+        # vierstellig nie, ihr Zaehler ist davon frei, auch wenn uebernehmen
+        # vor dem ersten Schreiben nach der ID fragt.
+        self.ordner.lege_karte_an(id="ue-0042", titel="Noch vierstellig")
+        self.plane({"kandidat": 1, "dateien": ["seite-01.jpg"], "status": "bereit"})
+        self.ordner.lege_wissensentwurf_an(ORDNER, 1, titel="Wann lohnt sich einarmige Abwehr?")
+
+        fertig = self.uebernimm("--kandidat", "1", "")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["1"]["Karte"], "wi-000001")
+
+    def test_uebung_und_wissenskarte_zaehlen_getrennt_und_der_linter_meldet_nichts(
+            self) -> None:
+        # Im selben Aufruf eine Uebung und eine Wissenskarte. Die hoechste
+        # Uebung ist ue-000009, die hoechste Wissenskarte wi-000004. Zaehlten
+        # beide gemeinsam, bekaeme eine von ihnen eine Nummer nach der
+        # anderen Sorte. Danach gilt der Pruefvertrag aus test_index.py fuer
+        # beide Sorten: Der Linter meldet nichts.
+        self.ordner.lege_karte_an(id="ue-000009", titel="Die bisher höchste Übung")
+        self.ordner.lege_wissenskarte_an(id="wi-000004", titel="Die bisher höchste Wissenskarte?")
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-01.jpg"], "status": "bereit"},
+            {"kandidat": 2, "dateien": ["seite-02.jpg"], "ergebnis": "wissen",
+             "status": "bereit"},
+        ])
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Einarmige Abwehr vom Kasten")
+        self.ordner.lege_wissensentwurf_an(
+            ORDNER, 2, titel="Wann lohnt sich einarmige Abwehr?",
+            schwerpunkt=["standortbestimmung"], uebungen=["ue-000009"])
+
+        fertig = self.uebernimm("--kandidat", "1", "", "--kandidat", "2", "")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        self.assertEqual((uebersicht["1"]["Karte"], uebersicht["2"]["Karte"]),
+                         ("ue-000010", "wi-000005"))
+        self.assertTrue(list((self.ordner.pfad / "uebungen").glob("ue-000010-*.md")))
+        self.assertTrue(list((self.ordner.pfad / "wissen").glob("wi-000005-*.md")))
+        self.assertIn("Linter: Keine Auffälligkeiten.", fertig.stdout)
+
+        index = self.ordner.starte("index.py")
+
+        self.assertEqual(auffaelligkeiten(index.stdout), [], index.stdout)
 
 
 def auftrag_von(arbeitsordner: Arbeitsordner, kandidat: int) -> str:
