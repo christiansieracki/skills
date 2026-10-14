@@ -13,8 +13,10 @@ Verhalten geaendert haette.
 
 from __future__ import annotations
 
+import json
 import os
 import unittest
+from pathlib import Path
 
 from arbeitsordner import OHNE, Arbeitsordner, auffaelligkeiten
 
@@ -469,6 +471,58 @@ class WissenskarteTest(unittest.TestCase):
                 self.assertEqual(len(zur_karte), 1, gemeldet)
                 self.assertIn(stichwort, zur_karte[0])
         self.assertEqual(len(gemeldet), len(faelle), gemeldet)
+
+
+class WissenImIndexTest(unittest.TestCase):
+    """Der Index fuehrt die Wissenskarten unter eigenem Schluessel (#67).
+
+    Welche Wissenskarten auf eine Uebung zeigen, pflegt niemand auf der
+    Uebungskarte. Der Index rechnet es aus den `uebungen` der Wissenskarten
+    aus. Gelesen wird die index.json, deren Pfad `index.py --still` nennt.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def index(self) -> dict:
+        fertig = self.ordner.starte("index.py", "--still")
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        return json.loads(Path(fertig.stdout.strip()).read_text(encoding="utf-8"))
+
+    def test_der_index_nennt_jede_wissenskarte_und_bei_der_uebung_die_die_auf_sie_zeigen(
+            self) -> None:
+        # Zwei Karten zeigen auf ue-000001, eine davon auch auf ue-000004, die
+        # dritte auf keine Uebung. Die uebrigen Uebungen tragen nichts.
+        self.ordner.lege_wissenskarte_an(id="wi-000001", uebungen=["ue-000001", "ue-000004"])
+        self.ordner.lege_wissenskarte_an(id="wi-000002", titel="Die zweite Frage?",
+                                         uebungen=["ue-000001"])
+        self.ordner.lege_wissenskarte_an(id="wi-000003", titel="Die Frage ohne Übung?",
+                                         uebungen=OHNE)
+
+        index = self.index()
+
+        self.assertEqual(sorted(k["id"] for k in index["wissen"]),
+                         ["wi-000001", "wi-000002", "wi-000003"])
+        self.assertEqual({e["id"]: e["hintergrund"] for e in index["uebungen"]}, {
+            "ue-000001": ["wi-000001", "wi-000002"],
+            "ue-000002": [],
+            "ue-000003": [],
+            "ue-000004": ["wi-000001"],
+            "ue-000005": [],
+        })
+
+    def test_die_konsole_zaehlt_die_wissenskarten_neben_den_uebungen(self) -> None:
+        # Wie "Übungen: n" zeigt die Zahl, dass wissen/ ueberhaupt gelesen
+        # wurde: ein Lauf ohne den Ordner meldete ebenfalls nichts.
+        self.ordner.lege_wissenskarte_an(id="wi-000001")
+        self.ordner.lege_wissenskarte_an(id="wi-000002", titel="Die zweite Frage?")
+
+        fertig = self.ordner.starte("index.py")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        self.assertIn(f"Übungen: {len(self.ordner.ids)}\n", fertig.stdout)
+        self.assertIn("Wissenskarten: 2\n", fertig.stdout)
 
 
 class SzenenTest(unittest.TestCase):

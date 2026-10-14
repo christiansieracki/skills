@@ -111,6 +111,7 @@ def main() -> int:
 
     print(f"Wurzel:  {wurzel}")
     print(f"Übungen: {daten['anzahl']}")
+    print(f"Wissenskarten: {len(daten['wissen'])}")
     print(f"Index:   {pfad}")
 
     if a.md:
