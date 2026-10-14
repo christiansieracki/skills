@@ -17,7 +17,7 @@ import json
 import socket
 import unittest
 
-from arbeitsordner import Arbeitsordner
+from arbeitsordner import OHNE, Arbeitsordner
 
 # Ein Trainer, der an einem anderen Rechner sitzt als dem, auf dem der Test
 # laeuft.
@@ -532,6 +532,115 @@ class NaechsteWissensIdTest(unittest.TestCase):
         self.ordner.lege_karte_an(id="ue-0042", titel="Karte von vor der Umstellung")
 
         self.assertEqual(self.naechste_id("--wissen"), "wi-000001")
+
+
+class WissenTest(unittest.TestCase):
+    """`suche.py --wissen`: alle Wissenskarten, ohne Filter (#67).
+
+    Bis Welle 2 die Suche nach Thema und Schwerpunkt bringt, ist das die
+    Liste, ueber die der Uebungsimport Duplikate einer Wissenskarte findet.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000001", titel="Wann lohnt sich einarmige Abwehr?",
+            thema=["technik", "taktik"], schwerpunkt=["annahme", "standortbestimmung"],
+            disziplin=["halle", "beach"], uebungen=["ue-000001", "ue-000004"],
+            quelldatei="volleyballmagazin/vm_08_2026/seite-24.jpg")
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000002", titel="Was hat Schlaf mit der Reaktion zu tun?",
+            thema=["physiologie"], schwerpunkt=OHNE, disziplin=["beach"], uebungen=OHNE)
+
+    def test_wissen_listet_jede_wissenskarte_in_einer_zeile_mit_frage_thema_und_schwerpunkt(
+            self) -> None:
+        fertig = self.ordner.starte("suche.py", "--wissen")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        zeilen = fertig.stdout.splitlines()
+        (eins,) = [z for z in zeilen if z.startswith("wi-000001")]
+        self.assertIn("Wann lohnt sich einarmige Abwehr?", eins)
+        self.assertIn("technik, taktik", eins)
+        self.assertIn("annahme, standortbestimmung", eins)
+        (zwei,) = [z for z in zeilen if z.startswith("wi-000002")]
+        self.assertIn("Was hat Schlaf mit der Reaktion zu tun?", zwei)
+        self.assertIn("physiologie", zwei)
+        # Die Uebungen stehen nicht in der Liste, auch nicht die, auf die
+        # eine der Karten zeigt.
+        self.assertEqual([z for z in zeilen if z.startswith("ue-")], [])
+
+    def test_mit_json_kommen_disziplin_quelldatei_und_uebungen_dazu(self) -> None:
+        # Damit prueft der Uebungsimport, ob es die Frage schon gibt, und
+        # ergaenzt die Karte, statt eine zweite anzulegen.
+        fertig = self.ordner.starte("suche.py", "--wissen", "--json")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        karten = {k["id"]: k for k in json.loads(fertig.stdout)}
+        self.assertEqual(sorted(karten), ["wi-000001", "wi-000002"])
+        eins = karten["wi-000001"]
+        self.assertEqual(eins["titel"], "Wann lohnt sich einarmige Abwehr?")
+        self.assertEqual(eins["thema"], ["technik", "taktik"])
+        self.assertEqual(eins["schwerpunkt"], ["annahme", "standortbestimmung"])
+        self.assertEqual(eins["disziplin"], ["halle", "beach"])
+        self.assertEqual(eins["quelldatei"], "volleyballmagazin/vm_08_2026/seite-24.jpg")
+        self.assertEqual(eins["uebungen"], ["ue-000001", "ue-000004"])
+        self.assertEqual(karten["wi-000002"]["disziplin"], ["beach"])
+
+    def test_mit_einem_filter_fuer_uebungen_endet_wissen_mit_einer_meldung(self) -> None:
+        # Die Filter fuer Wissenskarten kommen mit Welle 2. Bis dahin liefe
+        # ein Filter ins Leere, und die ganze Liste saehe aus wie eine
+        # gefilterte. `--schwerpunkt` und `--disziplin` gaebe es auf der
+        # Wissenskarte, gerade die duerfen nicht still wegfallen.
+        for filter_ in (["--element", "annahme"], ["--schwerpunkt", "annahme"],
+                        ["--disziplin", "beach"]):
+            with self.subTest(filter=filter_):
+                fertig = self.ordner.starte("suche.py", "--wissen", *filter_)
+
+                self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+                self.assertEqual(fertig.stdout, "")
+                self.assertIn(filter_[0], fertig.stderr)
+                self.assertIn("Welle 2", fertig.stderr)
+
+    def test_ohne_wissen_findet_die_suche_wie_bisher_nur_uebungen(self) -> None:
+        # volleyball-schaubild sucht ueber `suche.py --json` die Karten ohne
+        # Bild. Eine Wissenskarte hat kein Feld `schaubild` und stuende dort
+        # sonst als Karte ohne Bild.
+        fertig = self.ordner.starte("suche.py", "--json")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        self.assertEqual(sorted(e["id"] for e in json.loads(fertig.stdout)),
+                         ["ue-000001", "ue-000002", "ue-000003", "ue-000004", "ue-000005"])
+
+
+class OhneWissenskartenTest(unittest.TestCase):
+    """Ein Arbeitsordner ohne Wissenskarten, wie jeder vor dieser Welle (#67)."""
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def test_die_suche_bleibt_wie_bisher(self) -> None:
+        fertig = self.ordner.starte("suche.py")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        self.assertTrue(fertig.stdout.startswith("5 von 5 Übungen:"), fertig.stdout)
+        self.assertNotIn("Wissenskarte", fertig.stdout)
+        self.assertNotIn("Hintergrund", fertig.stdout)
+
+    def test_wissen_sagt_dass_es_keine_gibt_und_json_ist_eine_leere_liste(self) -> None:
+        # Wie eine Suche nach Uebungen ohne Treffer endet die Liste mit 1.
+        # Maschinell lesbar ist sie leer, und der Uebungsimport legt die
+        # erste Wissenskarte an.
+        fertig = self.ordner.starte("suche.py", "--wissen")
+
+        self.assertEqual(fertig.returncode, 1, fertig.stdout)
+        self.assertIn("Keine Wissenskarte", fertig.stdout)
+
+        fertig = self.ordner.starte("suche.py", "--wissen", "--json")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        self.assertEqual(json.loads(fertig.stdout), [])
 
 
 class PlaeneMitLeseansichtTest(unittest.TestCase):
