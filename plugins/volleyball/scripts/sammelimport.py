@@ -13,12 +13,14 @@
 
 `vorbereiten --plan` legt vor dem Zerlegungsplan die Planeingabe an: jede
 Datei, die noch in keiner Zeile der Übersicht steht und die `ohne:` nicht
-auslässt, bei PDFs ihr Text, dazu die nächste freie Kandidatennummer und die
-Bibliotheksliste. Ein zweiter Lauf über denselben Ordner nimmt so nur, was neu
-ist, und zählt weiter. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
+auslässt, bei PDFs ihr Text mit einer Marke, wo jede Seite beginnt, dazu die
+nächste freie Kandidatennummer und die Bibliotheksliste. Ein zweiter Lauf über
+denselben Ordner nimmt so nur, was neu ist, und zählt weiter. Den Text liest
+`pdftotext`, wenn es da ist (ADR-0008).
 
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
-nächsten offenen Kandidaten an, mit dem Text jedes PDF und der Angabe, ob der
+nächsten offenen Kandidaten an, mit dem Text jedes PDF, bei einem
+Seitenbereich nur dem dieser Seiten, und der Angabe, ob der
 Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein, welcher Trainer
 daran arbeitet. Arbeitet laut Eintrag ein anderer daran, geht es nur mit
 `--trotzdem` weiter. Wenn die Einstellungen es wollen, schneidet es
@@ -140,6 +142,78 @@ def _zelle(wert: str) -> str:
 # Die Übersicht
 # --------------------------------------------------------------------------
 
+# Ein Seitenbereich, wie er in der Spalte Dateien hinter einem PDF steht:
+# `S. 12–15` oder `S. 3`. Bindestrich und Halbgeviertstrich gelten beide, der
+# Zerlegungsplan schreibt den Halbgeviertstrich, von Hand kommt oft der
+# Bindestrich.
+_SEITENBEREICH = re.compile(r"S\.\s*(\d+)(?:\s*[-–]\s*(\d+))?")
+
+# Eine Datei in der Spalte Dateien: ihr Name in Backticks und, was bis zur
+# nächsten Datei dahinter steht.
+_DATEI_IN_DER_ZELLE = re.compile(r"`([^`]+)`([^`]*)")
+
+
+@dataclass(frozen=True)
+class Seitenbereich:
+    """Die Seiten eines PDF, die zu einem Kandidaten gehören, beide Enden mitgezählt (#64)."""
+
+    erste: int
+    letzte: int
+
+    def __str__(self) -> str:
+        """So, wie der Bereich in der Übersicht und im Auftrag steht."""
+        if self.erste == self.letzte:
+            return f"S. {self.erste}"
+        return f"S. {self.erste}–{self.letzte}"
+
+
+def lies_seitenbereich(text: str) -> Seitenbereich:
+    """Ein Seitenbereich aus seinem Text, oder ValueError mit dem Grund.
+
+    Der ganze Text muss der Bereich sein. Aus „S. 3 bis 5“ nur Seite 3 zu
+    lesen, gäbe dem Agenten still zu wenig. Den Text selbst nennt der Grund
+    nicht, das tut, wer ihn gelesen hat, mit dem, was dazugehört.
+    """
+    treffer = _SEITENBEREICH.fullmatch(text.strip())
+    if not treffer:
+        raise ValueError("das ist kein Seitenbereich wie S. 12–15 oder S. 3")
+    erste = int(treffer.group(1))
+    letzte = int(treffer.group(2) or erste)
+    if erste < 1:
+        raise ValueError("der Bereich beginnt vor Seite 1")
+    if letzte < erste:
+        raise ValueError("der Bereich endet vor seiner ersten Seite")
+    return Seitenbereich(erste, letzte)
+
+
+@dataclass(frozen=True)
+class Datei:
+    """Eine Datei aus der Spalte Dateien, relativ zum Quellenordner.
+
+    `angabe` ist, was in der Zelle hinter ihrem Namen steht, bei einem PDF
+    der Seitenbereich (#64). Ohne Angabe gehört die ganze Datei zum
+    Kandidaten, wie vor dem Seitenbereich. Ein Kandidat kann so aus einem
+    langen PDF nur seine Seiten nehmen, und eine Datei kann mit
+    verschiedenen Bereichen in mehreren Zeilen stehen.
+    """
+
+    name: str
+    angabe: str = ""
+
+    @property
+    def seiten(self) -> Seitenbereich | None:
+        """Der Seitenbereich, None für die ganze Datei.
+
+        Lässt sich die Angabe nicht lesen, kommt ValueError. `vorbereiten`
+        prüft das vor dem ersten Auftrag, siehe `pruefe_seitenbereiche`.
+        """
+        return lies_seitenbereich(self.angabe) if self.angabe else None
+
+    def __str__(self) -> str:
+        """So, wie die Datei in der Spalte Dateien steht."""
+        return f"`{self.name}` {self.angabe}" if self.angabe else f"`{self.name}`"
+
+
 @dataclass
 class Kandidat:
     """Eine Zeile der Übersicht.
@@ -180,15 +254,20 @@ class Kandidat:
         return self.ergebnis in TYPEN and self.status in NOCH_OFFEN
 
     @property
-    def dateien(self) -> list[str]:
-        """Die Dateien des Kandidaten, relativ zum Quellenordner.
+    def dateien(self) -> list[Datei]:
+        """Die Dateien des Kandidaten, relativ zum Quellenordner, jede mit ihrer Angabe.
 
         In der Zelle steht jede in Backticks, weil Dateinamen Kommas tragen
-        können. Eine von Hand geschriebene Zelle ohne Backticks wird an den
-        Kommas getrennt.
+        können, und dahinter, bei einem PDF, ein Seitenbereich. Das Komma vor
+        der nächsten Datei gehört nicht zur Angabe. Eine von Hand
+        geschriebene Zelle ohne Backticks wird an den Kommas getrennt, dann
+        ohne Seitenbereich.
         """
         zelle = self.zellen["Dateien"]
-        return re.findall(r"`([^`]+)`", zelle) or [d.strip() for d in zelle.split(",") if d.strip()]
+        treffer = _DATEI_IN_DER_ZELLE.findall(zelle)
+        if not treffer:
+            return [Datei(d.strip()) for d in zelle.split(",") if d.strip()]
+        return [Datei(name, angabe.strip().strip(",").strip()) for name, angabe in treffer]
 
     def setze(self, status: str, notiz: str = "", karte: str | None = None) -> None:
         self.zellen.update(Status=status, Notiz=notiz)
@@ -624,7 +703,8 @@ def laut_auftrag_ohne_quellgrafik(auftrag: Path, k: Kandidat) -> list[str]:
     """
     zeilen = [z for z in _auftragstext(auftrag).splitlines()
               if z.startswith((KEINE_AUSGESCHNITTEN, KEINE_QUELLGRAFIK_AUS))]
-    return [d for d in k.dateien if _ist_pdf(d) and any(f"`{d}`: " in z for z in zeilen)]
+    return [d.name for d in k.dateien
+            if _ist_pdf(d.name) and any(f"`{d.name}`: " in z for z in zeilen)]
 
 
 def _unter_quellen(quellen: Path, wert: str) -> bool:
@@ -849,14 +929,15 @@ def neue_dateien(quellordner: Path, sammelimport: Sammelimport | None) -> dict[s
     Der Schlüssel ist der Name relativ zum Quellenordner, so wie in der Spalte
     Dateien, samt Unterordnern. Ohne `sammelimport.md` ist jede Datei neu. Was `ohne:`
     auslässt, ist nie neu, und die `sammelimport.md` selbst ist nie eine
-    Quelle.
+    Quelle. Ein PDF, das mit einem Seitenbereich in einer Zeile steht, ist
+    auch nicht mehr neu, mit welchen Seiten auch immer (#64).
 
     Verglichen wird in einer Unicode-Form. macOS schreibt ein Ü im Dateinamen
     als U mit zwei Punkten, Windows und die Übersicht als ein Zeichen, und
     jeder Übungsordner von PlayDrill heißt `Ü_…`. Geöffnet wird die Datei
     über ihren Pfad, wie er auf der Platte steht.
     """
-    im_plan = ({_nfc(d) for k in sammelimport.kandidaten for d in k.dateien}
+    im_plan = ({_nfc(d.name) for k in sammelimport.kandidaten for d in k.dateien}
                if sammelimport else set())
     alle = {_nfc(p.relative_to(quellordner).as_posix()): p for p in quellordner.rglob("*")
             if p.is_file() and p.name != SAMMELIMPORT}
@@ -905,15 +986,24 @@ def _ist_pdf(datei: str | Path) -> bool:
     return Path(datei).suffix.lower() == ".pdf"
 
 
-def pdf_text(pdftotext: str, pdf: Path) -> str | None:
-    """Der Text eines PDF, oder None, wenn pdftotext es nicht lesen kann.
+@cache
+def pdf_seiten(pdftotext: str, pdf: Path) -> tuple[str, ...] | None:
+    """Der Text eines PDF je Seite, oder None, wenn pdftotext es nicht lesen kann.
 
     `-enc UTF-8`, weil Xpdf sonst Latin-1 schreibt und aus „Ausführung"
     „Ausf�hrung" wird. `-raw`, weil Xpdf ohne es die Zeilen eines Absatzes zu
     einer zusammenzieht: Aus den Kopfzeilen „Trainer/Ersteller", „ZEIT" und
     „Werkzeuge" eines PlayDrill-Blatts würde eine. Poppler zieht nichts
-    zusammen, mit `-raw` lesen beide gleich. Leere Zeilen und Seitenwechsel
-    fallen weg, sie kosten nur Platz.
+    zusammen, mit `-raw` lesen beide gleich. Leere Zeilen fallen weg, sie
+    kosten nur Platz.
+
+    Geteilt wird am Seitenvorschub. Xpdf und Poppler schließen jede Seite
+    damit ab, auch die letzte und eine ohne Text, die Zahl der Teile ist also
+    die Zahl der Seiten (#64). Mit `-f` und `-l` ließe sich eine Seite nicht
+    zählen: Hinter der letzten kommt dort nur nichts, ohne Fehler.
+
+    Einmal je Aufruf und PDF: `vorbereiten` zählt erst die Seiten, dann
+    schreibt es die Aufträge, und mehrere Kandidaten teilen sich ein Heft.
     """
     try:
         lauf = subprocess.run([pdftotext, "-raw", "-enc", "UTF-8", str(pdf), "-"],
@@ -922,8 +1012,37 @@ def pdf_text(pdftotext: str, pdf: Path) -> str | None:
         return None
     if lauf.returncode != 0:
         return None
-    zeilen = lauf.stdout.decode("utf-8", errors="replace").replace("\f", "\n").splitlines()
-    return "\n".join(z.strip() for z in zeilen if z.strip())
+    text = lauf.stdout.decode("utf-8", errors="replace").removesuffix("\f")
+    return tuple("\n".join(z.strip() for z in seite.splitlines() if z.strip())
+                 for seite in text.split("\f"))
+
+
+def pdf_text(seiten: tuple[str, ...] | None) -> str | None:
+    """Der Text von Seiten am Stück, leer, wenn keine Text hat, None bleibt None."""
+    if seiten is None:
+        return None
+    return "\n".join(seite for seite in seiten if seite)
+
+
+# Die Marke, mit der in der Planeingabe jede Seite eines PDF beginnt (#64).
+SEITENMARKE = "=== Seite {} ==="
+
+
+def mit_seitenmarken(seiten: tuple[str, ...] | None) -> str | None:
+    """Der Text eines PDF am Stück, vor jeder Seite ihre Marke, gezählt ab 1.
+
+    Daran nennt der Zerlegungsplan Seitenbereiche. Auch eine Seite ohne Text
+    bekommt ihre Marke, sonst verrutschte die Zählung danach. Hat keine Seite
+    Text, bleibt es leer wie bei `pdf_text`: Marken allein wären kein Text,
+    und der Agent soll lesen, dass er das PDF selbst öffnen muss.
+    """
+    text = pdf_text(seiten)
+    if not text:
+        return text
+    zeilen: list[str] = []
+    for nummer, seite in enumerate(seiten, 1):
+        zeilen += [SEITENMARKE.format(nummer), *([seite] if seite else [])]
+    return "\n".join(zeilen)
 
 
 def erste_zeilen(text: str) -> str:
@@ -1014,11 +1133,13 @@ def melde_unlesbare_fotos(ordner: str, quellordner: Path,
           f"'{interpreter()} bilder_aufbereiten.py quellen/{ordner}'\n")
 
 
-def _text_oder_grund(text: str | None, pdftotext: str | None) -> list[str]:
+def _text_oder_grund(text: str | None, pdftotext: str | None,
+                     seiten: Seitenbereich | None = None) -> list[str]:
     """Was unter einem PDF steht: sein Text, oder warum keiner da ist.
 
     Ohne Text muss der Agent das PDF selbst lesen, und das soll er nicht aus
-    einer leeren Stelle schließen müssen.
+    einer leeren Stelle schließen müssen. Gehören nur einige Seiten zum
+    Kandidaten, liest er nur sie (#64).
     """
     if text:
         return _eingezaeunt(text)
@@ -1028,14 +1149,16 @@ def _text_oder_grund(text: str | None, pdftotext: str | None) -> list[str]:
         grund = "pdftotext konnte die Datei nicht lesen."
     else:
         grund = "Keine Textebene."
-    return [f"{grund} Das PDF selbst lesen."]
+    nur = f", nur {seiten}" if seiten else ""
+    return [f"{grund} Das PDF selbst lesen{nur}."]
 
 
 def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     """Legt die Eingabe für den Zerlegungsplan an.
 
     Der Agent liest sie in einem Aufruf: jede Datei, die noch in keiner Zeile
-    der Übersicht steht, bei PDFs mit ihrem Text, und die Bibliotheksliste.
+    der Übersicht steht, bei PDFs mit ihrem Text und den Seitenmarken, und
+    die Bibliotheksliste.
     Der Quellenordner steht einmal absolut im Kopf, denn Fotos und PDFs ohne
     Text öffnet der Agent selbst. Dazu die nächste freie Kandidatennummer, ab
     der er zählt.
@@ -1053,7 +1176,8 @@ def lege_planeingabe_an(wurzel: Path, ordner: str) -> int:
     pdftotext = finde_pdftotext() if pdfs else None
     if pdfs and not pdftotext:
         melde_ohne_pdftotext("die Planeingabe", "den Zerlegungsplan")
-    texte = {name: pdf_text(pdftotext, dateien[name]) for name in pdfs} if pdftotext else {}
+    texte = ({name: mit_seitenmarken(pdf_seiten(pdftotext, dateien[name])) for name in pdfs}
+             if pdftotext else {})
 
     zeichen = sum(len(t) for t in texte.values() if t)
     if not pdfs:
@@ -1318,7 +1442,7 @@ def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list
         altes.unlink()
     if not sammelimport.quellgrafik_ausschneiden:
         return ["- Quellgrafik: wird bei dieser Quelle nicht ausgeschnitten."], []
-    pdfs = [d for d in k.dateien if _ist_pdf(d)]
+    pdfs = [d.name for d in k.dateien if _ist_pdf(d.name)]
     if not pdfs:
         return ["- Quellgrafik: keine, der Kandidat hat kein PDF."], []
     ausgeschnitten: list[tuple[str, Path]] = []
@@ -1429,28 +1553,51 @@ def ablauf_aus_dem_bild(sammelimport: Sammelimport, texte: list[str | None]) -> 
             f"Den Ablauf liest du aus dem Bild, der Trainer prüft ihn einzeln.")
 
 
+def dateien_im_auftrag(sammelimport: Sammelimport, k: Kandidat,
+                       pdftotext: str | None) -> tuple[list[str], list[str | None]]:
+    """Der Abschnitt `## Dateien` eines Auftrags, und je Datei ihr Text.
+
+    Je Datei steht ihr Pfad absolut da, denn der Agent öffnet sie damit.
+    Unter jedem PDF steht sein Text, anders als in der Planeingabe nie
+    gekappt: Der Agent schreibt aus ihm die Karte. Ohne Text steht da, warum,
+    und dass er das PDF selbst lesen muss.
+
+    Nennt der Kandidat Seiten, steht nur deren Text da, und der Abschnitt
+    sagt, welche Seiten der Agent im PDF öffnet (#64). Der Text je Datei geht
+    an die Regel „wenig Text“, None bei einem Foto oder ohne Text.
+    """
+    zeilen: list[str] = []
+    texte: list[str | None] = []
+    for d in k.dateien:
+        pfad = sammelimport.quellordner / d.name
+        zeilen += [f"### `{d.name}`", "", f"`{pfad.as_posix()}`", ""]
+        if not _ist_pdf(d.name):
+            texte.append(None)
+            continue
+        bereich = d.seiten
+        if bereich:
+            zeilen += [f"Zu diesem Kandidaten gehören nur {bereich}. Öffnest du das PDF, "
+                       f"lies nur diese Seiten.", ""]
+        seiten = pdf_seiten(pdftotext, pfad) if pdftotext else None
+        if bereich and seiten is not None:
+            seiten = seiten[bereich.erste - 1:bereich.letzte]
+        text = pdf_text(seiten)
+        texte.append(text)
+        zeilen += [*_text_oder_grund(text, pdftotext, bereich), ""]
+    return zeilen, texte
+
+
 def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[str],
                      pdftotext: str | None, quellgrafikzeilen: list[str]) -> Path:
     """Legt den Auftrag für einen Kandidaten an, alles, was der Agent braucht.
 
     Die Pfade stehen absolut da, denn der Agent liest und schreibt mit ihnen.
     `quelldatei:` steht relativ zu `quellen/`, so wie auf der Karte, damit sie
-    auf jedem Rechner stimmt, egal wo dort der Arbeitsordner liegt.
-
-    Unter jedem PDF steht sein ganzer Text, anders als in der Planeingabe nie
-    gekappt: Der Agent schreibt aus ihm die Karte. Ohne Text steht da, warum,
-    und dass er das PDF selbst lesen muss.
+    auf jedem Rechner stimmt, egal wo dort der Arbeitsordner liegt. Sie nennt
+    die Dateien ohne Seitenbereich, die Seiten kommen in `quelle` (#64).
     """
-    relativ = [f"{sammelimport.ordner}/{d}" for d in k.dateien]
-    dateien: list[str] = []
-    texte: list[str | None] = []
-    for d in k.dateien:
-        pfad = sammelimport.quellordner / d
-        dateien += [f"### `{d}`", "", f"`{pfad.as_posix()}`", ""]
-        text = pdf_text(pdftotext, pfad) if pdftotext and _ist_pdf(d) else None
-        texte.append(text)
-        if _ist_pdf(d):
-            dateien += [*_text_oder_grund(text, pdftotext), ""]
+    relativ = [f"{sammelimport.ordner}/{d.name}" for d in k.dateien]
+    dateien, texte = dateien_im_auftrag(sammelimport, k, pdftotext)
     teile = [
         f"# Auftrag für Kandidat {k.nummer}",
         "",
@@ -1517,6 +1664,38 @@ def verlange_freien_quellenordner(sammelimport: Sammelimport, trainer: str,
             f"Es ist noch kein Auftrag geschrieben.")
 
 
+def pruefe_seitenbereiche(sammelimport: Sammelimport, dran: list[Kandidat],
+                          pdftotext: str | None) -> None:
+    """Bricht ab, wenn ein Kandidat des Durchgangs Seiten nennt, die es so nicht gibt (#64).
+
+    Vor dem ersten Auftrag, wie bei anderen Fehlern in der Übersicht, und
+    die Meldung nennt die Zeile. Ein Seitenbereich steht nur hinter einem
+    PDF, ein Foto ist eine Seite. Ob er über die letzte Seite hinausgeht,
+    sagt die Zahl der Seiten aus pdftotext. Ohne pdftotext, oder wenn es
+    das PDF nicht lesen kann, bleibt das offen, und der Agent, der die Seiten
+    dann selbst liest, merkt es.
+    """
+    for k in dran:
+        for d in k.dateien:
+            try:
+                bereich = d.seiten
+            except ValueError as fehler:
+                grund = str(fehler)
+            else:
+                if bereich is None:
+                    continue
+                if not _ist_pdf(d.name):
+                    grund = "einen Seitenbereich gibt es nur bei einem PDF"
+                else:
+                    seiten = (pdf_seiten(pdftotext, sammelimport.quellordner / d.name)
+                              if pdftotext else None)
+                    if seiten is None or bereich.letzte <= len(seiten):
+                        continue
+                    grund = f"das PDF hat {len(seiten)} Seiten"
+            raise sammelimport._abbruch(f"Kandidat {k.nummer} nennt {d}, {grund}.\n"
+                                        f"Es ist noch kein Auftrag geschrieben.")
+
+
 def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     """Legt die Aufträge für den nächsten Durchgang an.
 
@@ -1539,10 +1718,11 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     if sammelimport.quellgrafik_ausschneiden:
         verlange_pillow(sammelimport)
     pdftotext = None
-    if any(_ist_pdf(d) for k in dran for d in k.dateien):
+    if any(_ist_pdf(d.name) for k in dran for d in k.dateien):
         pdftotext = finde_pdftotext()
         if not pdftotext:
             melde_ohne_pdftotext("die Aufträge", "den Kartenentwurf")
+    pruefe_seitenbereiche(sammelimport, dran, pdftotext)
     eintrag = sammelimport.in_arbeit
     if eintrag is None or not eintrag.ist_von(trainer):
         sammelimport.setze_in_arbeit(trainer)
@@ -1606,7 +1786,7 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
         "kandidat": k.nummer,
         "was": k.was,
         "ergebnis": k.ergebnis,
-        "dateien": k.dateien,
+        "dateien": [d.name for d in k.dateien],
         "status": k.status,
         "notiz": k.notiz,
         "entwurf": sammelimport.entwurf(k).as_posix(),

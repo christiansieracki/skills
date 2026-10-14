@@ -33,7 +33,7 @@ zählt alle Zeilen des Plans, `<m>` und `<k>` die Zeilen mit diesem Ergebnis,
 
 Lies nur die Planeingabe und die Dateien darin, und schreib nur den Plan.
 Fertig ist er, wenn jede Datei der Planeingabe in mindestens einer Zeile
-steht.
+steht, und von einem PDF mit Seitenbereichen jede Seite.
 
 ## Die Planeingabe
 
@@ -48,7 +48,8 @@ Darunter zwei Abschnitte:
 
 - `## Dateien`: je Datei eine Überschrift mit ihrem Namen relativ zum
   Quellenordner. Unter einem PDF steht sein Text, oder warum keiner da ist.
-  Ein Foto steht nur mit seinem Namen da.
+  Im Text beginnt jede Seite mit einer Marke wie `=== Seite 3 ===`, auch
+  eine Seite ohne Text. Ein Foto steht nur mit seinem Namen da.
 - `## Bibliothek`: jede Karte der Bibliothek mit ID, Titel, Element und
   `quelldatei`. „ja“ in der letzten Spalte heißt: Die Karte stammt aus diesem
   Quellenordner.
@@ -60,6 +61,16 @@ Darunter zwei Abschnitte:
   der nächsten Seite weiter, gehören beide Dateien dazu. Eine Datei kann in
   mehreren Zeilen stehen, etwa eine Seite mit dem Ende einer Übung und dem
   Anfang der nächsten.
+- **Seitenbereich:** Deckt ein Kandidat nur einen Teil eines PDF ab, nennst
+  du hinter der Datei die Seiten, `` `heft.pdf` S. 12–15 `` oder
+  `` `heft.pdf` S. 3 ``, aus den Seitenmarken der Planeingabe. Sein Auftrag
+  bekommt dann nur diese Seiten. So ergibt ein Heft mit vielen Übungen eine
+  Zeile je Übung, mit derselben Datei und verschiedenen Bereichen. Ohne
+  Seitenbereich gehört das ganze PDF zur Zeile. Einen Seitenbereich gibt es
+  nur bei PDFs. Teilst du ein PDF so auf, steht jede seiner Seiten in einer
+  Zeile, auch Titel, Inhaltsverzeichnis und Werbung, dann als `übersprungen`.
+  Beim nächsten Lauf kommt das PDF nicht wieder, und eine vergessene Seite
+  wäre verloren.
 - **Übung**, `uebung`: lässt sich aus dem Zusammenhang reißen und einzeln
   einsetzen.
 - **Folge**, `folge`: ergibt nur als Ganzes Sinn, weil Reihenfolge und
@@ -137,6 +148,9 @@ kommen seine Zeilen genau so dorthin.
 | 15 | `abwehr/vom-kasten-2.pdf` | Abwehr gegen Angriffe vom Kasten, mit Zuspiel | uebung | offen | | Rückfrage: Ist das dieselbe Übung wie ue-000022, nur mit Zuspiel? |
 | 16 | `seite-26.jpg` | Einleitung zur Annahme | zurückgestellt | zurückgestellt | | Theorie |
 | 17 | `notizen.md` | Notizen zum Heft | übersprungen | übersprungen | | keine Übung |
+| 18 | `volley-meets-school.pdf` S. 1–2 | Titel und Inhaltsverzeichnis | übersprungen | übersprungen | | keine Übung |
+| 19 | `volley-meets-school.pdf` S. 3 | Ballgewöhnung mit dem Luftballon | uebung | offen | | |
+| 20 | `volley-meets-school.pdf` S. 4–5 | Prellen und Fangen im Kreis | uebung | offen | | |
 ```
 
 - **Kandidat:** fortlaufend ab der nächsten freien Kandidatennummer. Jede
@@ -144,7 +158,9 @@ kommen seine Zeilen genau so dorthin.
   übersprungene.
 - **Dateien:** jede in Backticks, mit Komma getrennt, relativ zum
   Quellenordner und genau so geschrieben wie in der Überschrift der
-  Planeingabe.
+  Planeingabe. Gehört nur ein Teil eines PDF dazu, folgt hinter den
+  Backticks der Seitenbereich, `S. 12–15` mit Halbgeviertstrich oder
+  `S. 3` für eine Seite.
 - **Was es ist:** worum es geht, in wenigen Wörtern. Bei Magazinseiten dazu
   Beitrag und Seiten. Der Agent für den Kartenentwurf liest diesen Text in
   seinem Auftrag.
