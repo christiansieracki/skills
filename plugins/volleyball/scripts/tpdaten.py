@@ -973,6 +973,28 @@ def bildverweise(rumpf: str) -> list[str]:
             for m in _BILDVERWEIS.finditer(rumpf)]
 
 
+def biege_bildverweise_um(rumpf: str, neu: dict[str, str]) -> str:
+    """Der Text mit neuen Pfaden in den Bildverweisen, `neu` je alter Pfad der neue.
+
+    Gesucht wird der Pfad so, wie `bildverweise` ihn liefert. Ersetzt wird
+    nur der Pfad, Bildtext, spitze Klammern und Titel bleiben stehen. Ein
+    Verweis, dessen Pfad nicht in `neu` steht, bleibt, wie er ist. So legt
+    der Sammelimport die Bilder einer Wissenskarte nach schaubilder/ und
+    laesst ihre Verweise dorthin zeigen (#71).
+    """
+    from urllib.parse import unquote
+
+    def ersetze(m: re.Match) -> str:
+        gruppe = "spitz" if m.group("spitz") is not None else "pfad"
+        pfad = neu.get(unquote(m.group(gruppe)))
+        if pfad is None:
+            return m.group(0)
+        anfang, ende = m.start(gruppe) - m.start(), m.end(gruppe) - m.start()
+        return m.group(0)[:anfang] + pfad + m.group(0)[ende:]
+
+    return _BILDVERWEIS.sub(ersetze, rumpf)
+
+
 def pruefe_wissensrumpf(rumpf: str, ordner: Path) -> list[str]:
     """Was am Text einer Wissenskarte nicht stimmt: die beiden Abschnitte und die Bilder.
 

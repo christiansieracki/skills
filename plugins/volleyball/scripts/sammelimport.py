@@ -72,10 +72,10 @@ from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
     DISZIPLIN_SPALTE, KARTENFELDER, SORTEN, UEBUNGSKARTE, WISSENSFELDER, WISSENSKARTE,
-    Kartensorte, KeineId, bildverweise, finde_wurzel, hole_index, interpreter,
-    konsole_vorbereiten, lies_frontmatter, lies_karten, lies_schwerpunkt_zeilen, lies_schwerpunkte,
-    lies_uebungen, naechste_id, pruefe_felder, pruefe_wissensfelder, pruefe_wissensrumpf,
-    schaubilder, tabellenzellen, trainer_dieses_rechners,
+    Kartensorte, KeineId, biege_bildverweise_um, bildverweise, finde_wurzel, hole_index,
+    interpreter, konsole_vorbereiten, lies_frontmatter, lies_karten, lies_schwerpunkt_zeilen,
+    lies_schwerpunkte, lies_uebungen, naechste_id, pruefe_felder, pruefe_wissensfelder,
+    pruefe_wissensrumpf, schaubilder, tabellenzellen, trainer_dieses_rechners,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -2482,15 +2482,19 @@ def _setze_feld(felder: list[str], name: str, wert: str) -> list[str]:
 
 
 def als_karte(entwurf: str, uid: str, heute: str,
-              schaubildnamen: list[str] | None = None) -> str:
+              schaubildnamen: list[str] | None = None,
+              bildverweise_neu: dict[str, str] | None = None) -> str:
     """Aus dem Text eines Kartenentwurfs der Text der Karte.
 
     `id` kommt als erstes Feld dazu, `angelegt` wird der Tag der Freigabe.
     `schaubildnamen`, wenn angegeben, ersetzt die Namen der Quellgrafiken neben
     dem Entwurf durch die in schaubilder/. Einer steht als Name da, mehrere als
-    Liste. `## Freigabe` fällt weg: Vorschläge und Rückfragen sind mit dem Ja
-    des Trainers erledigt und gehören nicht auf die Karte in der Halle. Dass
-    das Frontmatter sauber schließt, hat `pruefe_entwurf` vorher festgestellt.
+    Liste. Bei einer Wissenskarte biegt `bildverweise_neu` stattdessen die
+    Bildverweise im Text um, je Quellgrafik neben dem Entwurf auf ihren Weg
+    von wissen/ aus (#71). `## Freigabe` fällt weg: Vorschläge und
+    Rückfragen sind mit dem Ja des Trainers erledigt und gehören nicht auf
+    die Karte in der Halle. Dass das Frontmatter sauber schließt, hat
+    `pruefe_entwurf` vorher festgestellt.
     """
     zeilen = entwurf.splitlines()
     ende = _frontmatter_ende(zeilen)
@@ -2509,6 +2513,8 @@ def als_karte(entwurf: str, uid: str, heute: str,
         rumpf = rumpf[:grenzen[0]] + rumpf[grenzen[1]:]
     while rumpf and not rumpf[-1].strip():
         rumpf.pop()
+    if bildverweise_neu:
+        rumpf = biege_bildverweise_um("\n".join(rumpf), bildverweise_neu).split("\n")
     return "\n".join(["---", f"id: {uid}", *felder, "---", *rumpf]) + "\n"
 
 
@@ -2533,10 +2539,12 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     eigenen Zähler, so zählen Übungen und Wissenskarten auch in einem Aufruf
     getrennt. Den Ordner legt erst sie an, ein Arbeitsordner von vor der
     Wissenskarte hat keinen. Der Slug kommt aus der Frage, das Fragezeichen
-    fällt dabei weg.
+    fällt dabei weg. Die Quellgrafiken einer Wissenskarte sind die aus ihren
+    Bildverweisen, nummeriert in der Reihenfolge des Texts, und die Verweise
+    zeigen danach von wissen/ aus auf `../schaubilder/<datei>` (#71).
     """
     entwurf = sammelimport.entwurf(k)
-    felder, _ = lies_frontmatter(entwurf)
+    felder, rumpf = lies_frontmatter(entwurf)
     sorte = k.sorte
     # Vor der Schleife in `uebernehmen` gab es schon eine. Scheitert sie hier,
     # ist der Bereich mitten im Durchgang voll geworden.
@@ -2549,7 +2557,7 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     # Welche Quellgrafiken, hat `pruefe_entwurf` sichergestellt: nur die
     # eigenen, jede einmal, und jede liegt da.
     quellgrafiken = [sammelimport.entwurfsordner / bild
-                     for bild in schaubilder(felder.get("schaubild"))]
+                     for bild in quellgrafiken_im_entwurf(k, felder, rumpf)]
     nummern = ([f"-{nr}" for nr in range(1, len(quellgrafiken) + 1)]
                if len(quellgrafiken) > 1 else [""])
     verschoben = {quellgrafik: (sammelimport.wurzel / "schaubilder"
@@ -2558,8 +2566,15 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     belegt = [bild.name for bild in verschoben.values() if bild.exists()]
     if belegt:
         raise NichtUebernommen(f"schaubilder/{', schaubilder/'.join(belegt)} gibt es schon")
+    if sorte is WISSENSKARTE:
+        schaubildnamen = None
+        bildverweise_neu = {alt.name: f"../schaubilder/{neu.name}"
+                            for alt, neu in verschoben.items()}
+    else:
+        schaubildnamen = [bild.name for bild in verschoben.values()]
+        bildverweise_neu = None
     text = als_karte(entwurf.read_text(encoding="utf-8"), uid, date.today().isoformat(),
-                     [bild.name for bild in verschoben.values()])
+                     schaubildnamen, bildverweise_neu)
     # "x" legt nur neu an. Eine Datei unter dieser ID gibt es laut
     # naechste_id() nicht, und falls doch, wird sie nicht überschrieben.
     ziel.parent.mkdir(exist_ok=True)

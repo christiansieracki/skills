@@ -1656,6 +1656,63 @@ class BilderDerWissenskarteTest(unittest.TestCase):
                 self.assertEqual(uebersicht[str(nr)]["Status"], "offen")
                 self.assertIn(stichwort.format(n=nr), uebersicht[str(nr)]["Notiz"])
 
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_nach_uebernehmen_liegen_die_bilder_unter_dem_kartennamen_und_die_verweise_zeigen_dorthin(
+            self) -> None:
+        # Wie die Quellgrafiken einer Uebung: unter dem Namen der Karte, mit
+        # ihrer Endung, mehrere nummeriert, in der Reihenfolge, in der sie im
+        # Text stehen. Die Verweise zeigen von wissen/ aus nach schaubilder/,
+        # so zeigt jede Markdown-Ansicht das Bild, und der Linter findet die
+        # Datei. Ein einzelnes Bild bekommt keine Nummer.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["heft.pdf", "seite-26.jpg"], "ergebnis": "wissen",
+             "status": "bereit"},
+            {"kandidat": 2, "dateien": ["seite-26.jpg"], "ergebnis": "wissen",
+             "status": "bereit"}], quellgrafik="ausschnitt")
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", ["Seite 1"], ["Seite 2"],
+                                      flaechen=[PdfFlaeche(2, BLAU, (10, 20, 60, 50))])
+        self.lege_entwurf_an()
+        self.ordner.lege_wissensentwurf_an(
+            ORDNER, 2, titel="Warum ein Bild?", rumpf="""
+                # Warum ein Bild?
+
+                ## Kernaussagen
+
+                - Ein Bild sagt mehr. ![Das Bild](<2.quellgrafik.jpg>)
+
+                ## Was das fürs Training heißt
+
+                1. Zeigen statt erklaeren.
+                """,
+            ausschnitte=["`2.quellgrafik.jpg`: `seite-26.jpg`, links 0, oben 0, rechts 30, unten 40"])
+
+        fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER,
+                                    "--kandidat", "1", "", "--kandidat", "2", "")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        schaubilder = self.ordner.pfad / "schaubilder"
+        eins = "wi-000001-wie-sieht-das-obere-zuspiel-aus"
+        with Image.open(schaubilder / f"{eins}-1.jpg") as bild:
+            self.assertEqual((bild.format, bild.size), ("JPEG", (500, 400)))
+        with Image.open(schaubilder / f"{eins}-2.png") as bild:
+            self.assertEqual(bild.format, "PNG")
+        with Image.open(schaubilder / "wi-000002-warum-ein-bild.jpg") as bild:
+            self.assertEqual(bild.size, (300, 320))
+        karte = (self.ordner.pfad / "wissen" / f"{eins}.md").read_text(encoding="utf-8")
+        self.assertIn(f"![Bildreihe oberes Zuspiel](../schaubilder/{eins}-1.jpg)\n", karte)
+        self.assertIn(f"![Kurve der Streckung](../schaubilder/{eins}-2.png \"Streckung\")\n",
+                      karte)
+        self.assertNotIn("quellgrafik", karte)
+        karte = (self.ordner.pfad / "wissen" / "wi-000002-warum-ein-bild.md").read_text(
+            encoding="utf-8")
+        self.assertIn("](<../schaubilder/wi-000002-warum-ein-bild.jpg>)", karte)
+        self.assertFalse(self.entwuerfe.exists())
+        self.assertIn("Linter: Keine Auffälligkeiten.", fertig.stdout)
+        index = self.ordner.starte("index.py")
+        self.assertEqual(auffaelligkeiten(index.stdout), [], index.stdout)
+
 
 class PlaneingabeTest(unittest.TestCase):
     """`vorbereiten --plan` legt an, woraus der Agent den Zerlegungsplan macht.
