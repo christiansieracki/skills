@@ -146,6 +146,18 @@ def disziplin_text(eintrag: dict) -> str:
     return ", ".join(eintrag.get("disziplin") or []) or "—"
 
 
+def als_liste(wert) -> list:
+    """Ein Listenfeld als Liste, auch wenn die eckigen Klammern fehlen.
+
+    Ohne sie liest der Parser einen Text. Der Linter meldet das. Wer das Feld
+    nur anzeigt, `index.md` oder die Suche, soll daran nicht jeden Buchstaben
+    als eigenen Wert aufzaehlen. Fehlt das Feld, ist die Liste leer.
+    """
+    if wert is None or wert == "":
+        return []
+    return wert if isinstance(wert, list) else [wert]
+
+
 def schaubilder(wert) -> list[str]:
     """Die Dateinamen in `schaubild:`, in ihrer Reihenfolge.
 
@@ -647,8 +659,23 @@ SCHLANK = [
     "variante_von", "schaubild", "quelle", "quelldatei", "autor", "datei",
 ]
 
+# Was der Index von einer Wissenskarte fuehrt, wie SCHLANK von der Uebung:
+# das Frontmatter ohne `angelegt`, dazu die Datei. Der Text bleibt auf der
+# Karte.
+SCHLANK_WISSEN = [
+    "id", "titel", "thema", "schwerpunkt", "disziplin", "uebungen",
+    "quelle", "quelldatei", "autor", "datei",
+]
+
 
 def baue_index(wurzel: Path) -> dict:
+    """Der Index: die Uebungen mit ihrem Einsatz, die Wissenskarten und was der Linter meldet.
+
+    Die Wissenskarten stehen unter `wissen`, getrennt von den Uebungen. Jede
+    Uebung traegt unter `hintergrund` die IDs der Wissenskarten, deren
+    `uebungen` sie nennen. Diese Gegenrichtung pflegt niemand auf der
+    Uebungskarte (#61), sie entsteht hier bei jedem Bau neu.
+    """
     karten = lies_uebungen(wurzel)
     wissenskarten = lies_karten(wurzel, WISSENSKARTE)
     trainings = lies_trainings(wurzel)
@@ -666,6 +693,14 @@ def baue_index(wurzel: Path) -> dict:
             einsaetze.setdefault(uid, []).append(datum)
             plaene.setdefault(uid, []).append(t["datei"])
 
+    # Ohne eckige Klammern ist `uebungen` ein Text. Das meldet der Linter,
+    # hier zaehlt so eine Karte bei keiner Uebung mit.
+    hintergrund: dict[str, set[str]] = {}
+    for wk in wissenskarten:
+        uebungen = wk.get("uebungen")
+        for uid in uebungen if isinstance(uebungen, list) else []:
+            hintergrund.setdefault(str(uid), set()).add(str(wk["id"]))
+
     bekannt = {k["id"] for k in karten}
     eintraege = []
     for k in karten:
@@ -675,6 +710,7 @@ def baue_index(wurzel: Path) -> dict:
         e["zuletzt"] = hist[-1] if hist else None
         e["anzahl_einsaetze"] = len(hist)
         e["plaene"] = sorted(plaene.get(k["id"], []))
+        e["hintergrund"] = sorted(hintergrund.get(str(k["id"]), ()))
         eintraege.append(e)
 
     warnungen = schwerpunkt_warnungen + pruefe(
@@ -684,6 +720,7 @@ def baue_index(wurzel: Path) -> dict:
         "wurzel": str(wurzel),
         "anzahl": len(eintraege),
         "uebungen": eintraege,
+        "wissen": [{f: wk.get(f) for f in SCHLANK_WISSEN} for wk in wissenskarten],
         "warnungen": warnungen,
     }
 
