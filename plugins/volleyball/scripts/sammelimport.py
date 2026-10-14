@@ -23,10 +23,13 @@ nächsten offenen Kandidaten an, mit dem Text jedes PDF, bei einem
 Seitenbereich nur dem dieser Seiten, und der Angabe, ob der
 Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein, welcher Trainer
 daran arbeitet. Arbeitet laut Eintrag ein anderer daran, geht es nur mit
-`--trotzdem` weiter. Wenn die Einstellungen es wollen, schneidet es
+`--trotzdem` weiter. Bei `quellgrafik: eingebettet` schneidet es
 daneben aus jedem PDF mit Bild die Quellgrafik aus, dafür braucht es Pillow
-(ADR-0005). `pruefen` setzt den Status aus den Kartenentwürfen, die dort auf
-der Platte liegen, und weist ab, was das Datenmodell bricht oder die Form der
+(ADR-0005). Bei `quellgrafik: ausschnitt` schneidet es nichts vorab, der
+Auftrag sagt, wie der Entwurf seine Ausschnitte nennt, und Pillow, bei einem
+PDF auch `pypdfium2`, muss da sein (ADR-0013). `pruefen` setzt den Status aus
+den Kartenentwürfen, die dort auf der Platte liegen, schneidet ihre
+Ausschnitte neu aus und weist ab, was das Datenmodell bricht oder die Form der
 Freigabe nicht einhält. Mit `--json` gibt es aus, was die Freigabe im Chat
 braucht. `uebernehmen` macht aus freigegebenen Entwürfen Karten in `uebungen/`,
 erst jetzt mit ID (ADR-0010), und legt die Quellgrafiken als ihre Schaubilder ab.
@@ -1641,7 +1644,11 @@ def verlange_bibliotheken_fuer_ausschnitte(sammelimport: Sammelimport,
 
 
 def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list[str], list[str]]:
-    """Schneidet die Quellgrafiken eines Kandidaten aus, wenn die Einstellungen es wollen.
+    """Schneidet die Quellgrafiken eines Kandidaten aus, bei `quellgrafik: eingebettet`.
+
+    Alte Quellgrafiken neben dem Entwurf räumt es vorher in jedem Fall weg,
+    auch Ausschnitte. Bei `ausschnitt` schneidet es nichts, die Zeile im
+    Auftrag verweist auf `## Ausschnitte`, siehe `ausschnitte_im_auftrag`.
 
     Zurück kommen die Zeilen für den Auftrag und, was das Skript dazu sagt,
     wenn etwas nicht geklappt hat. Jedes PDF des Kandidaten, das ein Bild
@@ -2078,6 +2085,11 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
     es bei der Freigabe dazu und nennt am Ende des Durchgangs die Karten, denen
     deshalb eine Quellgrafik fehlt.
 
+    `ausschnitte` nennt jeden Ausschnitt aus `## Freigabe` mit dem Pfad, unter
+    dem `pruefen` ihn eben geschnitten hat, dazu Datei, Seite und Rechteck
+    (#63). Der Skill zeigt jeden im Chat, und korrigiert der Trainer ihn, ändert
+    der Skill die Zahlen im Entwurf.
+
     Gefragt wird nur nach einem Kandidaten, dessen Entwurf auf der Platte
     liegt, siehe `pruefen`.
     """
@@ -2210,7 +2222,8 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
     dieselbe Karte ein zweites Mal.
 
     Die Quellgrafik bekommt den Namen der Karte, wie jedes PlayDrill-Bild in
-    schaubilder/. Mehrere bekommen ihn mit Nummer, in der Reihenfolge, in der
+    schaubilder/, mit ihrer Endung, ein Ausschnitt aus einem Foto also `.jpg`
+    (#63). Mehrere bekommen ihn mit Nummer, in der Reihenfolge, in der
     der Entwurf sie nennt (#39). Liegt dort schon eine Datei unter einem
     dieser Namen, wird nichts geschrieben, auch die Karte nicht: Überschrieben
     wird in schaubilder/ nichts.
@@ -2264,7 +2277,8 @@ def schliesse_ab(sammelimport: Sammelimport, k: Kandidat, status: str, notiz: st
     wieder offen aus.
 
     Die Quellgrafiken verschwinden auch dann, wenn der Entwurf sie nicht
-    eingetragen hat. Sie ließen sich jederzeit neu aus dem PDF schneiden.
+    eingetragen hat. Sie ließen sich jederzeit neu aus dem PDF schneiden, ein
+    Ausschnitt aus Foto oder PDF-Seite ebenso.
     """
     k.setze(status, notiz, karte=karte)
     sammelimport.speichere()
