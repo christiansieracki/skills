@@ -62,6 +62,51 @@ def disziplin_zu(index_md: str, uebung_id: str) -> set[str]:
     return zellen
 
 
+def spalte_zu(index_md: str, uebung_id: str, spalte: str) -> set[str]:
+    """Die Zelle unter `spalte` in jeder Tabellenzeile, die zu einer Uebung gehoert.
+
+    Wie `disziplin_zu`, nur wird die Spalte an ihrem Kopf erkannt statt an
+    ihrer Stelle. Eine Tabelle ohne diese Spalte traegt nichts bei, gibt es
+    sie nirgends, bleibt die Menge leer.
+    """
+    zellen = set()
+    kopf: list[str] = []
+    for zeile in index_md.splitlines():
+        if not zeile.startswith("|"):
+            kopf = []
+            continue
+        teile = [t.strip() for t in zeile.strip().strip("|").split("|")]
+        if not kopf:
+            kopf = teile
+        elif f"{uebung_id}-" in zeile and spalte in kopf:
+            zellen.add(teile[kopf.index(spalte)])
+    return zellen
+
+
+def wissenskarten_nach_thema(index_md: str) -> dict[str, list[str]]:
+    """Die Tabellenzeilen im Abschnitt "Wissenskarten" von index.md, je Thema.
+
+    Das Thema ist die `###`-Ueberschrift ueber der Tabelle. Kopf und
+    Trennzeile der Tabelle zaehlen nicht. Der Abschnitt endet an der
+    naechsten `##`-Ueberschrift oder am Strich vor dem Fuss.
+    """
+    zeilen = index_md.splitlines()
+    if "## Wissenskarten" not in zeilen:
+        return {}
+    nach_thema: dict[str, list[str]] = {}
+    thema = None
+    for zeile in zeilen[zeilen.index("## Wissenskarten") + 1:]:
+        if zeile.startswith("## ") or zeile == "---":
+            break
+        if zeile.startswith("### "):
+            thema = zeile[4:].strip()
+            nach_thema[thema] = []
+        elif zeile.startswith("|") and thema is not None:
+            nach_thema[thema].append(zeile)
+    # Die ersten beiden Zeilen jeder Tabelle sind Kopf und Trennzeile.
+    return {thema: tabelle[2:] for thema, tabelle in nach_thema.items()}
+
+
 class LinterTest(unittest.TestCase):
     def setUp(self) -> None:
         self.ordner = Arbeitsordner()
@@ -711,6 +756,81 @@ class IndexMdTest(unittest.TestCase):
 
     def test_die_karte_fuer_beide_zeigt_beide_werte(self) -> None:
         self.assertEqual(disziplin_zu(self.baue(), "ue-000005"), {"halle, beach"})
+
+
+class WissenInIndexMdTest(unittest.TestCase):
+    """Die Wissenskarten in der Lesebrille `index.md` (#67).
+
+    Bis die Suche aus Welle 2 nach Thema und Schwerpunkt filtert, findet der
+    Trainer seine Wissenskarten hier.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def baue(self) -> str:
+        fertig = self.ordner.starte("index.py", "--md")
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        return (self.ordner.pfad / "index.md").read_text(encoding="utf-8")
+
+    def test_die_wissenskarten_stehen_nach_thema_eine_mit_zwei_themen_unter_beiden(
+            self) -> None:
+        # Je Karte die Frage, die ID und die IDs ihrer Uebungen.
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000001", titel="Wann lohnt sich einarmige Abwehr?",
+            thema=["technik", "taktik"], uebungen=["ue-000001", "ue-000004"])
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000002", titel="Was hat Schlaf mit der Reaktion zu tun?",
+            thema=["physiologie"], schwerpunkt=OHNE, uebungen=OHNE)
+
+        nach_thema = wissenskarten_nach_thema(self.baue())
+
+        self.assertEqual(sorted(nach_thema), ["Physiologie", "Taktik", "Technik"])
+        for thema in ("Technik", "Taktik"):
+            with self.subTest(thema=thema):
+                (zeile,) = nach_thema[thema]
+                self.assertIn("Wann lohnt sich einarmige Abwehr?", zeile)
+                self.assertIn("wi-000001", zeile)
+                self.assertIn("ue-000001, ue-000004", zeile)
+        (zeile,) = nach_thema["Physiologie"]
+        self.assertIn("Was hat Schlaf mit der Reaktion zu tun?", zeile)
+        self.assertIn("wi-000002", zeile)
+        self.assertNotIn("ue-", zeile)
+
+    def test_bei_der_uebung_steht_der_hintergrund_und_bei_den_anderen_nichts(self) -> None:
+        # Die Gegenrichtung: ue-000001 nennen zwei Karten, ue-000004 eine.
+        # Eine Uebung steht in so vielen Tabellen, wie sie Elemente hat, in
+        # jeder dasselbe.
+        self.ordner.lege_wissenskarte_an(id="wi-000001", uebungen=["ue-000001"])
+        self.ordner.lege_wissenskarte_an(id="wi-000002", titel="Die zweite Frage?",
+                                         uebungen=["ue-000001", "ue-000004"])
+
+        index_md = self.baue()
+
+        self.assertEqual(spalte_zu(index_md, "ue-000001", "Hintergrund"),
+                         {"wi-000001, wi-000002"})
+        self.assertEqual(spalte_zu(index_md, "ue-000004", "Hintergrund"), {"wi-000002"})
+        for uid in ("ue-000002", "ue-000003", "ue-000005"):
+            with self.subTest(uebung=uid):
+                self.assertEqual(spalte_zu(index_md, uid, "Hintergrund"), {""})
+
+    def test_ohne_wissenskarten_bleibt_index_md_wie_bisher(self) -> None:
+        # Ein Arbeitsordner aus der Zeit vor der Wissenskarte hat kein
+        # wissen/, ein neuer einen leeren Ordner. In beiden steht weder der
+        # Abschnitt noch eine leere Spalte "Hintergrund".
+        for fall in ("ohne wissen/", "mit leerem wissen/"):
+            with self.subTest(fall=fall):
+                if fall == "mit leerem wissen/":
+                    (self.ordner.pfad / "wissen").mkdir()
+
+                index_md = self.baue()
+
+                self.assertNotIn("Wissenskarte", index_md)
+                self.assertNotIn("Hintergrund", index_md)
+                self.assertNotIn("wissen/", index_md)
+                self.assertIn("| Übung | Disziplin | Level | Spieler | Dauer | Zuletzt |\n",
+                              index_md)
 
 
 if __name__ == "__main__":
