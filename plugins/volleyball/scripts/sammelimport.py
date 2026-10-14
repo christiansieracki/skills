@@ -56,6 +56,10 @@ from functools import cache, cached_property
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ausschnitt import BibliothekFehlt, KeinAusschnitt, schneide_aus, verlange_bibliotheken  # noqa: E402
+from ausschnitt import FOTO as AUS_DEM_FOTO  # noqa: E402
+from ausschnitt import PDF as AUS_DEM_PDF  # noqa: E402
+from ausschnitt import ergebnis as ergebnis_des_ausschnitts  # noqa: E402
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
@@ -572,19 +576,20 @@ class Sammelimport:
     def auftrag(self, k: Kandidat) -> Path:
         return self.entwurfsordner / f"{k.nummer}.auftrag.md"
 
-    def quellgrafik(self, k: Kandidat, nr: int | None = None) -> Path:
+    def quellgrafik(self, k: Kandidat, nr: int | None = None, endung: str = ".png") -> Path:
         """Wo eine Quellgrafik des Kandidaten liegt.
 
         Ohne Nummer die einzige, `17.quellgrafik.png`. Hat der Kandidat
         mehrere, etwa ein Zirkel mit einem Bild je Blatt, heißen sie
         `17.quellgrafik-1.png`, `17.quellgrafik-2.png` und so weiter (#39).
+        Ein Ausschnitt aus einem Foto ist ein JPEG und endet auf `.jpg` (#63).
         """
-        endung = "" if nr is None else f"-{nr}"
-        return self.entwurfsordner / f"{k.nummer}.quellgrafik{endung}.png"
+        nummer = "" if nr is None else f"-{nr}"
+        return self.entwurfsordner / f"{k.nummer}.quellgrafik{nummer}{endung}"
 
     def ist_quellgrafik_von(self, k: Kandidat, name: str) -> bool:
-        """Ist `name` eine Quellgrafik dieses Kandidaten, einzeln oder mit Nummer?"""
-        muster = rf"{re.escape(k.nummer)}\.quellgrafik(-[1-9]\d*)?\.png"
+        """Ist `name` eine Quellgrafik dieses Kandidaten, einzeln oder mit Nummer, PNG oder JPEG?"""
+        muster = rf"{re.escape(k.nummer)}\.quellgrafik(-[1-9]\d*)?\.(png|jpg)"
         return re.fullmatch(muster, name) is not None
 
     def quellgrafiken(self, k: Kandidat) -> list[Path]:
@@ -1066,19 +1071,23 @@ def pdf_text(seiten: tuple[str, ...] | None) -> str | None:
 SEITENMARKE = "=== Seite {} ==="
 
 
-def mit_seitenmarken(seiten: tuple[str, ...] | None) -> str | None:
-    """Der Text eines PDF am Stück, vor jeder Seite ihre Marke, gezählt ab 1.
+def mit_seitenmarken(seiten: tuple[str, ...] | None, erste: int = 1) -> str | None:
+    """Der Text eines PDF am Stück, vor jeder Seite ihre Marke, gezählt ab `erste`.
 
     Daran nennt der Zerlegungsplan Seitenbereiche. Auch eine Seite ohne Text
     bekommt ihre Marke, sonst verrutschte die Zählung danach. Hat keine Seite
     Text, bleibt es leer wie bei `pdf_text`: Marken allein wären kein Text,
     und der Agent soll lesen, dass er das PDF selbst öffnen muss.
+
+    Im Auftrag stehen die Marken bei `quellgrafik: ausschnitt`, denn ein
+    Ausschnitt nennt seine Seite. Bei einem Seitenbereich beginnt der Text
+    dort mitten im PDF, `erste` ist dann die erste Seite des Bereichs.
     """
     text = pdf_text(seiten)
     if not text:
         return text
     zeilen: list[str] = []
-    for nummer, seite in enumerate(seiten, 1):
+    for nummer, seite in enumerate(seiten, erste):
         zeilen += [SEITENMARKE.format(nummer), *([seite] if seite else [])]
     return "\n".join(zeilen)
 
@@ -1460,6 +1469,24 @@ def verlange_pillow(sammelimport: Sammelimport) -> None:
             f"Es ist noch kein Auftrag geschrieben.") from None
 
 
+def verlange_bibliotheken_fuer_ausschnitte(sammelimport: Sammelimport,
+                                           dran: list[Kandidat]) -> None:
+    """Bricht ab, wenn den Ausschnitten des Durchgangs eine Bibliothek fehlt (ADR-0013).
+
+    Pillow braucht jeder Ausschnitt, `pypdfium2` nur einer aus einem PDF.
+    Gefragt wird deshalb nach `pypdfium2` nur, wenn ein Kandidat des
+    Durchgangs ein PDF hat. Vor dem ersten Auftrag, aus demselben Grund wie
+    bei `verlange_pillow`: Sonst kämen Entwürfe mit Ausschnitten, die
+    `pruefen` nicht schneiden kann.
+    """
+    try:
+        verlange_bibliotheken(any(_ist_pdf(d.name) for k in dran for d in k.dateien))
+    except BibliothekFehlt as fehler:
+        raise Abbruch(f"In quellen/{sammelimport.ordner}/{SAMMELIMPORT} steht "
+                      f"{sammelimport.quellgrafik_angabe}.\n{fehler}\n\n"
+                      f"Es ist noch kein Auftrag geschrieben.") from None
+
+
 def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list[str], list[str]]:
     """Schneidet die Quellgrafiken eines Kandidaten aus, wenn die Einstellungen es wollen.
 
@@ -1478,6 +1505,11 @@ def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list
     """
     for altes in sammelimport.quellgrafiken(k):
         altes.unlink()
+    if sammelimport.art_der_quellgrafik == "ausschnitt":
+        # Vorab geschnitten wird nichts, der Entwurf nennt seine Ausschnitte,
+        # und `pruefen` schneidet sie (#63).
+        return ["- Quellgrafik: als Ausschnitt, wenn die Quelle ein Bild der Übung zeigt, "
+                "siehe `## Ausschnitte`."], []
     if sammelimport.art_der_quellgrafik != "eingebettet":
         return ["- Quellgrafik: wird bei dieser Quelle nicht ausgeschnitten."], []
     pdfs = [d.name for d in k.dateien if _ist_pdf(d.name)]
@@ -1603,7 +1635,12 @@ def dateien_im_auftrag(sammelimport: Sammelimport, k: Kandidat,
     Nennt der Kandidat Seiten, steht nur deren Text da, und der Abschnitt
     sagt, welche Seiten der Agent im PDF öffnet (#64). Der Text je Datei geht
     an die Regel „wenig Text“, None bei einem Foto oder ohne Text.
+
+    Bei `quellgrafik: ausschnitt` steht vor jeder Seite ihre Marke, gezählt
+    wie im PDF, auch bei einem Seitenbereich. Ein Ausschnitt nennt seine
+    Seite, und ab 1 gezählt träfe er bei einem Bereich die falsche.
     """
+    marken = sammelimport.art_der_quellgrafik == "ausschnitt"
     zeilen: list[str] = []
     texte: list[str | None] = []
     for d in k.dateien:
@@ -1621,8 +1658,70 @@ def dateien_im_auftrag(sammelimport: Sammelimport, k: Kandidat,
             seiten = seiten[bereich.erste - 1:bereich.letzte]
         text = pdf_text(seiten)
         texte.append(text)
+        if marken and text:
+            text = mit_seitenmarken(seiten, bereich.erste if bereich else 1)
         zeilen += [*_text_oder_grund(text, pdftotext, bereich), ""]
     return zeilen, texte
+
+
+def endung_des_ausschnitts(datei: str) -> str | None:
+    """Die Endung eines Ausschnitts aus dieser Datei: `.jpg` beim Foto, `.png` beim PDF.
+
+    None für eine Datei, aus der `ausschnitt.py` nichts schneidet, etwa ein
+    TIFF, das noch nicht aufbereitet ist.
+    """
+    try:
+        return ergebnis_des_ausschnitts(Path(datei))[0]
+    except KeinAusschnitt:
+        return None
+
+
+def ausschnitte_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> list[str]:
+    """Der Abschnitt `## Ausschnitte` eines Auftrags bei `quellgrafik: ausschnitt` (#63).
+
+    Er sagt dem Agenten, in welcher Form der Entwurf seine Ausschnitte nennt
+    und wie sie heißen, mit einer Datei dieses Kandidaten als Beispiel. Die
+    Endung folgt der Quelle, wie bei `ausschnitt.py`: aus einer PDF-Seite ein
+    PNG, aus einem Foto ein JPEG. Genannt werden nur die Endungen, die bei
+    diesem Kandidaten vorkommen. Die Seite eines PDF zählt wie die Marken im
+    Text, bei einem Seitenbereich ist das Beispiel seine erste Seite.
+    """
+    moeglich = [(d, endung) for d in k.dateien if (endung := endung_des_ausschnitts(d.name))]
+    if not moeglich:
+        return ["## Ausschnitte", "",
+                "Aus keiner Datei dieses Kandidaten lässt sich ein Ausschnitt schneiden, nur aus "
+                "einem Foto (JPEG, PNG) oder einem PDF. Es gibt keinen, und `schaubild:` ist "
+                "`null`.", ""]
+    datei, endung = moeglich[0]
+    pdf, foto = AUS_DEM_PDF[0], AUS_DEM_FOTO[0]
+    seite = f" S. {datei.seiten.erste if datei.seiten else 1}" if endung == pdf else ""
+    einzeln = sammelimport.quellgrafik(k, endung=endung).name
+    mehrere = [sammelimport.quellgrafik(k, nr, endung).name for nr in (1, 2)]
+    endungen = {e for _, e in moeglich}
+    regeln = {pdf: (f"`{pdf}` aus einer PDF-Seite",
+                    "Bei einem PDF steht dahinter die Seite, gezählt im PDF ab 1 wie in den "
+                    "Marken `=== Seite 1 ===` im Text, nicht die Seitenzahl, die auf der Seite "
+                    "gedruckt ist."),
+              foto: (f"`{foto}` aus einem Foto", "Bei einem Foto steht keine Seite.")}
+    gilt = [regeln[e] for e in (pdf, foto) if e in endungen]
+    return [
+        "## Ausschnitte", "",
+        "Zeigt die Quelle ein Bild der Übung, nennst du es als Ausschnitt: unter `## Freigabe` "
+        "in einer eigenen Liste vor den Vorschlägen, ein Punkt je Ausschnitt, und `schaubild:` "
+        "trägt seinen Namen. Hat die Quelle kein Bild der Übung, gibt es keinen Ausschnitt und "
+        "keine Liste, und `schaubild:` ist `null`.", "",
+        "```markdown",
+        "Ausschnitte:",
+        f"- `{einzeln}`: `{datei.name}`{seite}, links 8, oben 42, rechts 94, unten 88",
+        "```", "",
+        f"- Name: ein einzelner Ausschnitt heißt `{einzeln}`, mehrere `{mehrere[0]}`, "
+        f"`{mehrere[1]}` und weiter, in `schaubild:` als Liste in derselben Reihenfolge. "
+        f"Die Endung ist {', '.join(e for e, _ in gilt)}.",
+        f"- Datei: wie unter `## Dateien`, relativ zum Quellenordner. "
+        f"{' '.join(regel for _, regel in gilt)}",
+        "- Rechteck: links, oben, rechts, unten in ganzen Prozent der Seite, wie sie aufrecht "
+        "steht. Links ist kleiner als rechts, oben kleiner als unten.", "",
+    ]
 
 
 def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[str],
@@ -1636,6 +1735,8 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
     """
     relativ = [f"{sammelimport.ordner}/{d.name}" for d in k.dateien]
     dateien, texte = dateien_im_auftrag(sammelimport, k, pdftotext)
+    ausschnitte = (ausschnitte_im_auftrag(sammelimport, k)
+                   if sammelimport.art_der_quellgrafik == "ausschnitt" else [])
     teile = [
         f"# Auftrag für Kandidat {k.nummer}",
         "",
@@ -1651,6 +1752,7 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
         "## Dateien",
         "",
         *dateien,
+        *ausschnitte,
         "## Absprachen",
         "",
         sammelimport.absprachen or "Keine.",
@@ -1755,6 +1857,8 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
         return 0
     if sammelimport.art_der_quellgrafik == "eingebettet":
         verlange_pillow(sammelimport)
+    elif sammelimport.art_der_quellgrafik == "ausschnitt":
+        verlange_bibliotheken_fuer_ausschnitte(sammelimport, dran)
     pdftotext = None
     if any(_ist_pdf(d.name) for k in dran for d in k.dateien):
         pdftotext = finde_pdftotext()

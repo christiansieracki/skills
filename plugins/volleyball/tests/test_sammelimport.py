@@ -44,6 +44,28 @@ except ImportError:
 
 BRAUCHT_PILLOW = unittest.skipUnless(HAT_PILLOW, "Pillow ist nicht installiert")
 
+try:
+    import pypdfium2  # noqa: F401
+    HAT_PYPDFIUM2 = True
+except ImportError:
+    HAT_PYPDFIUM2 = False
+
+BRAUCHT_PYPDFIUM2 = unittest.skipUnless(HAT_PYPDFIUM2, "pypdfium2 ist nicht installiert")
+
+
+def blende_aus(test: unittest.TestCase, modul: str) -> dict[str, str]:
+    """Die Umgebung fuer einen Aufruf, in dem sich `modul` nicht importieren laesst.
+
+    Wie in test_bilder.py: Ein `<modul>.py`, das beim Import abbricht,
+    verdeckt das echte Paket, denn der PYTHONPATH kommt vor den
+    site-packages. So laeuft der Test auch dort, wo es installiert ist.
+    """
+    schatten = Path(tempfile.mkdtemp(prefix=f"ohne-{modul}-"))
+    test.addCleanup(shutil.rmtree, schatten, True)
+    (schatten / f"{modul}.py").write_text(
+        f'raise ImportError("{modul} ist fuer diesen Test ausgeblendet")\n', encoding="utf-8")
+    return {"PYTHONPATH": str(schatten)}
+
 
 class VorbereitenTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -354,6 +376,9 @@ class SeitenbereichTest(unittest.TestCase):
         self.assertIn(HEFT[1][0], zwei)
         for seite in (1, 3, 4):
             self.assertNotIn(HEFT[seite - 1][0], zwei)
+        # Seitenmarken braucht der Auftrag nur fuer Ausschnitte (#63), ohne
+        # sie kosten sie nur Platz.
+        self.assertNotIn("=== Seite", eins)
 
     @BRAUCHT_PDFTOTEXT
     def test_ohne_seitenbereich_bekommt_der_auftrag_den_ganzen_text(self) -> None:
@@ -1076,6 +1101,116 @@ class QuellgrafikTest(unittest.TestCase):
         self.assertEqual(schon_da.read_bytes(), vorher)
         self.assertEqual(list((self.ordner.pfad / "uebungen").glob("ue-000010-*")), [])
         self.assertTrue((self.entwuerfe / "3.quellgrafik.png").exists())
+
+
+class AusschnittTest(unittest.TestCase):
+    """Bei `quellgrafik: ausschnitt` nennt der Entwurf seine Ausschnitte (#63).
+
+    Eine Magazinseite oder ein PDF, das nicht wie PlayDrill aufgebaut ist,
+    bettet das Bild der Uebung nicht als ein Bild ein. Der Agent nennt, wo es
+    auf der Seite liegt, `pruefen` schneidet es aus, und nach der Freigabe ist
+    es das Schaubild der Karte.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+        self.entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
+
+    def vorbereiten(self, ordner: str = ORDNER, **starte):
+        return self.ordner.starte("sammelimport.py", "vorbereiten", ordner, **starte)
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_vorbereiten_schneidet_nichts_vorab_aus_und_der_auftrag_nennt_form_und_namen(
+            self) -> None:
+        # Das PDF bettet ein Bild ein, bei `eingebettet` laege danach eine
+        # Quellgrafik da. Hier sagt der Auftrag nur, in welcher Form der
+        # Entwurf seine Ausschnitte nennt und wie sie heissen: aus einer
+        # PDF-Seite ein PNG, aus einem Foto ein JPEG.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 3, "dateien": ["kasten.pdf"]},
+            {"kandidat": 4, "dateien": ["seite-26.jpg"]}], quellgrafik="ausschnitt")
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/kasten.pdf", ["Abwehr vom Kasten"],
+                                      bilder=[PdfBild(90, 60, deckend=(12, 5, 80, 51))])
+
+        fertig = self.vorbereiten()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.iterdir()),
+                         ["3.auftrag.md", "4.auftrag.md"])
+        pdf = auftrag_von(self.ordner, 3)
+        self.assertIn("Ausschnitt", zeile_mit(pdf, "Quellgrafik"))
+        self.assertIn("Ausschnitte:\n- `3.quellgrafik.png`: `kasten.pdf` S. 1, links ", pdf)
+        self.assertIn("`3.quellgrafik-1.png`, `3.quellgrafik-2.png`", pdf)
+        foto = auftrag_von(self.ordner, 4)
+        self.assertIn("Ausschnitte:\n- `4.quellgrafik.jpg`: `seite-26.jpg`, links ", foto)
+        self.assertIn("`4.quellgrafik-1.jpg`, `4.quellgrafik-2.jpg`", foto)
+        self.assertNotIn(".png", foto)
+
+    @BRAUCHT_PDFTOTEXT
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_die_marken_im_text_nennen_die_seiten_wie_das_pdf_sie_zaehlt(self) -> None:
+        # Ein Ausschnitt nennt seine Seite im PDF. Mit Seitenbereich beginnt
+        # der Text im Auftrag mitten im Heft, und ohne Marke zaehlte der Agent
+        # ab 1. Die Marken tragen deshalb die Seiten des PDF (#64).
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": [("heft.pdf", "S. 2–3")]},
+            {"kandidat": 2, "dateien": ["heft.pdf"]}], quellgrafik="ausschnitt")
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", *HEFT)
+
+        fertig = self.vorbereiten()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        eins = unter_datei(auftrag_von(self.ordner, 1), "heft.pdf").splitlines()
+        for seite in (2, 3):
+            self.assertEqual(eins[eins.index(f"=== Seite {seite} ===") + 1], HEFT[seite - 1][0])
+        for seite in (1, 4):
+            self.assertNotIn(f"=== Seite {seite} ===", eins)
+        self.assertIn("`heft.pdf` S. 2, links", auftrag_von(self.ordner, 1))
+        zwei = unter_datei(auftrag_von(self.ordner, 2), "heft.pdf").splitlines()
+        for seite in (1, 2, 3, 4):
+            self.assertEqual(zwei[zwei.index(f"=== Seite {seite} ===") + 1], HEFT[seite - 1][0])
+
+    @BRAUCHT_PILLOW
+    def test_ohne_pypdfium2_bricht_nur_ein_durchgang_mit_pdf_ab(self) -> None:
+        # Eine PDF-Seite zeichnet pypdfium2, ein Foto schneidet Pillow allein
+        # (ADR-0013). Liegt das PDF hinter dem Durchgang, geht es weiter. Ohne
+        # Abbruch kaemen Entwuerfe mit Ausschnitten, die sich nicht schneiden
+        # lassen.
+        ohne = blende_aus(self, "pypdfium2")
+        for ordner, je_durchgang in (("mit-pdf", 2), ("ohne-pdf", 1)):
+            self.ordner.lege_quellenordner_an(ordner, [
+                {"kandidat": 1, "dateien": ["seite-26.jpg"]},
+                {"kandidat": 2, "dateien": ["heft.pdf"]}],
+                je_durchgang=je_durchgang, quellgrafik="ausschnitt")
+        vorher = (self.ordner.pfad / "quellen" / "mit-pdf" / "sammelimport.md").read_text(
+            encoding="utf-8")
+
+        gestoppt = self.vorbereiten("mit-pdf", umgebung=ohne)
+        weiter = self.vorbereiten("ohne-pdf", umgebung=ohne)
+
+        self.assertNotEqual(gestoppt.returncode, 0, gestoppt.stdout)
+        self.assertIn("pip install pypdfium2", gestoppt.stdout)
+        self.assertIn("quellgrafik: ausschnitt", gestoppt.stdout)
+        self.assertEqual((self.ordner.pfad / "quellen" / "mit-pdf" / "sammelimport.md").read_text(
+            encoding="utf-8"), vorher)
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe" / "mit-pdf").exists())
+        self.assertEqual(weiter.returncode, 0, weiter.stdout + weiter.stderr)
+        self.assertEqual(sorted(p.name for p in (self.ordner.pfad / "kartenentwuerfe"
+                                                 / "ohne-pdf").iterdir()), ["1.auftrag.md"])
+
+    def test_ohne_pillow_bricht_ein_durchgang_mit_ausschnitt_ab(self) -> None:
+        # Pillow schneidet jeden Ausschnitt, auch den aus einem Foto.
+        self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["seite-26.jpg"]}],
+                                          quellgrafik="ausschnitt")
+
+        fertig = self.vorbereiten(umgebung=blende_aus(self, "PIL"))
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        self.assertIn("pip install Pillow", fertig.stdout)
+        self.assertFalse((self.ordner.pfad / "kartenentwuerfe").exists())
 
 
 class PlaneingabeTest(unittest.TestCase):
