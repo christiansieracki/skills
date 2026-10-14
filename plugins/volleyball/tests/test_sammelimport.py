@@ -1381,6 +1381,32 @@ class AusschnittTest(unittest.TestCase):
         self.assertIn("pip install pypdfium2", fertig.stdout)
         self.assertEqual(datei.read_text(encoding="utf-8"), vorher)
 
+    def test_ohne_pypdfium2_schreiben_vorbereiten_und_uebernehmen_nichts_zum_entwurf(
+            self) -> None:
+        # Beide pruefen einen Entwurf wie `pruefen` und schneiden dabei. Ohne
+        # pypdfium2 schriebe vorbereiten sonst einen neuen Auftrag fuer einen
+        # Entwurf, der nichts falsch macht, und uebernehmen eine Karte, deren
+        # Ausschnitt nicht neu geschnitten ist. uebernehmen nennt den
+        # Kandidaten und wie pypdfium2 dazukommt.
+        self.ordner.lege_karte_an(id="ue-000009", titel="Die bisher höchste ID")
+        self.plane({"kandidat": 1, "dateien": ["heft.pdf"], "status": "bereit"},
+                   {"kandidat": 2, "dateien": ["seite-26.jpg"]})
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 1, titel="Von der PDF-Seite", schaubild="1.quellgrafik.png", ausschnitte=[
+                "`1.quellgrafik.png`: `heft.pdf` S. 1, links 10, oben 20, rechts 60, unten 50"])
+        ohne = blende_aus(self, "pypdfium2")
+
+        vorbereitet = self.vorbereiten(umgebung=ohne)
+        uebernommen = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER,
+                                         "--kandidat", "1", "", umgebung=ohne)
+
+        self.assertNotEqual(vorbereitet.returncode, 0, vorbereitet.stdout)
+        self.assertIn("pip install pypdfium2", vorbereitet.stdout)
+        self.assertEqual(uebernommen.returncode, 1, uebernommen.stdout + uebernommen.stderr)
+        self.assertIn("pypdfium2", zeile_mit(uebernommen.stdout, "nicht übernommen"))
+        self.assertEqual(list((self.ordner.pfad / "uebungen").glob("ue-000010-*")), [])
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.iterdir()), ["1.md"])
+
     @BRAUCHT_PILLOW
     def test_uebernehmen_legt_einen_jpeg_ausschnitt_unter_dem_kartennamen_ab(self) -> None:
         # Wie eine Quellgrafik aus PlayDrill, nur mit der Endung des
