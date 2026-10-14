@@ -58,9 +58,13 @@ Den Auftrag schreibt `sammelimport.py vorbereiten`. Oben steht eine Liste:
 - **Kandidat:** die Nummer. Mit ihr beginnt deine Antwort.
 - **Was es ist:** wie der Zerlegungsplan den Kandidaten beschreibt, mit der
   Frage der Karte. Am Ende kann `Übungen: …` stehen, die Übungen aus
-  demselben Beitrag. Die trägst du nicht ein, siehe `uebungen`.
+  demselben Beitrag. Die Nummern dort sind Kandidaten, keine IDs.
 - **Typ laut Zerlegungsplan:** `wissen`.
 - **`quelldatei:`** der Wert für das Feld. Übernimm ihn genau so.
+- **Übungen aus demselben Beitrag:** die Übungen aus `Übungen: …`, die schon
+  Karte sind, mit ID. Genau diese trägst du in `uebungen` ein. Steht dort
+  `keine`, bleibt das Feld `[]`. Die übrigen bekommen ihre ID erst, wenn sie
+  Karte werden, dann trägt das Skript sie nach.
 - **Bilder:** ob die Karte Bilder bekommt. Steht dort `keine`, setzt du
   keinen Bildverweis in den Entwurf.
 - **Zielpfad des Entwurfs:** wohin du schreibst.
@@ -88,8 +92,8 @@ Darunter drei Abschnitte:
   `## Freigabe` als Frage. Hast du eine Vermutung, steht sie im Entwurf, und
   die Rückfrage nennt sie.
 
-**Belegt:** `quelle`, `quelldatei` und `autor` nach Auftrag und Absprachen,
-die Kernaussagen, und unter „Was das fürs Training heißt“, was die Quelle dazu
+**Belegt:** `quelle`, `quelldatei`, `uebungen` und `autor` nach Auftrag und
+Absprachen, die Kernaussagen, und unter „Was das fürs Training heißt“, was die Quelle dazu
 selbst sagt.
 
 **Vorschlag:** `thema`, `schwerpunkt`, `disziplin`, und jeder Punkt unter
@@ -190,7 +194,9 @@ Rückfragen:
   nennt. Nennt der Auftrag Seiten eines PDF, stehen sie in `quelle`, etwa
   „S. 12–15“.
 - `quelldatei` steht genau wie im Auftrag. Seiten stehen dort nie.
-- `uebungen` bleibt `[]`. Die Bibliothek kennst du nicht.
+- `uebungen` trägt genau die IDs aus „Übungen aus demselben Beitrag“ im
+  Auftrag, sonst `[]`. Die Bibliothek kennst du nicht, eine andere ID gibt es
+  für dich nicht.
 
 ### Der Text
 
@@ -236,6 +242,7 @@ Geh den Entwurf einmal durch:
 - Hat das Frontmatter jedes Feld aus dem Schema, ohne `id` und `angelegt`?
 - Stehen nur kontrollierte Werte und Kennungen aus dem Auftrag darin?
 - Ist `quelldatei` genau wie im Auftrag?
+- Trägt `uebungen` genau die IDs aus dem Auftrag, und keine Kandidatennummer?
 - Beginnt jeder Vorschlag mit einem Feld oder einer Überschrift samt `##` in
   Backticks?
 - Hat jede Rückfrage genau ein Fragezeichen und endet auf ihre Vermutung oder

@@ -430,6 +430,9 @@ die für jede Karte gelten, stehen zuletzt unter
   es mit den Übungen aus demselben Beitrag, in der festen Form
   `Übungen: 13, 14, ue-000041`: Kandidatennummern für Übungen dieses Plans,
   IDs für Übungen, die schon Karte sind. Ohne solche Übungen fehlt der Teil.
+  Jede Nummer ist eine Zeile der Übersicht mit `uebung` oder `folge`, jede ID
+  eine Karte in `uebungen/`. Steht dort etwas anderes, bricht `vorbereiten`
+  vor dem ersten Auftrag ab, und die Meldung nennt die Zeile.
   Steht dort `ergänzt ue-######` oder `ergänzt wi-######`, ergänzt der
   Kandidat diese Karte, statt eine eigene zu werden, und `Variante von
   ue-######` macht ihn zur Variante. Bei `wissen` steht das vor `Übungen:`.
@@ -556,6 +559,12 @@ keiner Einstellung von `quellgrafik:`: `vorbereiten` schneidet für sie nichts
 aus, ihr Auftrag hat kein `## Ausschnitte` und sagt, dass sie keine Bilder
 bekommt.
 
+Unter „Übungen aus demselben Beitrag“ nennt der Auftrag einer Wissenskarte die
+Übungen aus `Übungen:`, die schon Karte sind, mit ID: die genannten IDs und die
+Karten der genannten Kandidaten, die `importiert` oder `ergänzt` sind. Der
+Agent trägt genau diese in `uebungen` ein. Ein Kandidat, der noch wartet, steht
+nur mit Nummer da, seine ID trägt `uebernehmen` nach.
+
 Ein Kartenentwurf hat das Frontmatter der Karte ohne `id` (ADR-0010), die
 Abschnitte der Karte und am Ende `## Freigabe` mit beiden Listen, davor, wenn
 er welche hat, die Liste seiner Ausschnitte:
@@ -677,9 +686,22 @@ nichts mehr offen, verschwinden auch `kartenentwuerfe/<ordner>/` und
 `in_arbeit`. Offen ist dabei jede Zeile, die noch auf ihre Karte wartet, ob
 Übungs- oder Wissenskarte.
 
+Gehören Übungen und Wissenskarte zum selben Beitrag, zeigt die Wissenskarte
+danach auf die Übungen. Die Verbindung steht in `Übungen:` in „Was es ist“ der
+`wissen`-Zeile. Wird die Wissenskarte übernommen, kommen in ihre `uebungen` zu
+den IDs aus dem Entwurf die genannten IDs und die Karten der genannten
+Kandidaten, die schon `importiert` oder `ergänzt` sind. Wird eine Übung
+übernommen, oder ergänzt sie eine bestehende Karte, kommt deren ID in jede
+schon übernommene Wissenskarte, deren Zeile ihre Nummer nennt. So stimmt das
+Ergebnis in jeder Reihenfolge, auch in einem Aufruf. Die IDs stehen sortiert
+da, keine doppelt. Ein Kandidat, der `übersprungen` oder `zurückgestellt` wird,
+kommt nie hinein. Die Übungskarte trägt nichts, die Gegenrichtung rechnet
+`index.py` aus.
+
 Nicht übernommen wird ein Kandidat, unter dessen Namen in `schaubilder/` schon
 eine Datei liegt, einer, dessen freigegebener Entwurf die Prüfung nicht
-besteht, und einer, für dessen Ausschnitt Pillow oder `pypdfium2` fehlt.
+besteht, einer, für dessen Ausschnitt Pillow oder `pypdfium2` fehlt, und eine
+Wissenskarte, hinter deren `Übungen:` etwas steht, das keine Übung ist.
 Entwurf und Status bleiben dann, wie sie sind, denn der Entwurf trägt
 die Antworten des Trainers, und ein neuer Durchgang überschriebe sie. Die
 Ausgabe nennt den Fehler, die übrigen Kandidaten übernimmt `uebernehmen`
