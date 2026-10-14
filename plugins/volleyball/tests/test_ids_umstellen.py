@@ -173,7 +173,22 @@ class IdsUmstellenTest(unittest.TestCase):
 
 
 class VorlageTest(unittest.TestCase):
-    """Die Wurzeldatei aus init_struktur.py hat `trainer:` schon, ohne Eintrag."""
+    """Ein neuer Arbeitsordner aus init_struktur.py.
+
+    Die Wurzeldatei hat `trainer:` schon, ohne Eintrag, und der Ordner fuer
+    die Wissenskarten ist da (#66).
+    """
+
+    def test_ein_neuer_arbeitsordner_hat_wissen(self) -> None:
+        ordner = Arbeitsordner()
+        self.addCleanup(ordner.raeume_auf)
+        neu = Path(tempfile.mkdtemp(prefix="trainingsplanung-vorlage-"))
+        self.addCleanup(shutil.rmtree, neu, True)
+
+        angelegt = ordner.starte("init_struktur.py", str(neu), mit_wurzel=False)
+
+        self.assertEqual(angelegt.returncode, 0, angelegt.stdout + angelegt.stderr)
+        self.assertTrue((neu / "wissen").is_dir())
 
     def test_der_leere_abschnitt_aus_der_vorlage_bekommt_den_trainer(self) -> None:
         ordner = Arbeitsordner()

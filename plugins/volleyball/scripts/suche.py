@@ -8,7 +8,8 @@
     <python> suche.py --id ue-000042
     <python> suche.py --nie-benutzt
     <python> suche.py --seit 180          # seit über 180 Tagen nicht eingesetzt
-    <python> suche.py --naechste-id       # die ID für die nächste Karte
+    <python> suche.py --naechste-id       # die ID für die nächste Übungskarte
+    <python> suche.py --naechste-id --wissen   # die für die nächste Wissenskarte
     <python> suche.py --plaene-mit-leseansicht ue-000042 ue-000043
 
 Der Index wird vor jeder Suche neu gebaut, die Treffer sind also immer aktuell.
@@ -38,7 +39,10 @@ sie anpasst.
 `--naechste-id` sucht nichts. Es gibt die ID aus, die der Trainer an diesem
 Rechner als nächste vergibt, und sonst nichts. Gehört der Rechner zu keinem
 Trainer unter `trainer:` in der Wurzeldatei, steht stattdessen auf stderr,
-warum, und der Aufruf endet mit 1 (ADR-0011).
+warum, und der Aufruf endet mit 1 (ADR-0011). Mit `--wissen` ist es die ID
+der nächsten Wissenskarte, `wi-` statt `ue-`. Gezählt wird dann nur in
+`wissen/`, getrennt von den Übungen. Ohne `--naechste-id` gibt es `--wissen`
+noch nicht.
 
 `--plaene-mit-leseansicht` sucht auch keine Übung. Es nennt je Zeile einen
 Trainingsplan, der eine der Karten nennt und neben dem schon seine Leseansicht
@@ -59,8 +63,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    DISZIPLINEN, LEVEL, KeineId, disziplin_text, finde_wurzel, hole_index,
-    interpreter, konsole_vorbereiten, naechste_id, schaubilder,
+    DISZIPLINEN, LEVEL, UEBUNGSKARTE, WISSENSKARTE, KeineId, disziplin_text,
+    finde_wurzel, hole_index, interpreter, konsole_vorbereiten, naechste_id, schaubilder,
 )
 
 
@@ -303,15 +307,22 @@ def main() -> int:
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--naechste-id", action="store_true",
                     help="nur die ID ausgeben, die der Trainer an diesem Rechner als nächste vergibt")
+    ap.add_argument("--wissen", action="store_true",
+                    help="mit --naechste-id: die ID für die nächste Wissenskarte statt Übung")
     ap.add_argument("--plaene-mit-leseansicht", nargs="+", metavar="ID",
                     help="nur die Trainingspläne ausgeben, die eine dieser Karten nennen "
                          "und schon eine Leseansicht haben")
     a = ap.parse_args()
 
+    # Eine Liste der Wissenskarten gibt es noch nicht. Ohne diese Meldung
+    # liefe die Suche nach Übungen und sähe aus wie eine Antwort.
+    if a.wissen and not a.naechste_id:
+        ap.error("--wissen geht bisher nur zusammen mit --naechste-id")
+
     wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
     if a.naechste_id:
         try:
-            print(naechste_id(wurzel))
+            print(naechste_id(wurzel, WISSENSKARTE if a.wissen else UEBUNGSKARTE))
         except KeineId as fehler:
             print(fehler, file=sys.stderr)
             return 1

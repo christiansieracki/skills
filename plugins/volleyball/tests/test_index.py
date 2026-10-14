@@ -19,6 +19,33 @@ import unittest
 from arbeitsordner import OHNE, Arbeitsordner, auffaelligkeiten
 
 
+# Der Text einer Wissenskarte, der einen der beiden Abschnitte nicht hat.
+NUR_KERNAUSSAGEN = """
+    ## Kernaussagen
+
+    - Steht da.
+"""
+NUR_TRAINING = """
+    ## Was das fürs Training heißt
+
+    - Steht da.
+"""
+
+# Der Text einer Wissenskarte mit einem Bild an der Kernaussage, wie
+# DATENMODELL.md ihn zeigt. `{bild}` ist der Name unter schaubilder/.
+MIT_BILD = """
+    ## Kernaussagen
+
+    - Eine Bildreihe zeigt es.
+
+      ![Bildreihe](../schaubilder/{bild})
+
+    ## Was das fürs Training heißt
+
+    - Steht da.
+"""
+
+
 def disziplin_zu(index_md: str, uebung_id: str) -> set[str]:
     """Die Disziplinzelle jeder Tabellenzeile, die zu einer Uebung gehoert.
 
@@ -318,6 +345,130 @@ class LinterTest(unittest.TestCase):
         self.assertIn("trainings/gruppe/2026-09-15.md", gemeldet[0])
         self.assertIn("ue-0003", gemeldet[0])
         self.assertIn("ids_umstellen.py", gemeldet[0])
+
+
+class WissenskarteTest(unittest.TestCase):
+    """Der Linter liest `wissen/` neben `uebungen/` (#66).
+
+    Die Regeln stehen in DATENMODELL.md unter "Die Wissenskarte". Jede Regel
+    meldet ihre Karte genau einmal, mit der Datei vorn wie bei der Uebung.
+    """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+
+    def test_gueltige_wissenskarten_melden_nichts(self) -> None:
+        # Eine mit Bild an der Kernaussage und Uebungen, eine fuer den Sand
+        # mit einem Steuerungsschwerpunkt, der keine Disziplinspalte hat und
+        # damit fuer beide gilt, und eine ganz ohne `schwerpunkt` und
+        # `uebungen`: Ein Beitrag ueber Schlaf hat keine Kennung.
+        self.ordner.lege_schaubild_an("wi-000001-bildreihe.png")
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000001", thema=["technik", "methodik"], disziplin=["halle", "beach"],
+            uebungen=["ue-000001", "ue-000004"],
+            rumpf=MIT_BILD.format(bild="wi-000001-bildreihe.png"))
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000002", titel="Wie steuert man die Belastung im Sand?",
+            thema=["trainingslehre"], disziplin=["beach"], schwerpunkt=["standortbestimmung"])
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000003", titel="Was hat Schlaf mit der Reaktion zu tun?",
+            thema=["physiologie"], schwerpunkt=OHNE, uebungen=OHNE)
+
+        fertig = self.ordner.starte("index.py")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        self.assertEqual(auffaelligkeiten(fertig.stdout), [])
+
+    def test_eine_id_ausserhalb_des_musters_wird_gemeldet(self) -> None:
+        self.ordner.lege_wissenskarte_an(id="wi-0042")
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertIn("wi-0042", gemeldet[0])
+        self.assertIn("wi-######", gemeldet[0])
+
+    def test_ein_dateiname_ohne_die_id_vorn_wird_gemeldet(self) -> None:
+        karte = self.ordner.lege_wissenskarte_an(id="wi-000031")
+        karte.rename(karte.with_name("wi-000032-umbenannt.md"))
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertTrue(gemeldet[0].startswith("wissen/wi-000032-umbenannt.md: "), gemeldet[0])
+        self.assertIn("wi-000031", gemeldet[0])
+
+    def test_eine_doppelte_id_wird_gemeldet(self) -> None:
+        # Ein Trainer an zwei Rechnern, bevor Nextcloud abgleicht.
+        self.ordner.lege_wissenskarte_an(id="wi-000033", titel="Die eine Frage?")
+        self.ordner.lege_wissenskarte_an(id="wi-000033", titel="Die andere Frage?")
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 1, gemeldet)
+        self.assertIn("wi-000033", gemeldet[0])
+        self.assertIn("gibt es schon", gemeldet[0])
+
+    def test_eine_karte_im_ordner_der_anderen_sorte_wird_einmal_gemeldet(self) -> None:
+        # Eine Uebungskarte in wissen/ und eine Wissenskarte in uebungen/,
+        # beide fuer sich richtig. Mit den Regeln des falschen Ordners
+        # geprueft, meldete jede jedes Feld der anderen Sorte. Die eine
+        # Meldung sagt, wohin sie gehoert.
+        wissen = self.ordner.lege_wissenskarte_an(id="wi-000041")
+        wissen.rename(self.ordner.pfad / "uebungen" / wissen.name)
+        self.ordner.lege_karte_an(id="ue-000040", titel="Übung unter dem Wissen")
+        uebung = next((self.ordner.pfad / "uebungen").glob("ue-000040-*.md"))
+        uebung.rename(self.ordner.pfad / "wissen" / uebung.name)
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        self.assertEqual(len(gemeldet), 2, gemeldet)
+        (in_wissen,) = [z for z in gemeldet if z.startswith("wissen/ue-000040-")]
+        (in_uebungen,) = [z for z in gemeldet if z.startswith("uebungen/wi-000041-")]
+        self.assertIn("uebungen/", in_wissen.split(": ", 1)[1])
+        self.assertIn("wissen/", in_uebungen.split(": ", 1)[1])
+
+    def test_jede_regel_meldet_ihre_karte_genau_einmal(self) -> None:
+        # Je Regel eine Karte mit genau diesem einen Fehler, alle in einem
+        # Arbeitsordner und einem Lauf. Ein Lauf je Regel kostete jedes Mal
+        # einen Arbeitsordner und einen Interpreter.
+        faelle = {
+            "wi-000011": ({"titel": "Ein Titel ohne Fragezeichen"}, "Ein Titel ohne Fragezeichen"),
+            "wi-000012": ({"thema": OHNE}, "thema"),
+            "wi-000013": ({"thema": []}, "thema"),
+            "wi-000014": ({"thema": ["technik", "geschichte"]}, "geschichte"),
+            # `thema: technik` statt `thema: [technik]`. Ohne eigene Pruefung
+            # liefe die Wertepruefung ueber die Buchstaben.
+            "wi-000015": ({"thema": "technik"}, "thema"),
+            # Pflicht und ohne Vorgabe, wie bei der Uebungskarte: Wissen nur
+            # ueber den Sand soll nicht still bei der Halle landen.
+            "wi-000016": ({"disziplin": OHNE}, "disziplin"),
+            "wi-000017": ({"disziplin": []}, "disziplin"),
+            "wi-000018": ({"disziplin": ["halle", "strand"]}, "strand"),
+            "wi-000019": ({"schwerpunkt": ["gibt-es-nicht"]}, "gibt-es-nicht"),
+            # Eine inhaltliche Kennung, die in keiner Disziplin der Karte gilt.
+            "wi-000020": ({"disziplin": ["halle"], "schwerpunkt": ["nur-beach"]}, "nur-beach"),
+            "wi-000021": ({"quelle": ""}, "quelle"),
+            "wi-000022": ({"quelle": OHNE}, "quelle"),
+            # ue-000001 gibt es, ue-000099 nicht. Gemeldet wird die eine.
+            "wi-000023": ({"uebungen": ["ue-000001", "ue-000099"]}, "ue-000099"),
+            "wi-000024": ({"rumpf": NUR_TRAINING}, "## Kernaussagen"),
+            "wi-000025": ({"rumpf": NUR_KERNAUSSAGEN}, "## Was das fürs Training heißt"),
+            "wi-000026": ({"rumpf": MIT_BILD.format(bild="wi-000026-gibt-es-nicht.png")},
+                          "../schaubilder/wi-000026-gibt-es-nicht.png"),
+        }
+        for uid, (felder, _) in faelle.items():
+            self.ordner.lege_wissenskarte_an(id=uid, **felder)
+
+        gemeldet = auffaelligkeiten(self.ordner.starte("index.py").stdout)
+
+        for uid, (felder, stichwort) in faelle.items():
+            with self.subTest(karte=uid, felder=felder):
+                zur_karte = [z for z in gemeldet if z.startswith(f"wissen/{uid}-")]
+                self.assertEqual(len(zur_karte), 1, gemeldet)
+                self.assertIn(stichwort, zur_karte[0])
+        self.assertEqual(len(gemeldet), len(faelle), gemeldet)
 
 
 class SzenenTest(unittest.TestCase):

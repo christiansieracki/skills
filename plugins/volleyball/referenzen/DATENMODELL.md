@@ -19,6 +19,7 @@ in `scripts/tpdaten.py` macht das.
 ├── teams/<team>/               team-profil.md, saisonplan.md, mesozyklen/
 ├── trainings/<gruppe>/         JJJJ-MM-TT.md, dazu _vorlage.md
 ├── uebungen/                   flach, eine Datei je Übung
+├── wissen/                     flach, eine Datei je Wissenskarte
 ├── quellen/                    Originaldokumente
 ├── kartenentwuerfe/            Kartenentwürfe eines laufenden Sammelimports
 └── schaubilder/                Schaubilder und die Szenen, aus denen sie entstehen
@@ -163,6 +164,99 @@ Entschieden wird in der Halle.
 Setzen nur, wenn die Quelle es hergibt. Eine geratene Altersfreigabe ist
 schlechter als gar keine. Im Zweifel nachfragen.
 
+## Die Wissenskarte
+
+Hintergrund aus einer Fremdquelle, in eigenen Worten (ADR-0002). Eine
+Wissenskarte beantwortet genau eine Frage, die sich ein Trainer stellt, und
+diese Frage ist ihr Titel. Wann etwas Wissenskarte wird und wann Übung oder
+Prinzip, steht im Glossar.
+
+Dateiname `wi-######-sprechender-slug.md`, der Slug aus der Frage ohne
+Fragezeichen. Frontmatter komplett:
+
+```yaml
+---
+id: wi-000001                    # stabil, ändert sich nie
+titel: "Wann lohnt sich einarmige Abwehr?"   # die Frage, endet auf ?
+thema: [technik, taktik]         # Liste, Pflicht, aus der Liste unten
+schwerpunkt: [abwehr]            # Liste, freiwillig, auch Steuerungsschwerpunkte
+disziplin: [halle, beach]        # Liste, Pflicht, ohne Default
+uebungen: [ue-000037, ue-000038] # Liste, freiwillig, IDs aus uebungen/
+quelle: "Volleyball-Magazin 08/2026, Einarmig gehts auch, Teil 1, S. 24–25"   # nie leer
+quelldatei: "volleyballmagazin/vm_08_2026/seite-24.jpg"   # relativ zu quellen/
+autor: christian
+angelegt: 2026-10-20
+---
+
+# Wann lohnt sich einarmige Abwehr?
+
+## Kernaussagen
+## Was das fürs Training heißt
+```
+
+Beide Abschnitte gibt es auf jeder Wissenskarte. Unter „Kernaussagen“ steht
+knapp, was die Quelle sagt, in eigenen Worten und ohne Volltext. Unter „Was das
+fürs Training heißt“ steht, was daraus für die Halle folgt: was die Quelle dazu
+sagt, und was der Trainer als Ableitung bestätigt hat.
+
+Ein Feld `schaubild` hat die Wissenskarte nicht, eines für Alter oder Level
+auch nicht.
+
+### Kontrollierte Werte
+
+- `thema`: trainingslehre, methodik, psychologie, physiologie, ernaehrung,
+  regelkunde, technik, taktik. Fest wie `element`, kein Trainer erweitert die
+  Liste selbst. Eine Karte darf mehrere Themen tragen.
+- `disziplin`: halle, beach. Pflicht und ohne Default, wie bei der Übungskarte:
+  Wissen nur über den Sand soll nicht still bei der Halle landen.
+- `schwerpunkt`: Kennungen aus `schwerpunkte.md`, die inhaltlichen und die
+  Steuerungsschwerpunkte, etwa `belastungssteuerung`. Mit denen plant der
+  Saisonplaner einen Trainingsblock, und dazu soll er die Karte finden. Eine
+  inhaltliche Kennung muss in einer Disziplin der Karte gelten, wie bei der
+  Übungskarte. Ein Steuerungsschwerpunkt hat keine Disziplinspalte und gilt
+  für beide. Das Feld ist freiwillig, ein Beitrag über Schlaf hat keine
+  Kennung. Eine neue Kennung kommt nur für etwas dazu, das man trainieren kann,
+  und erst nach dem Ja des Trainers.
+
+### Übungen
+
+`uebungen` nennt die Übungen, die zur Karte gehören, etwa die aus demselben
+Beitrag. Die Übungskarte trägt nichts davon. Welche Wissenskarten auf eine
+Übung zeigen, rechnet `index.py` aus. `index.py` meldet eine ID, die es in
+`uebungen/` nicht gibt.
+
+### Bilder
+
+Ein Bild steht als Markdown-Bildverweis im Text, an der Kernaussage, die es
+zeigt. Die Datei liegt in `schaubilder/`, ihr Name beginnt mit der ID der
+Karte:
+
+```markdown
+## Kernaussagen
+
+- Beim oberen Zuspiel bilden die Hände ein Dreieck über der Stirn.
+
+  ![Bildreihe oberes Zuspiel](../schaubilder/wi-000003-oberes-zuspiel-1.png)
+```
+
+Der Weg ist relativ zur Karte, so zeigt jede Markdown-Ansicht das Bild. Ein
+Bild ohne Zusammenhang erklärt auf einer Wissenskarte nichts, deshalb gibt es
+kein Feld dafür. `index.py` meldet einen Bildverweis, dessen Datei es nicht
+gibt.
+
+### Die ID einer Wissenskarte
+
+`wi-` und sechs Ziffern, vorn die Nummer des Trainers wie bei der Übung:
+`wi-000001` ist die erste Wissenskarte von Trainer 00, `wi-010001` die erste
+von Trainer 01. Der Bereich ist derselbe, der Zähler ein eigener. Gezählt wird
+nur in `wissen/`, die Übungen zählen nicht mit.
+
+Nächste freie ID: `python3 scripts/suche.py --naechste-id --wissen` (Windows:
+`python`). Sonst gilt alles aus „Die ID“: Dateiname und `id:` zählen, kein
+Trainer an diesem Rechner heißt keine ID, vergeben wird erst bei der Freigabe.
+Vierstellige IDs gab es bei Wissenskarten nie. Eine vierstellige Übung hält
+die nächste Wissenskarte deshalb nicht auf.
+
 ## Die ID
 
 `id` ist die Identität. Trainingspläne verweisen darüber, `index.py` löst sie
@@ -175,7 +269,8 @@ Eine ID ist `ue-` und sechs Ziffern: zwei für die Nummer des Trainers, der sie
 vergeben hat, vier laufend. `ue-000042` ist die Karte 42 von Trainer 00,
 `ue-010001` die erste von Trainer 01. Jeder Trainer vergibt die höchste Nummer
 in seinem Bereich plus eins. Zwei Trainer vergeben so nie dieselbe ID, auch
-wenn Nextcloud ihre Rechner noch nicht abgeglichen hat.
+wenn Nextcloud ihre Rechner noch nicht abgeglichen hat. Die Wissenskarte trägt
+`wi-` vorn und zählt für sich, siehe „Die ID einer Wissenskarte“.
 
 Nächste freie ID: `python3 scripts/suche.py --naechste-id` (Windows: `python`).
 Gezählt werden Dateiname und `id:` jeder Karte, aber nur im Bereich des
@@ -699,7 +794,7 @@ Die übrigen Skripte brauchen weder Pillow noch `pdftotext` noch einen Browser.
 | Skript | Wofür |
 |---|---|
 | `index.py` | Index neu bauen, Bibliothek prüfen, mit `--md` die Lesebrille schreiben |
-| `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek. Mit `--naechste-id` die ID für die nächste Karte, mit `--plaene-mit-leseansicht` die Trainingspläne, die eine Karte nennen und schon eine Leseansicht haben |
+| `suche.py` | Übungen filtern, das ist der normale Zugriff auf die Bibliothek. Mit `--naechste-id` die ID für die nächste Übungskarte, mit `--naechste-id --wissen` die für die nächste Wissenskarte, mit `--plaene-mit-leseansicht` die Trainingspläne, die eine Karte nennen und schon eine Leseansicht haben |
 | `leseansicht.py` | aus einem Trainingsplan die HTML-Fassung fürs Handy erzeugen, samt den Schaubildern der verwendeten Übungen. Meldet jede Überschrift, deren Zeitangabe auf keinen Programmpunkt passt |
 | `export_pdf.py` | PDF zum Ausdrucken |
 | `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen, mit `--png` dazu eine Ansicht als PNG im Temp-Verzeichnis |
@@ -712,5 +807,15 @@ auf Karten und in Trainingsplänen, fehlende oder unbekannte `disziplin`,
 unbekannte Schwerpunkte, fehlende Level, ins Leere zeigende `variante_von`,
 jeder Eintrag in `schaubild` auf eine Datei, die es unter `schaubilder/` nicht
 gibt, Szenen, die nicht aufgehen, Szenen ohne SVG oder mit einem älteren,
-Trainingspläne mit unbekannten IDs, Konfliktkopien von Nextcloud. Vor größeren
-Änderungen und nach jedem Import laufen lassen.
+Trainingspläne mit unbekannten IDs, Konfliktkopien von Nextcloud. Eine Karte im
+Ordner der anderen Sorte meldet er einmal, mit dem Ordner, in den sie gehört.
+
+Bei einer Wissenskarte meldet er dazu eine ID, die nicht `wi-######` ist,
+nicht vorn im Dateinamen steht oder doppelt vorkommt, einen Titel ohne
+Fragezeichen am Ende, ein fehlendes, leeres oder unbekanntes `thema` und
+ebenso `disziplin`, eine unbekannte Kennung in `schwerpunkt` und eine
+inhaltliche, die in keiner Disziplin der Karte gilt, eine leere `quelle`, eine
+ID in `uebungen`, die es in `uebungen/` nicht gibt, einen Bildverweis, dessen
+Datei es nicht gibt, und einen fehlenden der beiden Abschnitte.
+
+Vor größeren Änderungen und nach jedem Import laufen lassen.
