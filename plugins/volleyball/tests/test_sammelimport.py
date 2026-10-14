@@ -1381,6 +1381,43 @@ class AusschnittTest(unittest.TestCase):
         self.assertIn("pip install pypdfium2", fertig.stdout)
         self.assertEqual(datei.read_text(encoding="utf-8"), vorher)
 
+    @BRAUCHT_PILLOW
+    def test_uebernehmen_legt_einen_jpeg_ausschnitt_unter_dem_kartennamen_ab(self) -> None:
+        # Wie eine Quellgrafik aus PlayDrill, nur mit der Endung des
+        # Ausschnitts. Mit .png stuende ein JPEG unter falscher Endung in
+        # schaubilder/. Danach liegt neben dem Entwurf nichts mehr.
+        self.ordner.lege_karte_an(id="ue-000009", titel="Die bisher höchste ID")
+        self.plane({"kandidat": 3, "dateien": ["seite-26.jpg"], "status": "bereit"})
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        self.ordner.lege_kartenentwurf_an(
+            ORDNER, 3, titel="Abwehr vom Kasten", schaubild="3.quellgrafik.jpg", ausschnitte=[
+                "`3.quellgrafik.jpg`: `seite-26.jpg`, links 10, oben 20, rechts 60, unten 70"])
+
+        fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, "--kandidat", "3", "")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        name = "ue-000010-abwehr-vom-kasten"
+        with Image.open(self.ordner.pfad / "schaubilder" / f"{name}.jpg") as bild:
+            self.assertEqual((bild.format, bild.size), ("JPEG", (500, 400)))
+        karte = (self.ordner.pfad / "uebungen" / f"{name}.md").read_text(encoding="utf-8")
+        self.assertIn(f"\nschaubild: {name}.jpg\n", karte)
+        self.assertNotIn("Ausschnitte", karte)
+        self.assertFalse(self.entwuerfe.exists())
+        self.assertEqual(auffaelligkeiten(self.ordner.starte("index.py").stdout), [])
+
+    def test_vorbereiten_raeumt_einen_alten_ausschnitt_weg(self) -> None:
+        # Ein Entwurf, der die Pruefung nicht besteht, wird neu entworfen.
+        # Sein alter Ausschnitt gehoert zu keinem Entwurf mehr, und der neue
+        # nennt vielleicht keinen.
+        self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 3, "dateien": ["seite-26.jpg"]}])
+        self.entwuerfe.mkdir(parents=True)
+        (self.entwuerfe / "3.quellgrafik-1.jpg").write_bytes(b"der alte Ausschnitt")
+
+        fertig = self.vorbereiten()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.iterdir()), ["3.auftrag.md"])
+
 
 class PlaneingabeTest(unittest.TestCase):
     """`vorbereiten --plan` legt an, woraus der Agent den Zerlegungsplan macht.
