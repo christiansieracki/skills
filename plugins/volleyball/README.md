@@ -7,19 +7,26 @@ Fünf Skills, die zusammen auf einem Markdown-Ordner arbeiten.
 | `volleyball-saisonplaner` | Saisonplan und Mesozyklen für ein Team |
 | `volleyball-trainingsdesign` | einzelne Trainingseinheiten |
 | `volleyball-uebungsimport` | neue Übungskarten und Wissenskarten aus PDFs, Screenshots und Links |
-| `volleyball-sammelimport` | einen ganzen Quellenordner auf einmal importieren, mit Freigabe im Chat |
+| `volleyball-sammelimport` | einen ganzen Quellenordner auf einmal importieren, Übungen und Wissenskarten, mit Freigabe im Chat |
 | `volleyball-schaubild` | Schaubilder zu einer Übung, aus einer Szene gezeichnet |
 
 Sie teilen sich Datenmodell, Skripte und Sprachregeln, deshalb liegen sie in
 einem Plugin und nicht in fünfen.
 
-Dazu kommen zwei Agenten, die nur der Sammelimport startet. Beide arbeiten mit
-Sonnet und dürfen nur lesen und schreiben (ADR-0009).
+Dazu kommen drei Agenten, die nur der Sammelimport startet. Alle drei arbeiten
+mit Sonnet und dürfen nur lesen und schreiben (ADR-0009).
 
 | Agent | Wofür |
 |---|---|
 | `volleyball-zerlegungsplan` | legt fest, welche Dateien eines Quellenordners welche Karte ergeben |
-| `volleyball-kartenentwurf` | schreibt aus dem Auftrag eines Kandidaten einen Kartenentwurf |
+| `volleyball-kartenentwurf` | schreibt aus dem Auftrag eines Kandidaten den Entwurf einer Übungskarte |
+| `volleyball-wissenskarte` | schreibt aus dem Auftrag eines Kandidaten den Entwurf einer Wissenskarte |
+
+Eine Wissenskarte ist Hintergrund aus einer Fremdquelle, etwa die Theorie
+neben den Übungen in einem Magazinheft. Sie beantwortet eine Frage, die sich
+ein Trainer stellt, mit den Kernaussagen und dem, was das fürs Training heißt,
+und liegt unter `wissen/`. Wie sie aufgebaut ist, steht in
+`referenzen/DATENMODELL.md`.
 
 ## Wie der Arbeitsordner gefunden wird
 
@@ -36,7 +43,7 @@ heißt der Aufruf `python`.
 ```
 plugins/volleyball/
 ├── skills/            die fünf SKILL.md
-├── agents/            die beiden Agenten des Sammelimports
+├── agents/            die drei Agenten des Sammelimports
 ├── referenzen/        DATENMODELL, SPRACHE, VORLAGEN, METHODIK, ...
 ├── scripts/           index.py, suche.py, leseansicht.py, export_pdf.py,
 │                      bilder_aufbereiten.py, ausschnitt.py, schaubild.py,
@@ -49,8 +56,8 @@ plugins/volleyball/
 ```
 
 **Im Plugin liegt das Werkzeug, im Arbeitsordner liegen die Daten.** Übungen,
-Teams, Trainings, Quellen und die Schwerpunktliste gehören dem Verein und
-werden nicht mit einem Plugin-Update überschrieben.
+Wissenskarten, Teams, Trainings, Quellen und die Schwerpunktliste gehören dem
+Verein und werden nicht mit einem Plugin-Update überschrieben.
 
 ## Tests
 
