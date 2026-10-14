@@ -146,6 +146,18 @@ def disziplin_text(eintrag: dict) -> str:
     return ", ".join(eintrag.get("disziplin") or []) or "—"
 
 
+def als_liste(wert) -> list:
+    """Ein Listenfeld als Liste, auch wenn die eckigen Klammern fehlen.
+
+    Ohne sie liest der Parser einen Text. Der Linter meldet das. Wer das Feld
+    nur anzeigt, `index.md` oder die Suche, soll daran nicht jeden Buchstaben
+    als eigenen Wert aufzaehlen. Fehlt das Feld, ist die Liste leer.
+    """
+    if wert is None or wert == "":
+        return []
+    return wert if isinstance(wert, list) else [wert]
+
+
 def schaubilder(wert) -> list[str]:
     """Die Dateinamen in `schaubild:`, in ihrer Reihenfolge.
 

@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    cache_pfad, disziplin_text, finde_wurzel, hole_index,
+    als_liste, cache_pfad, disziplin_text, finde_wurzel, hole_index,
     konsole_vorbereiten,
 )
 
@@ -51,17 +51,6 @@ def spanne(lo, hi, einheit=""):
     if lo is None or lo == hi:
         return f"{hi}{einheit}"
     return f"{lo}–{hi}{einheit}"
-
-
-def als_liste(wert) -> list:
-    """Ein Listenfeld als Liste, auch wenn die eckigen Klammern fehlen.
-
-    Ohne sie liest der Parser einen Text. Der Linter meldet das, die
-    Lesebrille soll daran nicht jeden Buchstaben als Thema aufzaehlen.
-    """
-    if wert is None or wert == "":
-        return []
-    return wert if isinstance(wert, list) else [wert]
 
 
 def wissenskarten_md(wissen: list[dict]) -> list[str]:

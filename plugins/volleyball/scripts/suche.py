@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sucht Übungen in der Bibliothek.
+"""Sucht Übungen in der Bibliothek und listet die Wissenskarten.
 
     <python> suche.py --element annahme --spieler 14 --spielflaechen 2
     <python> suche.py --schwerpunkt sideout-sicherheit --level fortgeschritten
@@ -10,6 +10,7 @@
     <python> suche.py --seit 180          # seit über 180 Tagen nicht eingesetzt
     <python> suche.py --naechste-id       # die ID für die nächste Übungskarte
     <python> suche.py --naechste-id --wissen   # die für die nächste Wissenskarte
+    <python> suche.py --wissen            # alle Wissenskarten, mit --json samt Feldern
     <python> suche.py --plaene-mit-leseansicht ue-000042 ue-000043
 
 Der Index wird vor jeder Suche neu gebaut, die Treffer sind also immer aktuell.
@@ -41,8 +42,17 @@ Rechner als nächste vergibt, und sonst nichts. Gehört der Rechner zu keinem
 Trainer unter `trainer:` in der Wurzeldatei, steht stattdessen auf stderr,
 warum, und der Aufruf endet mit 1 (ADR-0011). Mit `--wissen` ist es die ID
 der nächsten Wissenskarte, `wi-` statt `ue-`. Gezählt wird dann nur in
-`wissen/`, getrennt von den Übungen. Ohne `--naechste-id` gibt es `--wissen`
-noch nicht.
+`wissen/`, getrennt von den Übungen.
+
+`--wissen` allein sucht keine Übung. Es listet alle Wissenskarten, eine Zeile
+je Karte mit ID, Frage, Thema und Schwerpunkt. Mit `--json` kommen die
+Einträge aus dem Index, darunter Disziplin, `quelldatei` und `uebungen`, so
+prüft der Import Duplikate. Filtern lassen sich Wissenskarten erst mit Welle
+2. Bis dahin endet `--wissen` zusammen mit einem Filter für Übungen, etwa
+`--element`, mit einer Meldung und dem Exitcode 2. Gibt es keine
+Wissenskarte, endet die Liste wie eine Suche ohne Treffer mit 1, mit `--json`
+ist sie leer. Ohne `--wissen` kommen nur Übungen, wie bisher. Im `--json`
+einer Übung nennt `hintergrund` die Wissenskarten, die auf sie zeigen.
 
 `--plaene-mit-leseansicht` sucht auch keine Übung. Es nennt je Zeile einen
 Trainingsplan, der eine der Karten nennt und neben dem schon seine Leseansicht
@@ -63,7 +73,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
-    DISZIPLINEN, LEVEL, UEBUNGSKARTE, WISSENSKARTE, KeineId, disziplin_text,
+    DISZIPLINEN, LEVEL, UEBUNGSKARTE, WISSENSKARTE, KeineId, als_liste, disziplin_text,
     finde_wurzel, hole_index, interpreter, konsole_vorbereiten, naechste_id, schaubilder,
 )
 
@@ -200,6 +210,18 @@ def plaene_mit_leseansicht(eintraege, ids: list[str], wurzel: Path) -> list[str]
     return sorted(p for p in plaene if (wurzel / p).with_suffix(".html").is_file())
 
 
+def zeige_wissen(k) -> None:
+    """Eine Zeile je Wissenskarte: ID, Frage, Thema und Schwerpunkt.
+
+    Mehr braucht es nicht, um eine Karte wiederzuerkennen. Disziplin,
+    `quelldatei` und `uebungen` stehen in `--json`, für den Skill, der
+    Duplikate prüft.
+    """
+    thema = ", ".join(str(t) for t in als_liste(k.get("thema"))) or "—"
+    schwerpunkt = ", ".join(str(s) for s in als_liste(k.get("schwerpunkt"))) or "—"
+    print(f"{k['id']}  {k.get('titel')}  Thema {thema} · Schwerpunkt {schwerpunkt}")
+
+
 def zeige(e, lang: bool, wurzel: Path, anwesend=None, verfuegbar=None):
     warn = " ⚠" if e.get("erwachsenenbelastung") else ""
     art = " (Folge)" if e.get("typ") == "folge" else ""
@@ -278,9 +300,65 @@ def zeige(e, lang: bool, wurzel: Path, anwesend=None, verfuegbar=None):
     print()
 
 
+# Was im Aufruf nur für Übungen gilt, nach dem Namen in argparse: die Filter,
+# dazu `--lang`, `--jugend` und `--plaene-mit-leseansicht`. Mit `--wissen`
+# endet jedes davon mit einer Meldung (#67). Die Filter für Wissenskarten
+# kommen mit Welle 2, bis dahin liefe ein Filter ins Leere, und die ganze
+# Liste sähe aus wie eine gefilterte. `--netz` und `--ohne-netz` teilen sich
+# einen Namen und stehen deshalb nicht hier, sondern in `nur_fuer_uebungen`.
+NUR_FUER_UEBUNGEN = {
+    "id": "--id", "text": "--text", "disziplin": "--disziplin", "element": "--element",
+    "schwerpunkt": "--schwerpunkt", "form": "--form", "spielphase": "--spielphase",
+    "typ": "--typ", "level": "--level", "spieler": "--spieler", "dauer": "--dauer",
+    "genau": "--genau", "spielflaechen": "--spielflaechen", "nie_benutzt": "--nie-benutzt",
+    "seit": "--seit", "jugend": "--jugend", "lang": "--lang",
+    "plaene_mit_leseansicht": "--plaene-mit-leseansicht",
+}
+
+
+def nur_fuer_uebungen(a) -> list[str]:
+    """Die Angaben im Aufruf, die nur für Übungen gelten, so wie sie auf der Kommandozeile heißen."""
+    gesetzt = [schalter for name, schalter in NUR_FUER_UEBUNGEN.items()
+               if getattr(a, name) not in (None, False)]
+    if a.netz is not None:
+        gesetzt.append("--netz" if a.netz else "--ohne-netz")
+    return gesetzt
+
+
+def hinweis_auf_auffaelligkeiten(daten) -> None:
+    """Am Ende jeder Trefferliste, wenn der Linter etwas zu melden hätte."""
+    if daten["warnungen"]:
+        print(f"Hinweis: {len(daten['warnungen'])} Auffälligkeiten in der Bibliothek, "
+              f"'{interpreter()} index.py' zeigt sie.")
+
+
+def liste_wissen(daten, als_json: bool) -> int:
+    """`--wissen`: alle Wissenskarten nach ID, eine Zeile je Karte.
+
+    Mit `--json` kommen die Einträge des Index, wie bei den Übungen: das
+    Frontmatter ohne `angelegt` und die Datei, darunter Disziplin,
+    `quelldatei` und `uebungen`.
+    """
+    wissen = sorted(daten["wissen"], key=lambda k: str(k["id"]))
+    if als_json:
+        print(json.dumps(wissen, ensure_ascii=False, indent=1))
+        return 0
+    # Wie eine Suche nach Übungen ohne Treffer endet das mit 1.
+    if not wissen:
+        print("Keine Wissenskarte in wissen/. Der Übungsimport oder der Sammelimport legt sie an.")
+        return 1
+    print(f"{len(wissen)} {'Wissenskarte' if len(wissen) == 1 else 'Wissenskarten'}:\n")
+    for k in wissen:
+        zeige_wissen(k)
+    print()
+    hinweis_auf_auffaelligkeiten(daten)
+    return 0
+
+
 def main() -> int:
     konsole_vorbereiten()
-    ap = argparse.ArgumentParser(description="Übungen in der Bibliothek suchen")
+    ap = argparse.ArgumentParser(
+        description="Übungen in der Bibliothek suchen, Wissenskarten auflisten")
     ap.add_argument("--wurzel", type=Path, default=None)
     ap.add_argument("--id")
     ap.add_argument("--text", help="Teilstring im Titel")
@@ -308,16 +386,19 @@ def main() -> int:
     ap.add_argument("--naechste-id", action="store_true",
                     help="nur die ID ausgeben, die der Trainer an diesem Rechner als nächste vergibt")
     ap.add_argument("--wissen", action="store_true",
-                    help="mit --naechste-id: die ID für die nächste Wissenskarte statt Übung")
+                    help="alle Wissenskarten auflisten statt Übungen zu suchen; "
+                         "mit --naechste-id die ID für die nächste Wissenskarte")
     ap.add_argument("--plaene-mit-leseansicht", nargs="+", metavar="ID",
                     help="nur die Trainingspläne ausgeben, die eine dieser Karten nennen "
                          "und schon eine Leseansicht haben")
     a = ap.parse_args()
 
-    # Eine Liste der Wissenskarten gibt es noch nicht. Ohne diese Meldung
-    # liefe die Suche nach Übungen und sähe aus wie eine Antwort.
-    if a.wissen and not a.naechste_id:
-        ap.error("--wissen geht bisher nur zusammen mit --naechste-id")
+    # `--naechste-id` sucht nichts, dort fragt niemand nach Filtern.
+    gesetzt = nur_fuer_uebungen(a) if a.wissen and not a.naechste_id else []
+    if gesetzt:
+        ap.error(f"{', '.join(gesetzt)} {'gilt' if len(gesetzt) == 1 else 'gelten'} "
+                 f"nur für Übungen. --wissen listet bisher alle Wissenskarten, "
+                 f"die Filter für Wissenskarten kommen mit Welle 2.")
 
     wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
     if a.naechste_id:
@@ -329,6 +410,8 @@ def main() -> int:
         return 0
 
     daten = hole_index(wurzel)
+    if a.wissen:
+        return liste_wissen(daten, a.json)
     if a.plaene_mit_leseansicht:
         bekannt = {e["id"] for e in daten["uebungen"]}
         fehlen = [uid for uid in a.plaene_mit_leseansicht if uid not in bekannt]
@@ -360,9 +443,7 @@ def main() -> int:
                 print(f"  {e['id']}  {e.get('belastungshinweis') or '(Hinweis fehlt)'}")
             print()
 
-    if daten["warnungen"]:
-        print(f"Hinweis: {len(daten['warnungen'])} Auffälligkeiten in der Bibliothek, "
-              f"'{interpreter()} index.py' zeigt sie.")
+    hinweis_auf_auffaelligkeiten(daten)
     return 0
 
 
