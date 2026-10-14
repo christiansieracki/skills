@@ -373,6 +373,9 @@ die für jede Karte gelten, stehen zuletzt unter
 | 1 | `Ü_Abwehr/Abwehr vom Kasten.pdf` | Abwehr gegen Angriffe vom Kasten | uebung | importiert | ue-000291 | spieler_min auf 6 |
 | 2 | `seite-24.jpg`, `seite-25.jpg` | Übung über zwei Seiten | uebung | offen | | kein Entwurf |
 | 3 | `volley-meets-school.pdf` S. 12–13 | Ballgewöhnung mit dem Luftballon | uebung | offen | | |
+| 4 | `seite-26.jpg`, `seite-27.jpg` | Einarmig gehts auch, Teil 2, S. 26–27: Wann lohnt sich einarmige Abwehr? Übungen: 5, ue-000041 | wissen | offen | | |
+| 5 | `seite-28.jpg` | Einarmige Abwehr vom Kasten, Einarmig gehts auch, Teil 2, S. 28 | uebung | offen | | |
+| 6 | `seite-30.jpg` | Drei Spielzüge über die Mitte | zurückgestellt | zurückgestellt | | Spielzüge, dafür gibt es keine Sorte |
 ```
 
 - Die Spalte **Kandidat** trägt die Nummer des Kandidaten, fortlaufend je
@@ -389,13 +392,31 @@ die für jede Karte gelten, stehen zuletzt unter
   `vorbereiten` vor dem ersten Auftrag ab, und die Meldung nennt die Zeile.
   Die letzte Seite kennt das Skript aus `pdftotext`. Ohne `pdftotext` merkt
   es erst der Agent.
-- **Ergebnis** ist eins von `uebung`, `folge`, `zurückgestellt`, `übersprungen`.
-  Aus `uebung` und `folge` wird eine Karte mit diesem `typ`.
+- **Ergebnis** ist eins von `uebung`, `folge`, `wissen`, `zurückgestellt`,
+  `übersprungen`. Aus `uebung` und `folge` wird eine Übungskarte mit diesem
+  `typ`, aus `wissen` eine Wissenskarte. Ein anderes Ergebnis bricht jeden
+  Unterbefehl ab.
+- **`zurückgestellt`** heißt: Das kann später eine Karte werden, aber es gibt
+  keine Sorte dafür, etwa eine Seite mit Spielzügen, oder der Trainer holt es
+  bewusst später. Der Grund steht in der Notiz. **`übersprungen`** ist, was
+  nie Karte wird: ein Bericht, ein Porträt, ein Interview ohne
+  Trainingsbezug, Werbung, eine Vorlage, eine leere Seite, ein kompletter
+  Trainingsabend. Auch hier mit Grund.
 - **Status** ist eins von `offen`, `bereit`, `rückfrage`, `importiert`,
-  `ergänzt`, `übersprungen`, `zurückgestellt`. Die ersten drei warten noch auf
-  ihre Karte. `rückfrage` heißt: Hier muss der Trainer eine Frage
-  beantworten, bevor er freigibt. Entweder hat der Entwurf eine Rückfrage
-  ohne Vermutung, oder sein Ablauf kommt laut Auftrag aus dem Bild.
+  `ergänzt`, `übersprungen`, `zurückgestellt`, bei Übungs- wie
+  Wissenskarten. Die ersten drei warten noch auf ihre Karte. `rückfrage`
+  heißt: Hier muss der Trainer eine Frage beantworten, bevor er freigibt.
+  Entweder hat der Entwurf eine Rückfrage ohne Vermutung, oder sein Ablauf
+  kommt laut Auftrag aus dem Bild. Den Status `zurückgestellt` kann auch eine
+  Zeile mit `uebung`, `folge` oder `wissen` tragen, wenn der Trainer sie bei
+  der Freigabe zurückstellt. Ihr Ergebnis bleibt dann.
+- **Was es ist** sagt in wenigen Wörtern, worum es geht. Bei `wissen` endet
+  es mit den Übungen aus demselben Beitrag, in der festen Form
+  `Übungen: 13, 14, ue-000041`: Kandidatennummern für Übungen dieses Plans,
+  IDs für Übungen, die schon Karte sind. Ohne solche Übungen fehlt der Teil.
+  Steht dort `ergänzt ue-######` oder `ergänzt wi-######`, ergänzt der
+  Kandidat diese Karte, statt eine eigene zu werden, und `Variante von
+  ue-######` macht ihn zur Variante. Bei `wissen` steht das vor `Übungen:`.
 
 `textmarke` und `platzhalter` sind für die Regel „wenig Text“. Stehen nach der
 Textmarke, ohne den Platzhalter, weniger als 150 Zeichen, sagt der Auftrag
@@ -433,10 +454,25 @@ die Eingabe für den Zerlegungsplan: jede Datei des Quellenordners, die noch in
 keiner Zeile der Übersicht steht und die `ohne` nicht auslässt, bei PDFs ihr
 Text, die nächste freie Kandidatennummer, ohne Übersicht 1, und die
 Bibliotheksliste, in der die Karten aus diesem Quellenordner markiert sind.
+Die Bibliotheksliste hat zwei Teile: die Übungskarten mit ID, Titel, Element
+und `quelldatei`, die Wissenskarten mit ID, Frage, Thema und `quelldatei`.
 Eine Datei, die mit einem Seitenbereich in einer Zeile steht, ist nicht mehr
 neu, gleich welche Seiten die Zeile nennt. In der Planeingabe steht im Text
 eines PDF vor jeder Seite eine **Seitenmarke**, `=== Seite 3 ===`, auch vor
 einer Seite ohne Text. Daran nennt der Zerlegungsplan Seitenbereiche.
+
+**Nachholen:** Eine zurückgestellte Zeile kommt nie von selbst wieder, auch
+nicht mit ihren Dateien. Holt der Trainer sie, nimmt
+`vorbereiten --plan --zurueckgestellte` zu den neuen Dateien die Dateien
+aller Zeilen mit Status `zurückgestellt`. Die Planeingabe nennt diese Zeilen
+unter „Zurückgestellt“ mit Nummer, Dateien, „Was es ist“ und Notiz. Nennt
+eine davon ein PDF mit Seitenbereich, steht von ihm nur der Text dieser
+Seiten da, der Rest steht schon in anderen Zeilen. Die erste Zeile, die der
+Plan aus einer zurückgestellten macht, trägt deren Nummer, weitere bekommen
+neue Nummern ab der nächsten freien. Bei der Freigabe ersetzt eine Zeile mit
+einer Nummer, die es in der Übersicht schon gibt, die alte, die übrigen kommen
+darunter.
+
 Daneben schreibt der Agent `volleyball-zerlegungsplan` den Plan als
 `zerlegungsplan.md`, in der Form der Übersicht. Daraus wird nach der Freigabe
 die Übersicht. Der Rest ist nach der Nummer des Kandidaten benannt:
@@ -526,11 +562,14 @@ darauf. Mehrere bekommen den Namen der Karte mit Nummer, in der Reihenfolge
 des Entwurfs, etwa `ue-000291-zirkel-1.png`, und `schaubild:` trägt sie als
 Liste. Eine einzelne Quellgrafik bleibt ein einzelner Name, auch wenn der
 Entwurf sie in eckigen Klammern nennt. Streicht der Trainer einen Kandidaten,
-wird er `übersprungen`, mit dem Grund in der Notiz. Ergänzt er als Duplikat
-eine bestehende Karte, wird er `ergänzt`, mit deren ID in der Spalte Karte.
-Aus beiden entsteht keine Karte, aber auch ihr Entwurf und Auftrag
-verschwinden. Ist im Quellenordner nichts mehr offen, verschwinden auch
-`kartenentwuerfe/<ordner>/` und `in_arbeit`.
+wird er `übersprungen`, mit dem Grund in der Notiz. Stellt er ihn zurück, um
+ihn später zu holen, wird er `zurückgestellt`, auch mit Grund, und sein
+Ergebnis bleibt. Ergänzt er als Duplikat eine bestehende Karte, wird er
+`ergänzt`, mit deren ID in der Spalte Karte. Aus allen dreien entsteht keine
+Karte, aber auch ihr Entwurf und Auftrag verschwinden. Ist im Quellenordner
+nichts mehr offen, verschwinden auch `kartenentwuerfe/<ordner>/` und
+`in_arbeit`. Offen ist dabei jede Zeile, die noch auf ihre Karte wartet, ob
+Übungs- oder Wissenskarte.
 
 Nicht übernommen wird ein Kandidat, unter dessen Namen in `schaubilder/` schon
 eine Datei liegt, und einer, dessen freigegebener Entwurf die Prüfung nicht
@@ -827,7 +866,7 @@ noch einen Browser.
 | `schaubild.py` | aus einer Szene das Schaubild als SVG zeichnen, mit `--png` dazu eine Ansicht als PNG im Temp-Verzeichnis |
 | `bilder_aufbereiten.py` | Quellbilder verkleinern, nach EXIF geradedrehen und aus TIFF und HEIC ein JPEG machen |
 | `ausschnitt.py` | eine Quellgrafik als Ausschnitt schneiden, aus einem Foto oder einer PDF-Seite: `<quelle> [--seite N] --rechteck LINKS OBEN RECHTS UNTEN <ziel>`, das Rechteck in ganzen Prozent der aufrechten Seite. Aus einem Foto wird ein JPEG, aus einer PDF-Seite, deren lange Kante 2000 Pixel misst, ein PNG. Nennt am Ende das Maß in Pixeln |
-| `sammelimport.py` | Sammelimport über einen Quellenordner: `vorbereiten --plan` legt die Eingabe für den Zerlegungsplan an, `vorbereiten` die Aufträge, `pruefen` setzt den Status aus den Entwürfen und gibt mit `--json` aus, was die Freigabe braucht, `uebernehmen` macht freigegebene Entwürfe zu Karten und trägt gestrichene und ergänzende Kandidaten ein |
+| `sammelimport.py` | Sammelimport über einen Quellenordner: `vorbereiten --plan` legt die Eingabe für den Zerlegungsplan an, mit `--zurueckgestellte` samt den zurückgestellten Zeilen, `vorbereiten` die Aufträge, `pruefen` setzt den Status aus den Entwürfen und gibt mit `--json` aus, was die Freigabe braucht, `uebernehmen` macht freigegebene Entwürfe zu Karten und trägt gestrichene, zurückgestellte und ergänzende Kandidaten ein |
 | `ids_umstellen.py` | einen Arbeitsordner von vierstelligen auf sechsstellige IDs umstellen, einmal je Arbeitsordner |
 
 `index.py` ohne Argumente ist auch der Linter: doppelte IDs, vierstellige IDs

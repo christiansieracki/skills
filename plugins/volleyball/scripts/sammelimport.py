@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Führt einen Sammelimport über einen Quellenordner, Kandidat für Kandidat.
 
-    <python> sammelimport.py vorbereiten --plan <ordner>
+    <python> sammelimport.py vorbereiten --plan <ordner> [--zurueckgestellte]
     <python> sammelimport.py vorbereiten <ordner> [--trotzdem]
     <python> sammelimport.py pruefen <ordner> [--json]
     <python> sammelimport.py uebernehmen <ordner> --kandidat 3 "Notiz" ...
@@ -15,14 +15,15 @@
 `vorbereiten --plan` legt vor dem Zerlegungsplan die Planeingabe an: jede
 Datei, die noch in keiner Zeile der Übersicht steht und die `ohne:` nicht
 auslässt, bei PDFs ihr Text mit einer Marke, wo jede Seite beginnt, dazu die
-nächste freie Kandidatennummer und die Bibliotheksliste. Ein zweiter Lauf über
-denselben Ordner nimmt so nur, was neu ist, und zählt weiter. Den Text liest
-`pdftotext`, wenn es da ist (ADR-0008).
+nächste freie Kandidatennummer und die Bibliotheksliste mit Übungs- und
+Wissenskarten. Ein zweiter Lauf über denselben Ordner nimmt so nur, was neu
+ist, und zählt weiter. Zurückgestellte Zeilen holt er nur mit
+`--zurueckgestellte`. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
 
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
-nächsten offenen Kandidaten an, mit dem Text jedes PDF, bei einem
-Seitenbereich nur dem dieser Seiten, und der Angabe, ob der
-Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein, welcher Trainer
+nächsten offenen Kandidaten an, bis #70 nur für Übungskarten, mit dem Text
+jedes PDF, bei einem Seitenbereich nur dem dieser Seiten, und der Angabe, ob
+der Ablauf aus dem Bild kommt, und trägt in `in_arbeit` ein, welcher Trainer
 daran arbeitet. Arbeitet laut Eintrag ein anderer daran, geht es nur mit
 `--trotzdem` weiter. Wenn die Einstellungen es wollen, schneidet es
 daneben aus jedem PDF mit Bild die Quellgrafik aus, dafür braucht es Pillow
