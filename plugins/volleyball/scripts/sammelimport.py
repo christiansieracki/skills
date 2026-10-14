@@ -63,8 +63,8 @@ from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E40
 from tpdaten import (  # noqa: E402
     DISZIPLIN_SPALTE, KARTENFELDER, UEBUNGSKARTE, WISSENSKARTE, Kartensorte, KeineId,
     finde_wurzel, hole_index, interpreter, konsole_vorbereiten, lies_frontmatter,
-    lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen, naechste_id, pruefe_felder,
-    schaubilder, tabellenzellen, trainer_dieses_rechners,
+    lies_karten, lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen, naechste_id,
+    pruefe_felder, schaubilder, tabellenzellen, trainer_dieses_rechners,
 )
 
 SAMMELIMPORT = "sammelimport.md"
@@ -1121,22 +1121,37 @@ def aus_diesem_ordner(quelldatei: object, ordner: str) -> bool:
                for teil in str(quelldatei).split(","))
 
 
+def _als_text(wert: object) -> str:
+    """Ein Feld einer Karte für eine Zelle, eine Liste durch Komma getrennt."""
+    if isinstance(wert, list):
+        return ", ".join(map(str, wert))
+    return str(wert or "")
+
+
 def bibliotheksliste(wurzel: Path, ordner: str) -> list[str]:
-    """Jede Karte der Bibliothek als Tabelle, die aus diesem Quellenordner markiert.
+    """Jede Karte der Bibliothek als Tabelle je Sorte, die aus diesem Quellenordner markiert.
 
     Daran erkennt der Agent für den Zerlegungsplan, was schon importiert ist,
-    und führt es als `importiert` mit seiner ID. Titel und Element braucht er,
-    um einen Verdacht auf ein Duplikat zu äußern.
+    und führt es als `importiert` mit seiner ID. Titel und Element einer
+    Übungskarte braucht er, um einen Verdacht auf ein Duplikat zu äußern.
+    Bei einer Wissenskarte sind es Frage und Thema, und dazu kommt der
+    Verdacht, dass ein Beitrag die Fortsetzung einer Karte aus einem
+    früheren Heft ist (#69).
     """
-    zeilen = ["| ID | Titel | Element | quelldatei | Aus diesem Ordner |",
-              "|---|---|---|---|---|"]
-    for karte in sorted(lies_uebungen(wurzel), key=lambda k: str(k["id"])):
-        element = karte.get("element") or []
-        element = ", ".join(map(str, element)) if isinstance(element, list) else str(element)
-        zellen = [karte["id"], karte.get("titel") or "", element, karte.get("quelldatei") or "",
-                  "ja" if aus_diesem_ordner(karte.get("quelldatei"), ordner) else ""]
-        zeilen.append("| " + " | ".join(_zelle(z) for z in zellen) + " |")
-    return zeilen
+    teile = [(UEBUNGSKARTE, "Übungskarten", ["Titel", "Element"], ["titel", "element"]),
+             (WISSENSKARTE, "Wissenskarten", ["Frage", "Thema"], ["titel", "thema"])]
+    zeilen: list[str] = []
+    for sorte, ueberschrift, spalten, felder in teile:
+        kopf = ["ID", *spalten, "quelldatei", "Aus diesem Ordner"]
+        zeilen += [f"### {ueberschrift}", "",
+                   "| " + " | ".join(kopf) + " |", "|" + "---|" * len(kopf)]
+        for karte in sorted(lies_karten(wurzel, sorte), key=lambda k: str(k["id"])):
+            zellen = [karte["id"], *(_als_text(karte.get(f)) for f in felder),
+                      _als_text(karte.get("quelldatei")),
+                      "ja" if aus_diesem_ordner(karte.get("quelldatei"), ordner) else ""]
+            zeilen.append("| " + " | ".join(_zelle(z) for z in zellen) + " |")
+        zeilen.append("")
+    return zeilen[:-1]
 
 
 def melde_unlesbare_fotos(ordner: str, quellordner: Path,

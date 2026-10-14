@@ -1304,9 +1304,14 @@ class PlaneingabeTest(unittest.TestCase):
         # Auch der Agent muss es wissen, sonst haelt er den Anfang fuer alles.
         self.assertIn("ersten Zeilen", self.planeingabe().split("## Dateien", 1)[0])
 
-    def bibliothek(self) -> dict[str, dict[str, str]]:
-        """Die Bibliotheksliste der Planeingabe, je ID eine Zeile."""
+    def bibliothek(self, teil: str) -> dict[str, dict[str, str]]:
+        """Ein Teil der Bibliotheksliste, je ID eine Zeile.
+
+        `teil` ist die Ueberschrift unter `## Bibliothek`, `Übungskarten`
+        oder `Wissenskarten`. Gelesen wird die Tabelle darunter.
+        """
         abschnitt = self.planeingabe().split("## Bibliothek", 1)[1]
+        abschnitt = abschnitt.split(f"### {teil}\n", 1)[1].split("\n#", 1)[0]
         zeilen = [[z.strip() for z in zeile.strip().strip("|").split("|")]
                   for zeile in abschnitt.splitlines() if zeile.startswith("|")]
         kopf, _trenner, *rest = zeilen
@@ -1327,7 +1332,7 @@ class PlaneingabeTest(unittest.TestCase):
 
         self.plane()
 
-        liste = self.bibliothek()
+        liste = self.bibliothek("Übungskarten")
         self.assertEqual(sorted(liste), sorted(self.ordner.ids))
         kasten = liste["ue-000006"]
         self.assertEqual(kasten["Titel"], "Abwehr vom Kasten")
@@ -1335,6 +1340,32 @@ class PlaneingabeTest(unittest.TestCase):
         self.assertEqual(kasten["quelldatei"], f"{ORDNER}/Ü_Abwehr/kasten.pdf")
         self.assertEqual({uid for uid, zeile in liste.items() if zeile["Aus diesem Ordner"]},
                          {"ue-000006", "ue-000007"})
+
+    def test_die_bibliotheksliste_nennt_die_wissenskarten_und_markiert_die_aus_diesem_ordner(
+            self) -> None:
+        # Daran erkennt der Agent eine Wissenskarte, die schon importiert ist,
+        # und die Fortsetzung eines Beitrags aus einem frueheren Heft (#69).
+        # Die Frage ist ihr Titel, das Thema sagt, wovon sie handelt.
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000001", titel="Wann lohnt sich einarmige Abwehr?",
+            thema=["technik", "taktik"], quelldatei=f"{ORDNER}/seite-26.jpg")
+        self.ordner.lege_wissenskarte_an(
+            id="wi-000002", titel="Wie lange schläft ein Spieler vor dem Spiel?",
+            thema=["physiologie"], quelldatei=f"{ORDNER}-alt/seite-03.jpg")
+        self.ordner.lege_wissenskarte_an(id="wi-000003", titel="Was steht in keinem Heft?")
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-27.jpg", b"")
+
+        self.plane()
+
+        liste = self.bibliothek("Wissenskarten")
+        self.assertEqual(sorted(liste), ["wi-000001", "wi-000002", "wi-000003"])
+        einarmig = liste["wi-000001"]
+        self.assertEqual(einarmig["Frage"], "Wann lohnt sich einarmige Abwehr?")
+        self.assertEqual(einarmig["Thema"], "technik, taktik")
+        self.assertEqual(einarmig["quelldatei"], f"{ORDNER}/seite-26.jpg")
+        self.assertEqual({uid for uid, zeile in liste.items() if zeile["Aus diesem Ordner"]},
+                         {"wi-000001"})
+        self.assertEqual(sorted(self.bibliothek("Übungskarten")), sorted(self.ordner.ids))
 
     def test_ein_foto_ueber_2_mb_ergibt_den_hinweis_auf_die_bildaufbereitung(self) -> None:
         # So schwer ist eine abfotografierte Magazinseite mit 50 Megapixeln.
