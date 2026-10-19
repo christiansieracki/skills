@@ -406,8 +406,9 @@ die für jede Karte gelten, stehen zuletzt unter
   nur bei PDFs. Hat ein Kandidat des Durchgangs einen an einem Foto, einen
   über die letzte Seite hinaus oder einen, der sich nicht lesen lässt, bricht
   `vorbereiten` vor dem ersten Auftrag ab, und die Meldung nennt die Zeile.
-  Die letzte Seite kennt das Skript aus `pdftotext`. Ohne `pdftotext` merkt
-  es erst der Agent.
+  Die Seiten zählt das Skript mit `pdftotext`, ohne es mit `pypdfium2`.
+  Fehlen beide, schreibt es die Aufträge trotzdem und nennt in der Ausgabe
+  jede Zeile, deren Seiten es nicht prüfen konnte.
 - **Ergebnis** ist eins von `uebung`, `folge`, `wissen`, `zurückgestellt`,
   `übersprungen`. Aus `uebung` und `folge` wird eine Übungskarte mit diesem
   `typ`, aus `wissen` eine Wissenskarte. Ein anderes Ergebnis bricht jeden
@@ -631,10 +632,14 @@ wird:
   Form oben. Ein Vorschlag nennt ein Feld aus dem Frontmatter oder einen
   Abschnitt, den der Entwurf hat;
 - die Ausschnitte: jeder in der Form oben, mit dem Namen einer eigenen
-  Quellgrafik, der nur einmal vorkommt, einer Datei des Kandidaten, bei einem
+  Quellgrafik, der nur einmal vorkommt, ein einzelner ohne Nummer, mehrere ab
+  1 gezählt ohne Lücke, einer Datei des Kandidaten, bei einem
   Seitenbereich einer Seite daraus, einer Endung, die zur Datei passt, und
   bei einer Übung eingetragen in `schaubild:`, bei einer Wissenskarte in einem
-  Bildverweis im Text. Dann schneidet `pruefen` jeden neu aus, über
+  Bildverweis im Text. Umgekehrt nennt `schaubild:` bei `quellgrafik:
+  ausschnitt` nur Ausschnitte aus der Liste. Ein gestrichener, den es noch
+  nennt, weist den Entwurf ab, auch wenn seine Datei vom letzten Lauf noch
+  neben dem Entwurf liegt. Dann schneidet `pruefen` jeden neu aus, über
   dieselbe Funktion wie `ausschnitt.py`, und legt ihn neben den Entwurf, bei
   jedem Lauf. Nach einer Änderung der Zahlen liegt danach der neue da. Lässt
   er sich nicht schneiden, etwa weil es die Seite nicht gibt, wird der Entwurf
@@ -1008,7 +1013,9 @@ aus der Standardbibliothek. Es gibt drei Ausnahmen von der Standardbibliothek:
   Funktion. Fehlt es, endet ein Ausschnitt aus einem PDF mit
   Installationshinweis und schreibt nichts. Bei `quellgrafik: ausschnitt`
   bricht `vorbereiten` dann ab, sobald ein Kandidat des Durchgangs ein PDF
-  hat. Ein Ausschnitt aus einem Foto geht ohne (ADR-0013).
+  hat. Ein Ausschnitt aus einem Foto geht ohne (ADR-0013). Fehlt
+  `pdftotext`, zählt `vorbereiten` mit `pypdfium2` die Seiten eines PDF,
+  wenn es da ist, damit ein Seitenbereich nicht über die letzte hinausgeht.
 
 Dazu nehmen zwei Skripte einen Browser, wo einer da ist:
 

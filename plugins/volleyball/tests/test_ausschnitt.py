@@ -20,12 +20,9 @@ PYTHONPATH, wie bei Pillow in test_bilder.py.
 
 from __future__ import annotations
 
-import shutil
-import tempfile
 import unittest
-from pathlib import Path
 
-from arbeitsordner import A4, FOLIE, Arbeitsordner, PdfFlaeche
+from arbeitsordner import A4, FOLIE, Arbeitsordner, PdfFlaeche, blende_aus
 
 try:
     from PIL import Image
@@ -44,22 +41,6 @@ BRAUCHT_PYPDFIUM2 = unittest.skipUnless(HAT_PYPDFIUM2, "pypdfium2 ist nicht inst
 
 ROT = (200, 30, 30)
 BLAU = (30, 120, 200)
-
-
-def blende_aus(test: unittest.TestCase, modul: str) -> dict[str, str]:
-    """Die Umgebung fuer einen Aufruf, in dem sich `modul` nicht importieren laesst.
-
-    Wie in test_bilder.py: Ein `<modul>.py`, das beim Import abbricht,
-    verdeckt das echte Paket, denn der PYTHONPATH kommt vor den
-    site-packages. Deinstalliert werden muss dafuer nichts.
-    """
-    schatten = Path(tempfile.mkdtemp(prefix=f"ohne-{modul}-"))
-    test.addCleanup(shutil.rmtree, schatten, True)
-    (schatten / f"{modul}.py").write_text(
-        f'raise ImportError("{modul} ist fuer diesen Test ausgeblendet")\n',
-        encoding="utf-8",
-    )
-    return {"PYTHONPATH": str(schatten)}
 
 
 def anteil_in_farbe(bild, farbe: tuple[int, int, int], toleranz: int = 24) -> float:

@@ -26,7 +26,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from arbeitsordner import OHNE, Arbeitsordner, PdfBild, PdfFlaeche, auffaelligkeiten
+from arbeitsordner import OHNE, Arbeitsordner, PdfBild, PdfFlaeche, auffaelligkeiten, blende_aus
 
 ORDNER = "stapel"
 BLAU = (30, 120, 200)
@@ -52,20 +52,6 @@ except ImportError:
     HAT_PYPDFIUM2 = False
 
 BRAUCHT_PYPDFIUM2 = unittest.skipUnless(HAT_PYPDFIUM2, "pypdfium2 ist nicht installiert")
-
-
-def blende_aus(test: unittest.TestCase, modul: str) -> dict[str, str]:
-    """Die Umgebung fuer einen Aufruf, in dem sich `modul` nicht importieren laesst.
-
-    Wie in test_bilder.py: Ein `<modul>.py`, das beim Import abbricht,
-    verdeckt das echte Paket, denn der PYTHONPATH kommt vor den
-    site-packages. So laeuft der Test auch dort, wo es installiert ist.
-    """
-    schatten = Path(tempfile.mkdtemp(prefix=f"ohne-{modul}-"))
-    test.addCleanup(shutil.rmtree, schatten, True)
-    (schatten / f"{modul}.py").write_text(
-        f'raise ImportError("{modul} ist fuer diesen Test ausgeblendet")\n', encoding="utf-8")
-    return {"PYTHONPATH": str(schatten)}
 
 
 class VorbereitenTest(unittest.TestCase):
@@ -484,7 +470,7 @@ class SeitenbereichTest(unittest.TestCase):
         self.assertNotIn(HEFT[1][0], abschnitt)
         self.assertIn("S. 2–3", zeile_mit(abschnitt, "selbst lesen"))
 
-    def bricht_ab(self, ordner: str = ORDNER) -> str:
+    def bricht_ab(self, ordner: str = ORDNER, umgebung: dict | None = None) -> str:
         """`vorbereiten` endet mit einem Fehler und hat nichts geschrieben. Zurueck kommt die Ausgabe.
 
         Vorn in der Uebersicht steht jeweils ein Kandidat ohne Fehler. Gaebe
@@ -493,7 +479,7 @@ class SeitenbereichTest(unittest.TestCase):
         sammelimport = self.ordner.pfad / "quellen" / ordner / "sammelimport.md"
         vorher = sammelimport.read_text(encoding="utf-8")
 
-        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ordner)
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ordner, umgebung=umgebung)
 
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
         self.assertEqual(sammelimport.read_text(encoding="utf-8"), vorher)
@@ -523,6 +509,39 @@ class SeitenbereichTest(unittest.TestCase):
 
         self.assertIn("Kandidat 7", meldung)
         self.assertIn("4 Seiten", meldung)
+
+    @BRAUCHT_PYPDFIUM2
+    def test_ohne_pdftotext_zaehlt_pypdfium2_die_seiten(self) -> None:
+        # pdftotext ist freiwillig (ADR-0008). Fehlt es, liest der Agent das
+        # PDF selbst, und ohne Pruefung schickte ihn der Auftrag auf Seiten,
+        # die es nicht gibt. pypdfium2 kann die Seiten auch zaehlen, und bei
+        # `quellgrafik: ausschnitt` ist es ohnehin da.
+        leer = Path(tempfile.mkdtemp(prefix="ohne-pdftotext-"))
+        self.addCleanup(shutil.rmtree, leer, True)
+        self.plane({"kandidat": 1, "dateien": [("heft.pdf", "S. 2")]},
+                   {"kandidat": 7, "dateien": [("heft.pdf", "S. 4–5")]})
+
+        meldung = zeile_mit(self.bricht_ab(umgebung={"PATH": str(leer)}), "S. 4–5")
+
+        self.assertIn("Kandidat 7", meldung)
+        self.assertIn("4 Seiten", meldung)
+
+    def test_ohne_pdftotext_und_pypdfium2_sagt_vorbereiten_welche_seiten_es_nicht_pruefen_konnte(
+            self) -> None:
+        # Dann zaehlt nichts die Seiten. Ein Abbruch machte den Seitenbereich
+        # von zwei freiwilligen Programmen abhaengig. Die Auftraege kommen
+        # deshalb, und die Ausgabe nennt die Zeile, damit der Skill sie dem
+        # Trainer sagt, bevor ein Agent im Heft nach Seite 5 sucht.
+        leer = Path(tempfile.mkdtemp(prefix="ohne-pdftotext-"))
+        self.addCleanup(shutil.rmtree, leer, True)
+        self.plane({"kandidat": 7, "dateien": [("heft.pdf", "S. 4–5")]})
+
+        fertig = self.vorbereiten(umgebung={**blende_aus(self, "pypdfium2"), "PATH": str(leer)})
+
+        meldung = zeile_mit(fertig.stdout, "S. 4–5")
+        self.assertIn("Kandidat 7", meldung)
+        self.assertIn("nicht prüfen", meldung)
+        self.assertTrue(auftrag_von(self.ordner, 7))
 
     def test_ein_seitenbereich_den_das_skript_nicht_lesen_kann_bricht_ab(self) -> None:
         # Aus „S. 3 bis 4“ nur Seite 3 zu nehmen, gaebe dem Agenten still zu
@@ -877,18 +896,13 @@ class QuellgrafikTest(unittest.TestCase):
         self.assertFalse((self.entwuerfe / "3.quellgrafik.png").exists())
 
     def test_ohne_pillow_bricht_es_vor_dem_ersten_auftrag_ab(self) -> None:
-        # Wie in test_bilder.py: Ein PIL.py, das beim Import abbricht,
-        # verdeckt das echte Paket. So laeuft der Test auch dort, wo Pillow
-        # installiert ist. Ohne Abbruch kaemen 30 Karten ohne Bild heraus.
-        schatten = Path(tempfile.mkdtemp(prefix="ohne-pillow-"))
-        self.addCleanup(shutil.rmtree, schatten, True)
-        (schatten / "PIL.py").write_text(
-            'raise ImportError("Pillow ist fuer diesen Test ausgeblendet")\n', encoding="utf-8")
+        # Laeuft auch dort, wo Pillow installiert ist, siehe blende_aus().
+        # Ohne Abbruch kaemen 30 Karten ohne Bild heraus.
         self.ordner.lege_quellenordner_an(
             ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], quellgrafik_ausschneiden=True)
 
         fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER,
-                                    umgebung={"PYTHONPATH": str(schatten)})
+                                    umgebung=blende_aus(self, "PIL"))
 
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
         self.assertIn("pip install Pillow", fertig.stdout)
@@ -1380,6 +1394,65 @@ class AusschnittTest(unittest.TestCase):
         self.assertEqual(uebersicht["1"]["Status"], "bereit", uebersicht["1"]["Notiz"])
         self.assertEqual(uebersicht["2"]["Status"], "offen")
         self.assertIn("schaubild", uebersicht["2"]["Notiz"])
+
+    @BRAUCHT_PILLOW
+    def test_ein_gestrichener_ausschnitt_der_noch_in_schaubild_steht_weist_den_entwurf_ab(
+            self) -> None:
+        # Bei der Freigabe streicht der Trainer den dritten Ausschnitt. Der
+        # Skill nimmt ihn aus der Liste, laesst ihn aber in `schaubild:`
+        # stehen. Seine Datei liegt noch vom letzten `pruefen` neben dem
+        # Entwurf, und ohne Pruefung kaeme der gestrichene Ausschnitt doch auf
+        # die Karte.
+        self.plane({"kandidat": 1, "dateien": ["seite-26.jpg"]})
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        schaubild = [f"1.quellgrafik-{nr}.jpg" for nr in (1, 2, 3)]
+        ausschnitte = [f"`{name}`: `seite-26.jpg`, links {nr * 10}, oben 20, rechts 90, unten 70"
+                       for nr, name in enumerate(schaubild, 1)]
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Drei Bilder", schaubild=schaubild,
+                                          ausschnitte=ausschnitte)
+        self.pruefe()
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["1"]["Status"], "bereit")
+
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Drei Bilder", schaubild=schaubild,
+                                          ausschnitte=ausschnitte[:2])
+        self.pruefe()
+
+        zeile = self.ordner.uebersicht(ORDNER)["1"]
+        self.assertEqual(zeile["Status"], "offen")
+        self.assertIn("1.quellgrafik-3.jpg", zeile["Notiz"])
+        self.assertIn("schaubild", zeile["Notiz"])
+
+    @BRAUCHT_PILLOW
+    def test_ein_einzelner_ausschnitt_heisst_ohne_nummer_mehrere_werden_ab_1_gezaehlt(
+            self) -> None:
+        # Dieselbe Regel wie fuer die Quellgrafiken, die `vorbereiten`
+        # ausschneidet. Je Kandidat eine Abweichung, die Notiz nennt, wie die
+        # Namen heissen muessen. Kandidat 1 und 2 halten sich an die Regel.
+        faelle = {
+            "einer mit Nummer": (["-1"], "{n}.quellgrafik.jpg"),
+            "einer ohne Nummer neben einem mit": (["", "-2"], "ab 1"),
+            "eine Luecke in der Zaehlung": (["-1", "-3"], "ab 1"),
+        }
+        heil = {1: [""], 2: ["-1", "-2"]}
+        nummern = {**heil, **{nr: endungen for nr, (endungen, _) in enumerate(faelle.values(), 3)}}
+        self.plane(*({"kandidat": nr, "dateien": ["seite-26.jpg"]} for nr in nummern))
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        for nr, endungen in nummern.items():
+            namen = [f"{nr}.quellgrafik{e}.jpg" for e in endungen]
+            self.ordner.lege_kartenentwurf_an(
+                ORDNER, nr, titel=f"Kandidat {nr}", schaubild=namen, ausschnitte=[
+                    f"`{name}`: `seite-26.jpg`, links 10, oben 20, rechts 60, unten 70"
+                    for name in namen])
+
+        self.pruefe()
+
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        for nr in heil:
+            self.assertEqual(uebersicht[str(nr)]["Status"], "bereit", uebersicht[str(nr)]["Notiz"])
+        for nr, (fall, (_, stichwort)) in enumerate(faelle.items(), 3):
+            with self.subTest(fall):
+                self.assertEqual(uebersicht[str(nr)]["Status"], "offen")
+                self.assertIn(stichwort.format(n=nr), uebersicht[str(nr)]["Notiz"])
 
     @BRAUCHT_PILLOW
     def test_json_nennt_die_ausschnitte_mit_pfad(self) -> None:

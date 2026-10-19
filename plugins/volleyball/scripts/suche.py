@@ -47,9 +47,9 @@ der nächsten Wissenskarte, `wi-` statt `ue-`. Gezählt wird dann nur in
 `--wissen` allein sucht keine Übung. Es listet alle Wissenskarten, eine Zeile
 je Karte mit ID, Frage, Thema und Schwerpunkt. Mit `--json` kommen die
 Einträge aus dem Index, darunter Disziplin, `quelldatei` und `uebungen`, so
-prüft der Import Duplikate. Filtern lassen sich Wissenskarten erst mit Welle
-2. Bis dahin endet `--wissen` zusammen mit einem Filter für Übungen, etwa
-`--element`, mit einer Meldung und dem Exitcode 2. Gibt es keine
+prüft der Import Duplikate. Filter für Wissenskarten gibt es noch nicht.
+Zusammen mit einem Filter für Übungen, etwa `--element`, endet `--wissen`
+deshalb mit einer Meldung und dem Exitcode 2. Gibt es keine
 Wissenskarte, endet die Liste wie eine Suche ohne Treffer mit 1, mit `--json`
 ist sie leer. Ohne `--wissen` kommen nur Übungen, wie bisher. Im `--json`
 einer Übung nennt `hintergrund` die Wissenskarten, die auf sie zeigen.
@@ -75,6 +75,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
     DISZIPLINEN, LEVEL, UEBUNGSKARTE, WISSENSKARTE, KeineId, als_liste, disziplin_text,
     finde_wurzel, hole_index, interpreter, konsole_vorbereiten, naechste_id, schaubilder,
+    wissenskarten_text,
 )
 
 
@@ -302,23 +303,21 @@ def zeige(e, lang: bool, wurzel: Path, anwesend=None, verfuegbar=None):
 
 # Was im Aufruf nur für Übungen gilt, nach dem Namen in argparse: die Filter,
 # dazu `--lang`, `--jugend` und `--plaene-mit-leseansicht`. Mit `--wissen`
-# endet jedes davon mit einer Meldung (#67). Die Filter für Wissenskarten
-# kommen mit Welle 2, bis dahin liefe ein Filter ins Leere, und die ganze
-# Liste sähe aus wie eine gefilterte. `--netz` und `--ohne-netz` teilen sich
-# einen Namen und stehen deshalb nicht hier, sondern in `nur_fuer_uebungen`.
-NUR_FUER_UEBUNGEN = {
-    "id": "--id", "text": "--text", "disziplin": "--disziplin", "element": "--element",
-    "schwerpunkt": "--schwerpunkt", "form": "--form", "spielphase": "--spielphase",
-    "typ": "--typ", "level": "--level", "spieler": "--spieler", "dauer": "--dauer",
-    "genau": "--genau", "spielflaechen": "--spielflaechen", "nie_benutzt": "--nie-benutzt",
-    "seit": "--seit", "jugend": "--jugend", "lang": "--lang",
-    "plaene_mit_leseansicht": "--plaene-mit-leseansicht",
-}
+# endet jedes davon mit einer Meldung (#67). Filter für Wissenskarten gibt
+# es noch nicht. Ein Filter liefe ins Leere, und die ganze
+# Liste sähe aus wie eine gefilterte. Auf der Kommandozeile heißt jeder mit
+# `--` davor und `-` statt `_`. `--netz` und `--ohne-netz` teilen sich einen
+# Namen und stehen deshalb nicht hier, sondern in `nur_fuer_uebungen`.
+NUR_FUER_UEBUNGEN = (
+    "id", "text", "disziplin", "element", "schwerpunkt", "form", "spielphase", "typ", "level",
+    "spieler", "dauer", "genau", "spielflaechen", "nie_benutzt", "seit", "jugend", "lang",
+    "plaene_mit_leseansicht",
+)
 
 
 def nur_fuer_uebungen(a) -> list[str]:
     """Die Angaben im Aufruf, die nur für Übungen gelten, so wie sie auf der Kommandozeile heißen."""
-    gesetzt = [schalter for name, schalter in NUR_FUER_UEBUNGEN.items()
+    gesetzt = [f"--{name.replace('_', '-')}" for name in NUR_FUER_UEBUNGEN
                if getattr(a, name) not in (None, False)]
     if a.netz is not None:
         gesetzt.append("--netz" if a.netz else "--ohne-netz")
@@ -347,7 +346,7 @@ def liste_wissen(daten, als_json: bool) -> int:
     if not wissen:
         print("Keine Wissenskarte in wissen/. Der Übungsimport oder der Sammelimport legt sie an.")
         return 1
-    print(f"{len(wissen)} {'Wissenskarte' if len(wissen) == 1 else 'Wissenskarten'}:\n")
+    print(f"{wissenskarten_text(len(wissen))}:\n")
     for k in wissen:
         zeige_wissen(k)
     print()
@@ -398,7 +397,7 @@ def main() -> int:
     if gesetzt:
         ap.error(f"{', '.join(gesetzt)} {'gilt' if len(gesetzt) == 1 else 'gelten'} "
                  f"nur für Übungen. --wissen listet bisher alle Wissenskarten, "
-                 f"die Filter für Wissenskarten kommen mit Welle 2.")
+                 f"Filter für Wissenskarten gibt es noch nicht.")
 
     wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
     if a.naechste_id:

@@ -25,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import unittest
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -258,6 +259,23 @@ def auffaelligkeiten(ausgabe: str) -> list[str]:
     Sammelimport soll er nichts melden.
     """
     return [zeile[4:] for zeile in ausgabe.splitlines() if zeile.startswith("  - ")]
+
+
+def blende_aus(test: unittest.TestCase, modul: str) -> dict[str, str]:
+    """Die Umgebung fuer einen Aufruf, in dem sich `modul` nicht importieren laesst.
+
+    Ein `<modul>.py`, das beim Import abbricht, verdeckt das echte Paket: der
+    PYTHONPATH kommt vor den site-packages. Das Skript sieht damit denselben
+    ImportError, den es auf einer Installation ohne das Paket saehe, und es
+    muss dafuer nichts deinstalliert werden. So fragen test_bilder.py nach
+    Pillow und pillow-heif, test_ausschnitt.py und test_sammelimport.py nach
+    Pillow und pypdfium2.
+    """
+    schatten = Path(tempfile.mkdtemp(prefix=f"ohne-{modul}-"))
+    test.addCleanup(shutil.rmtree, schatten, True)
+    (schatten / f"{modul}.py").write_text(
+        f'raise ImportError("{modul} ist fuer diesen Test ausgeblendet")\n', encoding="utf-8")
+    return {"PYTHONPATH": str(schatten)}
 
 
 def _slug(titel: str) -> str:

@@ -73,7 +73,7 @@ deshalb tauchen sie auf keiner Übungskarte auf und deshalb tragen sie keine
 Disziplinspalte.
 
 Eine Wissenskarte darf sie tragen, etwa ein Beitrag darüber, wie man die
-Belastung über einen Block steuert. Mit diesen Kennungen plant der Saisonplaner
+Belastung über einen Trainingsblock steuert. Mit diesen Kennungen plant der Saisonplaner
 einen Trainingsblock, und dazu soll er die Karte finden. Ohne Disziplinspalte
 gelten sie für Halle und Beach.
 

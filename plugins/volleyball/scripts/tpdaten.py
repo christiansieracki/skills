@@ -78,10 +78,13 @@ class Kartensorte:
     oder eine Karte prueft, bekommt die Sorte als Angabe, statt Ordner und
     Muster selbst zu kennen.
 
-    `alte_muster` ist das Muster einer vierstelligen ID von vor 3.0.0. Die gab
-    es nur bei Uebungen.
+    `name` ist, wie die Sorte in der Ausgabe eines Skripts heisst, etwa bei
+    `sammelimport.py vorbereiten` und `pruefen --json`. Daran waehlt der
+    Skill dort den Agenten und die Tabelle. `alte_muster` ist das Muster
+    einer vierstelligen ID von vor 3.0.0. Die gab es nur bei Uebungen.
     """
 
+    name: str
     ordner: str
     praefix: str
     muster: str
@@ -89,7 +92,8 @@ class Kartensorte:
     alte_muster: str | None = None
 
 
-UEBUNGSKARTE = Kartensorte("uebungen", "ue", ID_MUSTER, tuple(KARTENFELDER), ALTE_ID_MUSTER)
+UEBUNGSKARTE = Kartensorte("uebungskarte", "uebungen", "ue", ID_MUSTER, tuple(KARTENFELDER),
+                           ALTE_ID_MUSTER)
 
 # Die Wissenskarte (ADR-0002 mit Nachtrag, #61): Hintergrund aus einer
 # Fremdquelle, eine Frage je Karte, und die Frage ist ihr Titel. Ihre Felder in
@@ -117,7 +121,7 @@ WISSENSABSCHNITTE = ["Kernaussagen", "Was das fürs Training heißt"]
 # der Zaehler ein eigener.
 WISSEN_ID_MUSTER = r"wi-\d{6}"
 
-WISSENSKARTE = Kartensorte("wissen", "wi", WISSEN_ID_MUSTER, tuple(WISSENSFELDER))
+WISSENSKARTE = Kartensorte("wissenskarte", "wissen", "wi", WISSEN_ID_MUSTER, tuple(WISSENSFELDER))
 
 SORTEN = (UEBUNGSKARTE, WISSENSKARTE)
 
@@ -144,6 +148,11 @@ def disziplin_text(eintrag: dict) -> str:
     die Ausgabe nicht scheitern.
     """
     return ", ".join(eintrag.get("disziplin") or []) or "—"
+
+
+def wissenskarten_text(anzahl: int) -> str:
+    """"1 Wissenskarte" oder "3 Wissenskarten", so wie Suche und `index.md` sie zaehlen."""
+    return f"{anzahl} Wissenskarte" if anzahl == 1 else f"{anzahl} Wissenskarten"
 
 
 def als_liste(wert) -> list:

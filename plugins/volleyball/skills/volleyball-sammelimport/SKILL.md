@@ -278,6 +278,11 @@ angenommener Vorschlag oder als Ausnahme.
      Durchgang, Pillow bei `eingebettet` nur mit einer Übung im Durchgang.
    - **pdftotext fehlt:** Den Installationshinweis einmal weitergeben. Die
      Aufträge sind geschrieben, die Agenten lesen die PDFs selbst.
+   - **„Ob es diese Seiten gibt, kann das Skript nicht prüfen“:** Weder
+     `pdftotext` noch `pypdfium2` hat die Seiten gezählt. Die Aufträge sind
+     geschrieben. Dem Trainer die Zeilen nennen, bevor die Agenten starten:
+     Er sieht im PDF nach, ob es die Seiten gibt. Gibt es sie nicht, richtet
+     er die Zeile in der Übersicht, danach `vorbereiten` noch einmal.
    - **Hinter `Übungen:` steht etwas, das keine Übung ist:** Die Meldung
      nennt die Zeile und die Angabe. Geschrieben ist nichts. Dem Trainer
      sagen, was dort steht, und mit ihm klären, welche Übung gemeint ist. Die
@@ -339,8 +344,8 @@ angenommener Vorschlag oder als Ausnahme.
      `uebernehmen` für diesen Kandidaten noch einmal. Liegt in `schaubilder/`
      schon eine Datei unter dem Namen der neuen Karte, dem Trainer sagen,
      welche. Was mit ihr geschieht, entscheidet er. Nennt der Grund
-     `Übungen:`, liegt er nicht im Entwurf, sondern in der Zeile der
-     Übersicht, wie bei `vorbereiten`.
+     `Übungen:`, liegt er in der Zeile der Übersicht. Dann gilt dasselbe wie
+     bei `vorbereiten`.
    - **„nicht übersprungen“, „nicht zurückgestellt“ oder „nicht ergänzt“:**
      Die Meldung sagt, warum: Der Grund fehlt, die ID gibt es nicht oder
      nicht in der Sorte der Zeile, oder der Kandidat ist schon erledigt. Mit
@@ -421,8 +426,11 @@ Der Trainer sagt:
 - **streichen:** Die Zeile fällt aus `Ausschnitte:`, bei einer Übung der Name
   aus `schaubild:`, bei einer Wissenskarte der Bildverweis aus dem Text, die
   ganze Zeile. War es der letzte, fällt die Liste `Ausschnitte:` ganz weg,
-  und bei einer Übung wird `schaubild:` `null`. Danach `pruefen` wie beim
-  Korrigieren. Ein Bildverweis ohne seinen Ausschnitt weist den Entwurf ab.
+  und bei einer Übung wird `schaubild:` `null`. Die übrigen heißen danach
+  wieder nach der Regel, überall, wo ihr Name steht: einer allein ohne
+  Nummer, `17.quellgrafik.jpg`, mehrere ab 1 gezählt ohne Lücke, jeder mit
+  seiner Endung. Danach `pruefen` wie beim Korrigieren. Ein Bildverweis ohne
+  seinen Ausschnitt weist den Entwurf ab, ebenso ein Name in `schaubild:`.
 
 Fertig sind die Ausschnitte, wenn jeder behalten oder gestrichen ist.
 

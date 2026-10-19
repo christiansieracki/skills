@@ -37,6 +37,7 @@ import argparse
 import io
 import math
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -45,8 +46,18 @@ from tpdaten import interpreter, konsole_vorbereiten  # noqa: E402
 
 FOTO_ENDUNGEN = {".jpg", ".jpeg", ".png"}
 
-# Was aus welcher Quelle wird, Endung und Format des Ausschnitts.
-FOTO, PDF = (".jpg", "JPEG"), (".png", "PNG")
+
+@dataclass(frozen=True)
+class Bildformat:
+    """Als was ein Ausschnitt geschrieben wird: die Endung seiner Datei und das Format für Pillow."""
+
+    endung: str
+    name: str
+
+
+# Was aus welcher Quelle wird: aus einem Foto ein JPEG, aus einer PDF-Seite ein PNG.
+AUS_DEM_FOTO = Bildformat(".jpg", "JPEG")
+AUS_DEM_PDF = Bildformat(".png", "PNG")
 
 RECHTECK = ("links", "oben", "rechts", "unten")
 
@@ -96,17 +107,17 @@ def verlange_bibliotheken(pdf: bool) -> None:
 # Prüfen, bevor gelesen wird
 # --------------------------------------------------------------------------
 
-def ergebnis(quelle: Path) -> tuple[str, str]:
-    """Endung und Format des Ausschnitts aus dieser Quelle: JPEG beim Foto, PNG beim PDF.
+def bildformat(quelle: Path) -> Bildformat:
+    """Das Bildformat des Ausschnitts aus dieser Quelle: JPEG beim Foto, PNG beim PDF.
 
     Erkannt wird die Quelle an ihrer Endung. Was weder Foto noch PDF ist,
     wirft KeinAusschnitt.
     """
     endung = quelle.suffix.lower()
     if endung == ".pdf":
-        return PDF
+        return AUS_DEM_PDF
     if endung in FOTO_ENDUNGEN:
-        return FOTO
+        return AUS_DEM_FOTO
     raise KeinAusschnitt(
         f"{quelle.name} ist weder ein Foto (JPEG, PNG) noch ein PDF. "
         f"Ausschnitte gibt es nur aus diesen.")
@@ -133,19 +144,19 @@ def pruefe_rechteck(rechteck: tuple[int, int, int, int]) -> None:
 
 
 def _pruefe_aufruf(quelle: Path, ziel: Path, rechteck: tuple[int, int, int, int],
-                   seite: int | None) -> tuple[str, str]:
+                   seite: int | None) -> Bildformat:
     """Prüft alles, was sich ohne Bibliothek und ohne die Quelle zu lesen prüfen lässt.
 
-    Gibt Endung und Format des Ausschnitts zurück.
+    Gibt das Bildformat des Ausschnitts zurück.
     """
     if not quelle.is_file():
         raise KeinAusschnitt(f"Die Quelle {quelle} gibt es nicht.")
-    art = ergebnis(quelle)
-    endung = art[0]
-    if ziel.suffix.lower() != endung:
-        aus = "einem PDF wird ein PNG" if art == PDF else "einem Foto wird ein JPEG"
+    art = bildformat(quelle)
+    if ziel.suffix.lower() != art.endung:
+        aus = "einem PDF" if art is AUS_DEM_PDF else "einem Foto"
         raise KeinAusschnitt(
-            f"Aus {aus}, das Ziel muss deshalb auf {endung} enden, nicht {ziel.name}.")
+            f"Aus {aus} wird ein {art.name}, das Ziel muss deshalb auf {art.endung} enden, "
+            f"nicht {ziel.name}.")
     # Ein Tippfehler im Aufruf, und die Quelle wäre durch ihren eigenen
     # Ausschnitt ersetzt. Sie ist das Einzige, was sich nicht neu schneiden
     # lässt.
@@ -153,10 +164,10 @@ def _pruefe_aufruf(quelle: Path, ziel: Path, rechteck: tuple[int, int, int, int]
         raise KeinAusschnitt(f"Das Ziel ist die Quelle selbst: {quelle.name}.")
     if not ziel.parent.is_dir():
         raise KeinAusschnitt(f"Den Ordner für das Ziel gibt es nicht: {ziel.parent}")
-    if art == PDF and seite is None:
+    if art is AUS_DEM_PDF and seite is None:
         raise KeinAusschnitt(
             f"{quelle.name} ist ein PDF, und es fehlt, welche Seite. Gezählt wird ab 1.")
-    if art == FOTO and seite is not None:
+    if art is AUS_DEM_FOTO and seite is not None:
         raise KeinAusschnitt(
             f"Ein Foto hat keine Seiten, eine Seite gibt es nur bei einem PDF: {quelle.name}.")
     pruefe_rechteck(rechteck)
@@ -238,16 +249,14 @@ def schneide_aus(quelle: Path, ziel: Path, rechteck: tuple[int, int, int, int],
     da ist, bleibt dann, wie es war.
     """
     art = _pruefe_aufruf(quelle, ziel, rechteck, seite)
-    verlange_bibliotheken(art == PDF)
-    if art == PDF:
-        ausschnitt = _schneide(_pdf_seite(quelle, seite), rechteck)
+    verlange_bibliotheken(art is AUS_DEM_PDF)
+    if art is AUS_DEM_PDF:
+        ausschnitt, optionen = _schneide(_pdf_seite(quelle, seite), rechteck), {}
     else:
         ausschnitt = fuer_jpeg(_schneide(_foto(quelle), rechteck))
+        optionen = {"quality": QUALITAET}
     puffer = io.BytesIO()
-    if art == PDF:
-        ausschnitt.save(puffer, "PNG")
-    else:
-        ausschnitt.save(puffer, "JPEG", quality=QUALITAET)
+    ausschnitt.save(puffer, art.name, **optionen)
     ziel.write_bytes(puffer.getvalue())
     return ausschnitt.size
 
