@@ -26,12 +26,10 @@ aufbereitet, wird uebersprungen, wo das Paket fehlt.
 from __future__ import annotations
 
 import os
-import shutil
-import tempfile
 import unittest
 from pathlib import Path
 
-from arbeitsordner import ORIENTIERUNG, Arbeitsordner
+from arbeitsordner import ORIENTIERUNG, Arbeitsordner, blende_aus
 
 try:
     from PIL import Image
@@ -48,22 +46,6 @@ except ImportError:  # pragma: no cover - haengt an der Installation, nicht am C
 BRAUCHT_PILLOW = unittest.skipUnless(HAT_PILLOW, "Pillow ist nicht installiert")
 BRAUCHT_PILLOW_HEIF = unittest.skipUnless(HAT_PILLOW_HEIF, "pillow-heif ist nicht installiert")
 
-
-def blende_aus(test: unittest.TestCase, modul: str) -> dict[str, str]:
-    """Die Umgebung fuer einen Aufruf, in dem sich `modul` nicht importieren laesst.
-
-    Ein `<modul>.py`, das beim Import abbricht, verdeckt das echte Paket: der
-    PYTHONPATH kommt vor den site-packages. Das Skript sieht damit denselben
-    ImportError, den es auf einer Installation ohne das Paket saehe, und es
-    muss dafuer nichts deinstalliert werden.
-    """
-    schatten = Path(tempfile.mkdtemp(prefix=f"ohne-{modul}-"))
-    test.addCleanup(shutil.rmtree, schatten, True)
-    (schatten / f"{modul}.py").write_text(
-        f'raise ImportError("{modul} ist fuer diesen Test ausgeblendet")\n',
-        encoding="utf-8",
-    )
-    return {"PYTHONPATH": str(schatten)}
 
 # Reicht ueber die Schwelle von 2 MB, ohne dass ein Bild dafuer noetig waere.
 # Zufallsbytes, weil eine Datei aus Nullen je nach Dateisystem gar nicht so

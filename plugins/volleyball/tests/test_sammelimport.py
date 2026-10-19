@@ -26,7 +26,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from arbeitsordner import OHNE, Arbeitsordner, PdfBild, PdfFlaeche, auffaelligkeiten
+from arbeitsordner import OHNE, Arbeitsordner, PdfBild, PdfFlaeche, auffaelligkeiten, blende_aus
 
 ORDNER = "stapel"
 BLAU = (30, 120, 200)
@@ -52,20 +52,6 @@ except ImportError:
     HAT_PYPDFIUM2 = False
 
 BRAUCHT_PYPDFIUM2 = unittest.skipUnless(HAT_PYPDFIUM2, "pypdfium2 ist nicht installiert")
-
-
-def blende_aus(test: unittest.TestCase, modul: str) -> dict[str, str]:
-    """Die Umgebung fuer einen Aufruf, in dem sich `modul` nicht importieren laesst.
-
-    Wie in test_bilder.py: Ein `<modul>.py`, das beim Import abbricht,
-    verdeckt das echte Paket, denn der PYTHONPATH kommt vor den
-    site-packages. So laeuft der Test auch dort, wo es installiert ist.
-    """
-    schatten = Path(tempfile.mkdtemp(prefix=f"ohne-{modul}-"))
-    test.addCleanup(shutil.rmtree, schatten, True)
-    (schatten / f"{modul}.py").write_text(
-        f'raise ImportError("{modul} ist fuer diesen Test ausgeblendet")\n', encoding="utf-8")
-    return {"PYTHONPATH": str(schatten)}
 
 
 class VorbereitenTest(unittest.TestCase):
@@ -910,18 +896,13 @@ class QuellgrafikTest(unittest.TestCase):
         self.assertFalse((self.entwuerfe / "3.quellgrafik.png").exists())
 
     def test_ohne_pillow_bricht_es_vor_dem_ersten_auftrag_ab(self) -> None:
-        # Wie in test_bilder.py: Ein PIL.py, das beim Import abbricht,
-        # verdeckt das echte Paket. So laeuft der Test auch dort, wo Pillow
-        # installiert ist. Ohne Abbruch kaemen 30 Karten ohne Bild heraus.
-        schatten = Path(tempfile.mkdtemp(prefix="ohne-pillow-"))
-        self.addCleanup(shutil.rmtree, schatten, True)
-        (schatten / "PIL.py").write_text(
-            'raise ImportError("Pillow ist fuer diesen Test ausgeblendet")\n', encoding="utf-8")
+        # Laeuft auch dort, wo Pillow installiert ist, siehe blende_aus().
+        # Ohne Abbruch kaemen 30 Karten ohne Bild heraus.
         self.ordner.lege_quellenordner_an(
             ORDNER, [{"kandidat": 3, "dateien": ["kasten.pdf"]}], quellgrafik_ausschneiden=True)
 
         fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER,
-                                    umgebung={"PYTHONPATH": str(schatten)})
+                                    umgebung=blende_aus(self, "PIL"))
 
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
         self.assertIn("pip install Pillow", fertig.stdout)
