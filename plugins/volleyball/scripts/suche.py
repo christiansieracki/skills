@@ -47,9 +47,9 @@ der nächsten Wissenskarte, `wi-` statt `ue-`. Gezählt wird dann nur in
 `--wissen` allein sucht keine Übung. Es listet alle Wissenskarten, eine Zeile
 je Karte mit ID, Frage, Thema und Schwerpunkt. Mit `--json` kommen die
 Einträge aus dem Index, darunter Disziplin, `quelldatei` und `uebungen`, so
-prüft der Import Duplikate. Filtern lassen sich Wissenskarten erst mit Welle
-2. Bis dahin endet `--wissen` zusammen mit einem Filter für Übungen, etwa
-`--element`, mit einer Meldung und dem Exitcode 2. Gibt es keine
+prüft der Import Duplikate. Filter für Wissenskarten gibt es noch nicht.
+Zusammen mit einem Filter für Übungen, etwa `--element`, endet `--wissen`
+deshalb mit einer Meldung und dem Exitcode 2. Gibt es keine
 Wissenskarte, endet die Liste wie eine Suche ohne Treffer mit 1, mit `--json`
 ist sie leer. Ohne `--wissen` kommen nur Übungen, wie bisher. Im `--json`
 einer Übung nennt `hintergrund` die Wissenskarten, die auf sie zeigen.
@@ -302,8 +302,8 @@ def zeige(e, lang: bool, wurzel: Path, anwesend=None, verfuegbar=None):
 
 # Was im Aufruf nur für Übungen gilt, nach dem Namen in argparse: die Filter,
 # dazu `--lang`, `--jugend` und `--plaene-mit-leseansicht`. Mit `--wissen`
-# endet jedes davon mit einer Meldung (#67). Die Filter für Wissenskarten
-# kommen mit Welle 2, bis dahin liefe ein Filter ins Leere, und die ganze
+# endet jedes davon mit einer Meldung (#67). Filter für Wissenskarten gibt
+# es noch nicht. Ein Filter liefe ins Leere, und die ganze
 # Liste sähe aus wie eine gefilterte. `--netz` und `--ohne-netz` teilen sich
 # einen Namen und stehen deshalb nicht hier, sondern in `nur_fuer_uebungen`.
 NUR_FUER_UEBUNGEN = {
@@ -398,7 +398,7 @@ def main() -> int:
     if gesetzt:
         ap.error(f"{', '.join(gesetzt)} {'gilt' if len(gesetzt) == 1 else 'gelten'} "
                  f"nur für Übungen. --wissen listet bisher alle Wissenskarten, "
-                 f"die Filter für Wissenskarten kommen mit Welle 2.")
+                 f"Filter für Wissenskarten gibt es noch nicht.")
 
     wurzel = a.wurzel.resolve() if a.wurzel else finde_wurzel()
     if a.naechste_id:

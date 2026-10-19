@@ -588,8 +588,8 @@ class WissenTest(unittest.TestCase):
         self.assertEqual(karten["wi-000002"]["disziplin"], ["beach"])
 
     def test_mit_einem_filter_fuer_uebungen_endet_wissen_mit_einer_meldung(self) -> None:
-        # Die Filter fuer Wissenskarten kommen mit Welle 2. Bis dahin liefe
-        # ein Filter ins Leere, und die ganze Liste saehe aus wie eine
+        # Filter fuer Wissenskarten gibt es noch nicht. Ein Filter liefe
+        # ins Leere, und die ganze Liste saehe aus wie eine
         # gefilterte. `--schwerpunkt` und `--disziplin` gaebe es auf der
         # Wissenskarte, gerade die duerfen nicht still wegfallen.
         for filter_ in (["--element", "annahme"], ["--schwerpunkt", "annahme"],
@@ -600,7 +600,7 @@ class WissenTest(unittest.TestCase):
                 self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
                 self.assertEqual(fertig.stdout, "")
                 self.assertIn(filter_[0], fertig.stderr)
-                self.assertIn("Welle 2", fertig.stderr)
+                self.assertIn("gibt es noch nicht", fertig.stderr)
 
     def test_ohne_wissen_findet_die_suche_wie_bisher_nur_uebungen(self) -> None:
         # volleyball-schaubild sucht ueber `suche.py --json` die Karten ohne
