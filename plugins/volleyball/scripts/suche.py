@@ -305,21 +305,19 @@ def zeige(e, lang: bool, wurzel: Path, anwesend=None, verfuegbar=None):
 # dazu `--lang`, `--jugend` und `--plaene-mit-leseansicht`. Mit `--wissen`
 # endet jedes davon mit einer Meldung (#67). Filter für Wissenskarten gibt
 # es noch nicht. Ein Filter liefe ins Leere, und die ganze
-# Liste sähe aus wie eine gefilterte. `--netz` und `--ohne-netz` teilen sich
-# einen Namen und stehen deshalb nicht hier, sondern in `nur_fuer_uebungen`.
-NUR_FUER_UEBUNGEN = {
-    "id": "--id", "text": "--text", "disziplin": "--disziplin", "element": "--element",
-    "schwerpunkt": "--schwerpunkt", "form": "--form", "spielphase": "--spielphase",
-    "typ": "--typ", "level": "--level", "spieler": "--spieler", "dauer": "--dauer",
-    "genau": "--genau", "spielflaechen": "--spielflaechen", "nie_benutzt": "--nie-benutzt",
-    "seit": "--seit", "jugend": "--jugend", "lang": "--lang",
-    "plaene_mit_leseansicht": "--plaene-mit-leseansicht",
-}
+# Liste sähe aus wie eine gefilterte. Auf der Kommandozeile heißt jeder mit
+# `--` davor und `-` statt `_`. `--netz` und `--ohne-netz` teilen sich einen
+# Namen und stehen deshalb nicht hier, sondern in `nur_fuer_uebungen`.
+NUR_FUER_UEBUNGEN = (
+    "id", "text", "disziplin", "element", "schwerpunkt", "form", "spielphase", "typ", "level",
+    "spieler", "dauer", "genau", "spielflaechen", "nie_benutzt", "seit", "jugend", "lang",
+    "plaene_mit_leseansicht",
+)
 
 
 def nur_fuer_uebungen(a) -> list[str]:
     """Die Angaben im Aufruf, die nur für Übungen gelten, so wie sie auf der Kommandozeile heißen."""
-    gesetzt = [schalter for name, schalter in NUR_FUER_UEBUNGEN.items()
+    gesetzt = [f"--{name.replace('_', '-')}" for name in NUR_FUER_UEBUNGEN
                if getattr(a, name) not in (None, False)]
     if a.netz is not None:
         gesetzt.append("--netz" if a.netz else "--ohne-netz")
