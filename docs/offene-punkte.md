@@ -27,7 +27,10 @@ Leseansicht, #77 davor. Der Ausschnitt für PDFs, die nicht wie PlayDrill
 aufgebaut sind, bleibt in der Welle zur Wissenskarte (#62 bis #65), nach der
 Welle zur Leseansicht. Beim Bau der Welle zur Leseansicht am 06.10.2026 kamen
 Punkte aus #52 bis #59, #75, #76 und dem Code-Review dazu. Was davon die Abnahme prüfen soll,
-steht als Kommentar in #60, der Rest hier mit Ziel.
+steht als Kommentar in #60, der Rest hier mit Ziel. Beim Bau der Welle zur
+Wissenskarte am 14. und 19.10.2026 kamen Punkte aus #62 bis #64, #66 bis #73
+und dem Code-Review dazu. Was davon die Abnahme prüfen soll, steht als
+Kommentar in #65 und #74, der Rest hier mit Ziel.
 
 ### DVV Plan 1 als Übungsfolge mit ID
 
@@ -48,6 +51,14 @@ lässt „Block“ allein nur für das Technikelement zu. Die Welle zur Leseansi
 hat nur „Teil“ für den Programmpunkt bereinigt.
 
 Ziel: Welle 2, die das Trainingsdesign und den Saisonplaner ohnehin anfasst.
+
+### `suche.py --lang` zeigt keinen Hintergrund
+
+Aus #67. Welche Wissenskarten auf eine Übung zeigen, steht in `index.md` in der
+Spalte „Hintergrund" und bei `suche.py --json` unter `hintergrund`. Die lange
+Ausgabe mit `--lang` nennt es nicht.
+
+Ziel: Welle 2, mit der Suche nach Wissenskarten.
 
 ## Bewusst nicht gebaut
 
@@ -377,6 +388,123 @@ worden.
 Ziel: bewusst nicht. Auslöser: Ein zweiter Verweis ins Leere fällt in einem
 Plan auf.
 
+### Ein durchsichtiges PNG als Ausschnitt
+
+Aus #62. Ein Ausschnitt aus einem Foto wird ein JPEG. Ein PNG mit
+durchsichtigen Flächen verliert dabei seinen Alphakanal, und diese Flächen
+werden dunkel.
+
+Ziel: bewusst nicht. Auslöser: Eine Quellgrafik aus einem durchsichtigen PNG
+kommt schwarz auf die Karte.
+
+### Jede Seite eines geteilten PDF in einer Zeile
+
+Aus #64. Teilt der Zerlegungsplan ein PDF in Seitenbereiche, gilt die Datei
+beim nächsten Lauf nicht mehr als neu. Der Agent soll deshalb jede Seite in
+eine Zeile bringen, notfalls als `übersprungen`. Ein Skript prüft das nicht.
+Eine vergessene Seite käme nie wieder in eine Planeingabe.
+
+Ziel: bewusst nicht. Auslöser: Die Abnahme findet eine Seite, die in keiner
+Zeile steht.
+
+### Eingebettete Quellgrafik und Seitenbereich
+
+Aus #63 und #64. Bei `quellgrafik: eingebettet` nimmt `vorbereiten` das größte
+eingebettete Bild des ganzen PDF, auch wenn der Kandidat nur einige Seiten
+nennt. Auf die Seiten zu beschränken hieße, den Seitenbaum des PDF zu lesen.
+Das kann der Leser der Standardbibliothek nicht, und Objektströme liest er auch
+nicht. PlayDrill hat eine Übung je Datei und keine Seitenbereiche.
+
+Ziel: bewusst nicht. Auslöser: Ein Quellenordner mit eingebetteten Bildern
+braucht Seitenbereiche, oder ein Bild kommt von der falschen Seite.
+
+### Seiten zählen ohne `pdftotext` und `pypdfium2`
+
+Aus dem Code-Review der Welle zur Wissenskarte. `vorbereiten` zählt die Seiten
+eines PDF mit `pdftotext`, sonst mit `pypdfium2`. Fehlen beide, bricht es bei
+einem Seitenbereich nicht ab. Es schreibt die Aufträge und nennt jede Zeile,
+deren Seitenbereich es nicht prüfen konnte. Beide Werkzeuge sind freiwillig
+(ADR-0008, ADR-0013).
+
+Ziel: bewusst nicht. Auslöser: Ein Agent sucht trotz dieser Meldung Seiten,
+die es nicht gibt.
+
+### Die Datei einer zurückgestellten Zeile fehlt
+
+Aus #69. `vorbereiten --plan --zurueckgestellte` nennt die Dateien jeder
+zurückgestellten Zeile. Fehlt eine davon im Quellenordner, steht sie trotzdem
+in der Planeingabe, mit dem Pfad aus der Zeile.
+
+Ziel: bewusst nicht. Auslöser: Das passiert bei der Abnahme oder danach.
+
+### Steuerungsschwerpunkte auf einer Übungskarte
+
+Aus #70. Die Tabelle der Kennungen im Auftrag nennt die Steuerungsschwerpunkte
+auch für Übungen, und der Linter nimmt sie auf einer Übungskarte an. Gedacht
+sind sie für Wissenskarten.
+
+Ziel: bewusst nicht. Auslöser: Eine Übungskarte trägt einen
+Steuerungsschwerpunkt.
+
+### Ein falsches `Übungen:` in einer Zeile
+
+Aus #72. Ob die Nummern und IDs hinter `Übungen:` stimmen, prüft erst das erste
+`vorbereiten` nach der Freigabe des Plans. Dann muss der Trainer die Zeile von
+Hand berichtigen, denn der Skill schreibt die Übersicht nur bei der Freigabe des
+Plans. Abhilfe wäre, dass schon `vorbereiten --plan` die Angabe prüft.
+
+Ziel: bewusst nicht. Auslöser: Das passiert bei der Abnahme (#74).
+
+### Eine Übung aus `Übungen:` streichen
+
+Aus #72. Bei der Freigabe kann der Trainer eine ID auf der Wissenskarte
+ergänzen. Eine Nummer aus `Übungen:` herausnehmen kann er nicht, denn die Zeile
+schreibt der Skill nur bei der Freigabe des Plans.
+
+Ziel: bewusst nicht. Auslöser: Ein Trainer will eine Übung aus dem Beitrag
+nicht an der Wissenskarte haben.
+
+### Abbruch beim Übernehmen einer Übung oder Fortsetzung
+
+Aus #72 und #73. `uebernehmen` setzt die Zeile einer Übung auf `importiert`,
+bevor es ihre ID in die Wissenskarte schreibt. Bricht der Lauf dazwischen ab,
+fehlt die Übung auf der Wissenskarte, ohne Meldung. Beim Ergänzen einer
+Wissenskarte schreibt es erst die Karte und verschiebt dann die Bilder. Bricht
+es dazwischen ab, findet ein zweiter Lauf keine Verweise mit den Namen aus dem
+Entwurf mehr, löscht die Bilder mit dem Entwurf, und der Linter meldet tote
+Bildverweise.
+
+Ziel: bewusst nicht. Auslöser: Nach einem abgebrochenen Lauf fehlt einer
+Wissenskarte eine Übung oder ein Bild.
+
+### Ein Bildverweis mit `./` vorn
+
+Aus #71. Im Entwurf einer Wissenskarte zählt nur der bloße Name eines
+Ausschnitts, etwa `![…](17.quellgrafik.png)`. Schreibt der Agent
+`./17.quellgrafik.png`, weist `pruefen` den Entwurf ab.
+
+Ziel: bewusst nicht. Auslöser: Der Agent schreibt den Verweis bei der Abnahme
+so.
+
+### Ein TIFF oder HEIC, auf das eine Wissenskarte zeigt
+
+Aus #66. `bilder_aufbereiten.py` lässt ein TIFF oder HEIC liegen, wenn eine
+Übungskarte in `quelldatei` darauf zeigt. Die Wissenskarten liest es dafür
+nicht. Zeigt eine Wissenskarte auf ein solches Bild, wird es trotzdem zum
+JPEG, und ihre `quelldatei` zeigt ins Leere. Dazu passt „Ein HEIC, das schon
+im Zerlegungsplan steht".
+
+Ziel: bewusst nicht. Auslöser: Eine Wissenskarte zeigt auf ein TIFF oder HEIC.
+
+### Verzweigungen nach Kartensorte im Sammelimport
+
+Aus dem Code-Review der Welle zur Wissenskarte. `sammelimport.py` fragt an
+vielen Stellen, ob ein Kandidat eine Übungskarte oder eine Wissenskarte wird,
+und wählt danach Texte, Prüfungen und Ziele. Das an einer Stelle zu bündeln,
+hieße, das Skript umzubauen.
+
+Ziel: bewusst nicht. Auslöser: Eine dritte Kartensorte kommt dazu.
+
 ## Was als Nächstes ansteht
 
 Die Reihenfolge stammt aus #10 und ist dort begründet. Der Sammelimport kam am
@@ -392,7 +520,8 @@ Rückfragen gebündelt, erledigt am 05.10.2026 mit 3.0.2.
 
 1. Die Welle zur Leseansicht (#50): #51 bis #59, #75, #76, Abnahme #60.
 2. Die Welle zur Wissenskarte (#61): zuerst der Ausschnitt mit #62 bis #65,
-   dann #66 bis #74.
+   dann #66 bis #74. Gebaut am 14. und 19.10.2026 auf dem Branch
+   `welle/wissenskarte`. Offen sind die Abnahmen #65 und #74.
 
 ### Welle zur Leseansicht
 
