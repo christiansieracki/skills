@@ -692,19 +692,35 @@ Reihenfolge ihrer Bildverweise im Text, und die Verweise zeigen danach von
 Streicht der Trainer einen Kandidaten, wird er `übersprungen`, mit dem Grund
 in der Notiz. Stellt er ihn zurück, um
 ihn später zu holen, wird er `zurückgestellt`, auch mit Grund, und sein
-Ergebnis bleibt. Ergänzt er als Duplikat eine bestehende Karte, wird er
-`ergänzt`, mit deren ID in der Spalte Karte. Aus allen dreien entsteht keine
-Karte, aber auch ihr Entwurf und Auftrag verschwinden. Ist im Quellenordner
-nichts mehr offen, verschwinden auch `kartenentwuerfe/<ordner>/` und
-`in_arbeit`. Offen ist dabei jede Zeile, die noch auf ihre Karte wartet, ob
+Ergebnis bleibt. Ergänzt er als Duplikat oder Fortsetzung eine bestehende
+Karte, wird er `ergänzt`, mit deren ID in der Spalte Karte. Die ID gehört zur
+Sorte seiner Zeile, `ue-` zu einer Übung, `wi-` zu `wissen`. Aus allen dreien
+entsteht keine Karte, aber auch ihr Entwurf und Auftrag verschwinden. Ist im
+Quellenordner nichts mehr offen, verschwinden auch `kartenentwuerfe/<ordner>/`
+und `in_arbeit`. Offen ist dabei jede Zeile, die noch auf ihre Karte wartet, ob
 Übungs- oder Wissenskarte.
+
+Ergänzt eine Fortsetzung eine Wissenskarte, hat der Skill den Inhalt vorher in
+die bestehende Karte geschrieben, die Bildverweise mit den Namen aus dem
+Entwurf, etwa `![Abrollen](17.quellgrafik-1.jpg)`. `uebernehmen --ergaenzt
+<kandidat> <wi-id>` legt die Quellgrafiken, die diese Verweise nennen, unter
+dem Namen der Karte nach `schaubilder/`, mit der nächsten freien Nummer, in der
+Reihenfolge, in der sie auf der Karte stehen, und lässt die Verweise dorthin
+zeigen. Was in `schaubilder/` schon liegt, bleibt, wie es ist. Ein Bild ohne
+Nummer zählt als das erste: Nach `wi-000003-oberes-zuspiel.png` kommt
+`wi-000003-oberes-zuspiel-2.jpg`. Eine Karte ohne Bild bekommt ihre ab 1, auch
+ein einzelnes. Eine Quellgrafik, die die Karte nicht nennt, verschwindet mit dem
+Entwurf. In `uebungen` kommen die Übungen aus `Übungen:` dazu, wie unten. ID und
+`angelegt` der Karte bleiben.
 
 Gehören Übungen und Wissenskarte zum selben Beitrag, zeigt die Wissenskarte
 danach auf die Übungen. Die Verbindung steht in `Übungen:` in „Was es ist“ der
 `wissen`-Zeile. Wird die Wissenskarte übernommen, kommen in ihre `uebungen` zu
 den IDs aus dem Entwurf die genannten IDs und die Karten der genannten
-Kandidaten, die schon `importiert` oder `ergänzt` sind. Wird eine Übung
-übernommen, oder ergänzt sie eine bestehende Karte, kommt deren ID in jede
+Kandidaten, die schon `importiert` oder `ergänzt` sind. Ergänzt die Zeile eine
+bestehende Wissenskarte, kommen dieselben IDs zu denen, die die Karte schon
+trägt. Wird eine Übung übernommen, oder ergänzt sie eine bestehende Karte,
+kommt deren ID in jede
 schon übernommene Wissenskarte, deren Zeile ihre Nummer nennt. So stimmt das
 Ergebnis in jeder Reihenfolge, auch in einem Aufruf. Die IDs stehen sortiert
 da, keine doppelt. Ein Kandidat, der `übersprungen` oder `zurückgestellt` wird,
@@ -715,8 +731,13 @@ Nicht übernommen wird ein Kandidat, unter dessen Namen in `schaubilder/` schon
 eine Datei liegt, einer, dessen freigegebener Entwurf die Prüfung nicht
 besteht, einer, für dessen Ausschnitt Pillow oder `pypdfium2` fehlt, und eine
 Wissenskarte, hinter deren `Übungen:` etwas steht, das keine Übung ist.
-Entwurf und Status bleiben dann, wie sie sind, denn der Entwurf trägt
-die Antworten des Trainers, und ein neuer Durchgang überschriebe sie. Die
+Nicht ergänzt wird ein Kandidat, dessen ID es in `uebungen/`, bei `wissen` in
+`wissen/`, nicht gibt, und eine Fortsetzung, deren Karte eine Quellgrafik des
+Kandidaten nennt, die nicht neben dem Entwurf liegt, oder hinter deren
+`Übungen:` etwas steht, das keine Übung ist. Die Karte ist dann nicht
+angefasst. Entwurf und Status bleiben in allen diesen Fällen, wie sie sind,
+denn der Entwurf trägt die Antworten des Trainers, und ein neuer Durchgang
+überschriebe sie. Die
 Ausgabe nennt den Fehler, die übrigen Kandidaten übernimmt `uebernehmen`
 trotzdem und endet mit einem Exitcode ungleich 0. Fehlt `quellen/<ordner>/`,
 etwa weil die Nextcloud ihn an diesem Rechner nicht abgleicht, bricht

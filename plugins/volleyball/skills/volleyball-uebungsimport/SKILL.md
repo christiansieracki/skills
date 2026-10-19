@@ -386,7 +386,10 @@ Wissenskarte, gleich wie viele Übungen es gibt.
 Ein Kandidat, der laut Liste eine Wissenskarte ergänzt, bekommt keine neue
 Datei. Was dazukommt, steht in der Liste und kommt so in die bestehende Karte,
 nach „Duplikate prüfen“. Seine Ausschnitte bekommen den Namen dieser Karte mit
-der nächsten freien Nummer.
+der nächsten Nummer nach den Bildern, die dort schon liegen, wie im
+Sammelimport. Ein Bild ohne Nummer zählt als das erste: Nach
+`wi-000003-oberes-zuspiel.png` kommt `wi-000003-oberes-zuspiel-2.jpg`. Eine
+Karte ohne Bild bekommt ihre ab 1.
 
 ### Wenn es keine ID gibt
 
