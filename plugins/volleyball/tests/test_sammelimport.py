@@ -484,7 +484,7 @@ class SeitenbereichTest(unittest.TestCase):
         self.assertNotIn(HEFT[1][0], abschnitt)
         self.assertIn("S. 2–3", zeile_mit(abschnitt, "selbst lesen"))
 
-    def bricht_ab(self, ordner: str = ORDNER) -> str:
+    def bricht_ab(self, ordner: str = ORDNER, umgebung: dict | None = None) -> str:
         """`vorbereiten` endet mit einem Fehler und hat nichts geschrieben. Zurueck kommt die Ausgabe.
 
         Vorn in der Uebersicht steht jeweils ein Kandidat ohne Fehler. Gaebe
@@ -493,7 +493,7 @@ class SeitenbereichTest(unittest.TestCase):
         sammelimport = self.ordner.pfad / "quellen" / ordner / "sammelimport.md"
         vorher = sammelimport.read_text(encoding="utf-8")
 
-        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ordner)
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ordner, umgebung=umgebung)
 
         self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
         self.assertEqual(sammelimport.read_text(encoding="utf-8"), vorher)
@@ -523,6 +523,39 @@ class SeitenbereichTest(unittest.TestCase):
 
         self.assertIn("Kandidat 7", meldung)
         self.assertIn("4 Seiten", meldung)
+
+    @BRAUCHT_PYPDFIUM2
+    def test_ohne_pdftotext_zaehlt_pypdfium2_die_seiten(self) -> None:
+        # pdftotext ist freiwillig (ADR-0008). Fehlt es, liest der Agent das
+        # PDF selbst, und ohne Pruefung schickte ihn der Auftrag auf Seiten,
+        # die es nicht gibt. pypdfium2 kann die Seiten auch zaehlen, und bei
+        # `quellgrafik: ausschnitt` ist es ohnehin da.
+        leer = Path(tempfile.mkdtemp(prefix="ohne-pdftotext-"))
+        self.addCleanup(shutil.rmtree, leer, True)
+        self.plane({"kandidat": 1, "dateien": [("heft.pdf", "S. 2")]},
+                   {"kandidat": 7, "dateien": [("heft.pdf", "S. 4–5")]})
+
+        meldung = zeile_mit(self.bricht_ab(umgebung={"PATH": str(leer)}), "S. 4–5")
+
+        self.assertIn("Kandidat 7", meldung)
+        self.assertIn("4 Seiten", meldung)
+
+    def test_ohne_pdftotext_und_pypdfium2_sagt_vorbereiten_welche_seiten_es_nicht_pruefen_konnte(
+            self) -> None:
+        # Dann zaehlt nichts die Seiten. Ein Abbruch machte den Seitenbereich
+        # von zwei freiwilligen Programmen abhaengig. Die Auftraege kommen
+        # deshalb, und die Ausgabe nennt die Zeile, damit der Skill sie dem
+        # Trainer sagt, bevor ein Agent im Heft nach Seite 5 sucht.
+        leer = Path(tempfile.mkdtemp(prefix="ohne-pdftotext-"))
+        self.addCleanup(shutil.rmtree, leer, True)
+        self.plane({"kandidat": 7, "dateien": [("heft.pdf", "S. 4–5")]})
+
+        fertig = self.vorbereiten(umgebung={**blende_aus(self, "pypdfium2"), "PATH": str(leer)})
+
+        meldung = zeile_mit(fertig.stdout, "S. 4–5")
+        self.assertIn("Kandidat 7", meldung)
+        self.assertIn("nicht prüfen", meldung)
+        self.assertTrue(auftrag_von(self.ordner, 7))
 
     def test_ein_seitenbereich_den_das_skript_nicht_lesen_kann_bricht_ab(self) -> None:
         # Aus „S. 3 bis 4“ nur Seite 3 zu nehmen, gaebe dem Agenten still zu

@@ -1564,6 +1564,31 @@ def pdf_seiten(pdftotext: str, pdf: Path) -> tuple[str, ...] | None:
                  for seite in text.split("\f"))
 
 
+def zahl_der_seiten(pdftotext: str | None, pdf: Path) -> int | None:
+    """Wie viele Seiten ein PDF hat, None, wenn hier nichts sie zählen kann (#64).
+
+    Erst über pdftotext, siehe `pdf_seiten`. Fehlt es oder kann es das PDF
+    nicht lesen, zählt `pypdfium2`, wenn es da ist. Beide sind freiwillig
+    (ADR-0008, ADR-0013), aber bei `quellgrafik: ausschnitt` mit einem PDF
+    im Durchgang ist `pypdfium2` ohnehin da.
+    """
+    seiten = pdf_seiten(pdftotext, pdf) if pdftotext else None
+    if seiten is not None:
+        return len(seiten)
+    try:
+        import pypdfium2
+    except ImportError:
+        return None
+    try:
+        dokument = pypdfium2.PdfDocument(pdf.read_bytes())
+    except (pypdfium2.PdfiumError, OSError):
+        return None
+    try:
+        return len(dokument)
+    finally:
+        dokument.close()
+
+
 def pdf_text(seiten: tuple[str, ...] | None) -> str | None:
     """Der Text von Seiten am Stück, leer, wenn keine Text hat, None bleibt None."""
     if seiten is None:
@@ -2472,16 +2497,21 @@ def verlange_freien_quellenordner(sammelimport: Sammelimport, trainer: str,
 
 
 def pruefe_seitenbereiche(sammelimport: Sammelimport, dran: list[Kandidat],
-                          pdftotext: str | None) -> None:
+                          pdftotext: str | None) -> list[str]:
     """Bricht ab, wenn ein Kandidat des Durchgangs Seiten nennt, die es so nicht gibt (#64).
 
     Vor dem ersten Auftrag, wie bei anderen Fehlern in der Übersicht, und
     die Meldung nennt die Zeile. Ein Seitenbereich steht nur hinter einem
     PDF, ein Foto ist eine Seite. Ob er über die letzte Seite hinausgeht,
-    sagt die Zahl der Seiten aus pdftotext. Ohne pdftotext, oder wenn es
-    das PDF nicht lesen kann, bleibt das offen, und der Agent, der die Seiten
-    dann selbst liest, merkt es.
+    sagt `zahl_der_seiten`, über pdftotext oder `pypdfium2`.
+
+    Kann keins von beiden die Seiten zählen, bricht es nicht ab: Sonst
+    hinge der Seitenbereich an zwei Programmen, die beide freiwillig sind.
+    Zurück kommt dann je Bereich eine Zeile für die Ausgabe, die die Zeile
+    nennt, damit der Trainer im PDF nachsieht, bevor ein Agent dort nach
+    Seiten sucht, die es nicht gibt.
     """
+    ungeprueft: list[str] = []
     for k in dran:
         for d in k.dateien:
             try:
@@ -2494,13 +2524,17 @@ def pruefe_seitenbereiche(sammelimport: Sammelimport, dran: list[Kandidat],
                 if not _ist_pdf(d.name):
                     grund = "einen Seitenbereich gibt es nur bei einem PDF"
                 else:
-                    seiten = (pdf_seiten(pdftotext, sammelimport.quellordner / d.name)
-                              if pdftotext else None)
-                    if seiten is None or bereich.letzte <= len(seiten):
+                    zahl = zahl_der_seiten(pdftotext, sammelimport.quellordner / d.name)
+                    if zahl is None:
+                        ungeprueft.append(
+                            f"Kandidat {k.nummer} nennt {d}. Ob es diese Seiten gibt, kann das "
+                            f"Skript nicht prüfen, weder pdftotext noch pypdfium2 hat sie gezählt.")
+                    if zahl is None or bereich.letzte <= zahl:
                         continue
-                    grund = f"das PDF hat {len(seiten)} Seiten"
+                    grund = f"das PDF hat {zahl} Seiten"
             raise sammelimport._abbruch(f"Kandidat {k.nummer} nennt {d}, {grund}.\n"
                                         f"Es ist noch kein Auftrag geschrieben.")
+    return ungeprueft
 
 
 def pruefe_uebungen_aus_dem_beitrag(sammelimport: Sammelimport, dran: list[Kandidat]) -> None:
@@ -2556,8 +2590,12 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
         pdftotext = finde_pdftotext()
         if not pdftotext:
             melde_ohne_pdftotext("die Aufträge", "den Kartenentwurf")
-    pruefe_seitenbereiche(sammelimport, dran, pdftotext)
+    ungeprueft = pruefe_seitenbereiche(sammelimport, dran, pdftotext)
     pruefe_uebungen_aus_dem_beitrag(sammelimport, dran)
+    for meldung in ungeprueft:
+        print(meldung)
+    if ungeprueft:
+        print()
     eintrag = sammelimport.in_arbeit
     if eintrag is None or not eintrag.ist_von(trainer):
         sammelimport.setze_in_arbeit(trainer)

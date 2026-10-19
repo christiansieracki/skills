@@ -278,6 +278,11 @@ angenommener Vorschlag oder als Ausnahme.
      Durchgang, Pillow bei `eingebettet` nur mit einer Übung im Durchgang.
    - **pdftotext fehlt:** Den Installationshinweis einmal weitergeben. Die
      Aufträge sind geschrieben, die Agenten lesen die PDFs selbst.
+   - **„Ob es diese Seiten gibt, kann das Skript nicht prüfen“:** Weder
+     `pdftotext` noch `pypdfium2` hat die Seiten gezählt. Die Aufträge sind
+     geschrieben. Dem Trainer die Zeilen nennen, bevor die Agenten starten:
+     Er sieht im PDF nach, ob es die Seiten gibt. Gibt es sie nicht, richtet
+     er die Zeile in der Übersicht, danach `vorbereiten` noch einmal.
    - **Hinter `Übungen:` steht etwas, das keine Übung ist:** Die Meldung
      nennt die Zeile und die Angabe. Geschrieben ist nichts. Dem Trainer
      sagen, was dort steht, und mit ihm klären, welche Übung gemeint ist. Die
