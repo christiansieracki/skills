@@ -360,7 +360,8 @@ class Sammelimport:
         self.zeilen = self.datei.read_text(encoding="utf-8").splitlines()
         self._lies_uebersicht()
 
-    def _abbruch(self, text: str) -> Abbruch:
+    def fehler_in_der_uebersicht(self, text: str) -> Abbruch:
+        """Der Abbruch für einen Fehler in einer Zeile der Übersicht, mit der Datei davor."""
         return Abbruch(f"In der Übersicht von quellen/{self.ordner}/{SAMMELIMPORT}: {text}")
 
     def _lies_uebersicht(self) -> None:
@@ -377,7 +378,7 @@ class Sammelimport:
         self.spalten = tabellenzellen(self.zeilen[kopf])
         fehlend = [s for s in SPALTEN if s not in self.spalten]
         if fehlend:
-            raise self._abbruch(f"Es fehlen die Spalten {', '.join(fehlend)}.")
+            raise self.fehler_in_der_uebersicht(f"Es fehlen die Spalten {', '.join(fehlend)}.")
         self.anfang = self.ende = kopf + 2
         while self.ende < len(self.zeilen) and self.zeilen[self.ende].lstrip().startswith("|"):
             werte = tabellenzellen(self.zeilen[self.ende])
@@ -396,15 +397,15 @@ class Sammelimport:
         Entwurfsordner, obwohl aus ihm nie eine Karte wurde.
         """
         if not k.nummer.isdigit():
-            raise self._abbruch(f"Der Kandidat {k.nummer!r} ist keine Nummer.")
+            raise self.fehler_in_der_uebersicht(f"Der Kandidat {k.nummer!r} ist keine Nummer.")
         if any(k.nummer == anderer.nummer for anderer in self.kandidaten):
-            raise self._abbruch(f"Der Kandidat {k.nummer} steht zweimal da.")
+            raise self.fehler_in_der_uebersicht(f"Der Kandidat {k.nummer} steht zweimal da.")
         if k.ergebnis not in ERGEBNISSE:
-            raise self._abbruch(
+            raise self.fehler_in_der_uebersicht(
                 f"Kandidat {k.nummer} hat das Ergebnis {k.ergebnis!r}. "
                 f"Erlaubt sind {', '.join(sorted(ERGEBNISSE))}.")
         if k.status not in STATUS:
-            raise self._abbruch(
+            raise self.fehler_in_der_uebersicht(
                 f"Kandidat {k.nummer} hat den Status {k.status!r}. "
                 f"Erlaubt sind {', '.join(sorted(STATUS))}.")
         self.kandidaten.append(k)
@@ -2520,8 +2521,8 @@ def pruefe_seitenbereiche(sammelimport: Sammelimport, dran: list[Kandidat],
                     if zahl is None or bereich.letzte <= zahl:
                         continue
                     grund = f"das PDF hat {zahl} Seiten"
-            raise sammelimport._abbruch(f"Kandidat {k.nummer} nennt {d}, {grund}.\n"
-                                        f"Es ist noch kein Auftrag geschrieben.")
+            raise sammelimport.fehler_in_der_uebersicht(
+                f"Kandidat {k.nummer} nennt {d}, {grund}.\nEs ist noch kein Auftrag geschrieben.")
     return ungeprueft
 
 
@@ -2537,7 +2538,7 @@ def pruefe_uebungen_aus_dem_beitrag(sammelimport: Sammelimport, dran: list[Kandi
         try:
             uebungen_aus_dem_beitrag(sammelimport, k)
         except ValueError as fehler:
-            raise sammelimport._abbruch(
+            raise sammelimport.fehler_in_der_uebersicht(
                 f"Bei Kandidat {k.nummer} steht hinter {UEBUNGEN_MARKE} {fehler}.\n"
                 f"Es ist noch kein Auftrag geschrieben.") from None
 
