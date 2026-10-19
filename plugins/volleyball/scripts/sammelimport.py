@@ -70,10 +70,10 @@ from functools import cache, cached_property
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ausschnitt import BibliothekFehlt, KeinAusschnitt, schneide_aus, verlange_bibliotheken  # noqa: E402
-from ausschnitt import FOTO as AUS_DEM_FOTO  # noqa: E402
-from ausschnitt import PDF as AUS_DEM_PDF  # noqa: E402
-from ausschnitt import ergebnis as ergebnis_des_ausschnitts  # noqa: E402
+from ausschnitt import (  # noqa: E402
+    AUS_DEM_FOTO, AUS_DEM_PDF, RECHTECK, BibliothekFehlt, KeinAusschnitt, bildformat, schneide_aus,
+    verlange_bibliotheken,
+)
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
@@ -1189,7 +1189,7 @@ def lies_ausschnitte(rumpf: str) -> list[Ausschnitt]:
         ausschnitte.append(Ausschnitt(
             treffer.group("name").strip(), treffer.group("datei").strip(),
             int(seite) if seite else None,
-            tuple(int(treffer.group(name)) for name in ("links", "oben", "rechts", "unten"))))
+            tuple(int(treffer.group(name)) for name in RECHTECK)))
     return ausschnitte
 
 
@@ -1240,12 +1240,12 @@ def pruefe_ausschnitte(sammelimport: Sammelimport, k: Kandidat, ausschnitte: lis
             raise Formfehler(f"Ausschnitt {a.name} nennt {a.datei}, die Datei gehört nicht zu "
                              f"Kandidat {k.nummer}")
         try:
-            endung, form = ergebnis_des_ausschnitts(Path(a.datei))
+            art = bildformat(Path(a.datei))
         except KeinAusschnitt as fehler:
             raise Formfehler(f"Ausschnitt {a.name}: {fehler}") from None
-        if Path(a.name).suffix != endung:
-            raise Formfehler(f"Ausschnitt {a.name}: aus {a.datei} wird ein {form}, der Name "
-                             f"endet deshalb auf {endung}")
+        if Path(a.name).suffix != art.endung:
+            raise Formfehler(f"Ausschnitt {a.name}: aus {a.datei} wird ein {art.name}, der Name "
+                             f"endet deshalb auf {art.endung}")
         bereiche = _bereiche(eintraege)
         if a.seite is not None and bereiche and not any(
                 b.erste <= a.seite <= b.letzte for b in bereiche):
@@ -2290,7 +2290,7 @@ def endung_des_ausschnitts(datei: str) -> str | None:
     TIFF, das noch nicht aufbereitet ist.
     """
     try:
-        return ergebnis_des_ausschnitts(Path(datei))[0]
+        return bildformat(Path(datei)).endung
     except KeinAusschnitt:
         return None
 
@@ -2317,7 +2317,7 @@ def ausschnitte_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> list[str]
                 f"Aus keiner Datei dieses Kandidaten lässt sich ein Ausschnitt schneiden, nur aus "
                 f"einem Foto (JPEG, PNG) oder einem PDF. Es gibt keinen, und {ohne}.", ""]
     datei, endung = moeglich[0]
-    pdf, foto = AUS_DEM_PDF[0], AUS_DEM_FOTO[0]
+    pdf, foto = AUS_DEM_PDF.endung, AUS_DEM_FOTO.endung
     seite = f" S. {datei.seiten.erste if datei.seiten else 1}" if endung == pdf else ""
     einzeln = sammelimport.quellgrafik(k, endung=endung).name
     mehrere = [sammelimport.quellgrafik(k, nr, endung).name for nr in (1, 2)]
@@ -2665,7 +2665,7 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
         "ausschnitte": [{"name": a.name,
                          "pfad": (sammelimport.entwurfsordner / a.name).as_posix(),
                          "datei": a.datei, "seite": a.seite,
-                         "rechteck": dict(zip(("links", "oben", "rechts", "unten"), a.rechteck))}
+                         "rechteck": dict(zip(RECHTECK, a.rechteck))}
                         for a in befund.ausschnitte],
         "ablauf_aus_dem_bild": befund.aus_dem_bild,
         "felder": befund.felder,
