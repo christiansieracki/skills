@@ -6,7 +6,7 @@
     <python> sammelimport.py pruefen <ordner> [--json]
     <python> sammelimport.py uebernehmen <ordner> --kandidat 3 "Notiz" ...
                  --uebersprungen 4 "Grund" ... --zurueckgestellt 6 "Grund" ...
-                 --ergaenzt 5 ue-000027 ...
+                 --ergaenzt 5 ue-000027 --ergaenzt 7 wi-000003 ...
 
 `<ordner>` ist der Quellenordner, relativ zu `quellen/`. In ihm liegt die
 `sammelimport.md` mit den Einstellungen im Frontmatter, den Absprachen und der
@@ -43,7 +43,9 @@ trägt es deren IDs in ihre `uebungen` ein, gleich in welcher Reihenfolge beide
 Karte werden.
 Ein freigegebener Entwurf, der die Prüfung nicht besteht, bleibt mit seinem
 Status stehen. Gestrichene, zurückgestellte und ergänzende Kandidaten
-bekommen nur ihren Status.
+bekommen nur ihren Status. Ergänzt eine Fortsetzung eine Wissenskarte, legt
+es dazu ihre Quellgrafiken unter dem Namen dieser Karte nach `schaubilder/`,
+biegt die Verweise in der Karte um und trägt die Übungen aus `Übungen:` ein.
 Ist nichts mehr offen, löscht es `in_arbeit`.
 
 Nach der Freigabe des Plans schreibt nur noch dieses Skript in die Übersicht.
@@ -2782,7 +2784,106 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
 
 
 class NichtUebernommen(Exception):
-    """Ein Kandidat, dessen Karte nicht geschrieben wurde. Der Text sagt, warum."""
+    """Ein Kandidat, dessen Karte nicht geschrieben oder ergänzt wurde. Der Text sagt, warum."""
+
+
+def naechste_bildnummer(schaubilder: Path, name: str) -> int:
+    """Die nächste freie Nummer für ein Bild unter dem Namen einer Karte in schaubilder/ (#73).
+
+    Gezählt wird jede Datei, die `<name>` heißt, mit oder ohne `-<nummer>`,
+    gleich mit welcher Endung. Ein Bild ohne Nummer ist das erste, nach ihm
+    kommt also 2: Neben `<name>.jpg` läse man `<name>-1.jpg` als das erste.
+    Eine Lücke bleibt frei, das neue Bild kommt hinter die, die schon da
+    sind.
+    """
+    muster = re.compile(rf"{re.escape(name)}(?:-([1-9]\d*))?\..+")
+    dateien = schaubilder.iterdir() if schaubilder.is_dir() else []
+    nummern = [int(treffer.group(1) or 1) for p in dateien
+               if (treffer := muster.fullmatch(p.name))]
+    return max(nummern, default=0) + 1
+
+
+def ergaenze(sammelimport: Sammelimport, k: Kandidat, uid: str) -> list[str]:
+    """Trägt in die Karte ein, die der Kandidat ergänzt, was das Skript dazu beiträgt.
+
+    Den Inhalt hat der Skill vorher in die bestehende Karte geschrieben, nach
+    dem Ja des Trainers. Bei einer Übung bleibt hier nur, dass es die Karte in
+    uebungen/ gibt. Bei einer Wissenskarte kommt das Mechanische dazu, siehe
+    `ergaenze_wissenskarte`. Die Karte muss von der Sorte des Kandidaten
+    sein: Eine Fortsetzung ergänzt keine Übung. Zurück kommen die Zeilen für
+    die Ausgabe. Geht es nicht, kommt NichtUebernommen mit dem Grund, und
+    nichts ist geschrieben.
+    """
+    if k.sorte is WISSENSKARTE:
+        return ergaenze_wissenskarte(sammelimport, k, uid)
+    # `bekannt` kennt auch die Karten, die dieser Aufruf eben geschrieben
+    # hat. Auch eine davon kann die ergänzte sein.
+    if uid not in sammelimport.bekannt:
+        raise NichtUebernommen(f"{uid} gibt es nicht in uebungen/")
+    return []
+
+
+def ergaenze_wissenskarte(sammelimport: Sammelimport, k: Kandidat, wid: str) -> list[str]:
+    """Bringt die Bilder und Übungen einer Fortsetzung in die Wissenskarte, die sie ergänzt (#73).
+
+    Der Skill hat die Bildverweise mit den Namen aus dem Entwurf in die Karte
+    geschrieben, etwa `17.quellgrafik-1.jpg`. Die Quellgrafiken dahinter
+    kommen unter dem Namen der Karte nach schaubilder/, mit der nächsten
+    freien Nummer, in der Reihenfolge, in der sie auf der Karte stehen, und
+    die Verweise zeigen danach dorthin, wie beim Übernehmen einer neuen
+    (#71). Was in schaubilder/ schon liegt, bleibt, wie es ist. Eine
+    Quellgrafik, die die Karte nicht nennt, kommt nicht mit, sie verschwindet
+    mit dem Entwurf. In `uebungen` kommen die Übungen aus `Übungen:` dazu,
+    wie bei einer neuen Wissenskarte (#72), ohne Doppeltes.
+
+    Erst wird geprüft, dann die Karte geschrieben, dann werden die Bilder
+    verschoben. Liegt eine genannte Quellgrafik nicht neben dem Entwurf, ist
+    nichts geschrieben: Ihr Verweis zeigte sonst ins Leere.
+    """
+    dateien = {str(karte["id"]): sammelimport.wurzel / karte["datei"]
+               for karte in lies_karten(sammelimport.wurzel, WISSENSKARTE)}
+    datei = dateien.get(wid)
+    if datei is None:
+        raise NichtUebernommen(f"{wid} gibt es nicht in wissen/")
+    try:
+        uebungen = ids_der_uebungen(sammelimport, k)
+    except ValueError as fehler:
+        raise NichtUebernommen(f"hinter {UEBUNGEN_MARKE} steht {fehler}") from None
+    vorher = datei.read_text(encoding="utf-8")
+    zeilen = vorher.splitlines()
+    ende = _frontmatter_ende(zeilen)
+    if ende is None:
+        raise NichtUebernommen(f"in {wid} schließt das Frontmatter nicht auf einer eigenen "
+                               f"Zeile ---")
+    rumpf = "\n".join(zeilen[ende + 1:])
+    namen = [name for name in dict.fromkeys(bildverweise(rumpf))
+             if sammelimport.ist_quellgrafik_von(k, name)]
+    fehlend = [name for name in namen if not (sammelimport.entwurfsordner / name).is_file()]
+    if fehlend:
+        raise NichtUebernommen(f"{', '.join(fehlend)} steht in {wid}, liegt aber nicht neben "
+                               f"dem Entwurf")
+
+    schaubilder = sammelimport.wurzel / "schaubilder"
+    erste = naechste_bildnummer(schaubilder, datei.stem)
+    verschoben = {sammelimport.entwurfsordner / name:
+                  schaubilder / f"{datei.stem}-{nr}{Path(name).suffix}"
+                  for nr, name in enumerate(namen, erste)}
+    rumpf = biege_bildverweise_um(rumpf, {alt.name: f"../schaubilder/{neu.name}"
+                                          for alt, neu in verschoben.items()})
+    felder, _ = lies_frontmatter(datei)
+    bisher = [str(u) for u in als_liste(felder.get("uebungen"))]
+    text = mit_uebungen("\n".join([*zeilen[:ende + 1], rumpf]), sorted({*bisher, *uebungen}))
+    if text != vorher:
+        _ersetze(datei, text)
+    for alt, neu in verschoben.items():
+        neu.parent.mkdir(exist_ok=True)
+        shutil.move(alt, neu)
+
+    meldungen = [f"{alt.name} ist jetzt schaubilder/{neu.name}" for alt, neu in verschoben.items()]
+    dazu = [uid for uid in uebungen if uid not in bisher]
+    if dazu:
+        meldungen.append(f"{', '.join(dazu)} steht jetzt in uebungen von {wid}")
+    return meldungen
 
 
 def schliesse_ab(sammelimport: Sammelimport, k: Kandidat, status: str, notiz: str,
@@ -2854,9 +2955,10 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
     Freigegebene werden Karte. Gestrichene werden `übersprungen`, der Grund
     steht in der Notiz. Zurückgestellte werden `zurückgestellt`, auch mit
     Grund, und kommen wieder, wenn der Trainer sie holt (#69). Ein
-    bestätigtes Duplikat hat der Skill schon in die bestehende Karte
-    eingearbeitet, der Kandidat wird `ergänzt` und zeigt auf sie. Aus den
-    drei letzten entsteht keine Karte.
+    bestätigtes Duplikat oder eine Fortsetzung hat der Skill schon in die
+    bestehende Karte eingearbeitet, der Kandidat wird `ergänzt` und zeigt auf
+    sie. Bei einer Wissenskarte bringt `ergaenze` vorher ihre Bilder und
+    Übungen hinein (#73). Aus den drei letzten entsteht keine Karte.
 
     Vor allem anderen muss der Quellenordner da sein (#40). Gleicht die
     Nextcloud eines Rechners quellen/ nicht ab, liegen dort die Entwürfe,
@@ -2904,22 +3006,24 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
         print(f"  {nummer}  nicht übernommen: {grund}")
         abgewiesen += 1
 
-    # Je Kandidat ohne Karte: Status, Notiz, Karte, und was dagegen spricht.
-    # `bekannt` kennt auch die Karten, die dieser Aufruf eben geschrieben
-    # hat. Auch eine davon kann die ergänzte sein.
+    # Je Kandidat ohne eigene Karte: Status, Notiz und die ergänzte Karte.
+    # Was die ergänzte Karte vom Kandidaten bekommt, trägt `ergaenze` ein,
+    # bevor `schliesse_ab` Entwurf und Quellgrafiken löscht.
     ohne_karte = [
-        (nummer, status, grund.strip(), None, "" if grund.strip() else "ohne Grund")
+        (nummer, status, grund.strip(), None)
         for status, mit_grund in (("übersprungen", uebersprungen),
                                   ("zurückgestellt", zurueckgestellt))
         for nummer, grund in mit_grund
-    ] + [
-        (nummer, "ergänzt", "", uid,
-         "" if uid in sammelimport.bekannt else f"{uid} gibt es nicht in uebungen/")
-        for nummer, uid in ergaenzt
-    ]
-    for nummer, status, notiz, karte, einwand in ohne_karte:
+    ] + [(nummer, "ergänzt", "", uid) for nummer, uid in ergaenzt]
+    for nummer, status, notiz, karte in ohne_karte:
         k = nach_nummer.get(nummer)
-        einwand = warum_nicht_wartend(k) or einwand
+        einwand = warum_nicht_wartend(k) or ("" if karte or notiz else "ohne Grund")
+        meldungen: list[str] = []
+        if not einwand and karte:
+            try:
+                meldungen = ergaenze(sammelimport, k, karte)
+            except NichtUebernommen as fehler:
+                einwand = str(fehler)
         if einwand:
             print(f"  {nummer}  nicht {status}: {einwand}")
             abgewiesen += 1
@@ -2928,7 +3032,8 @@ def uebernehmen(wurzel: Path, ordner: str, freigegeben: list[tuple[str, str]],
         print(f"  {nummer}  {status}: {notiz or karte}")
         # Auch eine Übung, die eine Karte ergänzt, gehört auf die
         # Wissenskarte ihres Beitrags, mit der ID der ergänzten (#72).
-        for meldung in trage_bei_wissenskarten_ein(sammelimport, k, karte) if karte else []:
+        meldungen += trage_bei_wissenskarten_ein(sammelimport, k, karte) if karte else []
+        for meldung in meldungen:
             print(f"      {meldung}")
 
     # Der Linter prüft die ganze Bibliothek, nicht nur die neuen Karten. Was
@@ -3010,7 +3115,8 @@ def main() -> int:
                     help="ein Kandidat, den der Trainer später holen will, und warum")
     ue.add_argument("--ergaenzt", nargs=2, action="append", default=[],
                     metavar=("NR", "ID"),
-                    help="ein Kandidat, der als Duplikat eine bestehende Karte ergänzt hat")
+                    help="ein Kandidat, der als Duplikat oder Fortsetzung eine bestehende "
+                         "Karte ergänzt hat, und ihre ID")
     a = ap.parse_args()
     if a.befehl == "vorbereiten" and a.plan and a.trotzdem:
         ap.error("--trotzdem gilt nur ohne --plan, die Planeingabe trägt nicht ein, wer arbeitet")

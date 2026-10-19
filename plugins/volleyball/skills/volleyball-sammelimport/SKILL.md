@@ -324,9 +324,14 @@ angenommener Vorschlag oder als Ausnahme.
    aus ihrem eigenen Zähler. Die IDs der Übungen aus `Übungen:` trägt das
    Skript selbst in die Wissenskarte ein, in jeder Reihenfolge, auch über
    mehrere Durchgänge. `--uebersprungen` und `--zurueckgestellt` mit
-   dem Grund. `--ergaenzt` mit der ID der ergänzten Karte. Was der Trainer
-   offengelassen hat, fehlt im Aufruf und kommt bei der nächsten Freigabe
-   wieder.
+   dem Grund. `--ergaenzt` mit der ID der ergänzten Karte, `ue-` bei einer
+   Übung, `wi-` bei einer Fortsetzung. Bei einer Wissenskarte legt das Skript
+   dabei die Quellgrafiken, die ihre neuen Bildverweise nennen, unter ihrem
+   Namen mit der nächsten freien Nummer nach `schaubilder/`, lässt die
+   Verweise dorthin zeigen und trägt die Übungen aus `Übungen:` ein. Was dort
+   schon liegt, bleibt. Die Ausgabe nennt je Bild den neuen Namen. Was der
+   Trainer offengelassen hat, fehlt im Aufruf und kommt bei der nächsten
+   Freigabe wieder.
 
    Was nicht geklappt hat, nennt die Ausgabe je Kandidat, und der Exitcode ist
    ungleich 0. Entwurf und Status bleiben dann stehen, wie sie sind.
@@ -337,9 +342,14 @@ angenommener Vorschlag oder als Ausnahme.
      `Übungen:`, liegt er nicht im Entwurf, sondern in der Zeile der
      Übersicht, wie bei `vorbereiten`.
    - **„nicht übersprungen“, „nicht zurückgestellt“ oder „nicht ergänzt“:**
-     Die Meldung sagt, warum: Der Grund fehlt, die ID gibt es nicht, oder
-     der Kandidat ist schon erledigt. Mit dem Trainer klären und den Aufruf
-     für diesen Kandidaten wiederholen.
+     Die Meldung sagt, warum: Der Grund fehlt, die ID gibt es nicht oder
+     nicht in der Sorte der Zeile, oder der Kandidat ist schon erledigt. Mit
+     dem Trainer klären und den Aufruf für diesen Kandidaten wiederholen.
+     Nennt die Wissenskarte eine Quellgrafik, die nicht neben dem Entwurf
+     liegt, ist ein Bildverweis falsch, den du beim Einarbeiten geschrieben
+     hast: In der Karte richten, dann noch einmal. Nennt der Grund `Übungen:`,
+     gilt dasselbe wie bei „nicht übernommen“. Die Karte, die der Kandidat
+     ergänzen sollte, hat das Skript dann nicht angefasst.
    - **„Nichts übernommen.“ am Ende der Meldung:** Geschrieben ist nichts.
      Fehlt `quellen/<ordner>/` an diesem Rechner, gleicht die Nextcloud ihn
      nicht ab, und der Trainer muss das richten. Geht es um die ID, etwa weil
@@ -458,6 +468,9 @@ Fertig sind die Ausschnitte, wenn jeder behalten oder gestrichen ist.
   Vorschläge zu Feldern ohne eigene Spalte, etwa `autor`, als `feld: wert`.
 - **Vermutungen:** wie bei den Übungen.
 - Wer den Text sehen will, bekommt die beiden Abschnitte aus dem Entwurf.
+- Steht in „Was es ist“ „ergänzt wi-######“, steht das in der Zeile. Mit der
+  Zeile bestätigt der Trainer, dass die Fortsetzung diese Karte ergänzt. Was
+  genau dazukommt, sieht er beim Einarbeiten, bevor geschrieben wird.
 
 Unter den Tabellen steht:
 
@@ -495,6 +508,30 @@ offengelassen ist.
   das fürs Training heißt“ verschwindet, die übrigen behalten ihre
   Reihenfolge. Auf der Karte steht danach nur, was die Quelle sagt oder der
   Trainer bestätigt hat.
+- **Eine bestätigte Fortsetzung,** „ergänzt wi-######“ in „Was es ist“,
+  ergänzt die bestehende Wissenskarte statt eine eigene zu werden. Erst kommen
+  die übrigen Antworten in den Entwurf, dann die Karte unter `wissen/` lesen
+  und aus dem Entwurf in sie bringen, was neu ist, ohne Doppeltes:
+  - neue Kernaussagen und neue Punkte unter „Was das fürs Training heißt“,
+    hinter die, die schon da sind. Was die Karte schon sagt, auch mit anderen
+    Worten, kommt nicht noch einmal. Ein abgeleiteter Punkt ist ein
+    Vorschlag und kommt nur mit dem Ja aus der Freigabe hinein, wie auf einer
+    neuen Karte;
+  - in `quelle` die Quelle der Fortsetzung nach einem Semikolon, in
+    `quelldatei` ihre Dateien nach einem Komma, wie im Import-Skill. In `thema`
+    und `schwerpunkt` kommt, was neu ist;
+  - jeden Bildverweis aus dem Entwurf, an seiner Kernaussage und mit dem Namen
+    aus dem Entwurf, etwa `![Abrollen](17.quellgrafik-1.jpg)`. Wohin das Bild
+    kommt und wie es dann heißt, setzt `uebernehmen`;
+  - eine ID, die der Trainer bei der Freigabe in `uebungen` dazugenommen hat.
+    Die Übungen aus `Übungen:` trägt das Skript selbst ein.
+
+  ID und `angelegt` bleiben. Bevor du schreibst, zeigst du dem Trainer, was
+  dazukommt, so wie es in der Karte stehen wird: die neuen Punkte unter ihrer
+  Überschrift, die Felder mit altem und neuem Wert, die Bilder mit ihrer
+  Kernaussage. Nach dem Ja schreiben. Beim Übernehmen wird der Kandidat
+  `--ergaenzt` mit der ID der Karte. Bis dahin zeigen die neuen Bildverweise
+  ins Leere, und der Linter meldet sie.
 
 ## Am Ende eines Durchgangs
 
