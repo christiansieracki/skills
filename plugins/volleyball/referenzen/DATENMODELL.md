@@ -631,7 +631,8 @@ wird:
   Form oben. Ein Vorschlag nennt ein Feld aus dem Frontmatter oder einen
   Abschnitt, den der Entwurf hat;
 - die Ausschnitte: jeder in der Form oben, mit dem Namen einer eigenen
-  Quellgrafik, der nur einmal vorkommt, einer Datei des Kandidaten, bei einem
+  Quellgrafik, der nur einmal vorkommt, ein einzelner ohne Nummer, mehrere ab
+  1 gezählt ohne Lücke, einer Datei des Kandidaten, bei einem
   Seitenbereich einer Seite daraus, einer Endung, die zur Datei passt, und
   bei einer Übung eingetragen in `schaubild:`, bei einer Wissenskarte in einem
   Bildverweis im Text. Umgekehrt nennt `schaubild:` bei `quellgrafik:

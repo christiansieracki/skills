@@ -1409,6 +1409,38 @@ class AusschnittTest(unittest.TestCase):
         self.assertIn("schaubild", zeile["Notiz"])
 
     @BRAUCHT_PILLOW
+    def test_ein_einzelner_ausschnitt_heisst_ohne_nummer_mehrere_werden_ab_1_gezaehlt(
+            self) -> None:
+        # Dieselbe Regel wie fuer die Quellgrafiken, die `vorbereiten`
+        # ausschneidet. Je Kandidat eine Abweichung, die Notiz nennt, wie die
+        # Namen heissen muessen. Kandidat 1 und 2 halten sich an die Regel.
+        faelle = {
+            "einer mit Nummer": (["-1"], "{n}.quellgrafik.jpg"),
+            "einer ohne Nummer neben einem mit": (["", "-2"], "ab 1"),
+            "eine Luecke in der Zaehlung": (["-1", "-3"], "ab 1"),
+        }
+        heil = {1: [""], 2: ["-1", "-2"]}
+        nummern = {**heil, **{nr: endungen for nr, (endungen, _) in enumerate(faelle.values(), 3)}}
+        self.plane(*({"kandidat": nr, "dateien": ["seite-26.jpg"]} for nr in nummern))
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        for nr, endungen in nummern.items():
+            namen = [f"{nr}.quellgrafik{e}.jpg" for e in endungen]
+            self.ordner.lege_kartenentwurf_an(
+                ORDNER, nr, titel=f"Kandidat {nr}", schaubild=namen, ausschnitte=[
+                    f"`{name}`: `seite-26.jpg`, links 10, oben 20, rechts 60, unten 70"
+                    for name in namen])
+
+        self.pruefe()
+
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        for nr in heil:
+            self.assertEqual(uebersicht[str(nr)]["Status"], "bereit", uebersicht[str(nr)]["Notiz"])
+        for nr, (fall, (_, stichwort)) in enumerate(faelle.items(), 3):
+            with self.subTest(fall):
+                self.assertEqual(uebersicht[str(nr)]["Status"], "offen")
+                self.assertIn(stichwort.format(n=nr), uebersicht[str(nr)]["Notiz"])
+
+    @BRAUCHT_PILLOW
     def test_json_nennt_die_ausschnitte_mit_pfad(self) -> None:
         # Der Skill zeigt jeden Ausschnitt im Chat. Mit der Datei, der Seite
         # und dem Rechteck aendert er die Zahlen, wenn der Trainer korrigiert.

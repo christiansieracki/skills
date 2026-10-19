@@ -646,10 +646,19 @@ class Sammelimport:
         nummer = "" if nr is None else f"-{nr}"
         return self.entwurfsordner / f"{k.nummer}.quellgrafik{nummer}{endung}"
 
+    def _als_quellgrafik(self, k: Kandidat, name: str) -> re.Match[str] | None:
+        """`name` zerlegt als Name einer Quellgrafik des Kandidaten, in der Gruppe 1 die Nummer."""
+        return re.fullmatch(rf"{re.escape(k.nummer)}\.quellgrafik(?:-([1-9]\d*))?\.(?:png|jpg)",
+                            name)
+
     def ist_quellgrafik_von(self, k: Kandidat, name: str) -> bool:
         """Ist `name` eine Quellgrafik dieses Kandidaten, einzeln oder mit Nummer, PNG oder JPEG?"""
-        muster = rf"{re.escape(k.nummer)}\.quellgrafik(-[1-9]\d*)?\.(png|jpg)"
-        return re.fullmatch(muster, name) is not None
+        return self._als_quellgrafik(k, name) is not None
+
+    def nummer_der_quellgrafik(self, k: Kandidat, name: str) -> int | None:
+        """Die Nummer im Namen einer Quellgrafik des Kandidaten, None bei der einzigen."""
+        treffer = self._als_quellgrafik(k, name)
+        return int(treffer.group(1)) if treffer and treffer.group(1) else None
 
     def quellgrafiken(self, k: Kandidat) -> list[Path]:
         """Die Quellgrafiken des Kandidaten, die neben dem Entwurf liegen."""
@@ -1256,6 +1265,31 @@ def pruefe_ausschnitte(sammelimport: Sammelimport, k: Kandidat, ausschnitte: lis
         if a.name not in eingetragen:
             raise Formfehler(f"Ausschnitt {a.name} steht in keinem Bildverweis im Text" if wissen
                              else f"Ausschnitt {a.name} fehlt in schaubild:")
+    pruefe_zaehlung(sammelimport, k, ausschnitte)
+
+
+def pruefe_zaehlung(sammelimport: Sammelimport, k: Kandidat, ausschnitte: list[Ausschnitt]) -> None:
+    """Bricht mit Formfehler ab, wenn die Ausschnitte nicht nach der Regel heißen (#61).
+
+    Ein einzelner heißt `17.quellgrafik.<endung>`, mehrere werden ab 1
+    gezählt, ohne Lücke, wie die Quellgrafiken, die `vorbereiten`
+    ausschneidet. Auf die Karte kommen sie ohnehin unter ihrem Namen, aber
+    neben dem Entwurf sieht der Trainer so an jedem Namen, ob es mehrere
+    gibt. Streicht er bei der Freigabe einen, benennt der Skill die übrigen
+    deshalb neu.
+    """
+    if not ausschnitte:
+        return
+    nummern = sorted(sammelimport.nummer_der_quellgrafik(k, a.name) or 0 for a in ausschnitte)
+    if len(ausschnitte) == 1:
+        if nummern != [0]:
+            einzeln = sammelimport.quellgrafik(k, endung=Path(ausschnitte[0].name).suffix).name
+            raise Formfehler(f"Ein einzelner Ausschnitt heißt {einzeln}, nicht "
+                             f"{ausschnitte[0].name}")
+    elif nummern != list(range(1, len(ausschnitte) + 1)):
+        raise Formfehler(f"Mehrere Ausschnitte werden ab 1 gezählt, hier "
+                         f"{k.nummer}.quellgrafik-1 bis {k.nummer}.quellgrafik-{len(ausschnitte)}, "
+                         f"jeder mit seiner Endung")
 
 
 def schneide_ausschnitte(sammelimport: Sammelimport, k: Kandidat,

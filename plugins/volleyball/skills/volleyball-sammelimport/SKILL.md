@@ -421,7 +421,10 @@ Der Trainer sagt:
 - **streichen:** Die Zeile fällt aus `Ausschnitte:`, bei einer Übung der Name
   aus `schaubild:`, bei einer Wissenskarte der Bildverweis aus dem Text, die
   ganze Zeile. War es der letzte, fällt die Liste `Ausschnitte:` ganz weg,
-  und bei einer Übung wird `schaubild:` `null`. Danach `pruefen` wie beim
+  und bei einer Übung wird `schaubild:` `null`. Die übrigen heißen danach
+  wieder nach der Regel, überall, wo ihr Name steht: einer allein ohne
+  Nummer, `17.quellgrafik.jpg`, mehrere ab 1 gezählt ohne Lücke, jeder mit
+  seiner Endung. Danach `pruefen` wie beim
   Korrigieren. Ein Bildverweis ohne seinen Ausschnitt weist den Entwurf ab,
   ebenso ein Name in `schaubild:`.
 
