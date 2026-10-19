@@ -123,11 +123,6 @@ SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "
 SORTE_DES_ERGEBNISSES = {"uebung": UEBUNGSKARTE, "folge": UEBUNGSKARTE, "wissen": WISSENSKARTE}
 ERGEBNISSE = {*SORTE_DES_ERGEBNISSES, "zurückgestellt", "übersprungen"}
 
-# Die Sorten, für die es Auftrag, Agent und Prüfung gibt. Seit #70 sind es
-# beide. Eine Sorte, die hier fehlt, wartet `offen`: Ein Durchgang legt ihr
-# keinen Auftrag an, und `pruefen` lässt sie, wie sie ist.
-ENTWORFENE_SORTEN = (UEBUNGSKARTE, WISSENSKARTE)
-
 # Wie die Sorte in der Ausgabe von `vorbereiten` und in `pruefen --json`
 # heißt. Daran wählt der Skill den Agenten, der den Entwurf schreibt, und die
 # Tabelle, in der er ihn vorlegt.
@@ -306,18 +301,11 @@ class Kandidat:
     def wartet(self) -> bool:
         """Aus dem Kandidaten soll eine Karte werden, gleich welcher Sorte, und es gibt sie noch nicht.
 
-        Solange einer wartet, ist im Quellenordner etwas offen, und
-        `uebernehmen` räumt nicht auf.
+        Nur diese Kandidaten nimmt ein Durchgang und prüft `pruefen`. Solange
+        einer wartet, ist im Quellenordner etwas offen, und `uebernehmen`
+        räumt nicht auf.
         """
         return self.sorte is not None and self.status in NOCH_OFFEN
-
-    @property
-    def wartet_auf_entwurf(self) -> bool:
-        """Er wartet, und für seine Sorte gibt es schon Auftrag und Prüfung.
-
-        Nur diese Kandidaten nimmt ein Durchgang und prüft `pruefen`.
-        """
-        return self.wartet and self.sorte in ENTWORFENE_SORTEN
 
     @property
     def dateien(self) -> list[Datei]:
@@ -2569,7 +2557,7 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     verlange_freien_quellenordner(sammelimport, trainer, trotzdem)
     try:
         offen = [k for k in sammelimport.kandidaten
-                 if k.wartet_auf_entwurf and pruefe_entwurf(sammelimport, k).fehler]
+                 if k.wartet and pruefe_entwurf(sammelimport, k).fehler]
     except BibliothekFehlt as fehler:
         raise Abbruch(f"Ein Entwurf nennt einen Ausschnitt.\n{fehler}\n\n"
                       f"Es ist noch kein Auftrag geschrieben.") from None
@@ -2709,7 +2697,7 @@ def pruefen(wurzel: Path, ordner: str, als_json: bool = False) -> int:
     stand: dict[str, int] = {}
     freigabe = []
     for k in sammelimport.kandidaten:
-        if not k.wartet_auf_entwurf:
+        if not k.wartet:
             continue
         try:
             befund = pruefe_entwurf(sammelimport, k)
