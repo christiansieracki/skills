@@ -123,11 +123,6 @@ SPALTEN = ["Kandidat", "Dateien", "Was es ist", "Ergebnis", "Status", "Karte", "
 SORTE_DES_ERGEBNISSES = {"uebung": UEBUNGSKARTE, "folge": UEBUNGSKARTE, "wissen": WISSENSKARTE}
 ERGEBNISSE = {*SORTE_DES_ERGEBNISSES, "zurückgestellt", "übersprungen"}
 
-# Wie die Sorte in der Ausgabe von `vorbereiten` und in `pruefen --json`
-# heißt. Daran wählt der Skill den Agenten, der den Entwurf schreibt, und die
-# Tabelle, in der er ihn vorlegt.
-SORTENNAME = {UEBUNGSKARTE: "uebungskarte", WISSENSKARTE: "wissenskarte"}
-
 STATUS = {"offen", "bereit", "rückfrage", "importiert", "ergänzt", "übersprungen",
           "zurückgestellt"}
 
@@ -555,6 +550,11 @@ class Sammelimport:
             raise Abbruch(f"quellgrafik in {datei} ist {wert!r}, erwartet ist "
                           f"{', '.join(QUELLGRAFIK)}.")
         return wert
+
+    @property
+    def mit_ausschnitten(self) -> bool:
+        """Steht `quellgrafik: ausschnitt` da? Dann nennt jeder Entwurf seine Ausschnitte (#63, #71)."""
+        return self.art_der_quellgrafik == "ausschnitt"
 
     @property
     def quellgrafik_angabe(self) -> str:
@@ -1125,7 +1125,7 @@ def pruefe_nur_ausschnitte(sammelimport: Sammelimport, k: Kandidat, ausschnitte:
     ausgeschnitten hat, eine Liste gibt es dort nicht.
     """
     wissen = k.sorte is WISSENSKARTE
-    if not wissen and sammelimport.art_der_quellgrafik != "ausschnitt":
+    if not wissen and not sammelimport.mit_ausschnitten:
         return
     namen = {a.name for a in ausschnitte}
     for name in quellgrafiken_im_entwurf(k, felder, rumpf):
@@ -2118,11 +2118,11 @@ def lege_quellgrafiken_an(sammelimport: Sammelimport, k: Kandidat) -> tuple[list
     # Ausschnitt (#71). Das größte eingebettete Bild eines PDF zeigt bei
     # Theorie selten, was eine Kernaussage erklärt (#61).
     if k.sorte is WISSENSKARTE:
-        if sammelimport.art_der_quellgrafik == "ausschnitt":
+        if sammelimport.mit_ausschnitten:
             return ["- Bilder: als Ausschnitt mit Bildverweis, wenn die Quelle ein Bild zeigt, "
                     "das eine Kernaussage erklärt, siehe `## Ausschnitte`."], []
         return ["- Bilder: keine. Setz keinen Bildverweis in den Entwurf."], []
-    if sammelimport.art_der_quellgrafik == "ausschnitt":
+    if sammelimport.mit_ausschnitten:
         # Vorab geschnitten wird nichts, der Entwurf nennt seine Ausschnitte,
         # und `pruefen` schneidet sie (#63).
         return ["- Quellgrafik: als Ausschnitt, wenn die Quelle ein Bild der Übung zeigt, "
@@ -2257,7 +2257,7 @@ def dateien_im_auftrag(sammelimport: Sammelimport, k: Kandidat,
     wie im PDF, auch bei einem Seitenbereich. Ein Ausschnitt nennt seine
     Seite, und ab 1 gezählt träfe er bei einem Bereich die falsche.
     """
-    marken = sammelimport.art_der_quellgrafik == "ausschnitt"
+    marken = sammelimport.mit_ausschnitten
     zeilen: list[str] = []
     texte: list[str | None] = []
     for d in k.dateien:
@@ -2413,7 +2413,7 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
     uebungen = [uebungen_im_auftrag(sammelimport, k)] if k.sorte is WISSENSKARTE else []
     # Bei `ausschnitt` nennt der Entwurf beider Sorten seine Ausschnitte (#71).
     ausschnitte = (ausschnitte_im_auftrag(sammelimport, k)
-                   if sammelimport.art_der_quellgrafik == "ausschnitt" else [])
+                   if sammelimport.mit_ausschnitten else [])
     teile = [
         f"# Auftrag für Kandidat {k.nummer}",
         "",
@@ -2569,7 +2569,7 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     if sammelimport.art_der_quellgrafik == "eingebettet":
         if any(k.sorte is UEBUNGSKARTE for k in dran):
             verlange_pillow(sammelimport)
-    elif sammelimport.art_der_quellgrafik == "ausschnitt":
+    elif sammelimport.mit_ausschnitten:
         verlange_bibliotheken_fuer_ausschnitte(sammelimport, dran)
     pdftotext = None
     if any(_ist_pdf(d.name) for k in dran for d in k.dateien):
@@ -2591,7 +2591,7 @@ def vorbereiten(wurzel: Path, ordner: str, trotzdem: bool = False) -> int:
     for k in dran:
         quellgrafikzeilen, meldungen = lege_quellgrafiken_an(sammelimport, k)
         auftrag = schreibe_auftrag(sammelimport, k, kennungen, pdftotext, quellgrafikzeilen)
-        print(f"  {k.nummer}  {SORTENNAME[k.sorte]}  {auftrag.as_posix()}")
+        print(f"  {k.nummer}  {k.sorte.name}  {auftrag.as_posix()}")
         for meldung in meldungen:
             print(f"      {meldung}")
     return 0
@@ -2651,7 +2651,7 @@ def fuer_die_freigabe(sammelimport: Sammelimport, k: Kandidat, befund: Befund) -
         "kandidat": k.nummer,
         "was": k.was,
         "ergebnis": k.ergebnis,
-        "sorte": SORTENNAME[k.sorte],
+        "sorte": k.sorte.name,
         "dateien": [d.name for d in k.dateien],
         "status": k.status,
         "notiz": k.notiz,
