@@ -339,8 +339,8 @@ angenommener Vorschlag oder als Ausnahme.
      `uebernehmen` für diesen Kandidaten noch einmal. Liegt in `schaubilder/`
      schon eine Datei unter dem Namen der neuen Karte, dem Trainer sagen,
      welche. Was mit ihr geschieht, entscheidet er. Nennt der Grund
-     `Übungen:`, liegt er nicht im Entwurf, sondern in der Zeile der
-     Übersicht, wie bei `vorbereiten`.
+     `Übungen:`, liegt er in der Zeile der Übersicht. Dann gilt dasselbe wie
+     bei `vorbereiten`.
    - **„nicht übersprungen“, „nicht zurückgestellt“ oder „nicht ergänzt“:**
      Die Meldung sagt, warum: Der Grund fehlt, die ID gibt es nicht oder
      nicht in der Sorte der Zeile, oder der Kandidat ist schon erledigt. Mit
@@ -424,9 +424,8 @@ Der Trainer sagt:
   und bei einer Übung wird `schaubild:` `null`. Die übrigen heißen danach
   wieder nach der Regel, überall, wo ihr Name steht: einer allein ohne
   Nummer, `17.quellgrafik.jpg`, mehrere ab 1 gezählt ohne Lücke, jeder mit
-  seiner Endung. Danach `pruefen` wie beim
-  Korrigieren. Ein Bildverweis ohne seinen Ausschnitt weist den Entwurf ab,
-  ebenso ein Name in `schaubild:`.
+  seiner Endung. Danach `pruefen` wie beim Korrigieren. Ein Bildverweis ohne
+  seinen Ausschnitt weist den Entwurf ab, ebenso ein Name in `schaubild:`.
 
 Fertig sind die Ausschnitte, wenn jeder behalten oder gestrichen ist.
 
