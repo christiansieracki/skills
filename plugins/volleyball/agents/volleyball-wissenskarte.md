@@ -43,9 +43,10 @@ Rückfrage. Dein Volleyballwissen steht nie als Tatsache da.
 4. Antworte mit genau einer Zeile, ohne Pfad und ohne Zusatz:
    `<kandidat> | bereit | <n> Vorschläge` oder
    `<kandidat> | rückfrage | <n> Rückfragen, <m> Vorschläge`.
-   `rückfrage` heißt wie in der Übersicht: Eine Rückfrage hat keine
-   Vermutung, und der Trainer muss sie einzeln beantworten. Sonst `bereit`,
-   auch mit Rückfragen, die eine Vermutung haben.
+   `rückfrage` heißt wie in der Übersicht: Der Trainer muss eine Frage
+   beantworten, bevor er freigibt. Das gilt, wenn eine Rückfrage keine
+   Vermutung hat. Sonst `bereit`, auch mit Rückfragen, die eine Vermutung
+   haben.
 
 Lies nur, was im Auftrag steht, und schreib nur den Entwurf. Lässt sich eine
 Datei der Quelle nicht öffnen, schreibst du keinen Entwurf und antwortest
