@@ -3351,6 +3351,241 @@ class UebungenAusDemselbenBeitragTest(unittest.TestCase):
                          ("bereit", "ue-000006"))
 
 
+class FortsetzungTest(unittest.TestCase):
+    """Eine Fortsetzung ergaenzt die Wissenskarte, die es schon gibt (#73).
+
+    Der Fall aus vm_09: Teil 2 von "Einarmig gehts auch" beantwortet dieselbe
+    Frage wie Teil 1 aus vm_08, und dessen Karte wi-000001 liegt schon in
+    wissen/, mit zwei Bildern in schaubilder/. Den Inhalt hat der Skill vor
+    dem Aufruf in die Karte geschrieben, die Bildverweise mit den Namen aus
+    dem Entwurf. Das Mechanische macht `uebernehmen --ergaenzt`.
+    """
+
+    NAME = "wi-000001-wann-lohnt-sich-einarmige-abwehr"
+
+    # Die Karte, nachdem der Skill Teil 2 eingearbeitet hat. Das zweite Bild
+    # der Fortsetzung steht im Text vor dem ersten.
+    RUMPF = """
+        # Wann lohnt sich einarmige Abwehr?
+
+        ## Kernaussagen
+
+        - Einarmig kommt man weiter, als beide Arme reichen.
+
+          ![Teil 1](../schaubilder/{name}-1.jpg)
+
+          ![Reichweite](../schaubilder/{name}-2.png)
+
+        - Die Faust traegt den Ball hoeher als der offene Arm.
+
+          ![Faust und offener Arm](1.quellgrafik-2.jpg "Vergleich")
+
+        - Nach dem Hechtsprung zuerst die Hand am Boden.
+
+          ![Abrollen](<1.quellgrafik-1.jpg>)
+
+        ## Was das fürs Training heißt
+
+        1. Baelle ausserhalb der Reichweite beider Arme anspielen.
+        """
+
+    # Der Entwurf von Teil 2 nennt seine Bilder in der anderen Reihenfolge.
+    ENTWURF = """
+        # Wann lohnt sich einarmige Abwehr?
+
+        ## Kernaussagen
+
+        - Nach dem Hechtsprung zuerst die Hand am Boden. ![Abrollen](1.quellgrafik-1.jpg)
+        - Die Faust traegt den Ball hoeher. ![Faust und offener Arm](1.quellgrafik-2.jpg)
+
+        ## Was das fürs Training heißt
+
+        1. Den Hechtsprung erst auf der Matte.
+        """
+
+    def setUp(self) -> None:
+        self.ordner = Arbeitsordner()
+        self.addCleanup(self.ordner.raeume_auf)
+        self.schaubilder = self.ordner.pfad / "schaubilder"
+        self.entwuerfe = self.ordner.pfad / "kartenentwuerfe" / ORDNER
+
+    def plane(self, uebungen: str = "2, 3, ue-000004") -> Path:
+        """Der freigegebene Plan von vm_09 und die Karte aus vm_08, wie der Skill sie ergaenzt hat.
+
+        Kandidat 1 ist Teil 2, mit Entwurf, Auftrag und zwei Ausschnitten.
+        `uebungen` steht hinter `Übungen:`. Kandidat 2 ist schon ue-000003,
+        die auch Teil 1 schon nennt, Kandidat 3 wartet noch. Zurueck kommt der
+        Pfad der Karte.
+        """
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-12.jpg"], "ergebnis": "wissen", "status": "bereit",
+             "was": f"Einarmig gehts auch, Teil 2, ergänzt wi-000001 Übungen: {uebungen}"},
+            {"kandidat": 2, "dateien": ["seite-14.jpg"], "status": "importiert",
+             "karte": "ue-000003"},
+            {"kandidat": 3, "dateien": ["seite-15.jpg"], "status": "bereit"},
+        ], quellgrafik="ausschnitt")
+        self.ordner.lege_wissensentwurf_an(
+            ORDNER, 1, titel="Wann lohnt sich einarmige Abwehr?", rumpf=self.ENTWURF,
+            ausschnitte=[f"`1.quellgrafik-{nr}.jpg`: `seite-12.jpg`, links 10, oben 20, "
+                         f"rechts 60, unten 70" for nr in (1, 2)])
+        (self.entwuerfe / "1.auftrag.md").write_text("# Auftrag\n", encoding="utf-8")
+        for nr in (1, 2):
+            (self.entwuerfe / f"1.quellgrafik-{nr}.jpg").write_bytes(f"Teil 2, Bild {nr}".encode())
+        self.ordner.lege_kartenentwurf_an(ORDNER, 3, titel="Einarmige Abwehr am Netz")
+        self.schaubilder.mkdir()
+        (self.schaubilder / f"{self.NAME}-1.jpg").write_bytes(b"Teil 1, Bild 1")
+        (self.schaubilder / f"{self.NAME}-2.png").write_bytes(b"Teil 1, Bild 2")
+        return self.ordner.lege_wissenskarte_an(
+            rumpf=self.RUMPF.format(name=self.NAME), id="wi-000001",
+            titel="Wann lohnt sich einarmige Abwehr?", thema=["technik", "taktik"],
+            uebungen=["ue-000003"], angelegt="2026-10-01",
+            quelle="Volleyball-Magazin 08/2026, Einarmig gehts auch, Teil 1; "
+                   "Volleyball-Magazin 09/2026, Einarmig gehts auch, Teil 2",
+            quelldatei=f"vm_08/seite-26.jpg, {ORDNER}/seite-12.jpg")
+
+    def ergaenze(self, *argumente: str):
+        fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, *argumente)
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        return fertig
+
+    def test_die_quellgrafiken_kommen_mit_der_naechsten_freien_nummer_und_die_verweise_zeigen_dorthin(
+            self) -> None:
+        # Unter dem Namen der Karte liegen schon Bild 1 und 2 aus Teil 1. Die
+        # Bilder aus Teil 2 werden 3 und 4, in der Reihenfolge, in der sie auf
+        # der Karte stehen, wie beim Uebernehmen einer neuen (#71). Was schon
+        # in schaubilder/ liegt, bleibt Byte fuer Byte, wie es ist.
+        datei = self.plane()
+
+        self.ergaenze("--ergaenzt", "1", "wi-000001")
+
+        bilder = {p.name: p.read_bytes() for p in self.schaubilder.iterdir()}
+        self.assertEqual(bilder, {f"{self.NAME}-1.jpg": b"Teil 1, Bild 1",
+                                  f"{self.NAME}-2.png": b"Teil 1, Bild 2",
+                                  f"{self.NAME}-3.jpg": b"Teil 2, Bild 2",
+                                  f"{self.NAME}-4.jpg": b"Teil 2, Bild 1"})
+        karte = datei.read_text(encoding="utf-8")
+        self.assertIn(f"![Teil 1](../schaubilder/{self.NAME}-1.jpg)\n", karte)
+        self.assertIn(f"![Faust und offener Arm](../schaubilder/{self.NAME}-3.jpg \"Vergleich\")\n",
+                      karte)
+        self.assertIn(f"![Abrollen](<../schaubilder/{self.NAME}-4.jpg>)\n", karte)
+        self.assertNotIn("quellgrafik", karte)
+
+    def uebungen_auf(self, datei: Path) -> list[str]:
+        """Die IDs in `uebungen` der Karte, so wie sie in der Datei stehen."""
+        zeile = re.search(r"^uebungen: \[(.*)\]$", datei.read_text(encoding="utf-8"), re.MULTILINE)
+        self.assertIsNotNone(zeile, datei.read_text(encoding="utf-8"))
+        return [uid.strip() for uid in zeile.group(1).split(",") if uid.strip()]
+
+    def test_die_uebungen_aus_uebungen_kommen_dazu_ohne_doppeltes_auch_spaeter(self) -> None:
+        # Wie bei einer neuen Wissenskarte (#72): die genannte ID und die
+        # Karte von Kandidat 2. ue-000003 nennt Teil 1 schon, sie steht danach
+        # einmal da. Kandidat 3 wartet noch und bringt seine ID mit, wenn er
+        # spaeter Karte wird, auch zur ergaenzten Wissenskarte.
+        datei = self.plane()
+
+        self.ergaenze("--ergaenzt", "1", "wi-000001")
+        self.assertEqual(self.uebungen_auf(datei), ["ue-000003", "ue-000004"])
+
+        self.ergaenze("--kandidat", "3", "")
+
+        self.assertEqual(self.uebungen_auf(datei), ["ue-000003", "ue-000004", "ue-000006"])
+
+    def test_danach_ist_der_kandidat_ergaenzt_sein_entwurf_weg_und_der_linter_meldet_nichts(
+            self) -> None:
+        # Die Karte behaelt ihre ID und ihr Datum (#61), denn Plaene und
+        # Uebungen zeigen schon auf sie. Vom Kandidaten bleibt nur seine Zeile
+        # in der Uebersicht. Kandidat 3 wartet noch und haelt den
+        # Entwurfsordner fest, so zeigt sich, was einzeln verschwindet.
+        datei = self.plane()
+
+        fertig = self.ergaenze("--ergaenzt", "1", "wi-000001")
+
+        zeile = self.ordner.uebersicht(ORDNER)["1"]
+        self.assertEqual((zeile["Status"], zeile["Karte"]), ("ergänzt", "wi-000001"))
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.iterdir()), ["3.md"])
+        karte = datei.read_text(encoding="utf-8")
+        self.assertTrue(karte.startswith("---\nid: wi-000001\n"), karte)
+        self.assertIn("\nangelegt: 2026-10-01\n", karte)
+        self.assertEqual([p.name for p in (self.ordner.pfad / "wissen").iterdir()], [datei.name])
+        self.assertIn("Linter: Keine Auffälligkeiten.", fertig.stdout)
+        index = self.ordner.starte("index.py")
+        self.assertEqual(auffaelligkeiten(index.stdout), [], index.stdout)
+
+    def test_nach_einem_bild_ohne_nummer_kommt_die_2_ohne_bild_die_1(self) -> None:
+        # Ein einzelnes Bild bekommt beim Uebernehmen keine Nummer (#39). Es
+        # ist das erste, neben `<name>.jpg` laese man `<name>-1.jpg` als das
+        # erste. Eine Karte ohne Bild bekommt ihre Bilder ab 1, auch ein
+        # einzelnes, denn ein weiteres kann mit dem naechsten Heft kommen.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": nr, "dateien": [f"seite-{nr}.jpg"], "ergebnis": "wissen",
+             "status": "bereit", "was": f"Teil 2, ergänzt wi-00000{nr}"} for nr in (1, 2)])
+        self.schaubilder.mkdir()
+        mit_bild = "wi-000001-mit-bild"
+        (self.schaubilder / f"{mit_bild}.jpg").write_bytes(b"Teil 1")
+        karten = {}
+        for nr, titel in ((1, "Mit Bild?"), (2, "Ohne Bild?")):
+            self.ordner.lege_wissensentwurf_an(ORDNER, nr, titel=titel)
+            (self.entwuerfe / f"{nr}.quellgrafik.jpg").write_bytes(b"Teil 2")
+            vorher = f"\n\n  ![Teil 1](../schaubilder/{mit_bild}.jpg)" if nr == 1 else ""
+            karten[nr] = self.ordner.lege_wissenskarte_an(
+                id=f"wi-00000{nr}", titel=titel, rumpf=(
+                    f"# {titel}\n\n## Kernaussagen\n\n- Teil 1.{vorher}\n\n- Teil 2.\n\n"
+                    f"  ![Teil 2]({nr}.quellgrafik.jpg)\n\n"
+                    f"## Was das fürs Training heißt\n\n1. Ein Punkt.\n"))
+
+        self.ergaenze("--ergaenzt", "1", "wi-000001", "--ergaenzt", "2", "wi-000002")
+
+        self.assertEqual(sorted(p.name for p in self.schaubilder.iterdir()),
+                         [f"{mit_bild}-2.jpg", f"{mit_bild}.jpg", "wi-000002-ohne-bild-1.jpg"])
+        self.assertIn(f"](../schaubilder/{mit_bild}-2.jpg)", karten[1].read_text(encoding="utf-8"))
+        self.assertIn("](../schaubilder/wi-000002-ohne-bild-1.jpg)",
+                      karten[2].read_text(encoding="utf-8"))
+
+    def test_was_sich_nicht_ergaenzen_laesst_bleibt_wie_es_ist(self) -> None:
+        # Je Kandidat ein Fehler. Vertippt waere die ID einer Karte, die es
+        # nicht gibt, oder die einer Uebung, wo eine Wissenskarte gemeint ist,
+        # und umgekehrt. Nennt die Karte eine Quellgrafik, die nicht neben
+        # dem Entwurf liegt, zeigte ihr Verweis ins Leere. Hinter `Übungen:`
+        # kann von Hand etwas stehen, das keine Uebung ist. Nichts wird
+        # geschrieben, Entwurf und Status bleiben, die Ausgabe nennt den Grund.
+        faelle = {
+            "wi-ID, die es nicht gibt": ("wissen", "wi-000300", "", "wi-000300"),
+            "Übung statt Wissenskarte": ("wissen", "ue-000003", "", "wissen/"),
+            "Wissenskarte statt Übung": ("uebung", "wi-000001", "", "uebungen/"),
+            "Quellgrafik nicht neben dem Entwurf": ("wissen", "wi-000001", "", "quellgrafik"),
+            "Übungen: von Hand verdorben": ("wissen", "wi-000002", " Übungen: 9", "9"),
+        }
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": nr, "dateien": [f"seite-{nr}.jpg"], "ergebnis": ergebnis,
+             "status": "bereit", "was": f"Teil 2, ergänzt {uid}{uebungen}"}
+            for nr, (ergebnis, uid, uebungen, _) in enumerate(faelle.values(), 1)])
+        fehlt = list(faelle).index("Quellgrafik nicht neben dem Entwurf") + 1
+        karten = [self.ordner.lege_wissenskarte_an(
+                      id="wi-000001", titel="Fehlt ein Bild?", rumpf=(
+                          f"# Fehlt ein Bild?\n\n## Kernaussagen\n\n- Teil 2.\n\n"
+                          f"  ![Teil 2]({fehlt}.quellgrafik.jpg)\n\n"
+                          f"## Was das fürs Training heißt\n\n1. Ein Punkt.\n")),
+                  self.ordner.lege_wissenskarte_an(id="wi-000002", titel="Ohne Bild?")]
+        vorher = [karte.read_bytes() for karte in karten]
+        entwuerfe = [self.ordner.lege_wissensentwurf_an(ORDNER, nr, titel="Ergänzt?")
+                     for nr in range(1, len(faelle) + 1)]
+        (self.entwuerfe / f"{fehlt}.quellgrafik-1.jpg").write_bytes(b"ein anderes Bild")
+
+        fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER, *(
+            argument for nr, (_, uid, _, _) in enumerate(faelle.values(), 1)
+            for argument in ("--ergaenzt", str(nr), uid)))
+
+        self.assertNotEqual(fertig.returncode, 0, fertig.stdout)
+        uebersicht = self.ordner.uebersicht(ORDNER)
+        for nr, (fall, (_, _, _, stichwort)) in enumerate(faelle.items(), 1):
+            with self.subTest(fall):
+                self.assertIn(stichwort, zeile_mit(fertig.stdout, f"  {nr}  nicht ergänzt"))
+                self.assertEqual(uebersicht[str(nr)]["Status"], "bereit")
+                self.assertTrue(entwuerfe[nr - 1].exists())
+        self.assertEqual([karte.read_bytes() for karte in karten], vorher)
+        self.assertFalse(self.schaubilder.exists())
+
+
 def auftrag_von(arbeitsordner: Arbeitsordner, kandidat: int) -> str:
     """Der Auftrag, den `vorbereiten` fuer einen Kandidaten angelegt hat."""
     return (arbeitsordner.pfad / "kartenentwuerfe" / ORDNER / f"{kandidat}.auftrag.md").read_text(
