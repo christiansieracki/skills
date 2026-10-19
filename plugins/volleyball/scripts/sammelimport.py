@@ -182,6 +182,16 @@ def _zelle(wert: str) -> str:
     return " ".join(str(wert).split()).replace("|", "\\|")
 
 
+def _ersetze(datei: Path, text: str) -> None:
+    """Schreibt den Text erst daneben und benennt dann um, damit die Datei nie halb ist."""
+    zwischen = datei.with_name(datei.name + ".neu")
+    try:
+        zwischen.write_text(text, encoding="utf-8")
+        os.replace(zwischen, datei)
+    finally:
+        zwischen.unlink(missing_ok=True)
+
+
 # --------------------------------------------------------------------------
 # Die Übersicht
 # --------------------------------------------------------------------------
@@ -498,12 +508,7 @@ class Sammelimport:
                for k in self.kandidaten]
         self.zeilen[self.anfang:self.ende] = neu
         self.ende = self.anfang + len(neu)
-        zwischen = self.datei.with_name(self.datei.name + ".neu")
-        try:
-            zwischen.write_text("\n".join(self.zeilen) + "\n", encoding="utf-8")
-            os.replace(zwischen, self.datei)
-        finally:
-            zwischen.unlink(missing_ok=True)
+        _ersetze(self.datei, "\n".join(self.zeilen) + "\n")
 
     @property
     def je_durchgang(self) -> int:
@@ -752,14 +757,10 @@ def mit_uebungen(text: str, ids: list[str]) -> str:
     return "\n".join(["---", *felder, "---", *zeilen[ende + 1:]]) + "\n"
 
 
-def _ersetze(datei: Path, text: str) -> None:
-    """Schreibt den Text erst daneben und benennt dann um, damit die Datei nie halb ist."""
-    zwischen = datei.with_name(datei.name + ".neu")
-    try:
-        zwischen.write_text(text, encoding="utf-8")
-        os.replace(zwischen, datei)
-    finally:
-        zwischen.unlink(missing_ok=True)
+def wissenskarten_nach_id(wurzel: Path) -> dict[str, Path]:
+    """Je Wissenskarte in wissen/ ihre Datei, nach ID."""
+    return {str(karte["id"]): wurzel / karte["datei"]
+            for karte in lies_karten(wurzel, WISSENSKARTE)}
 
 
 def trage_bei_wissenskarten_ein(sammelimport: Sammelimport, k: Kandidat, uid: str) -> list[str]:
@@ -777,8 +778,7 @@ def trage_bei_wissenskarten_ein(sammelimport: Sammelimport, k: Kandidat, uid: st
                      if w.status in MIT_KARTE and k.nummer in _uebungen_angaben(w)]
     if not wissenskarten:
         return []
-    dateien = {str(karte["id"]): sammelimport.wurzel / karte["datei"]
-               for karte in lies_karten(sammelimport.wurzel, WISSENSKARTE)}
+    dateien = wissenskarten_nach_id(sammelimport.wurzel)
     meldungen = []
     for wid in wissenskarten:
         datei = dateien.get(wid)
@@ -2328,6 +2328,9 @@ def ausschnitte_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> list[str]
                     "gedruckt ist."),
               foto: (f"`{foto}` aus einem Foto", "Bei einem Foto steht keine Seite.")}
     gilt = [regeln[e] for e in (pdf, foto) if e in endungen]
+    beispiel = ["```markdown", "Ausschnitte:",
+                f"- `{einzeln}`: `{datei.name}`{seite}, links 8, oben 42, rechts 94, unten 88",
+                "```", ""]
     if wissen:
         wozu = [
             "Zeigt die Quelle ein Bild, das eine Kernaussage erklärt, etwa eine Bildreihe oder "
@@ -2336,10 +2339,7 @@ def ausschnitte_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> list[str]
             "Bildverweis an die Kernaussage, die er zeigt, mit seinem Namen als Pfad. Hat die "
             "Quelle kein Bild, das etwas erklärt, gibt es keinen Ausschnitt, keine Liste und "
             "keinen Bildverweis.", "",
-            "```markdown",
-            "Ausschnitte:",
-            f"- `{einzeln}`: `{datei.name}`{seite}, links 8, oben 42, rechts 94, unten 88",
-            "```", "",
+            *beispiel,
             f"- Bildverweis: `![Bildreihe oberes Zuspiel]({einzeln})`, in einer eigenen Zeile "
             f"unter der Kernaussage. Jeder Ausschnitt steht in einem Bildverweis, und jeder "
             f"Bildverweis nennt einen Ausschnitt aus der Liste.",
@@ -2351,10 +2351,7 @@ def ausschnitte_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> list[str]
             "`## Freigabe` in einer eigenen Liste vor den Vorschlägen, ein Punkt je Ausschnitt, "
             "und `schaubild:` trägt seinen Namen. Hat die Quelle kein Bild der Übung, gibt es "
             "keinen Ausschnitt und keine Liste, und `schaubild:` ist `null`.", "",
-            "```markdown",
-            "Ausschnitte:",
-            f"- `{einzeln}`: `{datei.name}`{seite}, links 8, oben 42, rechts 94, unten 88",
-            "```", "",
+            *beispiel,
         ]
         reihenfolge = "in `schaubild:` als Liste in derselben Reihenfolge"
     return [
@@ -2826,8 +2823,7 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
         raise NichtUebernommen(f"schaubilder/{', schaubilder/'.join(belegt)} gibt es schon")
     if sorte is WISSENSKARTE:
         schaubildnamen = None
-        bildverweise_neu = {alt.name: f"../schaubilder/{neu.name}"
-                            for alt, neu in verschoben.items()}
+        bildverweise_neu = verweise_aus_wissen(verschoben)
     else:
         schaubildnamen = [bild.name for bild in verschoben.values()]
         bildverweise_neu = None
@@ -2857,6 +2853,11 @@ def uebernimm(sammelimport: Sammelimport, k: Kandidat, notiz: str) -> str:
 
 class NichtUebernommen(Exception):
     """Ein Kandidat, dessen Karte nicht geschrieben oder ergänzt wurde. Der Text sagt, warum."""
+
+
+def verweise_aus_wissen(verschoben: dict[Path, Path]) -> dict[str, str]:
+    """Je Quellgrafik neben dem Entwurf ihr neuer Weg in schaubilder/, von wissen/ aus (#71)."""
+    return {alt.name: f"../schaubilder/{neu.name}" for alt, neu in verschoben.items()}
 
 
 def naechste_bildnummer(schaubilder: Path, name: str) -> int:
@@ -2912,9 +2913,7 @@ def ergaenze_wissenskarte(sammelimport: Sammelimport, k: Kandidat, wid: str) -> 
     verschoben. Liegt eine genannte Quellgrafik nicht neben dem Entwurf, ist
     nichts geschrieben: Ihr Verweis zeigte sonst ins Leere.
     """
-    dateien = {str(karte["id"]): sammelimport.wurzel / karte["datei"]
-               for karte in lies_karten(sammelimport.wurzel, WISSENSKARTE)}
-    datei = dateien.get(wid)
+    datei = wissenskarten_nach_id(sammelimport.wurzel).get(wid)
     if datei is None:
         raise NichtUebernommen(f"{wid} gibt es nicht in wissen/")
     try:
@@ -2940,8 +2939,7 @@ def ergaenze_wissenskarte(sammelimport: Sammelimport, k: Kandidat, wid: str) -> 
     verschoben = {sammelimport.entwurfsordner / name:
                   schaubilder / f"{datei.stem}-{nr}{Path(name).suffix}"
                   for nr, name in enumerate(namen, erste)}
-    rumpf = biege_bildverweise_um(rumpf, {alt.name: f"../schaubilder/{neu.name}"
-                                          for alt, neu in verschoben.items()})
+    rumpf = biege_bildverweise_um(rumpf, verweise_aus_wissen(verschoben))
     felder, _ = lies_frontmatter(datei)
     bisher = [str(u) for u in als_liste(felder.get("uebungen"))]
     text = mit_uebungen("\n".join([*zeilen[:ende + 1], rumpf]), sorted({*bisher, *uebungen}))
