@@ -1382,6 +1382,33 @@ class AusschnittTest(unittest.TestCase):
         self.assertIn("schaubild", uebersicht["2"]["Notiz"])
 
     @BRAUCHT_PILLOW
+    def test_ein_gestrichener_ausschnitt_der_noch_in_schaubild_steht_weist_den_entwurf_ab(
+            self) -> None:
+        # Bei der Freigabe streicht der Trainer den dritten Ausschnitt. Der
+        # Skill nimmt ihn aus der Liste, laesst ihn aber in `schaubild:`
+        # stehen. Seine Datei liegt noch vom letzten `pruefen` neben dem
+        # Entwurf, und ohne Pruefung kaeme der gestrichene Ausschnitt doch auf
+        # die Karte.
+        self.plane({"kandidat": 1, "dateien": ["seite-26.jpg"]})
+        self.ordner.lege_quellbild_an(f"{ORDNER}/seite-26.jpg", (1000, 800))
+        schaubild = [f"1.quellgrafik-{nr}.jpg" for nr in (1, 2, 3)]
+        ausschnitte = [f"`{name}`: `seite-26.jpg`, links {nr * 10}, oben 20, rechts 90, unten 70"
+                       for nr, name in enumerate(schaubild, 1)]
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Drei Bilder", schaubild=schaubild,
+                                          ausschnitte=ausschnitte)
+        self.pruefe()
+        self.assertEqual(self.ordner.uebersicht(ORDNER)["1"]["Status"], "bereit")
+
+        self.ordner.lege_kartenentwurf_an(ORDNER, 1, titel="Drei Bilder", schaubild=schaubild,
+                                          ausschnitte=ausschnitte[:2])
+        self.pruefe()
+
+        zeile = self.ordner.uebersicht(ORDNER)["1"]
+        self.assertEqual(zeile["Status"], "offen")
+        self.assertIn("1.quellgrafik-3.jpg", zeile["Notiz"])
+        self.assertIn("schaubild", zeile["Notiz"])
+
+    @BRAUCHT_PILLOW
     def test_json_nennt_die_ausschnitte_mit_pfad(self) -> None:
         # Der Skill zeigt jeden Ausschnitt im Chat. Mit der Datei, der Seite
         # und dem Rechteck aendert er die Zahlen, wenn der Trainer korrigiert.

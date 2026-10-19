@@ -1110,21 +1110,33 @@ def bildverweise_der_karte(rumpf: str) -> list[str]:
     return bildverweise("\n".join(zeilen))
 
 
-def pruefe_bildverweise(ausschnitte: list[Ausschnitt], rumpf: str) -> None:
-    """Bricht mit Formfehler ab, wenn ein Bildverweis im Entwurf einer Wissenskarte auf keinen Ausschnitt zeigt (#71).
+def pruefe_nur_ausschnitte(sammelimport: Sammelimport, k: Kandidat, ausschnitte: list[Ausschnitt],
+                           felder: dict, rumpf: str) -> None:
+    """Bricht mit Formfehler ab, wenn der Entwurf ein Bild auf die Karte brächte, das kein Ausschnitt aus seiner Liste ist.
 
-    Eine Wissenskarte bekommt ihre Bilder nur als Ausschnitt. Neben dem
-    Entwurf liegen nach `pruefen` genau die Ausschnitte aus seiner Liste, und
-    nur sie trägt `uebernehmen` nach schaubilder/. Ein anderer Bildverweis
-    zeigte auf der Karte ins Leere. Das gilt auch für einen gestrichenen
-    Ausschnitt, dessen Datei noch vom letzten Lauf daneben liegt: Er soll
-    nicht auf die Karte.
+    Das Gegenstück zum letzten Schritt in `pruefe_ausschnitte`. Neben dem
+    Entwurf liegen nach `pruefen` die Ausschnitte aus seiner Liste, frisch
+    geschnitten, und dazu, was ein früherer Lauf geschnitten hat. Ein
+    gestrichener Ausschnitt, den der Entwurf noch nennt, käme sonst mit
+    seiner alten Datei auf die Karte.
+
+    Eine Wissenskarte bekommt ihre Bilder nur als Ausschnitt (#71), jeder
+    Bildverweis muss also einer aus der Liste sein. Bei einer Übung gilt das
+    für `schaubild:`, wenn `quellgrafik: ausschnitt` eingestellt ist. Bei
+    `eingebettet` nennt `schaubild:` die Quellgrafiken, die `vorbereiten`
+    ausgeschnitten hat, eine Liste gibt es dort nicht.
     """
+    wissen = k.sorte is WISSENSKARTE
+    if not wissen and sammelimport.art_der_quellgrafik != "ausschnitt":
+        return
     namen = {a.name for a in ausschnitte}
-    for pfad in bildverweise_der_karte(rumpf):
-        if pfad not in namen:
-            raise Formfehler(f"Bildverweis {pfad} zeigt auf keine Quellgrafik neben dem Entwurf, "
+    for name in quellgrafiken_im_entwurf(k, felder, rumpf):
+        if name in namen:
+            continue
+        if wissen:
+            raise Formfehler(f"Bildverweis {name} zeigt auf keine Quellgrafik neben dem Entwurf, "
                              f"nur ein Ausschnitt aus der Liste Ausschnitte: wird eine")
+        raise Formfehler(f"schaubild: nennt {name}, das steht nicht unter Ausschnitte:")
 
 
 def pruefe_wissenstext(sammelimport: Sammelimport, rumpf: str) -> None:
@@ -1371,8 +1383,7 @@ def pruefe_entwurf(sammelimport: Sammelimport, k: Kandidat) -> Befund:
         vorschlaege, rueckfragen = lies_freigabe(rumpf, felder)
         ausschnitte = lies_ausschnitte(rumpf)
         pruefe_ausschnitte(sammelimport, k, ausschnitte, felder, rumpf)
-        if wissen:
-            pruefe_bildverweise(ausschnitte, rumpf)
+        pruefe_nur_ausschnitte(sammelimport, k, ausschnitte, felder, rumpf)
         schneide_ausschnitte(sammelimport, k, ausschnitte)
         if wissen:
             pruefe_wissenstext(sammelimport, rumpf)

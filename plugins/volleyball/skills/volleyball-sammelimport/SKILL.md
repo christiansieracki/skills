@@ -422,7 +422,8 @@ Der Trainer sagt:
   aus `schaubild:`, bei einer Wissenskarte der Bildverweis aus dem Text, die
   ganze Zeile. War es der letzte, fällt die Liste `Ausschnitte:` ganz weg,
   und bei einer Übung wird `schaubild:` `null`. Danach `pruefen` wie beim
-  Korrigieren. Ein Bildverweis ohne seinen Ausschnitt weist den Entwurf ab.
+  Korrigieren. Ein Bildverweis ohne seinen Ausschnitt weist den Entwurf ab,
+  ebenso ein Name in `schaubild:`.
 
 Fertig sind die Ausschnitte, wenn jeder behalten oder gestrichen ist.
 

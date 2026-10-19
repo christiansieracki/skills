@@ -634,7 +634,10 @@ wird:
   Quellgrafik, der nur einmal vorkommt, einer Datei des Kandidaten, bei einem
   Seitenbereich einer Seite daraus, einer Endung, die zur Datei passt, und
   bei einer Übung eingetragen in `schaubild:`, bei einer Wissenskarte in einem
-  Bildverweis im Text. Dann schneidet `pruefen` jeden neu aus, über
+  Bildverweis im Text. Umgekehrt nennt `schaubild:` bei `quellgrafik:
+  ausschnitt` nur Ausschnitte aus der Liste. Ein gestrichener, den es noch
+  nennt, weist den Entwurf ab, auch wenn seine Datei vom letzten Lauf noch
+  neben dem Entwurf liegt. Dann schneidet `pruefen` jeden neu aus, über
   dieselbe Funktion wie `ausschnitt.py`, und legt ihn neben den Entwurf, bei
   jedem Lauf. Nach einer Änderung der Zahlen liegt danach der neue da. Lässt
   er sich nicht schneiden, etwa weil es die Seite nicht gibt, wird der Entwurf
