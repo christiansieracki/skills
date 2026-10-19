@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
     als_liste, cache_pfad, disziplin_text, finde_wurzel, hole_index,
-    konsole_vorbereiten,
+    konsole_vorbereiten, wissenskarten_text,
 )
 
 ELEMENT_TITEL = {
@@ -98,7 +98,7 @@ def schreibe_md(wurzel: Path, daten: dict) -> Path:
     anzahl = f"{daten['anzahl']} Übungen"
     ordner = "`uebungen/`"
     if wissen:
-        anzahl += f", {len(wissen)} {'Wissenskarte' if len(wissen) == 1 else 'Wissenskarten'}"
+        anzahl += f", {wissenskarten_text(len(wissen))}"
         ordner += " und `wissen/`"
     z = [
         "# Übungsindex",

@@ -75,6 +75,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tpdaten import (  # noqa: E402
     DISZIPLINEN, LEVEL, UEBUNGSKARTE, WISSENSKARTE, KeineId, als_liste, disziplin_text,
     finde_wurzel, hole_index, interpreter, konsole_vorbereiten, naechste_id, schaubilder,
+    wissenskarten_text,
 )
 
 
@@ -347,7 +348,7 @@ def liste_wissen(daten, als_json: bool) -> int:
     if not wissen:
         print("Keine Wissenskarte in wissen/. Der Übungsimport oder der Sammelimport legt sie an.")
         return 1
-    print(f"{len(wissen)} {'Wissenskarte' if len(wissen) == 1 else 'Wissenskarten'}:\n")
+    print(f"{wissenskarten_text(len(wissen))}:\n")
     for k in wissen:
         zeige_wissen(k)
     print()

@@ -146,6 +146,11 @@ def disziplin_text(eintrag: dict) -> str:
     return ", ".join(eintrag.get("disziplin") or []) or "—"
 
 
+def wissenskarten_text(anzahl: int) -> str:
+    """"1 Wissenskarte" oder "3 Wissenskarten", so wie Suche und `index.md` sie zaehlen."""
+    return f"{anzahl} Wissenskarte" if anzahl == 1 else f"{anzahl} Wissenskarten"
+
+
 def als_liste(wert) -> list:
     """Ein Listenfeld als Liste, auch wenn die eckigen Klammern fehlen.
 
