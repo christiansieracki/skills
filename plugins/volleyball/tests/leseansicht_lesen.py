@@ -188,6 +188,8 @@ class Abschnitt:
     """Jede Liste zum Aufklappen im Abschnitt, in der Folge des Plans."""
     tabellen: list[list[list[str]]] = field(default_factory=list)
     """Jede Tabelle, die eine Tabelle blieb: je Zeile ihre Zellen, die Kopfzeile vorn."""
+    absaetze: list[str] = field(default_factory=list)
+    """Je Absatz und je Listenpunkt sein Text, in der Folge des Plans."""
 
 
 @dataclass
@@ -353,11 +355,13 @@ def _abschnitt(knoten: Knoten) -> Abschnitt:
     zum_aufklappen = knoten.tag == "details"
     kopf = (knoten.erstes("summary") if zum_aufklappen
             else next((k for k in knoten.elemente() if k.tag == "h3"), None))
+    rich = knoten.erstes(klasse="rich")
     return Abschnitt(ueberschrift=_text(kopf) or "",
-                     text=_text(knoten.erstes(klasse="rich")) or "",
+                     text=_text(rich) or "",
                      zugeklappt=zum_aufklappen and "open" not in knoten.attribute,
                      listen=_listen(knoten),
-                     tabellen=_tabellen(knoten))
+                     tabellen=_tabellen(knoten),
+                     absaetze=[k.text() for k in rich.alle() if k.tag in ("p", "li")] if rich else [])
 
 
 def _reiter(nachschlagen: Knoten | None) -> list[tuple[str | None, Reiter]]:
