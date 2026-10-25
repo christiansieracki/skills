@@ -290,6 +290,51 @@ class VorbereitungTest(LeseansichtTest):
         self.assertEqual((ansicht.knoepfe, ansicht.vorbereitung), ([], []))
 
 
+class AbsatzTest(LeseansichtTest):
+    """Ein Plan ist bei rund 80 Zeichen umbrochen. Erst eine Leerzeile beginnt
+    einen neuen Absatz, wie in jedem Markdown."""
+
+    ZEILEN = [Zeile("0–10", "Ankommen", "Zonenbaggern im Paar")]
+
+    def test_ein_umbrochener_absatz_bleibt_ein_absatz(self) -> None:
+        ansicht = self.ansicht(self.ZEILEN, nachher="""
+            ## Organisation und Coaching-Hinweise
+
+            Die Sechser gleich beim Ankommen einteilen. Dann ist der Wechsel in
+            den Hauptteil schnell, und die Leibchen sind schon verteilt.
+
+            Die Beobachter kurz halten.
+        """)
+
+        (abschnitt,) = ansicht.vorbereitung
+        self.assertEqual(abschnitt.absaetze, [
+            "Die Sechser gleich beim Ankommen einteilen. Dann ist der Wechsel in den "
+            "Hauptteil schnell, und die Leibchen sind schon verteilt.",
+            "Die Beobachter kurz halten."])
+
+    def test_die_folgezeilen_eines_listenpunkts_gehoeren_zu_ihm(self) -> None:
+        ansicht = self.ansicht(self.ZEILEN, nachher="""
+            ## 0–10 Zonenbaggern im Paar
+
+            - **Zwei Einwerfer,** einer an jeder Seitenlinie. Den Dankeball
+              spielt immer der auf der Aufschlagseite.
+            - **Zwei Ballholer.**
+
+            1. **Aufschlag** von der einen Seite.
+            2. Sobald der Ball tot ist, spielt der Einwerfer
+               sofort einen Dankeball.
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        (abschnitt,) = punkt.abschnitte
+        self.assertEqual(abschnitt.absaetze, [
+            "Zwei Einwerfer, einer an jeder Seitenlinie. Den Dankeball spielt immer der "
+            "auf der Aufschlagseite.",
+            "Zwei Ballholer.",
+            "Aufschlag von der einen Seite.",
+            "Sobald der Ball tot ist, spielt der Einwerfer sofort einen Dankeball."])
+
+
 class ZuordnungTest(LeseansichtTest):
     """Beginnt die Ueberschrift eines Abschnitts mit einer Zeitangabe, gehoert
     er zu diesem Programmpunkt (Glossar, "Trainingsplan und Leseansicht")."""

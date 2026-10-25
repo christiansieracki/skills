@@ -1087,6 +1087,16 @@ def nach_html(zeilen: list[str]) -> str:
     """
     raus = []
     liste = None
+    # Ein Plan ist bei rund 80 Zeichen umbrochen. Die Zeilen eines Absatzes oder
+    # Listenpunkts sammeln sich hier, erst eine Leerzeile oder ein anderer Block
+    # schliesst ihn.
+    offen: list[str] = []
+    offen_tag = "p"
+
+    def offen_zu():
+        if offen:
+            raus.append(f"<{offen_tag}>{inline(' '.join(offen))}</{offen_tag}>")
+            offen.clear()
 
     def liste_zu():
         nonlocal liste
@@ -1094,8 +1104,20 @@ def nach_html(zeilen: list[str]) -> str:
             raus.append(f"</{liste}>")
             liste = None
 
+    def punkt(tag: str, text: str):
+        nonlocal liste, offen_tag
+        offen_zu()
+        if liste != tag:
+            liste_zu()
+            raus.append(f"<{tag}>")
+            liste = tag
+        offen_tag = "li"
+        offen.append(text)
+
     for art, anfang, ende in _bloecke(zeilen):
+        z = zeilen[anfang]
         if art == "code":
+            offen_zu()
             liste_zu()
             code = zeilen[anfang + 1:ende]
             if code and ende - anfang > 1 and _ist_zaun(code[-1]):
@@ -1104,44 +1126,47 @@ def nach_html(zeilen: list[str]) -> str:
             continue
 
         if art == "tabelle":
+            offen_zu()
             liste_zu()
             raus.append(tabelle_html(zeilen[anfang:ende]))
             continue
 
-        z = zeilen[anfang]
+        if not z.strip():
+            offen_zu()
+            continue
+
         m = re.match(r"^#{1,4}\s+(.*)$", z)
         if m:
+            offen_zu()
             liste_zu()
             raus.append(f"<h4>{inline(m.group(1).strip())}</h4>")
             continue
 
         m = re.match(r"^\s*[-*]\s+(.*)$", z)
         if m:
-            if liste != "ul":
-                liste_zu()
-                raus.append("<ul>")
-                liste = "ul"
-            raus.append(f"<li>{inline(m.group(1))}</li>")
+            punkt("ul", m.group(1))
             continue
 
         m = re.match(r"^\s*(\d+)\.\s+(.*)$", z)
         if m:
-            if liste != "ol":
-                liste_zu()
-                raus.append("<ol>")
-                liste = "ol"
-            raus.append(f"<li>{inline(m.group(2))}</li>")
+            punkt("ol", m.group(2))
             continue
 
         if z.strip() in ("---", "___"):
+            offen_zu()
             liste_zu()
             raus.append("<hr>")
             continue
 
-        if z.strip():
+        if offen:
+            # Folgezeile, eines Absatzes wie eines Listenpunkts.
+            offen.append(z.strip())
+        else:
             liste_zu()
-            raus.append(f"<p>{inline(z.strip())}</p>")
+            offen_tag = "p"
+            offen.append(z.strip())
 
+    offen_zu()
     liste_zu()
     return "\n".join(raus)
 

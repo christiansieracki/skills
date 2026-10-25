@@ -27,7 +27,10 @@ Leseansicht, #77 davor. Der Ausschnitt für PDFs, die nicht wie PlayDrill
 aufgebaut sind, bleibt in der Welle zur Wissenskarte (#62 bis #65), nach der
 Welle zur Leseansicht. Beim Bau der Welle zur Leseansicht am 06.10.2026 kamen
 Punkte aus #52 bis #59, #75, #76 und dem Code-Review dazu. Was davon die Abnahme prüfen soll,
-steht als Kommentar in #60, der Rest hier mit Ziel. Beim Bau der Welle zur
+steht als Kommentar in #60, der Rest hier mit Ziel. Bei der Abnahme (#60) am
+25.10.2026 ist die Liste durchgesehen worden: Kein Auslöser ist eingetreten,
+zwei Punkte aus der Abnahme stehen unter „Bewusst nicht gebaut", und der
+Abschnitt zur Welle zur Leseansicht ist weggefallen. Beim Bau der Welle zur
 Wissenskarte am 14. und 19.10.2026 kamen Punkte aus #62 bis #64, #66 bis #73
 und dem Code-Review dazu. Was davon die Abnahme prüfen soll, steht als
 Kommentar in #65 und #74, der Rest hier mit Ziel.
@@ -116,8 +119,30 @@ einer Spalte `Heute`. `Nr.` oder `Dosierung` lässt sie eine Tabelle bleiben.
 Steht in `Nr` schon „1.“, erscheint „1.. Übung“, ist `Nr` leer, „. Übung“.
 Sind die übrigen Zellen einer Zeile leer, klappt der Eintrag ins Leere auf.
 
-Ziel: bewusst nicht. Auslöser: Ein echter Plan schreibt die Tabelle so, etwa
-bei der Abnahme der Welle zur Leseansicht (#60).
+Ziel: bewusst nicht. Auslöser: Ein echter Plan schreibt die Tabelle so. Bei
+der Abnahme (#60) schrieben alle Pläne im Arbeitsordner genau
+`Nr | Übung | Worauf es ankommt | Heute`.
+
+### „Skizze vergrößern“ unter Nachschlagen
+
+Aus #57 und der Abnahme (#60). Den Knopf gibt es nur unter Hallenskizzen in
+einem Programmpunkt. Eine Skizze in einem Thema unter Zum Nachschlagen hat
+keinen. Bei der Abnahme war alles auf dem Handy gut lesbar.
+
+Ziel: bewusst nicht. Auslöser: Eine Skizze unter Nachschlagen ist auf dem
+Handy zu klein.
+
+### Eine Leseansicht, die dauerhaft gesperrt bleibt
+
+Aus der Abnahme (#60). `2026-10-01.html` trägt seit dem 05.10.2026 vom
+Nextcloud-Client einen Eintrag, der Benutzern Schreiben und Löschen verweigert,
+und lässt sich wegen eines Nextcloud-Fehlers nicht entsperren. `leseansicht.py`
+meldet das (#75), die Leseansicht bleibt aber auf dem alten Stand. Ein anderer
+Name ginge nur von Hand über `--out`, und weder Skill noch Skript bieten ihn an.
+Die Abnahme hat die Datei übersprungen.
+
+Ziel: bewusst nicht. Auslöser: Eine gesperrte Leseansicht wird für eine
+kommende Einheit gebraucht.
 
 ### Gleiche Überschriften unter „Zum Nachschlagen“
 
@@ -511,77 +536,16 @@ Die Reihenfolge stammt aus #10 und ist dort begründet. Der Sammelimport kam am
 30.09.2026 davor und ist Welle 1d (#29), abgenommen und geschlossen am
 05.10.2026. Die PlayDrill-Bibliothek braucht die Wissenskarte nicht, und die
 Wissenskarte kann danach den Sammelimport um ihre Kartensorte erweitern.
-Zwischen 1d und die Wissenskarte kommt die Welle zur Leseansicht, beschlossen
-am 02.10.2026. Die Welle zur Wissenskarte ist am 04.10.2026 im Interview
-festgelegt worden.
+Zwischen 1d und die Wissenskarte kam die Welle zur Leseansicht (#50),
+beschlossen am 02.10.2026, abgenommen am 25.10.2026 mit 3.1.1 (#60). Die
+Welle zur Wissenskarte ist am 04.10.2026 im Interview festgelegt worden.
 
 Reihenfolge seit der Durchsicht am 05.10.2026. Davor kam #77, gleiche
 Rückfragen gebündelt, erledigt am 05.10.2026 mit 3.0.2.
 
-1. Die Welle zur Leseansicht (#50): #51 bis #59, #75, #76, Abnahme #60.
-2. Die Welle zur Wissenskarte (#61): zuerst der Ausschnitt mit #62 bis #65,
-   dann #66 bis #74. Gebaut am 14. und 19.10.2026 auf dem Branch
-   `welle/wissenskarte`. Offen sind die Abnahmen #65 und #74.
-
-### Welle zur Leseansicht
-
-Die Leseansicht bekommt die freigegebene Gestaltung vom Branch
-`overhaul/html-generation-display`: den Ablauf zum Aufklappen, Hell, Dunkel und
-System. Beschlossen im Interview am 02.10.2026. Kommt nach der Abnahme von 1d
-(#37) und setzt auf #39 auf, weil beide `leseansicht.py` ändern. Aus der
-Abnahme von 1d kamen #75 (eine gesperrte Leseansicht wird gemeldet) und #76
-(nach einem neuen Schaubild die Leseansichten neu bauen) dazu.
-
-- **Technik** steht in ADR-0012. `leseansicht.py` baut die Gestaltung nach,
-  eine einzige Datei, ohne JavaScript ganz lesbar. Umschalter Hell, Dunkel,
-  System, voreingestellt ist System. Keine festen Varianten nur hell oder nur
-  dunkel.
-- **Begriffe** stehen im Glossar: Ablauf, Programmpunkt, Zeitangabe, Abschnitt,
-  Hallenskizze. „Teil" ist kein Begriff mehr.
-- **Gliederung des Trainingsplans** kommt in `VORLAGEN.md`, `DATENMODELL.md`
-  und den Skill Trainingsdesign, dazu in die Hilfetexte der Skripte (etwa
-  `suche.py --dauer`):
-  - Die Spalte heißt „Programmpunkt". Die Skripte verstehen weiter „Teil" und
-    „Block".
-  - Beginnt eine Überschrift mit einer Zeitangabe, gehört der Abschnitt zu
-    diesem Programmpunkt. Bei zwei zur selben Zeit steht der Hallenteil dabei,
-    ohne ihn gilt der Abschnitt für beide. Passt die Zeitangabe auf keinen,
-    bleibt der Abschnitt unter „Vorbereitung", und der Generator meldet es.
-  - Verschiebt sich eine Zeit, zieht der Skill die Überschriften mit.
-  - Unter `## Zum Nachschlagen` wird jede `###` ein Reiter. Ein Verweis aus
-    einem Programmpunkt ist ein Markdown-Link auf die Überschrift.
-  - Eine Tabelle mit den Spalten `Nr | Übung | … | Heute` wird eine Liste zum
-    Aufklappen, `Heute` ist die Dosierung im Kopf.
-  - Der Plan schreibt kein „siehe unten" mehr. Der Generator ändert keinen
-    Text.
-- **Die Leseansicht**:
-  - Kopf: Kurztitel, Wochentag und Datum, Name der Gruppe aus der Wurzeldatei,
-    Teilnehmer, Dauer, Hallenteile aus `spielflaechen`. Der Fuß bleibt.
-  - Ein aufgeklappter Programmpunkt zeigt „Heute", dann die zugehörigen
-    Abschnitte in der Reihenfolge des Plans, mit ihrer Überschrift ohne
-    Zeitangabe. Gleicht die Überschrift dem Namen der Übung, fällt sie weg.
-    Danach das Schaubild der Karte, die Verweise und „Warum hier?" zugeklappt.
-  - Mehrere Schaubilder stehen untereinander, jedes lässt sich vergrößern, und
-    auch im Dunkeln liegen sie auf hellem Grund.
-  - Pause und Umbau erscheinen gedämpft. Zwei Programmpunkte zur selben Zeit
-    stehen untereinander, mit ihrem Hallenteil.
-  - Unter „Vorbereitung" steht alles ohne Zeitangabe außer „Zum Nachschlagen",
-    auch die Nachbereitung. Ein Abschnitt, der dabei leer wird, entfällt.
-  - Der Satz zum Abhaken im Docstring fliegt raus, das gibt es nicht.
-- **Ablage**: Die React-Dateien kommen nach `docs/gestaltung/leseansicht/`, sie
-  werden nicht mit dem Plugin ausgeliefert. Danach wird der Branch gelöscht.
-- **Abnahme**:
-  - Die Pläne vom 01.10. und vom 17.09. werden von Hand umgestellt, der eine
-    zum Vergleich mit der Vorlage, der andere wegen der Programmpunkte zur
-    selben Zeit. `_vorlage.md` und die lebende `glossary.md` im Arbeitsordner
-    ziehen wir von Hand nach.
-  - Das Android-Handy auf beiden Wegen, per WhatsApp vom Rechner und aus der
-    Nextcloud in den Browser, je in Hell und Dunkel.
-  - Ein Desktop-Browser mit ausgeschaltetem JavaScript im schmalen Fenster.
-  - Ein echtes iPhone: Ein Spieler bekommt die Datei per WhatsApp und schickt
-    einen Screenshot. Klappt das bis zur Abnahme nicht, kommt es mit Ziel
-    hierher.
-- **Version**: ein kleiner Sprung, alte Pläne bleiben gültig.
+1. Die Welle zur Wissenskarte (#61): zuerst der Ausschnitt mit #62 bis #65,
+   dann #66 bis #74. Gebaut am 14. und 19.10.2026, ausgeliefert mit 3.2.0.
+   Offen sind die Abnahmen #65 und #74.
 
 ### Welle zur Wissenskarte
 
