@@ -27,8 +27,9 @@ sind freiwillig (ADR-0005, ADR-0013): Fehlt eins, nennt das Skript den Befehl
 zum Installieren. Geholt werden sie erst, wenn geschnitten wird, so bekommt
 ein Skript, das dieses importiert, keine neue Voraussetzung.
 
-Der Sammelimport schneidet über dieselbe Funktion, `schneide_aus()`. Das
-Skript ist nur die Kommandozeile darum.
+Der Sammelimport schneidet über dieselbe Funktion, `schneide_aus()`. Mit
+`zeichne_seiten()` legt er dem Agenten die Seiten eines PDF als Bild hin,
+gezeichnet wie zum Schneiden. Das Skript ist nur die Kommandozeile darum.
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ import argparse
 import io
 import math
 import sys
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -194,8 +196,18 @@ def _foto(quelle: Path):
         raise KeinAusschnitt(f"{quelle.name} lässt sich nicht als Bild öffnen.") from None
 
 
-def _pdf_seite(quelle: Path, seite: int):
-    """Die Seite des PDF als Bild, ihre lange Kante ZIELKANTE Pixel lang.
+def _oeffne_pdf(quelle: Path):
+    """Das PDF, geöffnet mit `pypdfium2`. Wer es öffnet, schließt es auch."""
+    import pypdfium2
+
+    try:
+        return pypdfium2.PdfDocument(quelle.read_bytes())
+    except pypdfium2.PdfiumError:
+        raise KeinAusschnitt(f"{quelle.name} lässt sich nicht als PDF öffnen.") from None
+
+
+def _zeichne(pdf, quelle: Path, seite: int):
+    """Die Seite des offenen PDF als Bild, ihre lange Kante ZIELKANTE Pixel lang.
 
     Gezeichnet wird die Seite, wie sie aufrecht steht: Breite und Höhe, die
     `pypdfium2` nennt, rechnen eine Drehung der Seite schon ein.
@@ -205,24 +217,56 @@ def _pdf_seite(quelle: Path, seite: int):
     Er wird deshalb so weit verkleinert, bis die lange Kante genau
     ZIELKANTE misst.
     """
-    import pypdfium2
+    if not 1 <= seite <= len(pdf):
+        seiten = "eine Seite" if len(pdf) == 1 else f"{len(pdf)} Seiten"
+        raise KeinAusschnitt(
+            f"{quelle.name} hat {seiten}, eine Seite {seite} gibt es nicht. "
+            f"Gezählt wird ab 1.")
+    blatt = pdf[seite - 1]
+    lang = max(blatt.get_size())
+    faktor = ZIELKANTE / lang
+    while math.ceil(lang * faktor) > ZIELKANTE:
+        faktor = math.nextafter(faktor, 0)
+    return blatt.render(scale=faktor).to_pil()
 
+
+def _pdf_seite(quelle: Path, seite: int):
+    """Die Seite des PDF als Bild, gezeichnet wie in `_zeichne`."""
+    pdf = _oeffne_pdf(quelle)
     try:
-        pdf = pypdfium2.PdfDocument(quelle.read_bytes())
-    except pypdfium2.PdfiumError:
-        raise KeinAusschnitt(f"{quelle.name} lässt sich nicht als PDF öffnen.") from None
+        return _zeichne(pdf, quelle, seite)
+    finally:
+        pdf.close()
+
+
+def zeichne_seiten(quelle: Path, ziel: Callable[[int], Path],
+                   seiten: Iterable[int] | None = None) -> list[tuple[int, Path]]:
+    """Schreibt Seiten des PDF als PNG, so wie `schneide_aus` sie vor dem Schneiden zeichnet.
+
+    `seiten` zählt ab 1, ohne Angabe sind es alle Seiten. `ziel(seite)` sagt,
+    wohin eine Seite kommt. Zurück kommt je Seite ihre Zahl und ihr Pfad.
+
+    Der Sammelimport legt sie neben den Auftrag (#65). Der Agent schätzt
+    die Prozente eines Ausschnitts an der Seite, und das Werkzeug, mit dem
+    er liest, zeichnet PDF-Seiten mit `pdftoppm`. Das fehlt unter Windows,
+    wie ADR-0013 sagt. Mit diesen Bildern sieht er die Seite ohne, und
+    genau so, wie `pruefen` sie schneidet.
+
+    Wirft KeinAusschnitt, wenn sich das PDF nicht öffnen lässt oder es eine
+    Seite nicht gibt, und BibliothekFehlt ohne Pillow oder `pypdfium2`. Was
+    bis dahin geschrieben war, bleibt dann liegen.
+    """
+    verlange_bibliotheken(pdf=True)
+    pdf = _oeffne_pdf(quelle)
     try:
-        if not 1 <= seite <= len(pdf):
-            seiten = "eine Seite" if len(pdf) == 1 else f"{len(pdf)} Seiten"
-            raise KeinAusschnitt(
-                f"{quelle.name} hat {seiten}, eine Seite {seite} gibt es nicht. "
-                f"Gezählt wird ab 1.")
-        blatt = pdf[seite - 1]
-        lang = max(blatt.get_size())
-        faktor = ZIELKANTE / lang
-        while math.ceil(lang * faktor) > ZIELKANTE:
-            faktor = math.nextafter(faktor, 0)
-        return blatt.render(scale=faktor).to_pil()
+        geschrieben: list[tuple[int, Path]] = []
+        for seite in seiten if seiten is not None else range(1, len(pdf) + 1):
+            puffer = io.BytesIO()
+            _zeichne(pdf, quelle, seite).save(puffer, AUS_DEM_PDF.name)
+            pfad = ziel(seite)
+            pfad.write_bytes(puffer.getvalue())
+            geschrieben.append((seite, pfad))
+        return geschrieben
     finally:
         pdf.close()
 

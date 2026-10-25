@@ -516,7 +516,8 @@ die Übersicht. Der Rest ist nach der Nummer des Kandidaten benannt:
 `17.auftrag.md` ist der Auftrag, `17.md` der Kartenentwurf,
 `17.quellgrafik.png` die Quellgrafik, bei mehreren `17.quellgrafik-1.png`,
 `17.quellgrafik-2.png` und so weiter. Ein Ausschnitt aus einem Foto endet auf
-`.jpg`. Den Entwurf schreibt bei `uebung` und `folge` der Agent
+`.jpg`. `17.seite-3.png` ist Seite 3 eines PDF als Bild, siehe unten. Den
+Entwurf schreibt bei `uebung` und `folge` der Agent
 `volleyball-kartenentwurf`, bei `wissen` der Agent `volleyball-wissenskarte`.
 `vorbereiten` nennt je Auftrag die Sorte, `uebungskarte` oder `wissenskarte`,
 daran wählt der Skill den Agenten.
@@ -552,6 +553,17 @@ trägt der Text eines PDF im Auftrag dann die Seitenmarken, gezählt wie im PDF,
 bei einem Seitenbereich also ab seiner ersten Seite. Fehlt Pillow, oder hat
 ein Kandidat des Durchgangs ein PDF und `pypdfium2` fehlt, bricht
 `vorbereiten` vor dem ersten Auftrag ab und schreibt nichts (ADR-0013).
+
+Daneben zeichnet `vorbereiten` jede Seite eines PDF des Kandidaten als Bild,
+bei einem Seitenbereich nur dessen Seiten, über dieselbe Funktion wie
+`ausschnitt.py`: `17.seite-3.png` für Seite 3, bei mehreren PDFs mit der
+Stelle des PDF unter ihnen, `17.pdf-2.seite-1.png`. Der Auftrag nennt sie
+unter dem PDF, und der Agent sieht sie an, nicht das PDF. Das Werkzeug, mit
+dem ein Agent liest, zeichnet PDF-Seiten mit `pdftoppm`, und das fehlt unter
+Windows. So misst er seine Prozente an genau dem Bild, aus dem `pruefen`
+schneidet. Ein Seitenbild von einem früheren Lauf räumt `vorbereiten` vorher
+weg. Lässt sich ein PDF nicht zeichnen, nennt der Auftrag den Grund, und der
+Agent versucht es mit dem PDF selbst. Das hält den Durchgang nicht auf.
 
 Der Auftrag einer Wissenskarte hat dieselbe Form, nur ohne die Angabe zum
 Ablauf aus dem Bild, denn eine Wissenskarte hat keinen Ablauf. Die Kennungen
@@ -679,7 +691,7 @@ diese Angabe.
 
 Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
 mit `angelegt` von heute und ohne `## Freigabe`. Entwurf und Auftrag
-verschwinden dann. Der Entwurf einer Wissenskarte wird ebenso
+verschwinden dann, mit dem Auftrag seine Seitenbilder. Der Entwurf einer Wissenskarte wird ebenso
 `wissen/wi-######-<slug>.md`, mit der nächsten freien `wi-`-ID und dem Slug
 aus der Frage ohne Fragezeichen. Fehlt `wissen/`, legt `uebernehmen` es an.
 Übungen und Wissenskarten zählen getrennt, auch in einem Aufruf. Die
@@ -1013,7 +1025,8 @@ aus der Standardbibliothek. Es gibt drei Ausnahmen von der Standardbibliothek:
   Funktion. Fehlt es, endet ein Ausschnitt aus einem PDF mit
   Installationshinweis und schreibt nichts. Bei `quellgrafik: ausschnitt`
   bricht `vorbereiten` dann ab, sobald ein Kandidat des Durchgangs ein PDF
-  hat. Ein Ausschnitt aus einem Foto geht ohne (ADR-0013). Fehlt
+  hat. Ein Ausschnitt aus einem Foto geht ohne (ADR-0013). Mit derselben
+  Funktion zeichnet `vorbereiten` dem Agenten die Seiten als Bild. Fehlt
   `pdftotext`, zählt `vorbereiten` mit `pypdfium2` die Seiten eines PDF,
   wenn es da ist, damit ein Seitenbereich nicht über die letzte hinausgeht.
 

@@ -37,8 +37,9 @@ Rückfrage. Dein Volleyballwissen steht nie als Tatsache da.
    als Bild. Steht unter einer Datei, dass du das PDF selbst lesen musst,
    öffne es. Nennt der Auftrag unter einem PDF Seiten, gehören nur sie zum
    Kandidaten. Dann liest du im PDF nur diese Seiten. Kommen die Bilder als
-   Ausschnitt, öffnest du jedes PDF und siehst dir seine Seiten als Bild an,
-   denn dort suchst du die Bilder, die eine Kernaussage erklären.
+   Ausschnitt, siehst du dir jede Seite eines PDF als Bild an, denn dort
+   suchst du die Bilder, die eine Kernaussage erklären. Die Seiten nennt der
+   Auftrag unter dem PDF als Bilder. Öffne diese, nicht das PDF.
 3. Schreib den Entwurf an den Zielpfad aus dem Auftrag.
 4. Antworte mit genau einer Zeile, ohne Pfad und ohne Zusatz:
    `<kandidat> | bereit | <n> Vorschläge` oder
@@ -81,7 +82,9 @@ Darunter diese Abschnitte:
   und der Text ist nur der dieser Seiten.
 - `## Ausschnitte`, nur wenn die Bilder als Ausschnitt kommen: Form, Namen
   und Endung deiner Ausschnitte, siehe unten. Dann beginnt im Text jede
-  Seite eines PDF mit ihrer Marke, etwa `=== Seite 12 ===`.
+  Seite eines PDF mit ihrer Marke, etwa `=== Seite 12 ===`, und unter
+  `## Dateien` stehen die Seiten jedes PDF als Bild, etwa
+  `17.seite-12.png` für Seite 12.
 - `## Absprachen`: wie sich die Quelle liest und welche Feldregeln für jede
   Karte aus diesem Quellenordner gelten. Was dort steht, gilt als belegt.
 - `## Schwerpunkt-Kennungen`: die Kennungen dieses Arbeitsordners mit
@@ -124,10 +127,11 @@ der das sagt.
 Sagt der Auftrag `Bilder: als Ausschnitt`, suchst du in der Quelle die
 Bilder, die eine Kernaussage erklären: eine Bildreihe zu einer Technik, eine
 Kurve, eine Grafik, ein Foto, das zeigt, was der Text sagt. Sieh dir dafür
-jedes Foto des Kandidaten an, bei einem PDF jede Seite, die zu ihm gehört.
-Wo ein Bild liegt, nennst du als Ausschnitt, und `sammelimport.py` schneidet
-es aus. Sagt der Auftrag `Bilder: keine`, gibt es keinen Ausschnitt und
-keinen Bildverweis.
+jedes Foto des Kandidaten an, bei einem PDF jede Seite, die zu ihm gehört,
+als Bild aus dem Auftrag. Wo ein Bild liegt, nennst du als Ausschnitt, und
+`sammelimport.py` schneidet es aus. Die Prozente misst du an diesem Bild, es
+ist die Seite, aus der geschnitten wird. Sagt der Auftrag `Bilder: keine`,
+gibt es keinen Ausschnitt und keinen Bildverweis.
 
 - Ein Bild, das etwas erklärt, ist ein Ausschnitt. Eine Bildreihe, etwa fünf
   Bilder einer Bewegung nebeneinander, ist ein Ausschnitt, nicht fünf.

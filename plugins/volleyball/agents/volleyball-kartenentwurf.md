@@ -26,9 +26,10 @@ frühere Entwürfe stellenweise an der Quelle.
    Quellgrafik und jedes Foto als Bild. Steht unter einer Datei, dass du das
    PDF selbst lesen musst, öffne es. Nennt der Auftrag unter einem PDF
    Seiten, gehören nur sie zum Kandidaten. Dann liest du im PDF nur diese
-   Seiten. Kommt die Quellgrafik als Ausschnitt, öffnest du jedes PDF und
-   siehst dir seine Seiten als Bild an, denn dort suchst du das Bild der
-   Übung.
+   Seiten. Kommt die Quellgrafik als Ausschnitt, siehst du dir jede Seite
+   eines PDF als Bild an, denn dort suchst du das Bild der Übung. Die
+   Seiten nennt der Auftrag unter dem PDF als Bilder. Öffne diese, nicht das
+   PDF.
 3. Schreib den Entwurf an den Zielpfad aus dem Auftrag.
 4. Antworte mit genau einer Zeile, ohne Pfad und ohne Zusatz:
    `<kandidat> | bereit | <n> Vorschläge` oder
@@ -65,7 +66,9 @@ Darunter diese Abschnitte:
   und der Text ist nur der dieser Seiten.
 - `## Ausschnitte`, nur wenn die Quellgrafik als Ausschnitt kommt: Form,
   Namen und Endung deiner Ausschnitte, siehe unten. Dann beginnt im Text
-  jede Seite eines PDF mit ihrer Marke, etwa `=== Seite 12 ===`.
+  jede Seite eines PDF mit ihrer Marke, etwa `=== Seite 12 ===`, und unter
+  `## Dateien` stehen die Seiten jedes PDF als Bild, etwa
+  `17.seite-12.png` für Seite 12.
 - `## Absprachen`: wie sich die Quelle liest und welche Feldregeln für jede
   Karte aus diesem Quellenordner gelten. Was dort steht, gilt als belegt.
 - `## Schwerpunkt-Kennungen`: die Kennungen dieses Arbeitsordners mit
@@ -154,8 +157,9 @@ das genannte PDF und sieh dir dort das Bild an.
 Sagt der Auftrag „als Ausschnitt“, suchst du in der Quelle das Bild der
 Übung: eine Skizze, ein Feldbild, eine Bildreihe, ein Foto der Übung. Sieh dir
 dafür jedes Foto des Kandidaten an, bei einem PDF jede Seite, die zu ihm
-gehört. Wo das Bild liegt, nennst du als Ausschnitt, und `sammelimport.py`
-schneidet es aus.
+gehört, als Bild aus dem Auftrag. Wo das Bild liegt, nennst du als Ausschnitt,
+und `sammelimport.py` schneidet es aus. Die Prozente misst du an diesem Bild,
+es ist die Seite, aus der geschnitten wird.
 
 - Ein Bild der Übung ist ein Ausschnitt. Eine Bildreihe, etwa fünf Bilder
   einer Bewegung nebeneinander, ist ein Ausschnitt, nicht fünf.

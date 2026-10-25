@@ -278,6 +278,11 @@ angenommener Vorschlag oder als Ausnahme.
      Durchgang, Pillow bei `eingebettet` nur mit einer Übung im Durchgang.
    - **pdftotext fehlt:** Den Installationshinweis einmal weitergeben. Die
      Aufträge sind geschrieben, die Agenten lesen die PDFs selbst.
+   - **„Keine Seiten als Bild aus …“:** Bei `quellgrafik: ausschnitt` legt
+     `vorbereiten` die Seiten jedes PDF als Bild neben den Auftrag, an ihnen
+     misst der Agent seine Ausschnitte. Dieses PDF ließ sich nicht zeichnen,
+     die Meldung sagt, warum. Der Auftrag ist geschrieben, der Agent versucht
+     es mit dem PDF selbst. Dem Trainer das PDF und den Grund nennen.
    - **„Ob es diese Seiten gibt, kann das Skript nicht prüfen“:** Weder
      `pdftotext` noch `pypdfium2` hat die Seiten gezählt. Die Aufträge sind
      geschrieben. Dem Trainer die Zeilen nennen, bevor die Agenten starten:

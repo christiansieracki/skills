@@ -1197,7 +1197,7 @@ class AusschnittTest(unittest.TestCase):
 
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         self.assertEqual(sorted(p.name for p in self.entwuerfe.iterdir()),
-                         ["3.auftrag.md", "4.auftrag.md"])
+                         ["3.auftrag.md", "3.seite-1.png", "4.auftrag.md"])
         pdf = auftrag_von(self.ordner, 3)
         self.assertIn("Ausschnitt", zeile_mit(pdf, "Quellgrafik"))
         self.assertIn("Ausschnitte:\n- `3.quellgrafik.png`: `kasten.pdf` S. 1, links ", pdf)
@@ -1231,6 +1231,97 @@ class AusschnittTest(unittest.TestCase):
         zwei = unter_datei(auftrag_von(self.ordner, 2), "heft.pdf").splitlines()
         for seite in (1, 2, 3, 4):
             self.assertEqual(zwei[zwei.index(f"=== Seite {seite} ===") + 1], HEFT[seite - 1][0])
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_vorbereiten_zeichnet_die_seiten_des_kandidaten_als_bild_neben_den_auftrag(
+            self) -> None:
+        # Der Agent schaetzt die Prozente eines Ausschnitts an der Seite. Sein
+        # Werkzeug zum Lesen zeichnet eine PDF-Seite mit pdftoppm, und das
+        # fehlt unter Windows (#65). Deshalb zeichnet vorbereiten die Seiten
+        # selbst, mit pypdfium2 wie beim Ausschneiden, bei einem Seitenbereich
+        # nur dessen Seiten. Die blaue Flaeche liegt im Bild dort, wo sie ein
+        # Ausschnitt mit denselben Zahlen traefe. Ein Seitenbild von einem
+        # frueheren Lauf verschwindet.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": [("heft.pdf", "S. 2–3")]},
+            {"kandidat": 2, "dateien": ["heft.pdf"]},
+            {"kandidat": 3, "dateien": ["seite-26.jpg"]}], quellgrafik="ausschnitt")
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", *HEFT,
+                                      flaechen=[PdfFlaeche(2, BLAU, (10, 20, 60, 50))])
+        self.entwuerfe.mkdir(parents=True)
+        (self.entwuerfe / "1.seite-1.png").write_bytes(b"vom letzten Lauf")
+
+        fertig = self.vorbereiten()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.glob("*.png")),
+                         ["1.seite-2.png", "1.seite-3.png", "2.seite-1.png", "2.seite-2.png",
+                          "2.seite-3.png", "2.seite-4.png"])
+        eins = unter_datei(auftrag_von(self.ordner, 1), "heft.pdf")
+        for seite in (2, 3):
+            self.assertIn(f"- S. {seite}: `{(self.entwuerfe / f'1.seite-{seite}.png').as_posix()}`",
+                          eins)
+        self.assertNotIn("Öffnest du das PDF", eins)
+        with Image.open(self.entwuerfe / "1.seite-2.png") as bild:
+            self.assertEqual((bild.format, max(bild.size)), ("PNG", 2000))
+            mitte = bild.convert("RGB").getpixel((bild.width * 35 // 100, bild.height * 35 // 100))
+        self.assertTrue(all(abs(ist - soll) <= 8 for ist, soll in zip(mitte, BLAU)), mitte)
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_bei_mehreren_pdfs_nennt_das_seitenbild_auch_das_pdf(self) -> None:
+        # Eine Seite 1 hat jedes PDF. Ohne die Stelle des PDF im Namen
+        # ueberschriebe das zweite die Seiten des ersten.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": [("heft.pdf", "S. 1"), "kasten.pdf"]}],
+            quellgrafik="ausschnitt")
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", *HEFT)
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/kasten.pdf", ["Abwehr vom Kasten"])
+
+        fertig = self.vorbereiten()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.glob("*.png")),
+                         ["1.pdf-1.seite-1.png", "1.pdf-2.seite-1.png"])
+        self.assertIn("1.pdf-2.seite-1.png`", unter_datei(auftrag_von(self.ordner, 1), "kasten.pdf"))
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_laesst_sich_eine_seite_nicht_zeichnen_sagt_der_auftrag_warum(self) -> None:
+        # Ein PDF, das pypdfium2 nicht oeffnet, haelt den Durchgang nicht auf.
+        # Der Auftrag nennt den Grund, und der Agent versucht es selbst.
+        self.ordner.lege_quellenordner_an(ORDNER, [{"kandidat": 1, "dateien": ["kaputt.pdf"]}],
+                                          quellgrafik="ausschnitt")
+
+        fertig = self.vorbereiten()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual([p.name for p in self.entwuerfe.iterdir()], ["1.auftrag.md"])
+        kaputt = unter_datei(auftrag_von(self.ordner, 1), "kaputt.pdf")
+        self.assertIn("nicht als PDF öffnen", zeile_mit(kaputt, "als Bild"))
+        self.assertIn("Das PDF selbst lesen", kaputt)
+        self.assertNotIn("aus den Seiten als Bild", kaputt)
+        self.assertIn("kaputt.pdf", zeile_mit(fertig.stdout, "Keine Seiten als Bild"))
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
+    def test_die_seitenbilder_verschwinden_mit_dem_auftrag(self) -> None:
+        # Ein erledigter Kandidat raeumt weg, was fuer ihn angelegt war, auch
+        # seine Seiten als Bild. Die eines offenen bleiben liegen.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": [("heft.pdf", "S. 4")]},
+            {"kandidat": 2, "dateien": [("heft.pdf", "S. 2")]}], quellgrafik="ausschnitt")
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", *HEFT)
+        vorbereitet = self.vorbereiten()
+        self.assertEqual(vorbereitet.returncode, 0, vorbereitet.stdout + vorbereitet.stderr)
+
+        fertig = self.ordner.starte("sammelimport.py", "uebernehmen", ORDNER,
+                                    "--uebersprungen", "1", "Impressum und Werbung")
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.iterdir()),
+                         ["2.auftrag.md", "2.seite-2.png"])
 
     @BRAUCHT_PILLOW
     def test_ohne_pypdfium2_bricht_nur_ein_durchgang_mit_pdf_ab(self) -> None:
@@ -1580,10 +1671,10 @@ class BilderDerWissenskarteTest(unittest.TestCase):
     def test_der_auftrag_nennt_form_und_namen_der_ausschnitte_nur_bei_ausschnitt(self) -> None:
         # Bei `ausschnitt` sagt der Auftrag einer Wissenskarte wie der einer
         # Uebung, wie der Entwurf seine Ausschnitte nennt, nur kommt jeder als
-        # Bildverweis in den Text statt in `schaubild:`. Bei `eingebettet` und
-        # `keine` bekommt eine Wissenskarte keine Bilder: Das groesste
-        # eingebettete Bild zeigt bei Theorie selten, was eine Kernaussage
-        # erklaert.
+        # Bildverweis in den Text statt in `schaubild:`, und die Seiten des
+        # PDF liegen als Bild daneben. Bei `eingebettet` und `keine` bekommt
+        # eine Wissenskarte keine Bilder: Das groesste eingebettete Bild zeigt
+        # bei Theorie selten, was eine Kernaussage erklaert.
         for art in ("ausschnitt", "eingebettet", "keine"):
             self.ordner.lege_quellenordner_an(art, [
                 {"kandidat": 1, "dateien": ["merkmale.pdf", "seite-26.jpg"],
@@ -1596,7 +1687,9 @@ class BilderDerWissenskarteTest(unittest.TestCase):
             fertig = self.ordner.starte("sammelimport.py", "vorbereiten", art)
             self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
             entwuerfe = self.ordner.pfad / "kartenentwuerfe" / art
-            self.assertEqual(sorted(p.name for p in entwuerfe.iterdir()), ["1.auftrag.md"], art)
+            seiten = ["1.seite-1.png"] if art == "ausschnitt" else []
+            self.assertEqual(sorted(p.name for p in entwuerfe.iterdir()),
+                             ["1.auftrag.md", *seiten], art)
             auftraege[art] = (entwuerfe / "1.auftrag.md").read_text(encoding="utf-8")
 
         mit = auftraege["ausschnitt"]
