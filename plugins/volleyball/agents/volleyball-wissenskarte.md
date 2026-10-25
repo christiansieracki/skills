@@ -39,7 +39,8 @@ Rückfrage. Dein Volleyballwissen steht nie als Tatsache da.
    Kandidaten. Dann liest du im PDF nur diese Seiten. Kommen die Bilder als
    Ausschnitt, siehst du dir jede Seite eines PDF als Bild an, denn dort
    suchst du die Bilder, die eine Kernaussage erklären. Die Seiten nennt der
-   Auftrag unter dem PDF als Bilder. Öffne diese, nicht das PDF.
+   Auftrag unter dem PDF als Bilder. Öffne diese Bilder, das PDF brauchst
+   du dafür nicht.
 3. Schreib den Entwurf an den Zielpfad aus dem Auftrag.
 4. Antworte mit genau einer Zeile, ohne Pfad und ohne Zusatz:
    `<kandidat> | bereit | <n> Vorschläge` oder

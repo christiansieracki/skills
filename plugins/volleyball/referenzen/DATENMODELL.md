@@ -558,12 +558,14 @@ Daneben zeichnet `vorbereiten` jede Seite eines PDF des Kandidaten als Bild,
 bei einem Seitenbereich nur dessen Seiten, über dieselbe Funktion wie
 `ausschnitt.py`: `17.seite-3.png` für Seite 3, bei mehreren PDFs mit der
 Stelle des PDF unter ihnen, `17.pdf-2.seite-1.png`. Der Auftrag nennt sie
-unter dem PDF, und der Agent sieht sie an, nicht das PDF. Das Werkzeug, mit
-dem ein Agent liest, zeichnet PDF-Seiten mit `pdftoppm`, und das fehlt unter
-Windows. So misst er seine Prozente an genau dem Bild, aus dem `pruefen`
-schneidet. Ein Seitenbild von einem früheren Lauf räumt `vorbereiten` vorher
-weg. Lässt sich ein PDF nicht zeichnen, nennt der Auftrag den Grund, und der
-Agent versucht es mit dem PDF selbst. Das hält den Durchgang nicht auf.
+unter dem PDF, und der Agent sieht sie an. Das PDF öffnet er dafür nicht, denn
+das Werkzeug, mit dem ein Agent liest, zeichnet PDF-Seiten mit `pdftoppm`,
+und das fehlt unter Windows. So misst er seine Prozente an genau dem Bild, aus
+dem `pruefen` schneidet. Seiten als Bild von einem früheren Lauf räumt
+`vorbereiten` vorher weg. Lässt sich ein PDF nicht zeichnen, nennt der
+Auftrag den Grund, und der Agent versucht es mit dem PDF selbst. Das hält den
+Durchgang nicht auf. Auch beim Korrigieren eines Ausschnitts in der Freigabe
+liegen sie noch da.
 
 Der Auftrag einer Wissenskarte hat dieselbe Form, nur ohne die Angabe zum
 Ablauf aus dem Bild, denn eine Wissenskarte hat keinen Ablauf. Die Kennungen
@@ -691,9 +693,10 @@ diese Angabe.
 
 Bei der Freigabe bekommt der Entwurf seine ID und wird Karte in `uebungen/`,
 mit `angelegt` von heute und ohne `## Freigabe`. Entwurf und Auftrag
-verschwinden dann, mit dem Auftrag seine Seitenbilder. Der Entwurf einer Wissenskarte wird ebenso
-`wissen/wi-######-<slug>.md`, mit der nächsten freien `wi-`-ID und dem Slug
-aus der Frage ohne Fragezeichen. Fehlt `wissen/`, legt `uebernehmen` es an.
+verschwinden dann, mit dem Auftrag die Seiten als Bild. Der Entwurf einer
+Wissenskarte wird ebenso `wissen/wi-######-<slug>.md`, mit der nächsten
+freien `wi-`-ID und dem Slug aus der Frage ohne Fragezeichen. Fehlt
+`wissen/`, legt `uebernehmen` es an.
 Übungen und Wissenskarten zählen getrennt, auch in einem Aufruf. Die
 Quellgrafik einer Übung kommt unter dem Namen der Karte nach `schaubilder/`,
 etwa `ue-000291-abwehr-vom-kasten.png`, und `schaubild:` zeigt darauf. Sie

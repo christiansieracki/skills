@@ -222,12 +222,18 @@ def _zeichne(pdf, quelle: Path, seite: int):
         raise KeinAusschnitt(
             f"{quelle.name} hat {seiten}, eine Seite {seite} gibt es nicht. "
             f"Gezählt wird ab 1.")
+    import pypdfium2
+
     blatt = pdf[seite - 1]
     lang = max(blatt.get_size())
     faktor = ZIELKANTE / lang
     while math.ceil(lang * faktor) > ZIELKANTE:
         faktor = math.nextafter(faktor, 0)
-    return blatt.render(scale=faktor).to_pil()
+    try:
+        return blatt.render(scale=faktor).to_pil()
+    except pypdfium2.PdfiumError:
+        raise KeinAusschnitt(
+            f"Seite {seite} von {quelle.name} lässt sich nicht zeichnen.") from None
 
 
 def _pdf_seite(quelle: Path, seite: int):
@@ -252,23 +258,27 @@ def zeichne_seiten(quelle: Path, ziel: Callable[[int], Path],
     wie ADR-0013 sagt. Mit diesen Bildern sieht er die Seite ohne, und
     genau so, wie `pruefen` sie schneidet.
 
-    Wirft KeinAusschnitt, wenn sich das PDF nicht öffnen lässt oder es eine
-    Seite nicht gibt, und BibliothekFehlt ohne Pillow oder `pypdfium2`. Was
-    bis dahin geschrieben war, bleibt dann liegen.
+    Wirft KeinAusschnitt, wenn sich das PDF nicht öffnen oder eine Seite
+    nicht zeichnen lässt, oder es eine Seite nicht gibt, und BibliothekFehlt
+    ohne Pillow oder `pypdfium2`. Geschrieben wird erst, wenn jede Seite
+    gezeichnet ist, sonst gar nichts.
     """
     verlange_bibliotheken(pdf=True)
     pdf = _oeffne_pdf(quelle)
     try:
-        geschrieben: list[tuple[int, Path]] = []
+        fertig: list[tuple[int, bytes]] = []
         for seite in seiten if seiten is not None else range(1, len(pdf) + 1):
             puffer = io.BytesIO()
             _zeichne(pdf, quelle, seite).save(puffer, AUS_DEM_PDF.name)
-            pfad = ziel(seite)
-            pfad.write_bytes(puffer.getvalue())
-            geschrieben.append((seite, pfad))
-        return geschrieben
+            fertig.append((seite, puffer.getvalue()))
     finally:
         pdf.close()
+    geschrieben: list[tuple[int, Path]] = []
+    for seite, inhalt in fertig:
+        pfad = ziel(seite)
+        pfad.write_bytes(inhalt)
+        geschrieben.append((seite, pfad))
+    return geschrieben
 
 
 def _schneide(bild, rechteck: tuple[int, int, int, int]):

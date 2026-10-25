@@ -1288,6 +1288,27 @@ class AusschnittTest(unittest.TestCase):
 
     @BRAUCHT_PILLOW
     @BRAUCHT_PYPDFIUM2
+    def test_steht_ein_pdf_mit_zwei_bereichen_da_bekommt_jeder_seine_seiten(self) -> None:
+        # Eine Uebung auf Seite 2, ihre Fortsetzung hinter der Werbung auf
+        # Seite 4. Jeder Bereich nennt im Auftrag seine eigenen Seiten.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": [("heft.pdf", "S. 2"), ("heft.pdf", "S. 4")]}],
+            quellgrafik="ausschnitt")
+        self.ordner.lege_quell_pdf_an(f"{ORDNER}/heft.pdf", *HEFT)
+
+        fertig = self.vorbereiten()
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
+        self.assertEqual(sorted(p.name for p in self.entwuerfe.glob("*.png")),
+                         ["1.pdf-1.seite-2.png", "1.pdf-2.seite-4.png"])
+        auftrag = auftrag_von(self.ordner, 1)
+        erster, zweiter = auftrag.split("### `heft.pdf`\n")[1:]
+        self.assertIn("1.pdf-1.seite-2.png`", erster)
+        self.assertNotIn("seite-4", erster)
+        self.assertIn("1.pdf-2.seite-4.png`", zweiter)
+
+    @BRAUCHT_PILLOW
+    @BRAUCHT_PYPDFIUM2
     def test_laesst_sich_eine_seite_nicht_zeichnen_sagt_der_auftrag_warum(self) -> None:
         # Ein PDF, das pypdfium2 nicht oeffnet, haelt den Durchgang nicht auf.
         # Der Auftrag nennt den Grund, und der Agent versucht es selbst.

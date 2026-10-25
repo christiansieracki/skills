@@ -32,8 +32,8 @@ nichts vorab, der Auftrag sagt, wie der Entwurf seine Ausschnitte nennt, eine
 Übung in `schaubild:`, eine Wissenskarte als Bildverweis, und Pillow, bei
 einem PDF auch `pypdfium2`, muss da sein (ADR-0013). Die Seiten jedes PDF
 legt es dann als Bild neben den Auftrag, an ihnen misst der Agent seine
-Ausschnitte. `pruefen` setzt den Status aus
-den Kartenentwürfen, die dort auf der Platte liegen, schneidet ihre
+Ausschnitte. `pruefen` setzt den Status aus den Kartenentwürfen, die dort auf
+der Platte liegen, schneidet ihre
 Ausschnitte neu aus und weist ab, was das Datenmodell bricht oder die Form der
 Freigabe nicht einhält. Welche Sorte Karte ein Entwurf werden soll, sagt das
 Ergebnis seiner Zeile. Mit `--json` gibt es aus, was die Freigabe im Chat
@@ -663,15 +663,16 @@ class Sammelimport:
         return sorted(p for p in self.entwurfsordner.iterdir()
                       if self.ist_quellgrafik_von(k, p.name))
 
-    def seitenbild(self, k: Kandidat, seite: int, pdf: int | None = None) -> Path:
+    def seitenbild(self, k: Kandidat, seite: int, stelle: int | None = None) -> Path:
         """Wo eine Seite eines PDF des Kandidaten als Bild liegt, für den Agenten (#65).
 
         `17.seite-3.png` ist Seite 3 des PDF. Hat der Kandidat mehrere PDFs,
         trägt der Name die Stelle des PDF unter ihnen, `17.pdf-2.seite-1.png`,
-        denn eine Seite 1 hat jedes.
+        denn eine Seite 1 hat jedes. Das gilt auch für ein PDF, das mit zwei
+        Seitenbereichen dasteht.
         """
-        welches = "" if pdf is None else f".pdf-{pdf}"
-        return self.entwurfsordner / f"{k.nummer}{welches}.seite-{seite}.png"
+        pdf = "" if stelle is None else f".pdf-{stelle}"
+        return self.entwurfsordner / f"{k.nummer}{pdf}.seite-{seite}.png"
 
     def seitenbilder(self, k: Kandidat) -> list[Path]:
         """Die Seiten als Bild, die für den Kandidaten neben dem Auftrag liegen."""
@@ -1757,7 +1758,7 @@ def _text_oder_grund(text: str | None, pdftotext: str | None,
     else:
         grund = "Keine Textebene."
     if als_bild:
-        return [f"{grund} Lies ihn aus den Seiten als Bild."]
+        return [f"{grund} Den Text aus den Seiten als Bild lesen."]
     nur = f", nur {seiten}" if seiten else ""
     return [f"{grund} Das PDF selbst lesen{nur}."]
 
@@ -2263,7 +2264,7 @@ def ablauf_aus_dem_bild(sammelimport: Sammelimport, texte: list[str | None]) -> 
 
 
 def dateien_im_auftrag(sammelimport: Sammelimport, k: Kandidat, pdftotext: str | None,
-                       seitenbilder: dict[str, Seitenbilder] | None = None,
+                       seitenbilder: dict[Datei, Seitenbilder],
                        ) -> tuple[list[str], list[str | None]]:
     """Der Abschnitt `## Dateien` eines Auftrags, und je Datei ihr Text.
 
@@ -2285,7 +2286,6 @@ def dateien_im_auftrag(sammelimport: Sammelimport, k: Kandidat, pdftotext: str |
     und der Agent liest das PDF selbst.
     """
     marken = sammelimport.mit_ausschnitten
-    seitenbilder = seitenbilder or {}
     zeilen: list[str] = []
     texte: list[str | None] = []
     for d in k.dateien:
@@ -2295,7 +2295,7 @@ def dateien_im_auftrag(sammelimport: Sammelimport, k: Kandidat, pdftotext: str |
             texte.append(None)
             continue
         bereich = d.seiten
-        bilder = seitenbilder.get(d.name)
+        bilder = seitenbilder.get(d)
         als_bild = bool(bilder and bilder.gezeichnet)
         if bereich:
             nur = f"Zu diesem Kandidaten gehören nur {bereich}."
@@ -2328,13 +2328,13 @@ class Seitenbilder:
             return [f"Die Seiten ließen sich nicht als Bild zeichnen: {self.grund} Sieh dir die "
                     f"Bilder im PDF selbst an.", ""]
         return ["Die Seiten als Bild, so gezeichnet, wie `pruefen` sie zum Ausschneiden "
-                "zeichnet. Sieh sie dir an, statt das PDF zu öffnen. An ihnen suchst du die "
-                "Bilder für deine Ausschnitte und misst ihre Prozente.", "",
+                "zeichnet. An ihnen suchst du die Bilder für deine Ausschnitte und misst ihre "
+                "Prozente. Das PDF öffnest du dafür nicht.", "",
                 *(f"- S. {seite}: `{pfad.as_posix()}`" for seite, pfad in self.gezeichnet), ""]
 
 
 def lege_seitenbilder_an(sammelimport: Sammelimport,
-                         k: Kandidat) -> tuple[dict[str, Seitenbilder], list[str]]:
+                         k: Kandidat) -> tuple[dict[Datei, Seitenbilder], list[str]]:
     """Zeichnet bei `quellgrafik: ausschnitt` die Seiten jedes PDF des Kandidaten als Bild (#65).
 
     Der Agent misst seine Ausschnitte an der Seite. Das Werkzeug, mit dem er
@@ -2345,30 +2345,31 @@ def lege_seitenbilder_an(sammelimport: Sammelimport,
     nur dessen Seiten. Seitenbilder von einem früheren Lauf räumt es vorher
     weg, wie die Quellgrafiken.
 
-    Zurück kommen je PDF seine Seitenbilder und, was das Skript dazu sagt,
-    wenn sich ein PDF nicht zeichnen ließ. Dann nennt der Auftrag den Grund,
-    und der Agent liest das PDF selbst. Den Durchgang hält das nicht auf.
+    Zurück kommen je PDF der Spalte Dateien seine Seiten als Bild und, was
+    das Skript dazu sagt, wenn sich ein PDF nicht zeichnen ließ. Dann nennt
+    der Auftrag den Grund, und der Agent liest das PDF selbst. Den Durchgang
+    hält das nicht auf.
     """
     for altes in sammelimport.seitenbilder(k):
         altes.unlink()
     if not sammelimport.mit_ausschnitten:
         return {}, []
     pdfs = [d for d in k.dateien if _ist_pdf(d.name)]
-    bilder: dict[str, Seitenbilder] = {}
+    bilder: dict[Datei, Seitenbilder] = {}
     meldungen: list[str] = []
-    for nr, d in enumerate(pdfs, start=1):
-        welches = nr if len(pdfs) > 1 else None
+    for stelle, d in enumerate(pdfs, start=1):
+        stelle_im_namen = stelle if len(pdfs) > 1 else None
         bereich = d.seiten
         try:
             gezeichnet = zeichne_seiten(
                 sammelimport.quellordner / d.name,
-                lambda seite: sammelimport.seitenbild(k, seite, welches),
+                lambda seite: sammelimport.seitenbild(k, seite, stelle_im_namen),
                 range(bereich.erste, bereich.letzte + 1) if bereich else None)
         except KeinAusschnitt as grund:
-            bilder[d.name] = Seitenbilder(grund=str(grund))
+            bilder[d] = Seitenbilder(grund=str(grund))
             meldungen.append(f"Keine Seiten als Bild aus `{d.name}`: {grund}")
             continue
-        bilder[d.name] = Seitenbilder(tuple(gezeichnet))
+        bilder[d] = Seitenbilder(tuple(gezeichnet))
     return bilder, meldungen
 
 
@@ -2482,7 +2483,7 @@ def uebungen_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> str:
 
 def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[str],
                      pdftotext: str | None, quellgrafikzeilen: list[str],
-                     seitenbilder: dict[str, Seitenbilder] | None = None) -> Path:
+                     seitenbilder: dict[Datei, Seitenbilder]) -> Path:
     """Legt den Auftrag für einen Kandidaten an, alles, was der Agent braucht.
 
     Die Pfade stehen absolut da, denn der Agent liest und schreibt mit ihnen.

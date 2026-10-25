@@ -422,8 +422,11 @@ Der Trainer sagt:
   Prozentpunkte. „Weiter nach unten“ verschiebt oben und unten zugleich,
   „unten mehr“ nur unten. Jede Zahl bleibt von 0 bis 100, links kleiner als
   rechts, oben kleiner als unten. Liegt das Bild auf einer anderen Seite,
-  ändert sich auch die Seite. Dann `sammelimport.py pruefen <ordner> --json`
-  und den neuen Ausschnitt zeigen, bis der Trainer ihn behält oder streicht.
+  ändert sich auch die Seite. Bei einem PDF liegt jede Seite des Kandidaten
+  als Bild neben dem Entwurf, `17.seite-3.png`. Daran richtest du die Zahlen,
+  das PDF selbst lässt sich ohne `pdftoppm` nicht seitenweise ansehen. Dann
+  `sammelimport.py pruefen <ordner> --json` und den neuen Ausschnitt zeigen,
+  bis der Trainer ihn behält oder streicht.
   Steht der Kandidat danach auf `offen`, ließ sich der Ausschnitt so nicht
   schneiden. Der Grund steht in `notiz`, die Zahlen richten und noch einmal.
   Gehört das Bild einer Wissenskarte an eine andere Kernaussage, wandert nur
