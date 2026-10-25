@@ -26,10 +26,25 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from arbeitsordner import OHNE, Arbeitsordner, PdfBild, PdfFlaeche, auffaelligkeiten, blende_aus
+from arbeitsordner import (
+    ABSPRACHEN, OHNE, Arbeitsordner, PdfBild, PdfFlaeche, auffaelligkeiten, blende_aus,
+)
 
 ORDNER = "stapel"
 BLAU = (30, 120, 200)
+
+# Absprachen, die sagen, wie der Plan zerlegt, so wie bei 04_So_Vo (#78).
+ZERLEGUNG = """\
+### So liest sich die Quelle
+
+- Jedes Spiel der Spielreihe ist eine eigene Übung.
+- Das Stationentraining ist eine Folge.
+- Die Seiten 1 und 9 der Spielreihe stellt der Plan zurück, sie werden Wissenskarten.
+
+### Felder
+
+- **quelle:** Jugendtrainerlehrgang, Sonntag Vormittag, Seite
+"""
 
 # Gesucht wird hier nur im PATH. Das Skript sucht unter Windows auch neben
 # git.exe. Steht pdftotext nur dort, werden diese Tests uebersprungen, obwohl
@@ -2259,11 +2274,21 @@ class PlaneingabeTest(unittest.TestCase):
         ])
         self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-06.jpg", b"")
 
+    def abschnitt(self, titel: str) -> str | None:
+        """Was die Planeingabe unter `## <titel>` sagt, bis zur naechsten Ueberschrift dieser Ebene.
+
+        None, wenn sie den Abschnitt nicht hat. Ein `###` darin beendet ihn nicht.
+        """
+        teile = self.planeingabe().split(f"\n## {titel}\n", 1)
+        if len(teile) == 1:
+            return None
+        return teile[1].split("\n## ", 1)[0].strip()
+
     def zurueckgestellte(self) -> dict[str, dict[str, str]]:
         """Die zurueckgestellten Zeilen, die die Planeingabe nennt, je Nummer eine."""
-        abschnitt = self.planeingabe().split("## Zurückgestellt\n", 1)[1].split("\n## ", 1)[0]
         zeilen = [[z.strip() for z in zeile.strip().strip("|").split("|")]
-                  for zeile in abschnitt.splitlines() if zeile.startswith("|")]
+                  for zeile in self.abschnitt("Zurückgestellt").splitlines()
+                  if zeile.startswith("|")]
         kopf, _trenner, *rest = zeilen
         return {z[0]: dict(zip(kopf, z)) for z in rest}
 
@@ -2324,6 +2349,57 @@ class PlaneingabeTest(unittest.TestCase):
                       "=== Seite 3 ===", "Einarmig spart den Schritt zum Ball."):
             self.assertIn(zeile, heft)
         self.assertIn("S. 2–3", zeile_mit(heft, "Nur"))
+
+    def test_die_planeingabe_traegt_die_absprachen_vor_den_dateien(self) -> None:
+        # Beim Anlegen der Absprachen entscheidet der Trainer auch, wie der
+        # Plan zerlegt (#78). Bei 04_So_Vo hat der Agent sie nie gesehen, die
+        # Theorieseiten nicht zurueckgestellt und noch einmal nach der Folge
+        # gefragt. Sie stehen unveraendert da, mit ihren `###`, und vor den
+        # Dateien, damit er die Regeln kennt, bevor er die erste Datei plant.
+        self.ordner.lege_quellenordner_an(ORDNER, [], freigegeben=None, absprachen=ZERLEGUNG)
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-01.jpg", b"")
+
+        self.plane()
+
+        self.assertEqual(self.abschnitt("Absprachen"), ZERLEGUNG.strip())
+        planeingabe = self.planeingabe()
+        self.assertLess(planeingabe.index("\n## Absprachen\n"), planeingabe.index("\n## Dateien\n"))
+        self.assertEqual(self.genannte_dateien(), ["seite-01.jpg"])
+
+    def test_ohne_absprachen_fehlt_der_abschnitt_und_mit_kommt_nur_er_dazu(self) -> None:
+        # Beim ersten Lauf kann die sammelimport.md fehlen, oder ihre
+        # Absprachen sind leer. Dann fehlt der Abschnitt. Mit Absprachen kommt
+        # nur er dazu, alles andere steht da wie ohne.
+        self.ordner.lege_quelldatei_an(f"{ORDNER}/seite-01.jpg", b"")
+        self.plane()
+        ohne_datei = self.planeingabe()
+        self.ordner.lege_quellenordner_an(ORDNER, [], freigegeben=None, absprachen="")
+        self.plane()
+        leer = self.planeingabe()
+        self.ordner.lege_quellenordner_an(ORDNER, [], freigegeben=None, absprachen=ZERLEGUNG)
+        self.plane()
+        mit_absprachen = self.planeingabe()
+
+        self.assertNotIn("## Absprachen", ohne_datei)
+        self.assertEqual(leer, ohne_datei)
+        self.assertEqual(mit_absprachen, ohne_datei.replace(
+            "\n## Dateien\n", f"\n## Absprachen\n\n{ZERLEGUNG.strip()}\n\n## Dateien\n", 1))
+
+    def test_mit_dem_schalter_stehen_die_absprachen_genauso_da(self) -> None:
+        # Die zurueckgestellten holt ein eigener Lauf, oft Wochen spaeter (#74).
+        # Was der Trainer beim Anlegen entschieden hat, etwa was eine Folge
+        # ist, gilt auch dann.
+        self.lege_zurueckgestellte_an()
+        self.plane()
+        ohne_schalter = self.abschnitt("Absprachen")
+
+        self.plane("--zurueckgestellte")
+
+        self.assertEqual(ohne_schalter, ABSPRACHEN.strip())
+        self.assertEqual(self.abschnitt("Absprachen"), ohne_schalter)
+        planeingabe = self.planeingabe()
+        self.assertLess(planeingabe.index("\n## Absprachen\n"), planeingabe.index("\n## Dateien\n"))
+        self.assertIsNotNone(self.abschnitt("Zurückgestellt"))
 
     def test_ein_foto_ueber_2_mb_ergibt_den_hinweis_auf_die_bildaufbereitung(self) -> None:
         # So schwer ist eine abfotografierte Magazinseite mit 50 Megapixeln.

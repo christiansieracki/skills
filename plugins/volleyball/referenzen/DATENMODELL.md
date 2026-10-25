@@ -377,10 +377,10 @@ in_arbeit: christian, 2026-10-02 # schreibt das Skript: wer seit wann daran arbe
 
 ## Absprachen
 
-Freitext: wie sich die Quelle liest und welche Feldregeln für jede Karte
-daraus gelten. Geht unverändert in jeden Auftrag. Antworten aus der Freigabe,
-die für jede Karte gelten, stehen zuletzt unter
-`### Was die Quelle nicht sagt`.
+Freitext: wie sich die Quelle liest, wie der Plan sie zerlegt und welche
+Feldregeln für jede Karte daraus gelten. Geht unverändert in die Planeingabe
+und in jeden Auftrag. Antworten aus der Freigabe, die für jede Karte gelten,
+stehen zuletzt unter `### Was die Quelle nicht sagt`.
 
 ## Übersicht
 
@@ -491,6 +491,10 @@ die Eingabe für den Zerlegungsplan: jede Datei des Quellenordners, die noch in
 keiner Zeile der Übersicht steht und die `ohne` nicht auslässt, bei PDFs ihr
 Text, die nächste freie Kandidatennummer, ohne Übersicht 1, und die
 Bibliotheksliste, in der die Karten aus diesem Quellenordner markiert sind.
+Vor den Dateien stehen unter `## Absprachen` die Absprachen der
+`sammelimport.md`, unverändert. Was sie zur Zerlegung sagen, etwa was eine
+Folge ist oder welche Seiten zurückgestellt werden, nimmt der Agent für den
+Zerlegungsplan als entschieden. Ohne Absprachen fehlt der Abschnitt.
 Die Bibliotheksliste hat zwei Teile: die Übungskarten mit ID, Titel, Element
 und `quelldatei`, die Wissenskarten mit ID, Frage, Thema und `quelldatei`.
 Eine Datei, die mit einem Seitenbereich in einer Zeile steht, ist nicht mehr

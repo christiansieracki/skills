@@ -12,12 +12,12 @@
 `sammelimport.md` mit den Einstellungen im Frontmatter, den Absprachen und der
 Übersicht, dem freigegebenen Zerlegungsplan mit dem Stand je Kandidat.
 
-`vorbereiten --plan` legt vor dem Zerlegungsplan die Planeingabe an: jede
-Datei, die noch in keiner Zeile der Übersicht steht und die `ohne:` nicht
-auslässt, bei PDFs ihr Text mit einer Marke, wo jede Seite beginnt, dazu die
-nächste freie Kandidatennummer und die Bibliotheksliste mit Übungs- und
-Wissenskarten. Ein zweiter Lauf über denselben Ordner nimmt so nur, was neu
-ist, und zählt weiter. Zurückgestellte Zeilen holt er nur mit
+`vorbereiten --plan` legt vor dem Zerlegungsplan die Planeingabe an: die
+Absprachen, jede Datei, die noch in keiner Zeile der Übersicht steht und die
+`ohne:` nicht auslässt, bei PDFs ihr Text mit einer Marke, wo jede Seite
+beginnt, dazu die nächste freie Kandidatennummer und die Bibliotheksliste mit
+Übungs- und Wissenskarten. Ein zweiter Lauf über denselben Ordner nimmt so nur,
+was neu ist, und zählt weiter. Zurückgestellte Zeilen holt er nur mit
 `--zurueckgestellte`. Den Text liest `pdftotext`, wenn es da ist (ADR-0008).
 
 `vorbereiten` legt unter `kartenentwuerfe/<ordner>/` die Aufträge für die
@@ -1808,9 +1808,9 @@ def zurueckgestellt_teil(geholt: list[Kandidat]) -> list[str]:
 def lege_planeingabe_an(wurzel: Path, ordner: str, zurueckgestellte: bool = False) -> int:
     """Legt die Eingabe für den Zerlegungsplan an.
 
-    Der Agent liest sie in einem Aufruf: jede Datei, die noch in keiner Zeile
-    der Übersicht steht, bei PDFs mit ihrem Text und den Seitenmarken, und
-    die Bibliotheksliste.
+    Der Agent liest sie in einem Aufruf: die Absprachen der `sammelimport.md`
+    unverändert, jede Datei, die noch in keiner Zeile der Übersicht steht,
+    bei PDFs mit ihrem Text und den Seitenmarken, und die Bibliotheksliste.
     Der Quellenordner steht einmal absolut im Kopf, denn Fotos und PDFs ohne
     Text öffnet der Agent selbst. Dazu die nächste freie Kandidatennummer, ab
     der er zählt.
@@ -1859,6 +1859,9 @@ def lege_planeingabe_an(wurzel: Path, ordner: str, zurueckgestellte: bool = Fals
     else:
         textlage = ["Je PDF steht sein ganzer Text da."]
 
+    # Die Absprachen sagen auch, wie der Plan zerlegt (#78). Ohne sie fehlt
+    # der Abschnitt.
+    absprachen = sammelimport.absprachen if sammelimport else ""
     teile = [f"# Planeingabe für quellen/{ordner}/", "",
              f"Quellenordner: `{quellordner.as_posix()}/`", "",
              f"Nächste freie Kandidatennummer: {naechste_kandidatennummer(sammelimport)}", "",
@@ -1867,6 +1870,7 @@ def lege_planeingabe_an(wurzel: Path, ordner: str, zurueckgestellte: bool = Fals
              *([f"Dazu {len(aus_geholten)} Dateien aus {len(geholt)} zurückgestellten "
                 f"Zeilen, siehe „Zurückgestellt“."] if geholt else []),
              *textlage, "",
+             *(["## Absprachen", "", absprachen, ""] if absprachen else []),
              *(zurueckgestellt_teil(geholt) if geholt else []),
              "## Dateien", ""]
     for datei in dateien:

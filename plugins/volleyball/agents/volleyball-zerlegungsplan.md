@@ -47,6 +47,9 @@ Die Planeingabe schreibt `sammelimport.py vorbereiten --plan`. Im Kopf stehen:
 
 Darunter diese Abschnitte:
 
+- `## Absprachen`, nur wenn der Trainer welche angelegt hat: seine Regeln für
+  diesen Quellenordner, so wie sie in der `sammelimport.md` stehen. Was sie
+  zur Zerlegung sagen, ist entschieden, siehe „Die Absprachen gelten“.
 - `## Zurückgestellt`, nur wenn der Trainer zurückgestellte Zeilen holt: die
   Zeilen der Übersicht, die ein früherer Lauf oder der Trainer zurückgestellt
   hat, mit Nummer, Dateien, „Was es ist“ und Notiz. Ihre Dateien stehen
@@ -63,6 +66,18 @@ Darunter diese Abschnitte:
   stammt aus diesem Quellenordner.
 
 ## Regeln
+
+### Die Absprachen gelten
+
+Beim Anlegen der Absprachen hat der Trainer auch entschieden, wie der Plan
+zerlegt: was eine Folge ist und was einzelne Übungen, welche Seiten
+zurückgestellt werden, wie ein Heft aufgeteilt wird. Was dort steht, ist
+entschieden und geht den Regeln unten vor. Dazu stellst du keine Rückfrage.
+Sagen die Absprachen nichts, gelten die Regeln unten. Was sie zum Zurückstellen
+sagen, gilt nicht für die Zeilen, die der Trainer gerade holt, siehe
+„Zurückgestellte Zeilen“.
+
+### Die Zerlegung
 
 - Aus einem Kandidaten mit `uebung`, `folge` oder `wissen` wird eine Karte.
   Was zu ihr gehört, steht in seiner Zeile, auch über Dateien hinweg. Läuft
@@ -109,8 +124,9 @@ Darunter diese Abschnitte:
   Interview ohne Trainingsbezug, Werbung, eine Vorlage, eine leere Seite, ein
   kompletter Trainingsabend. Mit Grund in der Notiz.
 - Verweist eine Stelle auf einer Seite nur auf eine Übung an anderer Stelle,
-  bekommt sie keine eigene Karte. Die Notiz der Zeile, in der die Seite steht,
-  sagt, wohin sie verweist.
+  bekommt sie keine eigene Karte. „Was es ist“ der Zeile, in der die Seite
+  steht, sagt, wohin sie verweist. Ist es eine Zeile mit `übersprungen`, sagt
+  es ihre Notiz, als Grund.
 - **Jede Datei bekommt eine Zeile.** Eine Datei, die in keiner anderen Zeile
   steht, bekommt eine eigene mit `übersprungen` und Grund, etwa eine Datei, die
   nur verweist, eine `.md` oder ein Dokument ohne Übung und ohne Wissen. Sonst
@@ -122,6 +138,8 @@ Steht in der Planeingabe `## Zurückgestellt`, holt der Trainer diese Zeilen.
 
 - Plane ihre Dateien nach denselben Regeln wie neue. Die Notiz sagt, warum
   die Zeile lag. „Theorie“ von früher ist heute meist `wissen`.
+- Sagen die Absprachen, dass der Plan diese Seiten zurückstellt, gilt das für
+  sie nicht mehr. Der Trainer holt sie, damit sie jetzt Karte werden.
 - Die erste Zeile, die du aus einer zurückgestellten machst, trägt deren
   Nummer. Weitere Zeilen daraus bekommen neue Nummern ab der nächsten freien.
 - Gibt es für sie weiter keine Sorte, steht sie mit ihrer Nummer wieder als
@@ -151,8 +169,8 @@ Steht in der Planeingabe `## Zurückgestellt`, holt der Trainer diese Zeilen.
 ### Rückfragen
 
 - Ist unklar, ob Übung oder Folge, ob Übung oder Wissenskarte, oder ob zwei
-  Dateien dieselbe Übung sind, steht die Frage in der Notiz. In Ergebnis
-  steht, was du für wahrscheinlicher hältst.
+  Dateien dieselbe Übung sind, und sagen die Absprachen nichts dazu, steht die
+  Frage in der Notiz. In Ergebnis steht, was du für wahrscheinlicher hältst.
 - Jede Rückfrage beginnt mit `Rückfrage:` und stellt genau eine Frage. Hat eine
   Zeile zwei, beginnt jede mit `Rückfrage:`.
 
@@ -192,6 +210,7 @@ kommen seine Zeilen genau so dorthin.
 | 19 | `volley-meets-school.pdf` S. 1–2 | Titel und Inhaltsverzeichnis | übersprungen | übersprungen | | Inhaltsverzeichnis |
 | 20 | `volley-meets-school.pdf` S. 3 | Ballgewöhnung mit dem Luftballon | uebung | offen | | |
 | 21 | `volley-meets-school.pdf` S. 4–5 | Prellen und Fangen im Kreis | uebung | offen | | |
+| 22 | `volley-meets-school.pdf` S. 6 | Prellen und Fangen in der Gasse, der Aufbau steht bei Kandidat 21 auf S. 4 | uebung | offen | | |
 ```
 
 - **Kandidat:** fortlaufend ab der nächsten freien Kandidatennummer. Jede
@@ -205,16 +224,20 @@ kommen seine Zeilen genau so dorthin.
   `S. 3` für eine Seite.
 - **Was es ist:** worum es geht, in wenigen Wörtern. Bei Magazinseiten dazu
   Beitrag und Seiten. Bei `wissen` die Frage und am Ende, falls es sie gibt,
-  `Übungen: …`. Der Agent, der den Entwurf schreibt, liest diesen Text in
-  seinem Auftrag.
+  `Übungen: …`. Der Agent, der den Entwurf schreibt, liest von der Zeile nur
+  diesen Text, in seinem Auftrag. Bei `uebung`, `folge` und `wissen` steht
+  deshalb hier, was er sonst noch wissen muss: wohin ein Verweis zeigt, oder
+  dass er die Seite selbst lesen soll, weil ihr Text mehrfach überlagert ist.
 - **Ergebnis:** `uebung`, `folge`, `wissen`, `zurückgestellt` oder
   `übersprungen`. Bei `importiert` steht hier, was die Datei ist, `uebung`,
   `folge` oder `wissen`.
 - **Status:** `offen` bei `uebung`, `folge` und `wissen`, `importiert` bei
   einer Karte, die es schon gibt. Sonst derselbe Wert wie Ergebnis.
 - **Karte:** die ID bei `importiert`, sonst leer.
-- **Notiz:** der Grund bei `zurückgestellt` und `übersprungen`, wohin ein
-  Verweis zeigt, und die Rückfragen.
+- **Notiz:** bei `uebung`, `folge` und `wissen` nur die Rückfragen, bei
+  `zurückgestellt` und `übersprungen` der Grund. Die Notiz einer offenen Zeile
+  schreibt `sammelimport.py` später neu. Den Agenten für den Entwurf erreicht
+  sie nie.
 
 Ein Kandidat steht auf einer einzigen Textzeile, ohne Umbruch in einer Zelle
 und ohne `|` in einem Text.

@@ -69,7 +69,7 @@ Meldung ab. Dann ist Schritt 2 noch nicht durch.
 ## Die Absprachen anlegen
 
 Die Absprachen sind die Regeln, die für jede Karte aus diesem Quellenordner
-gelten. Sie gehen unverändert in jeden Auftrag.
+gelten. Sie gehen unverändert in die Planeingabe und in jeden Auftrag.
 
 Erst selbst hinsehen: den Ordner auflisten und zwei, drei Dateien öffnen, aus
 verschiedenen Unterordnern. Liegt im Ordner schon eine Notiz mit Absprachen,
