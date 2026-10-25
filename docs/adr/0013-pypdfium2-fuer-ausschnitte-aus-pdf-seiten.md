@@ -54,3 +54,38 @@ die eins haben sollten, wie bei Pillow in #29.
 
 Tests, die `pypdfium2` brauchen, werden übersprungen, wo es fehlt.
 `DATENMODELL.md` nennt künftig drei Ausnahmen.
+
+## Nachtrag nach der Abnahme, 25.10.2026
+
+Gemessen bei der Abnahme des Ausschnitts (#65) im echten Arbeitsordner, mit
+einem Sammelimport über `jugendtrainerlehrgang/04_So_Vo`: „Kleine Spiele“ mit
+26 Seiten und die „Spielreihe“ mit 9 Seiten, 15 Kandidaten mit Seitenbereich.
+
+- **Seiten als Bild für den Agenten (3.2.1):** Was oben für das Skript steht,
+  gilt auch für den Agenten. Sein Werkzeug zeichnet eine PDF-Seite mit
+  `pdftoppm`, und das fehlt unter Windows. Die ersten vier Agenten meldeten
+  deshalb „kein Entwurf“. Poppler mit dem Plugin einzurichten geht nicht, ein
+  Plugin kann keine Programme installieren. Seit 3.2.1 legt `vorbereiten` bei
+  `quellgrafik: ausschnitt` jede Seite eines PDF des Kandidaten als Bild neben
+  den Auftrag, mit `pypdfium2` über dieselbe Funktion wie `ausschnitt.py`, 2000
+  Pixel an der langen Kante. Der Agent misst seine Prozente an genau dem Bild,
+  aus dem `pruefen` schneidet.
+- **Getroffen:** Die 15 Entwürfe nennen 26 Ausschnitte, neun davon für die
+  Folge Stationentraining. Alle 26 zeigen die richtige Zeichnung auf der
+  richtigen Seite. 20 hat der Trainer behalten, wie sie waren, 6 mit je einem
+  Satz korrigiert, gestrichen keinen. Bei allen sechs lag Text 1 bis 2
+  Prozentpunkte neben der Zeichnung im Rahmen. Fünfmal ist ein Rand um einen
+  Punkt gewandert, einmal sind es zwei Ränder. „Etwas“, im Skill etwa fünf
+  Punkte, hätte dort die Zeichnung angeschnitten. Die Zahlen sind am Seitenbild
+  nachgemessen.
+- **Seitenzahlen:** Die gedruckten Seitenzahlen in „Kleine Spiele“ weichen ab,
+  auf der siebten Seite steht etwa 20, auf der achten 30. Jeder Ausschnitt
+  nennt die Seite der Datei, wie der Auftrag es verlangt.
+- **Zeit:** `vorbereiten` brauchte für 15 Aufträge mit 33 Seitenbildern 8,5 s,
+  17 der Bilder gehören zu einem Kandidaten. `pruefen` schnitt die 26
+  Ausschnitte in 13,5 s, obwohl jeder Schnitt das PDF neu liest. Das PDF
+  zwischenzuspeichern lohnt sich bei dieser Größe nicht.
+- **Der alte Schlüssel:** `vorbereiten` über `playdrill` mit
+  `quellgrafik_ausschneiden: true` lief in einer Kopie des Arbeitsordners ohne
+  Fehler. Es schrieb 30 Aufträge in 13,5 s, mit eingebetteten Quellgrafiken wie
+  bisher und ohne Seitenbilder.

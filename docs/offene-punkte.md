@@ -33,7 +33,11 @@ zwei Punkte aus der Abnahme stehen unter „Bewusst nicht gebaut", und der
 Abschnitt zur Welle zur Leseansicht ist weggefallen. Beim Bau der Welle zur
 Wissenskarte am 14. und 19.10.2026 kamen Punkte aus #62 bis #64, #66 bis #73
 und dem Code-Review dazu. Was davon die Abnahme prüfen soll, steht als
-Kommentar in #65 und #74, der Rest hier mit Ziel.
+Kommentar in #65 und #74, der Rest hier mit Ziel. Mit der Abnahme des
+Ausschnitts (#65) am 25.10.2026 ist der Riegel gefallen: Ein Sammelimport über
+PDFs, die nicht wie PlayDrill aufgebaut sind, läuft mit `quellgrafik:
+ausschnitt`. Von dem, was bei dieser Abnahme liegen blieb, stehen zwei Punkte
+in #78, zwei als Kommentar in #74 und zwei unter „Bewusst nicht gebaut“.
 
 ### DVV Plan 1 als Übungsfolge mit ID
 
@@ -454,6 +458,26 @@ deren Seitenbereich es nicht prüfen konnte. Beide Werkzeuge sind freiwillig
 Ziel: bewusst nicht. Auslöser: Ein Agent sucht trotz dieser Meldung Seiten,
 die es nicht gibt.
 
+### Seiten lesen ohne Seitenbilder
+
+Aus der Abnahme #65. Seiten als Bild legt `vorbereiten` nur bei `quellgrafik:
+ausschnitt` neben den Auftrag. Hat ein PDF bei `eingebettet` oder `keine`
+keinen Text oder einen Seitenbereich, sagt der Auftrag, der Agent lese das PDF
+selbst, nur diese Seiten. Seitenweise zeichnet sein Werkzeug ein PDF aber mit
+`pdftoppm`, und das fehlt unter Windows (ADR-0013, Nachtrag vom 25.10.2026).
+
+Ziel: bewusst nicht. Auslöser: Ein Quellenordner mit `eingebettet` oder
+`keine` braucht Seitenbereiche oder hat PDFs ohne Text.
+
+### Die Seiten eines Seitenbereichs an drei Stellen
+
+Aus dem Code-Review von 3.2.1. `sammelimport.py` zählt die Seiten eines
+Seitenbereichs an drei Stellen mit `range(….erste, ….letzte + 1)` aus. Die
+Dataclass `Seitenbilder` steht bei ihrer Funktion, nicht oben bei den anderen.
+
+Ziel: bewusst nicht. Auslöser: Diese Stellen in `sammelimport.py` werden
+wieder angefasst.
+
 ### Die Datei einer zurückgestellten Zeile fehlt
 
 Aus #69. `vorbereiten --plan --zurueckgestellte` nennt die Dateien jeder
@@ -545,7 +569,8 @@ Rückfragen gebündelt, erledigt am 05.10.2026 mit 3.0.2.
 
 1. Die Welle zur Wissenskarte (#61): zuerst der Ausschnitt mit #62 bis #65,
    dann #66 bis #74. Gebaut am 14. und 19.10.2026, ausgeliefert mit 3.2.0.
-   Offen sind die Abnahmen #65 und #74.
+   Der Ausschnitt ist am 25.10.2026 mit 3.2.1 abgenommen (#65). Offen sind
+   #78 aus dieser Abnahme und danach die Abnahme #74.
 
 ### Welle zur Wissenskarte
 
@@ -553,8 +578,7 @@ Bisher „der zweite Ast von Welle 1b". Die Wissenskarte als eigene Kartensorte
 (ADR-0002 mit Nachtrag), dazu der Ausschnitt als Quellgrafik für beide Sorten
 (ADR-0013). Beschlossen im Interview am 04.10.2026. Kommt nach der Welle zur
 Leseansicht, auch der Ausschnitt (#62 bis #65), entschieden am 05.10.2026 nach
-der Abnahme von 1d. Bis dahin läuft kein Sammelimport über PDFs, die nicht wie
-PlayDrill aufgebaut sind. Tickets mit WK/ vorn.
+der Abnahme von 1d. Tickets mit WK/ vorn.
 
 - **Begriffe** stehen im Glossar: Wissenskarte, Ausschnitt, „Karte oder
   Übungskarte?", „Wissenskarte oder Prinzip?". „Karte" meint beide Sorten,
@@ -638,7 +662,8 @@ PlayDrill aufgebaut sind. Tickets mit WK/ vorn.
   - Version installiert. In der `glossary.md` des Arbeitsordners sind die
     neuen Begriffe von Hand nachgezogen.
   - Ein Sammelimport über `jugendtrainerlehrgang/04_So_Vo` ergibt
-    Übungskarten mit Ausschnitten aus PDF-Seiten.
+    Übungskarten mit Ausschnitten aus PDF-Seiten. Erledigt am 25.10.2026
+    (#65), 15 Karten.
   - Der erste Sammelimport über `vm_08_2026`: `ue-000030` bis `ue-000034`
     stehen als importiert, „Einarmig gehts auch, Teil 1" wird eine
     Wissenskarte mit Ausschnitt aus dem Foto.
