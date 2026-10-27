@@ -38,6 +38,10 @@ Ausschnitts (#65) am 25.10.2026 ist der Riegel gefallen: Ein Sammelimport über
 PDFs, die nicht wie PlayDrill aufgebaut sind, läuft mit `quellgrafik:
 ausschnitt`. Von dem, was bei dieser Abnahme liegen blieb, stehen zwei Punkte
 in #78, zwei als Kommentar in #74 und zwei unter „Bewusst nicht gebaut“.
+Bei der Abnahme der Wissenskarte (#74) vom 25. bis 27.10.2026 ist die Liste
+durchgesehen worden. Eingetreten ist nur der Auslöser bei „Lange Titel aus dem
+Kartenentwurf“, für Wissenskarten, das nimmt #79 auf. Aus der Abnahme kamen
+#79, ein Punkt für Welle 2 und zwei unter „Bewusst nicht gebaut“.
 
 ### DVV Plan 1 als Übungsfolge mit ID
 
@@ -66,6 +70,16 @@ Spalte „Hintergrund" und bei `suche.py --json` unter `hintergrund`. Die lange
 Ausgabe mit `--lang` nennt es nicht.
 
 Ziel: Welle 2, mit der Suche nach Wissenskarten.
+
+### `index.md` für beide Kartensorten
+
+Aus #74. Die Spalte „Hintergrund“ bei den Übungen nennt nur die IDs der
+Wissenskarten, etwa `wi-000004, wi-000006, wi-000009`. Worum es geht, muss man
+nachschlagen. Und die Datei heißt weiter „# Übungsindex“, obwohl unten 27
+Wissenskarten nach Thema stehen. Abhilfe wäre die Frage als Link in der Spalte
+und ein Titel, der beide Sorten meint.
+
+Ziel: Welle 2, mit dem Zugriff auf Wissenskarten.
 
 ## Bewusst nicht gebaut
 
@@ -356,6 +370,10 @@ damit bis zu 95 Zeichen lang. Die Karten von Hand haben kurze Titel. Der
 Trainer hat alle 30 so freigegeben. Abhilfe wäre eine Längengrenze im
 Agenten oder ein gekürzter Name beim Übernehmen.
 
+Bei der Abnahme der Wissenskarte (#74) hat der Trainer 9 von 30 Titeln von
+Wissenskarten gekürzt, 7 davon waren zwei Fragen in einer. Das nimmt #79 auf.
+Für Übungskarten gilt der Punkt weiter.
+
 Ziel: bewusst nicht. Auslöser: Der Trainer kürzt Titel bei der Freigabe
 regelmäßig, oder ein Pfad wird für Windows oder Nextcloud zu lang.
 
@@ -554,6 +572,30 @@ hieße, das Skript umzubauen.
 
 Ziel: bewusst nicht. Auslöser: Eine dritte Kartensorte kommt dazu.
 
+### Ein Quellenordner mit eigenen Quellenordnern darunter
+
+Aus #74. `vorbereiten` nimmt jede Datei des Quellenordners samt Unterordnern.
+Liegt darunter ein Ordner mit eigener `sammelimport.md`, etwa `03_Sa_Na` unter
+`jugendtrainerlehrgang`, gelten dessen Dateien im oberen Ordner als neu, obwohl
+sie schon in seiner Übersicht stehen. Bei der Abnahme ist die PDF der
+Technik-Guidelines deshalb aus `jugendtrainerlehrgang` in einen eigenen Ordner
+`swissvolley` gewandert. Abhilfe wäre, dass `vorbereiten` Unterordner mit
+eigener `sammelimport.md` überspringt.
+
+Ziel: bewusst nicht. Auslöser: Ein Ordner, unter dem schon Quellenordner
+liegen, soll selbst als Ganzes importiert werden.
+
+### Office-Dateien im Quellenordner
+
+Aus #74. Ein Word-Dokument, eine Präsentation oder eine Tabelle liest weder
+`pdftotext` noch das Werkzeug der Agenten. In `03_Sa_Na` steht deshalb die
+Datei `03-2 … nach Weineck.doc` unter `ohne`. Wer so eine Datei braucht,
+speichert sie als PDF in denselben Ordner und nimmt sie aus `ohne`, dann holt
+der nächste Plan sie.
+
+Ziel: bewusst nicht. Auslöser: Eine Datei soll Karte werden, die sich nicht
+als PDF speichern lässt.
+
 ## Was als Nächstes ansteht
 
 Die Reihenfolge stammt aus #10 und ist dort begründet. Der Sammelimport kam am
@@ -569,8 +611,9 @@ Rückfragen gebündelt, erledigt am 05.10.2026 mit 3.0.2.
 
 1. Die Welle zur Wissenskarte (#61): zuerst der Ausschnitt mit #62 bis #65,
    dann #66 bis #74. Gebaut am 14. und 19.10.2026, ausgeliefert mit 3.2.0.
-   Der Ausschnitt ist am 25.10.2026 mit 3.2.1 abgenommen (#65). Offen sind
-   #78 aus dieser Abnahme und danach die Abnahme #74.
+   Der Ausschnitt ist am 25.10.2026 mit 3.2.1 abgenommen (#65), #78 aus
+   dieser Abnahme kam am selben Tag mit 3.2.2. Die Abnahme #74 lief vom 25.
+   bis 27.10.2026. Offen ist #79 aus ihr.
 
 ### Welle zur Wissenskarte
 
@@ -680,6 +723,8 @@ der Abnahme von 1d. Tickets mit WK/ vorn.
   - Der Linter meldet nichts, `index.md` listet die Wissenskarten,
     `suche.py --wissen` findet sie.
   - Die Tokens je Entwurf einer Wissenskarte stehen als Nachtrag in ADR-0009.
+  - Erledigt vom 25. bis 27.10.2026 (#74), mit 3.2.2: 27 Wissenskarten,
+    dazu vier ergänzte. Die Nachträge stehen in ADR-0009 und ADR-0013.
 - **Version:** ein kleiner Sprung, kein Arbeitsordner bricht.
 
 ### Welle 2

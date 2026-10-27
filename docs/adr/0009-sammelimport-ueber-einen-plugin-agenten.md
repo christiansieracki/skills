@@ -118,3 +118,31 @@ beiden Plugin-Agenten auf Sonnet 5.5.
   dafür eine und zwei mit Vermutung. Unter „Was die Quelle nicht sagt“ standen
   in den Absprachen „Gewechselt wird nach Ansage“ und kein Rückweg der Bälle,
   und der zweite Entwurf hat die erste Antwort übernommen.
+
+## Nachtrag nach der Abnahme der Wissenskarte, 27.10.2026
+
+Gemessen bei der Abnahme der Wissenskarte (#74) vom 25. bis 27.10.2026 im
+echten Arbeitsordner, mit 3.2.2 und den Plugin-Agenten auf Sonnet. Dazu kam
+der dritte Agent, `volleyball-wissenskarte`.
+
+- **Entwurf einer Wissenskarte:** im Median 37 026 Tokens je Entwurf, über 30
+  Entwürfe zwischen 27 978 und 73 927, zusammen 1,25 Millionen. Das ist rund
+  ein Drittel weniger als ein Kartenentwurf in #37 mit 55 840. Ein Entwurf
+  dauerte 50 Sekunden bis 4 Minuten, in Runden zu vier.
+- **Bilder kosten mit:** Die 13 Entwürfe mit 1 bis 13 Ausschnitten brauchten im
+  Median 44 207 Tokens, die 17 ohne 34 462. Am teuersten waren der Aufschlag aus
+  den Swiss-Volley-Guidelines, 4 Seiten mit 13 Ausschnitten (71 917), und die
+  koordinativen Fähigkeiten, 10 Folien ohne Bild (73 927).
+- **Je Quellenordner, im Median:** `vm_08_2026`, 6 Entwürfe aus Fotos, 42 738.
+  `vm_09_2026` beim Nachholen, 6 aus Fotos, 41 813. `03_Sa_Na`, 8 aus Folien,
+  32 502. `swissvolley`, 7 aus PDF-Seiten mit Seitenbereich, 41 939. `04_So_Vo`
+  beim Nachholen, 3, 35 515.
+- **Zerlegungsplan:** über 15 Fotos von `vm_08_2026` 106 476 Tokens, beim
+  Nachholen über 11 Fotos von `vm_09_2026` 109 701, über 4 PDFs mit 22 Seiten in
+  `03_Sa_Na` 41 923, beim Nachholen über zwei Seiten in `04_So_Vo` 43 368. Die
+  Technik-Guidelines mit 48 Seiten und 131 KB Planeingabe kosteten 125 773
+  Tokens, 8 Werkzeugaufrufe und knapp 5 Minuten, für 25 Kandidaten mit
+  Seitenbereich.
+- **Rückfragen:** Die 30 Entwürfe hatten zusammen 2 Rückfragen ohne Vermutung
+  und 22 mit. Von den Ableitungen unter „Was das fürs Training heißt“ hat der
+  Trainer eine gekippt, die übrigen bestätigt.
