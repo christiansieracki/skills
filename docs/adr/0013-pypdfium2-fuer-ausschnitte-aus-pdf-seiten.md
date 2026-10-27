@@ -92,30 +92,30 @@ einem Sammelimport über `jugendtrainerlehrgang/04_So_Vo`: „Kleine Spiele“ m
 
 ## Nachtrag nach der Abnahme der Wissenskarte, 27.10.2026
 
-Bei der Abnahme der Wissenskarte (#74) entstanden 45 Ausschnitte für
-Wissenskarten: 9 aus Fotos von Magazinseiten in `vm_08_2026` und `vm_09_2026`,
-36 aus PDF-Seiten, den Folien in `03_Sa_Na`, den Swiss-Volley-Guidelines und
-der Spielreihe in `04_So_Vo`.
+Bei der Abnahme der Wissenskarte (#74) entstanden im echten Arbeitsordner, mit
+3.2.2, 45 Ausschnitte für Wissenskarten: 9 aus Fotos von Magazinseiten in
+`vm_08_2026` und `vm_09_2026`, 36 aus PDF-Seiten, den Folien in `03_Sa_Na`,
+den Technik-Guidelines von Swiss Volley und der Spielreihe in `04_So_Vo`.
 
 - **Getroffen:** Alle 45 zeigen das richtige Bild auf der richtigen Seite,
   gestrichen hat der Trainer keinen. 35 hat er behalten, 10 mit je einem Satz
   korrigiert. Wieder lag etwas 0,5 bis 2 Punkte neben dem Bild im Rahmen: eine
   Textzeile, die Rubrik und der Schriftzug über einem Titelfoto, viermal das
-  Logo der Fußzeile. In den Tabellen der Swiss-Volley-Guidelines kam das nicht
+  Logo der Fußzeile. In den Tabellen der Technik-Guidelines kam das nicht
   vor, 0 von 27, dort trennt die Tabellenlinie das Foto vom Text. Daraus ist
   #79 geworden, eine Regel für den Rand in beiden Agenten.
 - **Ganze Prozent:** Dreimal lag die gemessene Kante auf einem halben Punkt.
   Gerundet traf die Korrektur trotzdem, im schlechtesten Fall fiel ein Punkt
   vom Rand des Fotos weg.
 - **EXIF-Drehung:** Die Fotos aus `vm_08_2026` lagen mit 4000 × 3000 Pixeln und
-  Orientierung 6 vor. Eine kleine Kopie mit Orientierung 6 zeigt das
-  Lesewerkzeug aufrecht, und `ausschnitt.py` dreht vor dem Schneiden nach EXIF.
+  Orientierung 6 vor. Das Lesewerkzeug zeigt eine kleine Kopie mit Orientierung
+  6 aufrecht, und `ausschnitt.py` dreht vor dem Schneiden nach EXIF.
   Die Prozente des Agenten und der Schnitt beziehen sich also auf dieselbe
   aufrechte Seite. Im Durchlauf selbst waren die Fotos vorher mit
   `bilder_aufbereiten.py` geradegedreht, weil jedes über 2 MB wog.
 - **Bilder beim Ergänzen:** Ergänzt ein Kandidat eine Wissenskarte, legt
-  `uebernehmen` seine Ausschnitte mit der nächsten freien Nummer der Karte nach
-  `schaubilder/`, bei `wi-000014` etwa `-4` bis `-9`, und nennt jeden neuen
+  `uebernehmen` seine Quellgrafiken mit der nächsten freien Nummer der Karte
+  nach `schaubilder/`, bei `wi-000014` etwa `-4` bis `-9`, und nennt jeden neuen
   Namen.
-- **Zeit:** `pruefen` schnitt die 27 Ausschnitte aus den Swiss-Volley-Seiten in
+- **Zeit:** `pruefen` schnitt die 27 Ausschnitte aus den Technik-Guidelines in
   5,9 s.

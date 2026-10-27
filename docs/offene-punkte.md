@@ -39,9 +39,11 @@ PDFs, die nicht wie PlayDrill aufgebaut sind, läuft mit `quellgrafik:
 ausschnitt`. Von dem, was bei dieser Abnahme liegen blieb, stehen zwei Punkte
 in #78, zwei als Kommentar in #74 und zwei unter „Bewusst nicht gebaut“.
 Bei der Abnahme der Wissenskarte (#74) vom 25. bis 27.10.2026 ist die Liste
-durchgesehen worden. Eingetreten ist nur der Auslöser bei „Lange Titel aus dem
-Kartenentwurf“, für Wissenskarten, das nimmt #79 auf. Aus der Abnahme kamen
-#79, ein Punkt für Welle 2 und zwei unter „Bewusst nicht gebaut“.
+durchgesehen worden. Eingetreten ist nur der Auslöser bei den langen Titeln,
+und zwar bei Wissenskarten. Das nimmt #79 auf, der Punkt gilt jetzt nur noch
+für Übungskarten. Aus der Abnahme kamen #79, ein Punkt für Welle 2 und zwei
+unter „Bewusst nicht gebaut“. Drei Auslöser nannten die Abnahme selbst und
+nennen jetzt einen Sammelimport.
 
 ### DVV Plan 1 als Übungsfolge mit ID
 
@@ -361,7 +363,7 @@ Code, und ohne echtes Beach-Team gibt es nichts anzulegen. Steht so seit #10.
 
 Ziel: bewusst nicht. Auslöser: Es gibt ein echtes Beach-Team.
 
-### Lange Titel aus dem Kartenentwurf
+### Lange Titel von Übungskarten
 
 Die Titel der 30 Karten aus dem ersten Durchgang über PlayDrill beschreiben
 ganze Abläufe, etwa „Dankeball auf der Abwehrposition hoch in die Feldmitte
@@ -371,11 +373,12 @@ Trainer hat alle 30 so freigegeben. Abhilfe wäre eine Längengrenze im
 Agenten oder ein gekürzter Name beim Übernehmen.
 
 Bei der Abnahme der Wissenskarte (#74) hat der Trainer 9 von 30 Titeln von
-Wissenskarten gekürzt, 7 davon waren zwei Fragen in einer. Das nimmt #79 auf.
-Für Übungskarten gilt der Punkt weiter.
+Wissenskarten gekürzt, 7 davon waren zwei Fragen in einer, 2 eine lange
+Frage. Das nimmt #79 auf. Für Übungskarten gilt der Punkt weiter.
 
-Ziel: bewusst nicht. Auslöser: Der Trainer kürzt Titel bei der Freigabe
-regelmäßig, oder ein Pfad wird für Windows oder Nextcloud zu lang.
+Ziel: bewusst nicht. Auslöser: Der Trainer kürzt Titel von Übungskarten bei
+der Freigabe regelmäßig, oder ein Pfad wird für Windows oder Nextcloud zu
+lang.
 
 ### Die Regel „wenig Text" zählt Ziel und Varianten mit
 
@@ -451,8 +454,8 @@ beim nächsten Lauf nicht mehr als neu. Der Agent soll deshalb jede Seite in
 eine Zeile bringen, notfalls als `übersprungen`. Ein Skript prüft das nicht.
 Eine vergessene Seite käme nie wieder in eine Planeingabe.
 
-Ziel: bewusst nicht. Auslöser: Die Abnahme findet eine Seite, die in keiner
-Zeile steht.
+Ziel: bewusst nicht. Auslöser: Bei einem Sammelimport bleibt eine Seite in
+keiner Zeile stehen. Bei der Abnahme (#74) stand jede Seite in einer Zeile.
 
 ### Eingebettete Quellgrafik und Seitenbereich
 
@@ -520,7 +523,8 @@ Aus #72. Ob die Nummern und IDs hinter `Übungen:` stimmen, prüft erst das erst
 Hand berichtigen, denn der Skill schreibt die Übersicht nur bei der Freigabe des
 Plans. Abhilfe wäre, dass schon `vorbereiten --plan` die Angabe prüft.
 
-Ziel: bewusst nicht. Auslöser: Das passiert bei der Abnahme (#74).
+Ziel: bewusst nicht. Auslöser: Das passiert bei einem Sammelimport. Bei der
+Abnahme (#74) stimmte jedes `Übungen:`.
 
 ### Eine Übung aus `Übungen:` streichen
 
@@ -550,8 +554,8 @@ Aus #71. Im Entwurf einer Wissenskarte zählt nur der bloße Name eines
 Ausschnitts, etwa `![…](17.quellgrafik.png)`. Schreibt der Agent
 `./17.quellgrafik.png`, weist `pruefen` den Entwurf ab.
 
-Ziel: bewusst nicht. Auslöser: Der Agent schreibt den Verweis bei der Abnahme
-so.
+Ziel: bewusst nicht. Auslöser: Der Agent schreibt den Verweis bei einem
+Sammelimport so. Bei der Abnahme (#74) hat er es nie getan.
 
 ### Ein TIFF oder HEIC, auf das eine Wissenskarte zeigt
 
@@ -577,7 +581,7 @@ Ziel: bewusst nicht. Auslöser: Eine dritte Kartensorte kommt dazu.
 Aus #74. `vorbereiten` nimmt jede Datei des Quellenordners samt Unterordnern.
 Liegt darunter ein Ordner mit eigener `sammelimport.md`, etwa `03_Sa_Na` unter
 `jugendtrainerlehrgang`, gelten dessen Dateien im oberen Ordner als neu, obwohl
-sie schon in seiner Übersicht stehen. Bei der Abnahme ist die PDF der
+sie schon in seiner Übersicht stehen. Bei der Abnahme ist das PDF der
 Technik-Guidelines deshalb aus `jugendtrainerlehrgang` in einen eigenen Ordner
 `swissvolley` gewandert. Abhilfe wäre, dass `vorbereiten` Unterordner mit
 eigener `sammelimport.md` überspringt.
