@@ -79,11 +79,11 @@ from ausschnitt import (  # noqa: E402
 from bilder_aufbereiten import SCHWELLE, bilder, menschenmass  # noqa: E402
 from bilder_aufbereiten import kandidaten as bilder_zum_aufbereiten  # noqa: E402
 from tpdaten import (  # noqa: E402
-    DISZIPLIN_SPALTE, ID_MUSTER, KARTENFELDER, SORTEN, UEBUNGSKARTE, WISSENSFELDER,
-    WISSENSKARTE, Kartensorte, KeineId, als_liste, biege_bildverweise_um, bildverweise,
-    finde_wurzel, hole_index, interpreter, konsole_vorbereiten, lies_frontmatter, lies_karten,
-    lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen, naechste_id, pruefe_felder,
-    pruefe_wissensfelder, pruefe_wissensrumpf, schaubilder, tabellenzellen,
+    DISZIPLIN_SPALTE, ID_MUSTER, KARTENFELDER, SORTEN, UEBUNGSKARTE, WISSEN_ID_MUSTER,
+    WISSENSFELDER, WISSENSKARTE, Kartensorte, KeineId, als_liste, biege_bildverweise_um,
+    bildverweise, finde_wurzel, hole_index, interpreter, konsole_vorbereiten, lies_frontmatter,
+    lies_karten, lies_schwerpunkt_zeilen, lies_schwerpunkte, lies_uebungen, naechste_id,
+    pruefe_felder, pruefe_wissensfelder, pruefe_wissensrumpf, schaubilder, tabellenzellen,
     trainer_dieses_rechners,
 )
 
@@ -141,6 +141,12 @@ MIT_KARTE = {"importiert", "ergänzt"}
 # (#69): Kandidatennummern für Übungen dieses Plans, IDs für Übungen, die schon
 # Karte sind.
 UEBUNGEN_MARKE = "Übungen:"
+
+# Hat der Trainer bei der Freigabe des Plans ein Duplikat oder eine Fortsetzung
+# bestätigt, steht in „Was es ist“ `ergänzt ue-######` oder `ergänzt
+# wi-######`. Der Kandidat ergänzt diese Karte, statt eine eigene zu werden.
+# Von Hand steht das Wort auch groß am Satzanfang, die ID auch in Backticks.
+_ERGAENZT = re.compile(rf"\b(?i:ergänzt)\s+`?({ID_MUSTER}|{WISSEN_ID_MUSTER})\b")
 
 
 class Abbruch(Exception):
@@ -2485,6 +2491,21 @@ def uebungen_im_auftrag(sammelimport: Sammelimport, k: Kandidat) -> str:
     return f"- Übungen aus demselben Beitrag: {text}"
 
 
+def ergaenzt_im_auftrag(k: Kandidat) -> list[str]:
+    """Die Zeile im Auftrag, die `ergänzt …` aus „Was es ist“ erklärt, sonst keine (#79).
+
+    Ohne sie hielt der Agent den Satz für unvollständig und fragte, ob die
+    Karte die andere nennen soll. Zusammengeführt wird aber erst bei der
+    Freigabe, vom Skill. Bis dahin ist der Entwurf einer wie jeder andere.
+    """
+    treffer = _ERGAENZT.search(_nfc(k.was))
+    if treffer is None:
+        return []
+    uid = treffer.group(1)
+    return [f"- Ergänzt: {uid}. Bei der Freigabe bringt der Skill deinen Entwurf in diese "
+            f"Karte. Schreib ihn wie eine eigene Karte und nenn {uid} darin nicht."]
+
+
 def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[str],
                      pdftotext: str | None, quellgrafikzeilen: list[str],
                      seitenbilder: dict[Datei, Seitenbilder]) -> Path:
@@ -2500,7 +2521,8 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
     Regel „wenig Text“ zählen könnte. Die Kennungen kommen für beide Sorten
     samt den Steuerungsschwerpunkten. Die stehen auf keiner Übungskarte, auf
     einer Wissenskarte schon. Dafür nennt er die Übungen aus demselben
-    Beitrag, die schon Karte sind (#72).
+    Beitrag, die schon Karte sind (#72). Ergänzt der Kandidat eine Karte,
+    sagt eine Zeile unter „Was es ist“, was das für den Entwurf heißt (#79).
     """
     relativ = [f"{sammelimport.ordner}/{d.name}" for d in k.dateien]
     dateien, texte = dateien_im_auftrag(sammelimport, k, pdftotext, seitenbilder)
@@ -2515,6 +2537,7 @@ def schreibe_auftrag(sammelimport: Sammelimport, k: Kandidat, kennungen: list[st
         f"- Quellenordner: `quellen/{sammelimport.ordner}/`",
         f"- Kandidat: {k.nummer}",
         f"- Was es ist: {k.was}",
+        *ergaenzt_im_auftrag(k),
         f"- Typ laut Zerlegungsplan: `{k.ergebnis}`",
         f"- `quelldatei:` `{', '.join(relativ)}`",
         *ablauf,

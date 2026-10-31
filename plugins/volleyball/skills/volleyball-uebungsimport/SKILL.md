@@ -89,8 +89,8 @@ ergibt beides, eine Übungskarte und eine Wissenskarte.
 ### Der Zuschnitt einer Wissenskarte
 
 Eine Wissenskarte beantwortet genau eine Frage, die sich ein Trainer stellt.
-Die Frage ist ihr Titel und endet auf ein Fragezeichen: „Wann lohnt sich
-einarmige Abwehr?“.
+Die Frage ist ihr Titel, eine kurze Frage, und endet auf ein Fragezeichen:
+„Wann lohnt sich einarmige Abwehr?“.
 
 - Drei kurze Tipps zu Schlaf, Trinken und Aufwärmen sind drei Karten.
 - Ein Heft über alle Techniken wird eine Karte je Technik, ein langes Dokument
@@ -271,8 +271,11 @@ ausgeschnitten wird aus der gezeichneten Seite.
 
 Ein Ausschnitt ist die Datei, bei einem PDF die Seite, und ein Rechteck in
 ganzen Prozent der Seite, wie sie aufrecht steht: links, oben, rechts, unten.
-Das Rechteck fasst das ganze Bild samt Beschriftung, mit etwas Rand. Lieber
-zwei Prozent zu viel als eine Ecke abgeschnitten.
+Das Rechteck fasst das ganze Bild samt seiner Beschriftung, mit etwas Rand.
+Lieber zwei Prozent zu viel als eine Ecke abgeschnitten. Text der Seite, eine
+Fußzeile oder ein Logo über, unter oder neben dem Bild gehört nicht dazu.
+Liegt so etwas näher als zwei Prozent am Bild, endet der Rand davor, auch wenn
+dann weniger Rand bleibt. Miss diese Kante am Bild der Seite nach.
 
 Für jeden Ausschnitt der freigegebenen Kandidaten eine Runde:
 

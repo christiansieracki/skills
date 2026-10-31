@@ -15,8 +15,15 @@ fragen würdest, schreibst du als Rückfrage in den Entwurf.
 
 **Eine Frage je Karte.** Die Karte beantwortet genau eine Frage, die sich ein
 Trainer stellt, und diese Frage ist ihr Titel, mit Fragezeichen. Welche, sagt
-„Was es ist“ im Auftrag. Die Prüffrage dahinter: Es ist keine Übung, aber es
-lässt sich sagen, was es fürs Training heißt, ohne etwas zu erfinden.
+„Was es ist“ im Auftrag. Der Titel ist eine kurze Frage, etwa „Wann lohnt sich
+einarmige Abwehr?“. Steht in „Was es ist“ eine Doppelfrage, also zwei Fragen
+in einer wie „Was heißt Umschalten, und wie bereitet das Aufwärmen darauf
+vor?“, oder eine lange Frage, die mehreres aufzählt oder ein „damit …“
+anhängt, nimmst du die Frage, die deine Kernaussagen tragen. Du kürzt sie und
+nennst das als Vorschlag. Der Rest ist keine zweite Frage für eine eigene
+Karte. Was die Quelle dazu sagt, bleibt in den Kernaussagen. Die Prüffrage
+dahinter: Es ist keine Übung, aber es lässt sich sagen, was es fürs Training
+heißt, ohne etwas zu erfinden.
 
 **In eigenen Worten, kein Volltext.** Die Quelle ist fremdes Material, oft aus
 einem Magazin. Unter „Kernaussagen“ steht knapp, was sie sagt, so wie ein
@@ -61,9 +68,13 @@ Den Auftrag schreibt `sammelimport.py vorbereiten`. Oben steht eine Liste:
 
 - **Quellenordner:** woher die Quelle stammt, unter `quellen/`.
 - **Kandidat:** die Nummer. Mit ihr beginnt deine Antwort.
-- **Was es ist:** wie der Zerlegungsplan den Kandidaten beschreibt, mit der
-  Frage der Karte. Am Ende kann `Übungen: …` stehen, die Übungen aus
+- **Was es ist:** wie der Zerlegungsplan den Kandidaten beschreibt: vorn die
+  Frage der Karte, dahinter in wenigen Wörtern, was der Beitrag sonst sagt.
+  Am Ende kann `Übungen: …` stehen, die Übungen aus
   demselben Beitrag. Die Nummern dort sind Kandidaten, keine IDs.
+- **Ergänzt:** nur, wenn in „Was es ist“ `ergänzt wi-######` steht. Dann
+  bringt der Skill deinen Entwurf bei der Freigabe in diese Karte. Du
+  schreibst ihn wie eine eigene Karte und nennst die andere nicht.
 - **Typ laut Zerlegungsplan:** `wissen`.
 - **`quelldatei:`** der Wert für das Feld. Übernimm ihn genau so.
 - **Übungen aus demselben Beitrag:** die Übungen aus `Übungen: …`, die schon
@@ -110,7 +121,8 @@ selbst sagt.
 **Vorschlag:** `thema`, `schwerpunkt`, `disziplin`, und jeder Punkt unter
 „Was das fürs Training heißt“, den du ableitest. Sagt die Quelle einen dieser
 Werte ausdrücklich, etwa „im Sand“, ist er belegt. Den `titel` übernimmst du
-als Frage aus „Was es ist“. Stellst du sie anders, ist das ein Vorschlag.
+als Frage aus „Was es ist“. Stellst du sie anders oder kürzt du sie, ist das
+ein Vorschlag.
 Nennen die Absprachen keinen `autor`, steht dort `null`, mit einem Vorschlag,
 der das sagt.
 
@@ -146,10 +158,14 @@ gibt es keinen Ausschnitt und keinen Bildverweis.
   `![Bildreihe oberes Zuspiel](17.quellgrafik-1.png)`. Jeder Ausschnitt
   steht in einem Bildverweis, und jeder Bildverweis nennt einen Ausschnitt
   aus deiner Liste, sonst nichts.
-- Das Rechteck fasst das ganze Bild samt Beschriftung, mit etwas Rand, aber
-  nicht die halbe Seite. Lieber zwei Prozent zu viel als eine Ecke
+- Das Rechteck fasst das ganze Bild samt seiner Beschriftung, mit etwas
+  Rand, aber nicht die halbe Seite. Lieber zwei Prozent zu viel als eine Ecke
   abgeschnitten. Der Trainer sieht jeden Ausschnitt bei der Freigabe und
   korrigiert ihn.
+- Text der Seite, eine Fußzeile oder ein Logo über, unter oder neben dem Bild
+  gehört nicht dazu. Liegt so etwas näher als zwei Prozent am Bild, endet der
+  Rand davor, auch wenn dann weniger Rand bleibt. Miss diese Kante am Bild der
+  Seite nach.
 - Die Zahlen sind ganze Prozent der Seite, wie sie aufrecht steht: links,
   oben, rechts, unten, jede gemessen von der linken oder der oberen Kante.
   Links ist kleiner als rechts, oben kleiner als unten.
@@ -198,7 +214,7 @@ Er hat das Frontmatter der Wissenskarte, ihre beiden Abschnitte und am Ende
 
 ```markdown
 ---
-titel: "Wann lohnt sich einarmige Abwehr?"   # die Frage, endet auf ?
+titel: "Wann lohnt sich einarmige Abwehr?"   # eine kurze Frage, endet auf ?
 thema: [technik, taktik]
 schwerpunkt: [abwehr]          # nur Kennungen aus dem Auftrag, sonst []
 disziplin: [halle, beach]
@@ -245,8 +261,8 @@ Rückfragen:
   „ und “, nie in gerade Anführungszeichen.
 - Listen stehen in eckigen Klammern auf einer Zeile, auch mit einem Wert:
   `[halle]`. Nie als Zeilen mit `- `.
-- `titel` ist die Frage und endet auf `?`. Der Titel der Quelle steht in
-  `quelle`.
+- `titel` ist eine kurze Frage und endet auf `?`. Der Titel der Quelle steht
+  in `quelle`.
 - `quelle` ist nie leer und folgt dem Format der Absprachen. Sagen sie nichts,
   nenn Heft oder Sammlung, Beitrag, Autor und Seite, soweit die Quelle sie
   nennt. Nennt der Auftrag Seiten eines PDF, stehen sie in `quelle`, etwa
@@ -302,7 +318,8 @@ abgewiesen und neu entworfen.
 
 Geh den Entwurf einmal durch:
 
-- Ist der Titel eine Frage, und beantwortet die Karte genau sie?
+- Ist der Titel eine kurze Frage, nur eine, und beantwortet die Karte genau
+  sie?
 - Steht ein Satz da, der aus der Quelle abgeschrieben ist? Neu formulieren.
 - Steht unter „Was das fürs Training heißt“ etwas, das die Quelle nicht sagt,
   ohne Vorschlag dazu? Vorschlag schreiben oder streichen.
@@ -310,8 +327,9 @@ Geh den Entwurf einmal durch:
 - Stehen nur kontrollierte Werte und Kennungen aus dem Auftrag darin?
 - Ist `quelldatei` genau wie im Auftrag?
 - Trägt `uebungen` genau die IDs aus dem Auftrag, und keine Kandidatennummer?
-- Hat jeder Ausschnitt die feste Form, steht jeder als Bildverweis an seiner
-  Kernaussage, und nennt jeder Bildverweis einen Ausschnitt aus der Liste?
+- Hat jeder Ausschnitt die feste Form, endet er vor Text, Fußzeile oder Logo
+  der Seite, steht jeder als Bildverweis an seiner Kernaussage, und nennt
+  jeder Bildverweis einen Ausschnitt aus der Liste?
 - Beginnt jeder Vorschlag mit einem Feld oder einer Überschrift samt `##` in
   Backticks?
 - Hat jede Rückfrage genau ein Fragezeichen und endet auf ihre Vermutung oder

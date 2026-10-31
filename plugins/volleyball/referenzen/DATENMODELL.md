@@ -177,7 +177,7 @@ Fragezeichen. Frontmatter komplett:
 ```yaml
 ---
 id: wi-000001                    # stabil, ändert sich nie
-titel: "Wann lohnt sich einarmige Abwehr?"   # die Frage, endet auf ?
+titel: "Wann lohnt sich einarmige Abwehr?"   # eine kurze Frage, endet auf ?
 thema: [technik, taktik]         # Liste, Pflicht, aus der Liste unten
 schwerpunkt: [abwehr]            # Liste, freiwillig, auch Steuerungsschwerpunkte
 disziplin: [halle, beach]        # Liste, Pflicht, ohne Default
@@ -389,7 +389,7 @@ stehen zuletzt unter `### Was die Quelle nicht sagt`.
 | 1 | `Ü_Abwehr/Abwehr vom Kasten.pdf` | Abwehr gegen Angriffe vom Kasten | uebung | importiert | ue-000291 | spieler_min auf 6 |
 | 2 | `seite-24.jpg`, `seite-25.jpg` | Übung über zwei Seiten | uebung | offen | | kein Entwurf |
 | 3 | `volley-meets-school.pdf` S. 12–13 | Ballgewöhnung mit dem Luftballon | uebung | offen | | |
-| 4 | `seite-26.jpg`, `seite-27.jpg` | Einarmig gehts auch, Teil 2, S. 26–27: Wann lohnt sich einarmige Abwehr? Übungen: 5, ue-000041 | wissen | offen | | |
+| 4 | `seite-26.jpg`, `seite-27.jpg` | Wann lohnt sich einarmige Abwehr? Einarmig gehts auch, Teil 2, S. 26–27. Übungen: 5, ue-000041 | wissen | offen | | |
 | 5 | `seite-28.jpg` | Einarmige Abwehr vom Kasten, Einarmig gehts auch, Teil 2, S. 28 | uebung | offen | | |
 | 6 | `seite-30.jpg` | Drei Spielzüge über die Mitte | zurückgestellt | zurückgestellt | | Spielzüge, dafür gibt es keine Sorte |
 ```
@@ -427,8 +427,10 @@ stehen zuletzt unter `### Was die Quelle nicht sagt`.
   kommt laut Auftrag aus dem Bild. Den Status `zurückgestellt` kann auch eine
   Zeile mit `uebung`, `folge` oder `wissen` tragen, wenn der Trainer sie bei
   der Freigabe zurückstellt. Ihr Ergebnis bleibt dann.
-- **Was es ist** sagt in wenigen Wörtern, worum es geht. Bei `wissen` endet
-  es mit den Übungen aus demselben Beitrag, in der festen Form
+- **Was es ist** sagt in wenigen Wörtern, worum es geht. Bei `wissen` steht
+  vorn die Frage der Karte, genau eine und kurz. Dahinter steht in wenigen
+  Wörtern, was der Beitrag sonst sagt. Am Ende stehen die Übungen aus
+  demselben Beitrag, in der festen Form
   `Übungen: 13, 14, ue-000041`: Kandidatennummern für Übungen dieses Plans,
   IDs für Übungen, die schon Karte sind. Ohne solche Übungen fehlt der Teil.
   Jede Nummer ist eine Zeile der Übersicht mit `uebung` oder `folge`, jede ID
@@ -586,6 +588,11 @@ Unter „Übungen aus demselben Beitrag“ nennt der Auftrag einer Wissenskarte 
 Karten der genannten Kandidaten, die `importiert` oder `ergänzt` sind. Der
 Agent trägt genau diese in `uebungen` ein. Ein Kandidat, der noch wartet, steht
 nur mit Nummer da, seine ID trägt `uebernehmen` nach.
+
+Steht in „Was es ist“ `ergänzt ue-######` oder `ergänzt wi-######`, erklärt
+der Auftrag das in einer Zeile „Ergänzt“: Bei der Freigabe bringt der Skill den
+Entwurf in diese Karte. Der Agent schreibt ihn wie eine eigene Karte und nennt
+die andere nicht.
 
 Ein Kartenentwurf hat das Frontmatter der Karte ohne `id` (ADR-0010), die
 Abschnitte der Karte und am Ende `## Freigabe` mit beiden Listen, davor, wenn

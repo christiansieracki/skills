@@ -286,6 +286,40 @@ class VorbereitenTest(unittest.TestCase):
         self.assertNotIn("Ablauf aus dem Bild", auftrag)
         self.assertIn("Ablauf aus dem Bild", auftrag_von(self.ordner, 1))
 
+    def test_ein_kandidat_der_eine_karte_ergaenzt_bekommt_das_im_auftrag_erklaert(self) -> None:
+        # Bei swissvolley 6 und 7 bekam der Agent `ergänzt wi-000014` ohne
+        # Erklaerung, hielt den Satz fuer unvollstaendig und fragte, ob die
+        # Karte wi-000014 nennen soll (#79). Zusammengefuehrt wird erst bei der
+        # Freigabe, vom Skill. Eine Zeile gleich unter "Was es ist" sagt ihm
+        # das, bei beiden Sorten, auch wenn die Angabe von Hand gross oder in
+        # Backticks steht. Bei einem Kandidaten, der nichts ergaenzt, fehlt
+        # sie, auch bei einer Variante, die eine ID nennt.
+        self.ordner.lege_quellenordner_an(ORDNER, [
+            {"kandidat": 1, "dateien": ["seite-01.jpg"],
+             "was": "Zonenbaggern im Sand, ergänzt ue-000002"},
+            {"kandidat": 2, "dateien": ["seite-02.jpg"], "ergebnis": "wissen",
+             "was": "Wie wird gepritscht? Technikbeschreibung, Teil 2, ergänzt wi-000014 "
+                    "Übungen: 1"},
+            {"kandidat": 3, "dateien": ["seite-03.jpg"], "ergebnis": "wissen",
+             "was": "Wie wird gebaggert? Teil 2. Ergänzt `wi-000015`"},
+            {"kandidat": 4, "dateien": ["seite-04.jpg"],
+             "was": "Zonenbaggern zu dritt, Variante von ue-000002"},
+        ])
+
+        fertig = self.ordner.starte("sammelimport.py", "vorbereiten", ORDNER)
+
+        self.assertEqual(fertig.returncode, 0, fertig.stdout)
+        for nummer, uid in ((1, "ue-000002"), (2, "wi-000014"), (3, "wi-000015")):
+            with self.subTest(nummer):
+                zeilen = auftrag_von(self.ordner, nummer).splitlines()
+                ergaenzt = [i for i, z in enumerate(zeilen) if z.startswith("- Ergänzt:")]
+                self.assertEqual(len(ergaenzt), 1, zeilen)
+                self.assertTrue(zeilen[ergaenzt[0] - 1].startswith("- Was es ist:"), zeilen)
+                self.assertIn(uid, zeilen[ergaenzt[0]])
+                self.assertIn("Freigabe", zeilen[ergaenzt[0]])
+                self.assertIn("eigene Karte", zeilen[ergaenzt[0]])
+        self.assertNotIn("Ergänzt", auftrag_von(self.ordner, 4))
+
     def test_ein_unbekanntes_ergebnis_bricht_ab_und_schreibt_nichts(self) -> None:
         # Vertippt oder erfunden. Mit `wissen` gibt es ein Ergebnis mehr,
         # aber nicht jedes: Gaelte "theorie" als erledigt, bliebe die Theorie

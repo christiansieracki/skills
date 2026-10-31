@@ -51,6 +51,9 @@ Den Auftrag schreibt `sammelimport.py vorbereiten`. Oben steht eine Liste:
 - **Quellenordner:** woher die Quelle stammt, unter `quellen/`.
 - **Kandidat:** die Nummer. Mit ihr beginnt deine Antwort.
 - **Was es ist:** wie der Zerlegungsplan den Kandidaten beschreibt.
+- **Ergänzt:** nur, wenn in „Was es ist“ `ergänzt ue-######` steht. Dann
+  bringt der Skill deinen Entwurf bei der Freigabe in diese Karte. Du
+  schreibst ihn wie eine eigene Karte und nennst die andere nicht.
 - **Typ laut Zerlegungsplan:** `uebung` oder `folge`. Das ist `typ:`.
 - **`quelldatei:`** der Wert für das Feld. Übernimm ihn genau so.
 - **Ablauf aus dem Bild:** `nein`, `ja` oder `entscheidest du`, siehe unten.
@@ -166,10 +169,14 @@ es ist die Seite, aus der geschnitten wird.
 - Kein Bild der Übung sind Kopfleiste, Logo, Werbung, ein Porträt oder ein
   Foto, das die Übung nicht zeigt. Hat die Quelle kein Bild der Übung, gibt es
   keinen Ausschnitt, keine Liste `Ausschnitte:` und `schaubild: null`.
-- Das Rechteck fasst das ganze Bild samt Beschriftung, mit etwas Rand, aber
-  nicht die halbe Seite. Lieber zwei Prozent zu viel als eine Ecke
+- Das Rechteck fasst das ganze Bild samt seiner Beschriftung, mit etwas
+  Rand, aber nicht die halbe Seite. Lieber zwei Prozent zu viel als eine Ecke
   abgeschnitten. Der Trainer sieht jeden Ausschnitt bei der Freigabe und
   korrigiert ihn.
+- Text der Seite, eine Fußzeile oder ein Logo über, unter oder neben dem Bild
+  gehört nicht dazu. Liegt so etwas näher als zwei Prozent am Bild, endet der
+  Rand davor, auch wenn dann weniger Rand bleibt. Miss diese Kante am Bild der
+  Seite nach.
 - Die Zahlen sind ganze Prozent der Seite, wie sie aufrecht steht: links,
   oben, rechts, unten, jede gemessen von der linken oder der oberen Kante.
   Links ist kleiner als rechts, oben kleiner als unten.
@@ -355,7 +362,8 @@ Geh den Entwurf einmal durch:
 - Hat das Frontmatter jedes Feld aus dem Schema, ohne `id` und `angelegt`?
 - Stehen nur kontrollierte Werte und Kennungen aus dem Auftrag darin?
 - Sind `quelldatei` und `schaubild` genau wie im Auftrag?
-- Hat jeder Ausschnitt die feste Form, und nennt `schaubild:` jeden?
+- Hat jeder Ausschnitt die feste Form, endet er vor Text, Fußzeile oder Logo
+  der Seite, und nennt `schaubild:` jeden?
 - Beginnt jeder Vorschlag mit einem Feld oder einer Überschrift samt `##` in
   Backticks?
 - Hat jede Rückfrage genau ein Fragezeichen und endet auf ihre Vermutung oder

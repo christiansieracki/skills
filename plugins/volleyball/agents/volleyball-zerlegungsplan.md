@@ -109,10 +109,14 @@ sagen, gilt nicht für die Zeilen, die der Trainer gerade holt, siehe
   sich aber sagen, was es fürs Training heißt, ohne etwas zu erfinden? Dann
   `wissen`. Das ist Theorie, Hintergrund, eine Technikbeschreibung, Tipps.
 - **Zuschnitt bei `wissen`:** ein Kandidat je Frage, die sich ein Trainer
-  stellt. „Was es ist“ nennt diese Frage. Ein langes Dokument wird ein
-  Kandidat je Kapitel, mit Seitenbereich, ein Heft über alle Techniken also
-  einer je Technik. Drei kurze Tipps zu Schlaf, Trinken und Aufwärmen sind
-  drei Kandidaten.
+  stellt. „Was es ist“ nennt diese Frage vorn, genau eine und kurz. Keine
+  Doppelfrage, also keine zwei Fragen in einer wie „Was heißt Umschalten, und
+  wie bereitet das Aufwärmen darauf vor?“. Keine lange Frage, die mehreres
+  aufzählt oder ein „damit …“ anhängt. Was der Beitrag sonst sagt, steht
+  dahinter in wenigen Wörtern, ohne Fragezeichen. Ein langes Dokument wird
+  ein Kandidat je Kapitel, mit Seitenbereich, ein Heft über alle Techniken
+  also einer je Technik. Drei kurze Tipps zu Schlaf, Trinken und Aufwärmen
+  sind drei Kandidaten.
 - **Übungen aus demselben Beitrag:** Bringt ein Beitrag Theorie und Übungen,
   endet „Was es ist“ der `wissen`-Zeile mit ihnen, in genau dieser Form:
   `Übungen: 13, 14, ue-000041`. Eine Übung dieses Plans steht mit ihrer
@@ -204,7 +208,7 @@ kommen seine Zeilen genau so dorthin.
 | 13 | `zirkel/uebersicht.pdf`, `zirkel/station-1.pdf`, `zirkel/station-2.pdf` | Sprungzirkel mit zwei Stationen | folge | offen | | |
 | 14 | `abwehr/vom-kasten.pdf` | Abwehr gegen Angriffe vom Kasten | uebung | importiert | ue-000022 | |
 | 15 | `abwehr/vom-kasten-2.pdf` | Abwehr gegen Angriffe vom Kasten, mit Zuspiel | uebung | offen | | Rückfrage: Ist das dieselbe Übung wie ue-000022, nur mit Zuspiel? |
-| 16 | `seite-26.jpg` | Beitrag zur Annahme, Seite 26: Warum lohnt sich die Annahme aus dem Knien? Übungen: 12, ue-000022 | wissen | offen | | |
+| 16 | `seite-26.jpg` | Warum lohnt sich die Annahme aus dem Knien? Beitrag zur Annahme, Seite 26, dazu die Fehler beim Abknien. Übungen: 12, ue-000022 | wissen | offen | | |
 | 17 | `seite-27.jpg` | Drei Spielzüge nach der Annahme | zurückgestellt | zurückgestellt | | Spielzüge, dafür gibt es keine Sorte |
 | 18 | `notizen.md` | Notizen zum Heft | übersprungen | übersprungen | | keine Übung, kein Wissen |
 | 19 | `volley-meets-school.pdf` S. 1–2 | Titel und Inhaltsverzeichnis | übersprungen | übersprungen | | Inhaltsverzeichnis |
@@ -223,11 +227,12 @@ kommen seine Zeilen genau so dorthin.
   Backticks der Seitenbereich, `S. 12–15` mit Halbgeviertstrich oder
   `S. 3` für eine Seite.
 - **Was es ist:** worum es geht, in wenigen Wörtern. Bei Magazinseiten dazu
-  Beitrag und Seiten. Bei `wissen` die Frage und am Ende, falls es sie gibt,
-  `Übungen: …`. Der Agent, der den Entwurf schreibt, liest von der Zeile nur
-  diesen Text, in seinem Auftrag. Bei `uebung`, `folge` und `wissen` steht
-  deshalb hier, was er sonst noch wissen muss: wohin ein Verweis zeigt, oder
-  dass er die Seite selbst lesen soll, weil ihr Text mehrfach überlagert ist.
+  Beitrag und Seiten. Bei `wissen` steht vorn die Frage, siehe „Zuschnitt
+  bei `wissen`“. Am Ende stehen, falls es sie gibt, die `Übungen: …`. Der
+  Agent, der den Entwurf schreibt, liest von der Zeile nur diesen Text, in
+  seinem Auftrag. Bei `uebung`, `folge` und `wissen` steht deshalb hier, was
+  er sonst noch wissen muss: wohin ein Verweis zeigt, oder dass er die Seite
+  selbst lesen soll, weil ihr Text mehrfach überlagert ist.
 - **Ergebnis:** `uebung`, `folge`, `wissen`, `zurückgestellt` oder
   `übersprungen`. Bei `importiert` steht hier, was die Datei ist, `uebung`,
   `folge` oder `wissen`.
