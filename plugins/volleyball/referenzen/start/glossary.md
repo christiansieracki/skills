@@ -126,6 +126,11 @@ diesem Abend steht. In der Leseansicht heißt das eine nur „Schaubild“, ohne
 Schaubild noch eine Hallenskizze, ist der Aufbau heute anders, und die
 Leseansicht nennt sie „Heute anders aufgebaut“.
 
+**Ablauf oder Ablauf?** Der Ablauf ist die Tabelle aller Programmpunkte. Im
+Abschnitt eines Programmpunkts steht „Ablauf:“ zwischen „Aufbau:“ und „Worauf
+achten:“ und sagt, wie diese eine Übung heute läuft. Was gemeint ist, zeigt die
+Stelle: die Überschrift `## Ablauf` oder das fette Wort im Abschnitt.
+
 ## Szene und Schaubild
 
 | Begriff | Was es ist | Wo es liegt |
