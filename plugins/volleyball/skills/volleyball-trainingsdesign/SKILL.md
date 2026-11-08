@@ -158,9 +158,12 @@ Bibliothek nicht kennt, leitet den Abend allein danach:
   Zuspieler in verschiedene Gruppen“), unter **Ablauf** der Wechsel als Regel
   („nach jeder Runde eine Position weiter“). Ein Thema zur Einteilung unter
   Zum Nachschlagen nur, wenn mehrere Programmpunkte dieselbe brauchen.
-- Keine Leibchen. Kürzel nur in der Hallenskizze. Teile der Anwesenden heißen
-  Gruppen, Dreier, Sechser, im Spiel Mannschaften. Die Einzelheiten stehen in
-  `SPRACHE.md` unter „Begriffe“.
+- Keine Leibchen. Kürzel nur in der Hallenskizze, auch nicht in der Spalte
+  **Übung** und in den Überschriften: Trägt der Titel der Karte ein Kürzel,
+  steht er dort ausgeschrieben, „Unteres und oberes Zuspiel zu dritt“ statt
+  „UZ und OZ zu dritt“. Teile der Anwesenden heißen Gruppen, Dreier, Sechser,
+  im Spiel Mannschaften. Die Einzelheiten stehen in `SPRACHE.md` unter
+  „Begriffe“.
 - **Anpassung heute** ist ein Halbsatz, der sagt, was gegenüber der Karte
   anders ist. Den Abschnitt wiederholt er nicht, und die Nachbereitung braucht
   ihn, um zu entscheiden, was in die Bibliothek wandert. **Warum hier** bleibt
