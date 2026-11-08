@@ -29,8 +29,11 @@ LEERE_ELEMENTE = {"area", "base", "br", "col", "embed", "hr", "img", "input", "l
 IM_SATZ = {"a", "abbr", "b", "code", "em", "i", "small", "span", "strong"}
 
 # Was aufgeklappt in einem Programmpunkt stehen kann, nach der Klasse im Markup.
+# Traegt ein Element mehrere, zaehlt die erste hier. "Heute anders aufgebaut"
+# ist auch ein Abschnitt des Plans.
 INHALTE = {
     "heute": "Heute",
+    "heute-anders": "Heute anders aufgebaut",
     "planabschnitt": "Abschnitt",
     "schaubild": "Schaubild",
     "quelle": "Quelle",
@@ -150,7 +153,9 @@ class Programmpunkt:
     uebung: str
     heute: str | None
     abschnitte: list[Abschnitt]
-    """Die Abschnitte des Plans, die zu diesem Programmpunkt gehoeren, in ihrer Folge."""
+    """Die Abschnitte des Plans, die zu diesem Programmpunkt gehoeren, in der Folge der Seite."""
+    skizzen: list[str]
+    """Je Codeblock, wie die Ansicht zum Vergroessern ihn nennt, in der Folge der Seite."""
     schaubilder: list[Schaubild]
     ueberschrift_schaubild: str | None
     """Was ueber den Schaubildern steht. Ohne Schaubild None."""
@@ -287,8 +292,12 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, Reiter]) -> Programmpunkt:
         unterschrift = bild.erstes("figcaption")
         schaubilder.append(Schaubild(bild.erstes("img").attribute.get("src") or "",
                                      _text(unterschrift) or ""))
-    inhalte = [INHALTE[k] for kind in inhalt.elemente() for k in sorted(kind.klassen)
-               if k in INHALTE]
+    inhalte = [next(name for k, name in INHALTE.items() if k in kind.klassen)
+               for kind in inhalt.elemente() if kind.klassen & INHALTE.keys()]
+    # Den Namen setzt das Skript aus data-skizze des Abschnitts, ohne ihn
+    # "Hallenskizze".
+    skizzen = [kind.attribute.get("data-skizze") or "Hallenskizze"
+               for kind in inhalt.elemente() for _ in kind.alle("pre")]
     return Programmpunkt(
         zeit=_text(kopf.erstes(klasse="zeit")) or "",
         dauer=int(re.search(r"\d+", dauer).group()) if dauer else None,
@@ -297,6 +306,7 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, Reiter]) -> Programmpunkt:
         uebung=_text(kopf.erstes(klasse="uebung")) or "",
         heute=_text(heute.erstes("p")) if heute is not None else None,
         abschnitte=[_abschnitt(k) for k in inhalt.alle(klasse="planabschnitt")],
+        skizzen=skizzen,
         schaubilder=schaubilder,
         ueberschrift_schaubild=_text(schaubild.erstes("h3")) if schaubild is not None else None,
         quelle=_text(inhalt.erstes(klasse="quelle")),

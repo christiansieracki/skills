@@ -212,8 +212,11 @@ In der HTML findet der Trainer:
 - Den **Ablauf zum Aufklappen**: je Programmpunkt eine Zeile mit Zeitangabe,
   Dauer, Name und Übung. Aufgeklappt stehen darin „Heute", die Abschnitte mit
   seiner Zeitangabe, das Schaubild mit seiner Quelle, die Verweise zum
-  Nachschlagen und zugeklappt „Warum hier?". Mehrere Programmpunkte dürfen
-  zugleich offen sein. Pause und Umbau stehen gedämpft.
+  Nachschlagen und zugeklappt „Warum hier?". Hat der Programmpunkt ein
+  Schaubild, steht seine Hallenskizze erst danach, unter „Heute anders
+  aufgebaut", mit Hallenteil davor, wo einer in der Überschrift bleibt. Ohne
+  Schaubild heißt sie „Hallenskizze" und steht bei den Abschnitten. Mehrere
+  Programmpunkte dürfen zugleich offen sein. Pause und Umbau stehen gedämpft.
 - Die Knöpfe **Nachschlagen**, mit einem Reiter je Thema, und
   **Vorbereitung**, mit allem, was keinem Programmpunkt gehört, auch Material
   und Nachbereitung. Jeder öffnet eine Ansicht über dem Ablauf. „Zurück" oder

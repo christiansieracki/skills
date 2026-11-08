@@ -1190,6 +1190,237 @@ class SchaubildTest(LeseansichtTest):
                          ["ue-000032-zirkel-1.png", "ue-000032-zirkel-3.png"])
 
 
+class HeuteAndersTest(LeseansichtTest):
+    """Neben einem Schaubild heisst die Hallenskizze "Heute anders aufgebaut" (#83).
+
+    Sie steht dann nach dem Schaubild und seiner Quelle, damit klar ist,
+    wovon der Aufbau an diesem Abend abweicht. Im Plan heisst sie weiter
+    `### <Zeitangabe> Hallenskizze`.
+    """
+
+    UEBUNG = """
+        ## 10–35 Mit einem Bild
+
+        **Aufbau:** Drei Streifen.
+
+        ### 10–35 Hallenskizze
+
+        ```
+        |  A1   A2   A3  |
+        ```
+
+        ### Bälle
+
+        Zwei Wagen.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.ordner.lege_schaubild_an("ue-000030-aufbau.svg")
+        self.ordner.lege_karte_an(id="ue-000030", titel="Mit einem Bild",
+                                  schaubild="ue-000030-aufbau.svg", quelle="PlayDrill")
+
+    def abschnitte(self, punkt) -> list[tuple[str, str]]:
+        return [(a.ueberschrift, a.text) for a in punkt.abschnitte]
+
+    def test_erst_das_schaubild_dann_heute_anders_aufgebaut(self) -> None:
+        # Was im Abschnitt nach der Skizze steht, bleibt, wo es ist.
+        ansicht = self.ansicht([Zeile("10–35", "Hauptteil", "Mit einem Bild", "ue-000030",
+                                      warum="Die Sechser stehen schon zusammen")],
+                               nachher=self.UEBUNG)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(punkt.inhalte, ["Abschnitt", "Schaubild", "Quelle",
+                                         "Heute anders aufgebaut", "Warum hier?"])
+        self.assertEqual(self.abschnitte(punkt), [
+            ("", "Aufbau: Drei Streifen. Bälle Zwei Wagen."),
+            ("Heute anders aufgebaut", "| A1 A2 A3 |")])
+        self.assertNotIn("Hallenskizze", punkt.text)
+
+    def test_auch_eine_skizze_als_eigener_abschnitt(self) -> None:
+        ansicht = self.ansicht([Zeile("10–35", "Hauptteil", "Mit einem Bild", "ue-000030")],
+                               nachher="""
+            ## 10–35 Hallenskizze
+
+            Netz längs.
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(punkt.inhalte, ["Schaubild", "Quelle", "Heute anders aufgebaut"])
+        self.assertEqual(self.abschnitte(punkt), [("Heute anders aufgebaut", "Netz längs.")])
+
+    def test_was_hinter_hallenskizze_steht_bleibt(self) -> None:
+        # So schreiben die Plaene seit Oktober, was an der Skizze besonders ist.
+        ansicht = self.ansicht([Zeile("10–35", "Hauptteil", "Mit einem Bild", "ue-000030")],
+                               nachher="""
+            ## Hallenskizzen
+
+            ### 10–35 Hallenskizze: Seite A ist dran
+
+            Netz längs.
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(self.abschnitte(punkt),
+                         [("Heute anders aufgebaut: Seite A ist dran", "Netz längs.")])
+
+    def test_mehrere_skizzen_folgen_dem_schaubild_in_der_reihenfolge_des_plans(self) -> None:
+        ansicht = self.ansicht([Zeile("10–35", "Hauptteil", "Mit einem Bild", "ue-000030")],
+                               nachher="""
+            ## 10–35 Mit einem Bild
+
+            Erst die Annahme.
+
+            ### 10–35 Hallenskizze: erste Hälfte
+
+            Netz längs.
+
+            ## 10–35 Wechsel
+
+            Nach zwölf Minuten.
+
+            ### 10–35 Hallenskizze: zweite Hälfte
+
+            Netz quer.
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(punkt.inhalte, ["Abschnitt", "Abschnitt", "Schaubild", "Quelle",
+                                         "Heute anders aufgebaut", "Heute anders aufgebaut"])
+        self.assertEqual([a.ueberschrift for a in punkt.abschnitte], [
+            "", "Wechsel", "Heute anders aufgebaut: erste Hälfte",
+            "Heute anders aufgebaut: zweite Hälfte"])
+
+    def test_ein_abschnitt_nur_mit_der_skizze_bleibt_nicht_leer_stehen(self) -> None:
+        ansicht = self.ansicht([Zeile("10–35", "Hauptteil", "Mit einem Bild", "ue-000030")],
+                               nachher="""
+            ## 10–35 Aufbau
+
+            ### 10–35 Hallenskizze
+
+            Netz längs.
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(self.abschnitte(punkt), [("Heute anders aufgebaut", "Netz längs.")])
+
+    def test_mit_hallenteil_beim_richtigen_programmpunkt(self) -> None:
+        # Hallenteil A hat ein Schaubild, Hallenteil B nicht. Der Hallenteil
+        # faellt aus der Ueberschrift wie bisher, er steht im Namen.
+        ansicht = self.ansicht([Zeile("10–35", "Zuspiel, Hallenteil A", "Mit einem Bild",
+                                      "ue-000030"),
+                                Zeile("10–35", "Annahme, Hallenteil B", "Annahme im Halbfeld",
+                                      "ue-000001")],
+                               nachher="""
+            ## Hallenskizzen
+
+            ### 10–35 Hallenteil B: Hallenskizze
+
+            Netz quer.
+
+            ### 10–35 Hallenteil A: Hallenskizze
+
+            Netz längs.
+        """)
+
+        a, b = ansicht.programmpunkte
+        self.assertEqual(a.inhalte, ["Schaubild", "Quelle", "Heute anders aufgebaut"])
+        self.assertEqual(self.abschnitte(a), [("Heute anders aufgebaut", "Netz längs.")])
+        self.assertEqual(b.inhalte, ["Abschnitt", "Quelle"])
+        self.assertEqual(self.abschnitte(b), [("Hallenskizze", "Netz quer.")])
+
+    def test_ein_hallenteil_ohne_zeitangabe_steht_weiter_davor(self) -> None:
+        ansicht = self.ansicht([Zeile("10–35", "Zuspiel, Hallenteil A", "Mit einem Bild",
+                                      "ue-000030")],
+                               nachher="""
+            ## 10–35 Mit einem Bild
+
+            Erst die Annahme.
+
+            ### Hallenteil A: Hallenskizze
+
+            Netz längs.
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual([a.ueberschrift for a in punkt.abschnitte],
+                         ["", "Hallenteil A: Heute anders aufgebaut"])
+
+    def test_die_skizze_eines_anderen_hallenteils_bleibt_wo_sie_ist(self) -> None:
+        # Ohne Zeitangabe folgt sie ihrem ## auch zu Hallenteil A. Vom
+        # Schaubild in A weicht sie nicht ab.
+        ansicht = self.ansicht([Zeile("10–35", "Zuspiel, Hallenteil A", "Mit einem Bild",
+                                      "ue-000030"),
+                                Zeile("10–35", "Annahme, Hallenteil B", "Annahme im Halbfeld",
+                                      "ue-000001")],
+                               nachher="""
+            ## 10–35 Zuspiel und Annahme
+
+            Nach zwölf Minuten tauschen.
+
+            ### Hallenteil B: Hallenskizze
+
+            Netz quer.
+        """)
+
+        a, _ = ansicht.programmpunkte
+        self.assertEqual(a.inhalte, ["Abschnitt", "Schaubild", "Quelle"])
+        self.assertNotIn("Heute anders aufgebaut", a.text)
+
+    def test_ohne_schaubild_bleibt_die_hallenskizze_an_ihrer_stelle(self) -> None:
+        ansicht = self.ansicht([Zeile("10–35", "Hauptteil", "Annahme im Halbfeld", "ue-000001")],
+                               nachher="""
+            ## 10–35 Annahme im Halbfeld
+
+            **Aufbau:** Drei Streifen.
+
+            ### 10–35 Hallenskizze
+
+            Netz längs.
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(punkt.inhalte, ["Abschnitt", "Quelle"])
+        self.assertEqual(self.abschnitte(punkt),
+                         [("", "Aufbau: Drei Streifen. Hallenskizze Netz längs.")])
+        self.assertNotIn("Heute anders aufgebaut", punkt.text)
+
+    def test_mit_bilder_aus_bleibt_die_hallenskizze_an_ihrer_stelle(self) -> None:
+        # Ohne Bild gibt es nichts, wovon der Aufbau abweichen koennte.
+        plan = self.ordner.lege_plan_an(PLAN, [Zeile("10–35", "Hauptteil", "Mit einem Bild",
+                                                     "ue-000030")], nachher=self.UEBUNG)
+
+        (punkt,) = self.erzeuge(plan, bilder="aus").programmpunkte
+
+        self.assertEqual(punkt.inhalte, ["Abschnitt", "Quelle"])
+        self.assertEqual(self.abschnitte(punkt), [
+            ("", "Aufbau: Drei Streifen. Hallenskizze | A1 A2 A3 | Bälle Zwei Wagen.")])
+        self.assertNotIn("Heute anders aufgebaut", punkt.text)
+
+    def test_die_skizze_laesst_sich_weiter_vergroessern(self) -> None:
+        # Den Knopf setzt das Skript unter jeden Codeblock im Programmpunkt.
+        # Hier steht, dass die Skizze einer bleibt und die Ansicht sie nennt.
+        ansicht = self.ansicht([Zeile("10–35", "Hauptteil", "Mit einem Bild", "ue-000030")],
+                               nachher=self.UEBUNG)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(punkt.skizzen, ["Heute anders aufgebaut"])
+        self.assertEqual(ansicht.vergroessern, [])
+
+    def test_die_ansicht_zum_vergroessern_nennt_die_skizze_wie_ihr_abschnitt(self) -> None:
+        ansicht = self.ansicht([Zeile("10–35", "Hauptteil", "Mit einem Bild", "ue-000030")],
+                               nachher="""
+            ## 10–35 Hallenskizze: Seite A ist dran
+
+            ```
+            |  A1   A2   A3  |
+            ```
+        """)
+
+        (punkt,) = ansicht.programmpunkte
+        self.assertEqual(punkt.skizzen, ["Heute anders aufgebaut: Seite A ist dran"])
+
+
 class VergroessernTest(LeseansichtTest):
     """Hallenskizze und Schaubild lassen sich auf dem Handy vergroessern (#57).
 

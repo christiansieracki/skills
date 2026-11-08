@@ -971,11 +971,14 @@ ANSICHTEN_SKRIPT = """
   }
 
   // Unter jedem Codeblock im Ablauf, also jeder Hallenskizze, ein Knopf.
+  // Neben einem Schaubild nennt ihr Abschnitt sie anders (#83).
   document.querySelectorAll(".programmpunkt pre").forEach(function (skizze) {
+    var abschnitt = skizze.closest("[data-skizze]");
+    var titel = abschnitt ? abschnitt.dataset.skizze : "Hallenskizze";
     skizze.after(knopf("vergroessern", "Skizze vergrößern", function () {
       var gross = document.createElement("pre");
       gross.textContent = skizze.textContent;
-      vergroessere("Hallenskizze", [gross]);
+      vergroessere(titel, [gross]);
     }));
   });
 
@@ -1184,14 +1187,19 @@ def abschnitt_html(abschnitt: Abschnitt, unter_tag: str = "h3") -> str:
     return "\n".join(t for t in teile if t)
 
 
-def planabschnitt_html(abschnitt: Abschnitt) -> str:
+def planabschnitt_html(abschnitt: Abschnitt, heute_anders: bool = False) -> str:
     """Ein Abschnitt im Programmpunkt. Ist seine Ueberschrift weggefallen, ohne sie.
 
     Die Ueberschrift steht eine Stufe tiefer als die des Programmpunkts, die
-    seiner Unterabschnitte noch eine darunter.
+    seiner Unterabschnitte noch eine darunter. Eine Hallenskizze neben einem
+    Schaubild ist `heute_anders`, die Ansicht zum Vergroessern nennt sie wie
+    ihre Ueberschrift.
     """
     kopf = f"<h3>{inline(abschnitt.ueberschrift)}</h3>" if abschnitt.ueberschrift else ""
-    return (f'<section class="planabschnitt">{kopf}<div class="rich">\n'
+    art = (f' class="planabschnitt heute-anders"'
+           f' data-skizze="{html.escape(abschnitt.ueberschrift)}"'
+           if heute_anders else ' class="planabschnitt"')
+    return (f'<section{art}>{kopf}<div class="rich">\n'
             f"{abschnitt_html(abschnitt, 'h4')}\n</div></section>")
 
 
@@ -1234,7 +1242,52 @@ def nachschlagen_html(abschnitt: Abschnitt | None) -> str:
     return "\n".join(teile) + "\n</section>"
 
 
-def karte_html(punkt: Programmpunkt, adresse) -> list[str]:
+def gezeigte_schaubilder(punkt: Programmpunkt, adresse) -> list[Path]:
+    """Die Schaubilder, die der Programmpunkt zeigt. Mit `--bilder aus` keins."""
+    return punkt.karte.schaubilder if punkt.karte and adresse else []
+
+
+# Eine Hallenskizze, an der Ueberschrift im Programmpunkt erkannt, nach Abzug
+# von Zeitangabe und Hallenteil, wenn sie auf ihn zeigen: "Hallenskizze",
+# "Hallenskizze: Seite A ist dran", ohne Zeitangabe auch "Hallenteil A:
+# Hallenskizze". "Hallenskizzen" ueber mehreren ist keine.
+HALLENSKIZZE = re.compile(r"((?:Hallenteil\s+([^\W_])[\s:,·–—-]*)?)Hallenskizze(?!\w)",
+                          re.IGNORECASE)
+HEUTE_ANDERS = "Heute anders aufgebaut"
+
+
+def trenne_hallenskizzen(punkt: Programmpunkt) -> tuple[list[Abschnitt], list[Abschnitt]]:
+    """Trennt die Hallenskizzen von den uebrigen Abschnitten eines Programmpunkts (#83).
+
+    Zurueck kommen die uebrigen, wie sie waren, nur ohne die Skizzen, und
+    die Skizzen unter "Heute anders aufgebaut", beide in der Reihenfolge des
+    Plans. Bleibt von einem Abschnitt nichts, faellt er weg. Die Skizze eines
+    anderen Hallenteils weicht nicht von diesem Schaubild ab und bleibt.
+    """
+    uebrige, skizzen = [], []
+
+    def umbenannt(abschnitt: Abschnitt) -> Abschnitt | None:
+        m = HALLENSKIZZE.match(abschnitt.ueberschrift)
+        if not m or (m.group(2) or punkt.hallenteil).casefold() != punkt.hallenteil.casefold():
+            return None
+        return replace(abschnitt, ueberschrift=(m.group(1) + HEUTE_ANDERS
+                                                + abschnitt.ueberschrift[m.end():]))
+
+    for abschnitt in punkt.abschnitte:
+        skizze = umbenannt(abschnitt)
+        if skizze:
+            skizzen.append(skizze)
+            continue
+        darin = [umbenannt(u) for u in abschnitt.unterabschnitte]
+        skizzen += [s for s in darin if s]
+        rest = replace(abschnitt, unterabschnitte=[
+            u for u, s in zip(abschnitt.unterabschnitte, darin) if not s])
+        if not (rest.leer and any(darin)):
+            uebrige.append(rest)
+    return uebrige, skizzen
+
+
+def karte_html(punkt: Programmpunkt, bilder: list[Path], adresse) -> list[str]:
     """Das Schaubild und darunter klein die Quelle der Karte.
 
     Ohne Bild bleibt die Quelle, ohne Quelle steht nichts. Die ID steht nur
@@ -1244,7 +1297,6 @@ def karte_html(punkt: Programmpunkt, adresse) -> list[str]:
     if not karte:
         return []
     teile = []
-    bilder = karte.schaubilder if adresse else []
     if bilder:
         figuren = []
         for nr, datei in enumerate(bilder, 1):
@@ -1270,8 +1322,13 @@ def programmpunkt_html(punkt: Programmpunkt, adresse) -> str:
     inhalt = []
     if punkt.heute:
         inhalt.append(f'<div class="heute"><b>Heute</b><p>{inline(punkt.heute)}</p></div>')
-    inhalt += [planabschnitt_html(a) for a in punkt.abschnitte]
-    inhalt += karte_html(punkt, adresse)
+    # Neben einem Schaubild zeigt eine Hallenskizze, was heute anders ist.
+    # Sie steht dann dahinter, damit man weiss, wovon sie abweicht (#83).
+    bilder = gezeigte_schaubilder(punkt, adresse)
+    abschnitte, skizzen = trenne_hallenskizzen(punkt) if bilder else (punkt.abschnitte, [])
+    inhalt += [planabschnitt_html(a) for a in abschnitte]
+    inhalt += karte_html(punkt, bilder, adresse)
+    inhalt += [planabschnitt_html(a, heute_anders=True) for a in skizzen]
     if punkt.verweise:
         inhalt.append('<nav class="verweise" aria-label="Nachschlagen">'
                       + "".join(map(link_auf_reiter, punkt.verweise)) + "</nav>")

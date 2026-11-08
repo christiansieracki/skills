@@ -906,6 +906,12 @@ In der Leseansicht steht er dort, wo man den Programmpunkt aufklappt:
 - Im Programmpunkt steht jede Überschrift ohne Zeitangabe und Hallenteil.
   Gleicht der Rest dem Namen der Übung, fällt sie weg, beim `##` wie beim
   `###`.
+- Zeigt der Programmpunkt ein Schaubild, steht jede Überschrift, deren Rest mit
+  „Hallenskizze“ beginnt, nach dem Schaubild und seiner Quelle, und
+  „Hallenskizze“ heißt dort „Heute anders aufgebaut“. Ein Hallenteil, der in
+  der Überschrift bleibt, etwa ohne Zeitangabe in `### Hallenteil A:
+  Hallenskizze`, steht weiter davor. Ohne Schaubild, auch mit `--bilder aus`,
+  bleibt sie, wo sie ist.
 - Eine Überschrift, die mit einer Uhrzeit wie `18:00` beginnt, trägt keine
   Zeitangabe.
 
