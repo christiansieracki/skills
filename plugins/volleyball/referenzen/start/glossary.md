@@ -84,8 +84,9 @@ Trainingseinheit. Was im Sammelimport zur Karte werden soll, ist ein Kandidat.
 | **Trainingsgruppe** | Wer zusammen in der Halle steht. Daran hängen die Trainingseinheiten. |
 
 Beides kann zusammenfallen, muss aber nicht. Zwei Mannschaften, die zusammen
-trainieren, sind zwei Teams und eine Gruppe. Welche Gruppe welche Teams
-abdeckt und welches Team führt, steht in `trainingsplanung-root.yml`.
+trainieren, sind zwei Teams und eine Trainingsgruppe. Welche Trainingsgruppe
+welche Teams abdeckt und welches Team führt, steht in
+`trainingsplanung-root.yml`.
 
 **Gruppe oder Trainingsgruppe?** Im Text eines Programmpunkts ist eine Gruppe
 ein Teil der Anwesenden, wie in der Halle gesprochen: zwei Gruppen, die Dreier,

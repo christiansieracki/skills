@@ -44,12 +44,13 @@ Wer den Trainingsplan auf dem Handy in der Halle liest, soll nichts nachschlagen
 | ZH | zweiter Zuspieler |
 | M | Mittelblocker |
 | AA, AU | Außenangreifer |
+| D, Dia, Diag | Diagonalspieler |
 | L | Libero |
 | OZ | oberes Zuspiel |
 | UZ | unteres Zuspiel |
 | K2 | Gegenangriff |
 
-Der Diagonalspieler steht genauso ausgeschrieben, wie auch immer er sonst abgekürzt wird. Wie gesprochen dürfen „die Mitte“ und „nach außen“ stehen: „spielt die Mitte“, „Pass nach außen“.
+Dasselbe gilt für Kürzel, die nur für einen Abend entstehen, etwa DA für den Drive-Angreifer, BM für den Block in der Mitte oder Pos4 für die Position 4. Wie gesprochen dürfen „die Mitte“ und „nach außen“ stehen: „spielt die Mitte“, „Pass nach außen“.
 
 Kürzel nur in der Hallenskizze, mit der Legende daneben. Dort ist der Platz knapp. Positionsnummern sind keine Kürzel, „auf 4“ und „Abwehr auf 5“ bleiben. In der Athletiktabelle bleiben „Wdh.“ und „s“.
 
@@ -83,7 +84,7 @@ Im Volleyball trennt das Netz die Mannschaften. Leibchen braucht es dafür nicht
 - Stehen Gedankenstriche als Einschub? Meist reicht ein Punkt.
 - Gibt es Sätze, die nur betonen, wie wichtig etwas ist? Streichen.
 - Stehen Tapering, Peak oder Movement Preps drin? Ersetzen.
-- Steht außerhalb einer Hallenskizze ein Kürzel wie Z, ZH, M, AA, AU, L, OZ, UZ oder K2? Ausschreiben.
+- Steht außerhalb einer Hallenskizze ein Kürzel? Die aus der Tabelle oben, aber auch eins für einen Abend wie DA, BM oder Pos4. Ausschreiben.
 - Stehen Leibchen drin? Das Netz trennt, markiert wird mit Hütchen oder Bodenmarkierungen.
 - Bekommen Spieler oder Gruppen Nummern? Durch die Bedingung fürs Einteilen und eine Regel fürs Wechseln ersetzen.
 - Laut gelesen: klingt das nach Trainer oder nach Lehrbuch?
