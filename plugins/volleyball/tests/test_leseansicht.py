@@ -32,13 +32,13 @@ class LeseansichtTest(unittest.TestCase):
         self.ordner = Arbeitsordner()
         self.addCleanup(self.ordner.raeume_auf)
 
-    def erzeuge(self, plan: Path) -> Leseansicht:
+    def erzeuge(self, plan: Path, bilder: str = "verweis") -> Leseansicht:
         """Erzeugt die Leseansicht dieses Plans und liest sie zurueck.
 
         Was auf der Konsole stand, liegt danach in `self.konsole`, eine Zeile
-        je Eintrag.
+        je Eintrag. `bilder` geht an `--bilder`.
         """
-        fertig = self.ordner.starte("leseansicht.py", str(plan), "--bilder", "verweis",
+        fertig = self.ordner.starte("leseansicht.py", str(plan), "--bilder", bilder,
                                     mit_wurzel=False)
         self.assertEqual(fertig.returncode, 0, fertig.stdout + fertig.stderr)
         self.konsole = (fertig.stdout + fertig.stderr).splitlines()
@@ -100,7 +100,7 @@ class ProgrammpunktTest(LeseansichtTest):
 
         (punkt,) = ansicht.programmpunkte
         self.assertEqual(punkt.inhalte,
-                         ["Heute", "Schaubild der Karte", "Quelle und ID", "Warum hier?"])
+                         ["Heute", "Schaubild", "Quelle", "Warum hier?"])
         self.assertEqual(punkt.heute, "Drei Längsstreifen statt zwei")
         self.assertEqual(punkt.warum, "Die Sechser stehen schon zusammen")
         self.assertTrue(punkt.warum_zugeklappt)
@@ -566,7 +566,7 @@ class ZuordnungTest(LeseansichtTest):
                          [("Aufbau", "Zwei Netze. Sechs gegen sechs. Zweierserie.")])
 
     def test_mehrere_abschnitte_stehen_in_der_reihenfolge_des_plans(self) -> None:
-        # Zwischen "Heute" und dem Schaubild der Karte. Die Ueberschriften
+        # Zwischen "Heute" und dem Schaubild. Die Ueberschriften
         # sind absichtlich nicht alphabetisch.
         self.ordner.lege_schaubild_an("ue-000030-aufbau.svg")
         self.ordner.lege_karte_an(id="ue-000030", titel="Mit einem Bild",
@@ -595,8 +595,7 @@ class ZuordnungTest(LeseansichtTest):
         self.assertEqual([a.ueberschrift for a in hauptteil.abschnitte],
                          ["Zuerst die Annahme", "Danach das Zuspiel"])
         self.assertEqual(hauptteil.inhalte, ["Heute", "Abschnitt", "Abschnitt",
-                                           "Schaubild der Karte", "Quelle und ID",
-                                           "Warum hier?"])
+                                           "Schaubild", "Quelle", "Warum hier?"])
 
     def test_ein_leer_gewordener_abschnitt_fehlt_unter_vorbereitung(self) -> None:
         ansicht = self.ansicht(self.ZEILEN, nachher="""
@@ -770,7 +769,7 @@ class VerweisTest(LeseansichtTest):
 
         erster, zweiter = ansicht.programmpunkte
         self.assertEqual(erster.verweise, ["Die Sechser", "Kommunikationsregeln"])
-        self.assertEqual(erster.inhalte, ["Heute", "Quelle und ID", "Verweise", "Warum hier?"])
+        self.assertEqual(erster.inhalte, ["Heute", "Quelle", "Verweise", "Warum hier?"])
         self.assertEqual(zweiter.verweise, [])
 
     def test_der_link_im_text_fuehrt_ebenfalls_zum_reiter(self) -> None:
@@ -1073,15 +1072,30 @@ class SchaubildTest(LeseansichtTest):
         return [bild.datei.rsplit("/", 1)[-1]
                 for punkt in ansicht.programmpunkte for bild in punkt.schaubilder]
 
-    def test_unter_dem_schaubild_stehen_quelle_und_id_der_karte(self) -> None:
+    def test_ueber_dem_bild_steht_schaubild(self) -> None:
+        # Wer die Leseansicht liest, muss die Bibliothek nicht kennen (#81).
         self.ordner.lege_schaubild_an("ue-000030-aufbau.svg")
         self.ordner.lege_karte_an(id="ue-000030", titel="Mit einem Bild",
                                   schaubild="ue-000030-aufbau.svg", quelle="PlayDrill")
 
         (punkt,) = self.erzeuge(self.ordner.lege_trainingsplan_an(PLAN, "ue-000030")).programmpunkte
 
+        self.assertEqual(punkt.ueberschrift_schaubild, "Schaubild")
         self.assertEqual([bild.beschriftung for bild in punkt.schaubilder], [""])
-        self.assertEqual((punkt.quelle, punkt.id), ("PlayDrill", "ue-000030"))
+        self.assertNotIn("Schaubild der Karte", punkt.text)
+
+    def test_unter_dem_schaubild_steht_die_quelle_ohne_id(self) -> None:
+        # Geprueft wird, was der Trainer liest. Als Verweis traegt der Pfad
+        # des Bildes die ID im Dateinamen, eingebettet steht sie nirgends.
+        self.ordner.lege_schaubild_an("ue-000030-aufbau.svg")
+        self.ordner.lege_karte_an(id="ue-000030", titel="Mit einem Bild",
+                                  schaubild="ue-000030-aufbau.svg", quelle="PlayDrill")
+
+        (punkt,) = self.erzeuge(self.ordner.lege_trainingsplan_an(PLAN, "ue-000030")).programmpunkte
+
+        self.assertEqual(punkt.inhalte, ["Schaubild", "Quelle"])
+        self.assertEqual(punkt.quelle, "PlayDrill")
+        self.assertNotIn("ue-000030", punkt.text)
 
     def test_mehrere_schaubilder_sind_gezaehlt(self) -> None:
         namen = ["ue-000031-uebersicht.png", "ue-000031-station-1.png"]
@@ -1092,16 +1106,55 @@ class SchaubildTest(LeseansichtTest):
 
         (punkt,) = self.erzeuge(self.ordner.lege_trainingsplan_an(PLAN, "ue-000031")).programmpunkte
 
+        self.assertEqual(punkt.ueberschrift_schaubild, "Schaubild")
         self.assertEqual([bild.beschriftung for bild in punkt.schaubilder],
                          ["Schaubild 1 von 2", "Schaubild 2 von 2"])
 
-    def test_ohne_schaubild_bleiben_quelle_und_id_der_karte(self) -> None:
-        # Damit man die Karte findet. Fruehere Leseansichten zeigten die ID
-        # neben der Uebung.
+    def test_ohne_schaubild_steht_die_quelle_allein(self) -> None:
         (punkt,) = self.erzeuge(self.ordner.lege_trainingsplan_an(PLAN, "ue-000001")).programmpunkte
 
-        self.assertNotIn("Schaubild der Karte", punkt.inhalte)
-        self.assertEqual((punkt.quelle, punkt.id), ("Testbestand", "ue-000001"))
+        self.assertEqual(punkt.inhalte, ["Quelle"])
+        self.assertEqual(punkt.quelle, "Testbestand")
+        self.assertNotIn("ue-000001", punkt.text)
+
+    def test_ohne_quelle_steht_nichts(self) -> None:
+        self.ordner.lege_karte_an(id="ue-000030", titel="Ohne Quelle", quelle=OHNE)
+
+        (punkt,) = self.erzeuge(self.ordner.lege_trainingsplan_an(PLAN, "ue-000030")).programmpunkte
+
+        self.assertEqual(punkt.inhalte, [])
+        self.assertIsNone(punkt.quelle)
+        self.assertNotIn("ue-000030", punkt.text)
+
+    def test_ohne_quelle_steht_unter_dem_schaubild_nichts(self) -> None:
+        self.ordner.lege_schaubild_an("ue-000030-aufbau.svg")
+        self.ordner.lege_karte_an(id="ue-000030", titel="Mit einem Bild",
+                                  schaubild="ue-000030-aufbau.svg", quelle=OHNE)
+
+        (punkt,) = self.erzeuge(self.ordner.lege_trainingsplan_an(PLAN, "ue-000030")).programmpunkte
+
+        self.assertEqual(punkt.inhalte, ["Schaubild"])
+        self.assertIsNone(punkt.quelle)
+
+    def test_ohne_karte_in_der_bibliothek_steht_auch_die_id_nicht(self) -> None:
+        # Frueher stand die ID dann allein da, damit man die Karte findet.
+        (punkt,) = self.erzeuge(self.ordner.lege_trainingsplan_an(PLAN, "ue-000099")).programmpunkte
+
+        self.assertEqual(punkt.inhalte, [])
+        self.assertNotIn("ue-000099", punkt.text)
+
+    def test_mit_bilder_aus_steht_nur_die_quelle(self) -> None:
+        self.ordner.lege_schaubild_an("ue-000030-aufbau.svg")
+        self.ordner.lege_karte_an(id="ue-000030", titel="Mit einem Bild",
+                                  schaubild="ue-000030-aufbau.svg", quelle="PlayDrill")
+
+        (punkt,) = self.erzeuge(self.ordner.lege_trainingsplan_an(PLAN, "ue-000030"),
+                                bilder="aus").programmpunkte
+
+        self.assertEqual(punkt.inhalte, ["Quelle"])
+        self.assertIsNone(punkt.ueberschrift_schaubild)
+        self.assertEqual(punkt.quelle, "PlayDrill")
+        self.assertNotIn("ue-000030", punkt.text)
 
     def test_ein_einzelnes_schaubild_steht_bei_seiner_uebung(self) -> None:
         self.ordner.lege_schaubild_an("ue-000030-aufbau.svg")

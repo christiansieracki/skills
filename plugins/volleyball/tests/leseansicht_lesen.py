@@ -32,8 +32,8 @@ IM_SATZ = {"a", "abbr", "b", "code", "em", "i", "small", "span", "strong"}
 INHALTE = {
     "heute": "Heute",
     "planabschnitt": "Abschnitt",
-    "schaubild": "Schaubild der Karte",
-    "karte": "Quelle und ID",
+    "schaubild": "Schaubild",
+    "quelle": "Quelle",
     "verweise": "Verweise",
     "warum": "Warum hier?",
 }
@@ -152,8 +152,9 @@ class Programmpunkt:
     abschnitte: list[Abschnitt]
     """Die Abschnitte des Plans, die zu diesem Programmpunkt gehoeren, in ihrer Folge."""
     schaubilder: list[Schaubild]
+    ueberschrift_schaubild: str | None
+    """Was ueber den Schaubildern steht. Ohne Schaubild None."""
     quelle: str | None
-    id: str | None
     warum: str | None
     inhalte: list[str]
     """Was aufgeklappt untereinander steht, in dieser Folge, benannt wie in INHALTE."""
@@ -164,6 +165,8 @@ class Programmpunkt:
     """Die Knoepfe zum Nachschlagen, je der Name des Reiters, den er oeffnet."""
     links: list[Link]
     """Jeder Link im Text des Programmpunkts, ohne die Verweise."""
+    text: str
+    """Aller Text, den der Programmpunkt zugeklappt und aufgeklappt zeigt."""
 
 
 @dataclass
@@ -278,6 +281,7 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, Reiter]) -> Programmpunkt:
     dauer = _text(kopf.erstes(klasse="dauer"))
     heute = inhalt.erstes(klasse="heute")
     warum = inhalt.erstes(klasse="warum")
+    schaubild = inhalt.erstes(klasse="schaubild")
     schaubilder = []
     for bild in inhalt.alle("figure"):
         unterschrift = bild.erstes("figcaption")
@@ -294,8 +298,8 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, Reiter]) -> Programmpunkt:
         heute=_text(heute.erstes("p")) if heute is not None else None,
         abschnitte=[_abschnitt(k) for k in inhalt.alle(klasse="planabschnitt")],
         schaubilder=schaubilder,
+        ueberschrift_schaubild=_text(schaubild.erstes("h3")) if schaubild is not None else None,
         quelle=_text(inhalt.erstes(klasse="quelle")),
-        id=_text(inhalt.erstes(klasse="id")),
         warum=_text(warum.erstes(klasse="rich")) if warum is not None else None,
         inhalte=inhalte,
         zugeklappt="open" not in knoten.attribute,
@@ -305,6 +309,7 @@ def _programmpunkt(knoten: Knoten, reiter: dict[str, Reiter]) -> Programmpunkt:
                   for a in knoepfe],
         links=[Link(a.text(), a.attribute.get("href") or "", reitername(a))
                for a in inhalt.alle("a") if a not in knoepfe],
+        text=knoten.text(),
     )
 
 

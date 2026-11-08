@@ -710,7 +710,7 @@ margin-bottom:6px;color:var(--heute-marke)}
 border:1px solid var(--bildrand);color:var(--bildtinte);color-scheme:light}
 .schaubild img{display:block;width:100%;height:auto;border-radius:4px;background:var(--bild)}
 .schaubild figcaption{text-align:center;font-size:12px;margin-top:8px}
-.karte{color:var(--gedaempft);font-size:12px;margin-top:3px}
+.quelle{color:var(--gedaempft);font-size:12px;margin-top:3px}
 .warum{margin-top:24px;border-top:1px solid var(--linie)}
 .warum>summary{color:var(--gedaempft);font-size:13px;padding-top:10px}
 .warum .rich p{font-size:14px;color:var(--gedaempft)}
@@ -979,7 +979,7 @@ ANSICHTEN_SKRIPT = """
     }));
   });
 
-  // Jedes Schaubild der Karte wird selbst ein Knopf. Die Ansicht nimmt das
+  // Jedes Schaubild wird selbst ein Knopf. Die Ansicht nimmt das
   // Bild beim Oeffnen von ihm, eingebettet steht es nur einmal in der Datei.
   document.querySelectorAll(".programmpunkt .schaubild img").forEach(function (bild) {
     var k = knopf("bildknopf", "", function () {
@@ -1235,15 +1235,16 @@ def nachschlagen_html(abschnitt: Abschnitt | None) -> str:
 
 
 def karte_html(punkt: Programmpunkt, adresse) -> list[str]:
-    """Das Schaubild der Karte und darunter ihre Quelle und ID.
+    """Das Schaubild und darunter klein die Quelle der Karte.
 
-    Ohne Bild bleiben Quelle und ID, damit man die Karte findet.
+    Ohne Bild bleibt die Quelle, ohne Quelle steht nichts. Die ID steht nur
+    in der `.md`, in der Halle bedeutet sie nichts (#81).
     """
-    if not punkt.id:
-        return []
     karte = punkt.karte
+    if not karte:
+        return []
     teile = []
-    bilder = karte.schaubilder if karte and adresse else []
+    bilder = karte.schaubilder if adresse else []
     if bilder:
         figuren = []
         for nr, datei in enumerate(bilder, 1):
@@ -1252,11 +1253,10 @@ def karte_html(punkt: Programmpunkt, adresse) -> list[str]:
             unterschrift = f"<figcaption>{zaehler}</figcaption>" if zaehler else ""
             figuren.append(f'<figure><img src="{html.escape(adresse(datei))}" alt="{alt}" '
                            f'loading="lazy">{unterschrift}</figure>')
-        teile.append('<section class="schaubild"><h3>Schaubild der Karte</h3>'
+        teile.append('<section class="schaubild"><h3>Schaubild</h3>'
                      + "".join(figuren) + "</section>")
-    quelle = (f'<span class="quelle">{html.escape(karte.quelle)}</span> · '
-              if karte and karte.quelle else "")
-    teile.append(f'<p class="karte">{quelle}<span class="id">{html.escape(punkt.id)}</span></p>')
+    if karte.quelle:
+        teile.append(f'<p class="quelle">{html.escape(karte.quelle)}</p>')
     return teile
 
 

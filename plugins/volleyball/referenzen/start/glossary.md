@@ -224,7 +224,7 @@ die an dem Abend in der Halle stehen.
 | Movement Preps | Bewegungsvorbereitung, Mobilisation |
 | Athletikspur | Athletikprogramm, Athletik über die Saison |
 | Teil, Trainingsteil für eine Zeile im Ablauf | Programmpunkt |
-| Grundform für das Bild der Karte in der Leseansicht | Schaubild der Karte |
+| Grundform für das Bild der Karte in der Leseansicht | Schaubild |
 | Feldbild für das Bild, das der Sammelimport aus der Quelle ausschneidet | Quellgrafik |
 
 **Bleibt so:** Sideout, Annahme, Abwehr, Zuspiel, Libero, Riegel, 5-1, 6-2 und
