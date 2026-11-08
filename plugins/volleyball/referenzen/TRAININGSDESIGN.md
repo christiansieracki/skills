@@ -25,7 +25,7 @@ Ein kleines Schaubild erzeugen (nicht nur beschreiben), wenn:
 
 Kein Schaubild bei rein konditionellen Übungen oder wenn eine Zeile Text reicht. Gezeichnet wird es vom Skill `volleyball-schaubild`, aus einer Szene heraus. Das Schaubild einer Karte zeigt die Leseansicht von selbst beim Programmpunkt, der ihre ID trägt. Ein Bild nur für diesen Abend bekommt einen Kurzverweis unter `## Schaubilder` im Trainingsplan.
 
-Wie die Übung an diesem Abend in der Halle steht, zeigt die Hallenskizze im Trainingsplan: ein Codeblock unter `### <Zeitangabe> Hallenskizze`, je Programmpunkt mit einem Aufbau.
+Wie die Übung an diesem Abend in der Halle steht, sagt meist ein Satz unter **Aufbau** im Abschnitt des Programmpunkts. Eine Hallenskizze im Trainingsplan, ein Codeblock unter `### <Zeitangabe> Hallenskizze`, gibt es nur, wenn der Programmpunkt kein Schaubild hat und ein, zwei Sätze den Aufbau nicht sagen, oder wenn der Aufbau heute anders ist als im Schaubild. Dann zeigt sie den ganzen Aufbau von heute, mit einem Satz darüber, was anders ist.
 
 ## Übungsauswahl: Prinzip
 

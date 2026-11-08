@@ -127,8 +127,13 @@ wohin stellt:
   dessen Überschrift mit seiner Zeitangabe beginnt:
   `## 46–93 Drei Sechser mit Zweierserie`. Kein „siehe unten", die Zeitangabe
   verbindet Zeile und Abschnitt.
-- Je Programmpunkt mit einem Aufbau eine eigene Hallenskizze als
-  `### 46–93 Hallenskizze`, die Zeichnung in einem Codeblock. Bei zwei
+- Eine Hallenskizze als `### 46–93 Hallenskizze`, die Zeichnung in einem
+  Codeblock, nur in zwei Fällen. Der Programmpunkt hat kein Schaubild, und
+  ein, zwei Sätze sagen den Aufbau nicht. Oder der Aufbau ist heute anders als
+  im Schaubild, etwa ein längs geteiltes Feld, andere Ziele, zwei Hallenteile
+  oder mehrere Gruppen über die Halle verteilt. Dann zeigt sie den ganzen
+  Aufbau von heute, und darüber steht ein Satz, was anders ist. Reicht ein
+  Satz („vier Dreier, über die Halle verteilt“), keine Skizze. Bei zwei
   Programmpunkten zur selben Zeit mit dem Hallenteil:
   `### 69–89 Hallenteil A: Hallenskizze`.
 - Was mehrere Programmpunkte brauchen, etwa die Sechser, die Läufer oder die
@@ -138,6 +143,37 @@ wohin stellt:
 - Athletik als Tabelle `Nr | Übung | Worauf es ankommt | Heute`, mit der
   Dosierung des Abends in `Heute`. Je Programmpunkt ein
   `### <Zeitangabe> Athletik` unter `## Athletik`.
+
+Der Plan muss ohne die Karten verständlich sein. Ein zweiter Trainer, der die
+Bibliothek nicht kennt, leitet den Abend allein danach:
+
+- Der Abschnitt eines Programmpunkts beschreibt die Übung, wie sie heute
+  läuft, gegliedert in **Aufbau**, **Ablauf** und **Worauf achten**. Die
+  Anpassungen sind eingearbeitet. Kein „wie auf der Karte“, keine „Regeln der
+  Karte“, kein „linker Teil der Karte“ und keine Zählweise der Karte. Was die
+  Karte nur andeutet, schreibst du aus.
+- Spieler bekommen keine Nummern, Gruppen keine Kennungen, es gibt keine
+  Wechseltabelle nach Nummern und keinen Hinweis, Nummern zu verteilen. Unter
+  **Aufbau** steht, worauf es beim Einteilen ankommt („Zuspieler und zweiter
+  Zuspieler in verschiedene Gruppen“), unter **Ablauf** der Wechsel als Regel
+  („nach jeder Runde eine Position weiter“). Ein Thema zur Einteilung unter
+  Zum Nachschlagen nur, wenn mehrere Programmpunkte dieselbe brauchen.
+- Keine Leibchen. Kürzel nur in der Hallenskizze. Teile der Anwesenden heißen
+  Gruppen, Dreier, Sechser, im Spiel Mannschaften. Die Einzelheiten stehen in
+  `SPRACHE.md` unter „Begriffe“.
+- **Anpassung heute** ist ein Halbsatz, der sagt, was gegenüber der Karte
+  anders ist. Den Abschnitt wiederholt er nicht, und die Nachbereitung braucht
+  ihn, um zu entscheiden, was in die Bibliothek wandert. **Warum hier** bleibt
+  ein Satz.
+- Rahmenbedingungen als Stichworte. Der Bezug zum Trainingsblock in zwei
+  Sätzen. Kein Hinweis wie „Die Zeilen ohne ID“, der die Tabelle erklärt.
+- `## Schaubilder` kommt nur dazu, wenn es ein Schaubild eigens für diesen
+  Abend gibt, mit einem Kurzverweis darauf. Dass die Leseansicht das Schaubild einer Karte beim
+  Programmpunkt zeigt, schreibst du nicht hin.
+- Organisation und Coaching-Hinweise nur mit dem, was nirgends sonst steht.
+- In der Nachbereitung steht „Haben sich Anpassungen bewährt?“ ohne
+  Aufzählung, die Anpassungen stehen in der Tabelle. Keine Frage, wer welche
+  Nummer hatte.
 
 Verschiebt sich beim Planen eine Zeit, ziehst du jede Überschrift mit, die mit
 der alten Zeitangabe beginnt, auch die mit Hallenteil. Das gilt für jede Zeit,
@@ -149,11 +185,12 @@ Einen älteren Plan mit der Spalte „Teil" und ohne Zeitangaben in den
 weiter, die Leseansicht zeigt ihn vollständig, das Ausgeschriebene unter
 Vorbereitung.
 
-Fertig ist der Plan, wenn jede Zeile mit Übung auch eine ID trägt oder im Text
-steht, warum nicht (etwa weil die Karte noch fehlt),
-`<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py` keine unbekannten IDs meldet
-und jede Zeitangabe in einer Überschrift zu einer Zeile der Ablauftabelle
-passt.
+Fertig ist der Plan, wenn jede Zeile mit Übung auch eine ID trägt oder im
+Abschnitt ihres Programmpunkts steht, warum nicht (etwa weil die Karte noch
+fehlt), `<python> ${CLAUDE_PLUGIN_ROOT}/scripts/index.py` keine unbekannten
+IDs meldet und jede Zeitangabe in einer Überschrift zu einer Zeile der
+Ablauftabelle passt. Eine Übung, die ausgeschrieben im Plan steht, wie die
+Athletik, braucht keine ID.
 
 ## Leseansicht
 

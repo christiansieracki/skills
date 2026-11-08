@@ -34,6 +34,35 @@ Wie ein Trainerkollege in der Halle: locker, direkt, nah an der gesprochenen Spr
 
 Bei neuen englischen Fachbegriffen: wenn es ein gängiges deutsches Wort gibt, dieses nehmen. Wenn nicht (Sideout), Begriff behalten statt künstlich zu übersetzen.
 
+### Ausgeschrieben statt Kürzel
+
+Wer den Trainingsplan auf dem Handy in der Halle liest, soll nichts nachschlagen müssen. Im Text stehen die Namen ausgeschrieben:
+
+| Kürzel | Ausgeschrieben |
+|---|---|
+| Z | Zuspieler |
+| ZH | zweiter Zuspieler |
+| M | Mittelblocker |
+| AA, AU | Außenangreifer |
+| L | Libero |
+| OZ | oberes Zuspiel |
+| UZ | unteres Zuspiel |
+| K2 | Gegenangriff |
+
+Der Diagonalspieler steht genauso ausgeschrieben, wie auch immer er sonst abgekürzt wird. Wie gesprochen dürfen „die Mitte“ und „nach außen“ stehen: „spielt die Mitte“, „Pass nach außen“.
+
+Kürzel nur in der Hallenskizze, mit der Legende daneben. Dort ist der Platz knapp. Positionsnummern sind keine Kürzel, „auf 4“ und „Abwehr auf 5“ bleiben. In der Athletiktabelle bleiben „Wdh.“ und „s“.
+
+### Gruppen, keine Nummern
+
+Teile der Anwesenden heißen wie in der Halle: Gruppen, Dreier, Sechser, im Spiel Mannschaften. Die Trainingsgruppe sind alle, die an dem Abend da sind (Glossar, „Gruppe oder Trainingsgruppe?“).
+
+Spieler bekommen keine Nummern wie V1 oder M2, und Gruppen keine wie D1 oder Gruppe A. Eingeteilt wird in der Halle, wenn alle da sind. Der Plan sagt, worauf es dabei ankommt („Zuspieler und zweiter Zuspieler in verschiedene Gruppen“), und gewechselt wird nach einer Regel („nach jeder Runde eine Position weiter“).
+
+### Keine Leibchen
+
+Im Volleyball trennt das Netz die Mannschaften. Leibchen braucht es dafür nicht. Was markiert werden muss, eine Zone, ein Startpunkt, eine Linie, bekommt Hütchen oder eine Bodenmarkierung.
+
 ## Vorher / Nachher
 
 > Vorher: „Da alle drei Termine dicht aufeinander folgen, bleibt die Gruppe über den gesamten Zeitraum in erhöhter Wettkampfbereitschaft, statt auf einen Einzeltermin zu peaken."
@@ -54,4 +83,7 @@ Bei neuen englischen Fachbegriffen: wenn es ein gängiges deutsches Wort gibt, d
 - Stehen Gedankenstriche als Einschub? Meist reicht ein Punkt.
 - Gibt es Sätze, die nur betonen, wie wichtig etwas ist? Streichen.
 - Stehen Tapering, Peak oder Movement Preps drin? Ersetzen.
+- Steht außerhalb einer Hallenskizze ein Kürzel wie Z, ZH, M, AA, AU, L, OZ, UZ oder K2? Ausschreiben.
+- Stehen Leibchen drin? Das Netz trennt, markiert wird mit Hütchen oder Bodenmarkierungen.
+- Bekommen Spieler oder Gruppen Nummern? Durch die Bedingung fürs Einteilen und eine Regel fürs Wechseln ersetzen.
 - Laut gelesen: klingt das nach Trainer oder nach Lehrbuch?

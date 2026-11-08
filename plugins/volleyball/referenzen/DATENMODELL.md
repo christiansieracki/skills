@@ -869,9 +869,10 @@ Jede Zeile ist ein Programmpunkt, auch Pause und Umbau.
   Programmpunkt. Beginnt der Name mit „Pause" oder „Umbau", erscheint er in der
   Leseansicht gedämpft.
 - **ID** verweist auf die Karte. Was die Übung ist, steht dort, nicht hier.
-- **Anpassung heute** ist alles, was an diesem Abend anders war als auf der
-  Karte: Gruppengrößen, welches Netz, veränderte Regeln, Anpassung an eine
-  Altersklasse. Die Karte bleibt dabei unberührt. „—" heißt: nichts anders.
+- **Anpassung heute** sagt in einem Halbsatz, was an diesem Abend anders war
+  als auf der Karte: Gruppengrößen, welches Netz, veränderte Regeln, Anpassung
+  an eine Altersklasse. Ausgeschrieben steht es im Abschnitt des
+  Programmpunkts. Die Karte bleibt dabei unberührt. „—" heißt: nichts anders.
 - **Warum hier** ist ein Satz, warum die Übung an dieser Stelle steht.
 
 Ältere Pläne nennen die zweite Spalte „Teil", noch ältere „Block", und die
@@ -907,6 +908,11 @@ In der Leseansicht steht er dort, wo man den Programmpunkt aufklappt:
   `###`.
 - Eine Überschrift, die mit einer Uhrzeit wie `18:00` beginnt, trägt keine
   Zeitangabe.
+
+Der Abschnitt eines Programmpunkts beschreibt die Übung, wie sie an diesem
+Abend läuft, in **Aufbau**, **Ablauf** und **Worauf achten**, und ist ohne die
+Karte verständlich. Eine Hallenskizze gibt es nicht bei jedem Programmpunkt.
+Wann eine entsteht, steht im Skill Trainingsdesign unter „Schreiben“.
 
 Alles ohne Zeitangabe außer „Zum Nachschlagen" steht in der Leseansicht unter
 **Vorbereitung**, in der Reihenfolge des Plans, auch die Nachbereitung. Was im

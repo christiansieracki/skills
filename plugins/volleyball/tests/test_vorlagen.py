@@ -99,8 +99,9 @@ class VorlageTest(unittest.TestCase):
         if angelegt.returncode != 0:
             raise AssertionError(angelegt.stdout + angelegt.stderr)
         cls.saat = (cls.neu / "trainings" / "gruppe" / "_vorlage.md").read_text(encoding="utf-8")
-        cls.laeufe = {"_vorlage.md": cls.erzeuge("2026-10-01.md", cls.saat),
-                      "VORLAGEN.md": cls.erzeuge("2026-10-02.md", geruest_aus_vorlagen_md())}
+        cls.vorlagen = {"_vorlage.md": cls.saat, "VORLAGEN.md": geruest_aus_vorlagen_md()}
+        cls.laeufe = {name: cls.erzeuge(f"2026-10-0{i}.md", markdown)
+                      for i, (name, markdown) in enumerate(cls.vorlagen.items(), 1)}
 
     @classmethod
     def erzeuge(cls, name: str, markdown: str) -> Lauf:
@@ -146,6 +147,26 @@ class VorlageTest(unittest.TestCase):
                 self.assertEqual([a.ueberschrift for a in ansicht.vorbereitung
                                   if re.match(r"\d+\s*[–-]\s*\d+", a.ueberschrift)], [])
 
+    def test_der_beispielabschnitt_gliedert_in_aufbau_ablauf_worauf_achten(self) -> None:
+        # Der Abschnitt beschreibt die Uebung, wie sie heute laeuft (#82). Im
+        # aufgeklappten Programmpunkt steht das in dieser Folge.
+        for name, lauf in self.laeufe.items():
+            with self.subTest(vorlage=name):
+                punkt = next(p for p in self.ansicht(lauf).programmpunkte if p.zeit == "45–75")
+                text = " ".join(a.text for a in punkt.abschnitte)
+                stellen = [text.find(teil) for teil in ("Aufbau:", "Ablauf:", "Worauf achten:")]
+                self.assertNotIn(-1, stellen, text)
+                self.assertEqual(stellen, sorted(stellen), text)
+
+    def test_schaubilder_gehoeren_nicht_zum_festen_geruest(self) -> None:
+        # Den Abschnitt gibt es nur noch fuer ein Schaubild nur fuer diesen
+        # Abend (#82). In der Leseansicht taucht er dann unter Vorbereitung auf.
+        for name, markdown in self.vorlagen.items():
+            with self.subTest(vorlage=name):
+                self.assertNotIn("## Schaubilder", gliederung(markdown))
+                self.assertNotIn("Schaubilder", [a.ueberschrift for a in
+                                                 self.ansicht(self.laeufe[name]).vorbereitung])
+
     def test_der_kurztitel_steht_nach_dem_gedankenstrich(self) -> None:
         for name, lauf in self.laeufe.items():
             with self.subTest(vorlage=name):
@@ -155,7 +176,7 @@ class VorlageTest(unittest.TestCase):
         # Dieselben Ueberschriften in derselben Folge und dieselben Tabellen.
         # Der Text darunter darf sich unterscheiden: Die Saat-Vorlage erklaert
         # mehr, sie fuellt auch jemand ohne Claude aus.
-        saat, vorlagen_md = gliederung(self.saat), gliederung(geruest_aus_vorlagen_md())
+        saat, vorlagen_md = (gliederung(self.vorlagen[n]) for n in ("_vorlage.md", "VORLAGEN.md"))
 
         self.assertIn(KOPFZEILE, saat)
         self.assertEqual(vorlagen_md, saat)
