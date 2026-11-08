@@ -87,6 +87,11 @@ Beides kann zusammenfallen, muss aber nicht. Zwei Mannschaften, die zusammen
 trainieren, sind zwei Teams und eine Gruppe. Welche Gruppe welche Teams
 abdeckt und welches Team führt, steht in `trainingsplanung-root.yml`.
 
+**Gruppe oder Trainingsgruppe?** Im Text eines Programmpunkts ist eine Gruppe
+ein Teil der Anwesenden, wie in der Halle gesprochen: zwei Gruppen, die Dreier,
+die Sechser, im Spiel die Mannschaften. Die Trainingsgruppe sind alle, die an
+dem Abend zusammen trainieren.
+
 ## Trainingsplan und Leseansicht
 
 | Begriff | Was es ist |
@@ -115,8 +120,11 @@ Zeitangabe. Ohne folgt er seinem `##`.
 
 **Schaubild oder Hallenskizze?** Das Schaubild gehört zur Karte und zeigt die
 Übung. Die Hallenskizze gehört zum Trainingsplan und zeigt, wie die Übung an
-diesem Abend steht. In der Leseansicht heißt das eine „Schaubild der Karte",
-nie „Grundform": Grundform ist, worauf eine Szene gezeichnet wird.
+diesem Abend steht. In der Leseansicht heißt das eine nur „Schaubild“, ohne
+„der Karte“, denn wer sie liest, muss die Bibliothek nicht kennen. Nie
+„Grundform“: Grundform ist, worauf eine Szene gezeichnet wird. Steht neben dem
+Schaubild noch eine Hallenskizze, ist der Aufbau heute anders, und die
+Leseansicht nennt sie „Heute anders aufgebaut“.
 
 ## Szene und Schaubild
 
