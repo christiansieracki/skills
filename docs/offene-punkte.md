@@ -45,7 +45,10 @@ für Übungskarten. Aus der Abnahme kamen #79, ein Punkt für Welle 2 und zwei
 unter „Bewusst nicht gebaut“. Drei Auslöser nannten die Abnahme selbst und
 nennen jetzt einen Sammelimport. Mit #79 ist die Welle zur Wissenskarte am
 31.10.2026 abgeschlossen, ihr Abschnitt unter „Was als Nächstes ansteht“ ist
-weggefallen. Offen sind hier nur noch Punkte für Welle 2.
+weggefallen. Offen sind hier nur noch Punkte für Welle 2. Die Welle zur
+Lesbarkeit (#80) ist am 10.11.2026 mit 3.3.0 abgenommen (#84). Sie hat keinen
+Punkt für eine spätere Welle gebracht, drei unter „Bewusst nicht gebaut“ und
+einen Nachtrag bei den langen Titeln von Übungskarten.
 
 ### DVV Plan 1 als Übungsfolge mit ID
 
@@ -378,6 +381,11 @@ Bei der Abnahme der Wissenskarte (#74) hat der Trainer 9 von 30 Titeln von
 Wissenskarten gekürzt, 7 davon waren zwei Fragen in einer, 2 eine lange
 Frage. Das nimmt #79 auf. Für Übungskarten gilt der Punkt weiter.
 
+Seit der Welle zur Lesbarkeit (#80) steht der Titel ausgeschrieben in der
+Spalte **Übung** des Plans und damit im Ablauf der Leseansicht, etwa
+„Blocker löst sich in die Abwehr und greift nach Vorgabe an“. Bei der Abnahme
+(#84) hat das nicht gestört.
+
 Ziel: bewusst nicht. Auslöser: Der Trainer kürzt Titel von Übungskarten bei
 der Freigabe regelmäßig, oder ein Pfad wird für Windows oder Nextcloud zu
 lang.
@@ -601,6 +609,37 @@ der nächste Plan sie.
 
 Ziel: bewusst nicht. Auslöser: Eine Datei soll Karte werden, die sich nicht
 als PDF speichern lässt.
+
+### Die Quelle unter einem Schaubild erzählt vom Import
+
+Aus der Abnahme (#84). Unter dem Schaubild steht in der Leseansicht die
+`quelle:` der Karte. Bei den Karten aus PlayDrill endet sie mit einem Satz wie
+„Der Ablauf ist aus Text und Quellgrafik gelesen und mit Christian
+abgestimmt.“ In der Halle braucht das niemand. Abhilfe wäre, dass die
+Leseansicht nur den ersten Satz zeigt, oder ein eigenes Feld für die Notiz vom
+Import. Der Trainer hat die Fassung so freigegeben.
+
+Ziel: bewusst nicht. Auslöser: Der Trainer stört sich in der Halle daran.
+
+### Die Regel zur Hallenskizze an vier Stellen
+
+Aus dem Code-Review der Welle zur Lesbarkeit. Wann ein Plan eine Hallenskizze
+bekommt und dass sie neben einem Schaubild „Heute anders aufgebaut“ heißt,
+sagen `TRAININGSDESIGN.md`, der Skill `volleyball-trainingsdesign`,
+`DATENMODELL.md` und das Glossar, jeweils in eigenen Worten. #84 wollte die
+Regel dort, wo ein Plan entsteht.
+
+Ziel: bewusst nicht. Auslöser: Die Regel ändert sich wieder.
+
+### Die ID im Bildpfad bei `--bilder verweis`
+
+Aus dem Code-Review der Welle zur Lesbarkeit. In der Leseansicht steht nirgends
+eine ID. Mit `--bilder verweis` zeigt ein Schaubild aber auf seine Datei, und
+deren Name beginnt mit der ID der Karte, etwa `ue-000141-….png`. Sehen kann
+das nur, wer das Bild einzeln öffnet.
+
+Ziel: bewusst nicht. Auslöser: Jemand öffnet so ein Bild einzeln und stolpert
+über die ID.
 
 ## Was als Nächstes ansteht
 
